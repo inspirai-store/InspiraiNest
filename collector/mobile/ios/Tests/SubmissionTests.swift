@@ -1,4 +1,5 @@
 import XCTest
+import WebKit
 @testable import PersonalLibrary
 
 final class SubmissionTests: XCTestCase {
@@ -42,11 +43,23 @@ final class SubmissionTests: XCTestCase {
         }
         let origin = try ServerOrigin("HTTPS://Example.com:443/")
         XCTAssertEqual(origin.value, "https://example.com")
+        XCTAssertTrue(ReaderPolicy.allows(URL(string: "https://example.com/library/")!, origin: origin))
         XCTAssertTrue(ReaderPolicy.allows(URL(string: "https://example.com/library/files/a/report.md")!, origin: origin))
-        for target in ["https://example.com.evil.test/library/", "https://example.com:444/library/", "http://example.com/library/", "https://example.com/api/state", "https://user@example.com/library/"] {
+        for target in ["https://example.com.evil.test/library/", "https://example.com:444/library/", "http://example.com/library/", "https://example.com/library", "https://example.com/api/state", "https://user@example.com/library/"] {
             XCTAssertFalse(ReaderPolicy.allows(URL(string: target)!, origin: origin), target)
         }
         XCTAssertNoThrow(try JSONSerialization.jsonObject(with: Data(ReaderPolicy.rules(origin: origin).utf8)))
+    }
+    func testReaderContentRulesCompileInWebKit() throws {
+        let origin = try ServerOrigin("https://example.com")
+        let done = expectation(description: "WebKit content rules compile")
+        WKContentRuleListStore.default().compileContentRuleList(
+            forIdentifier: "CollectorRulesTest", encodedContentRuleList: try ReaderPolicy.rules(origin: origin)
+        ) { list, error in
+            XCTAssertNotNil(list, error?.localizedDescription ?? "No list returned")
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 10)
     }
     func testCookieScopeValidation() throws {
         let origin = try ServerOrigin("https://example.com")

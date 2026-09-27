@@ -26,6 +26,7 @@ final class ShareModel: ObservableObject {
     @Published var saving = false
     @Published var saved = false
     @Published var message: String?
+    @Published var captureNotice: String?
     @Published var captureFailed = false
     @Published var agent = ""
     @Published var deviceID = ""
@@ -38,11 +39,15 @@ final class ShareModel: ObservableObject {
     private var dispatchOrigin: String?
     init(context: NSExtensionContext?) { self.context = context }
     func capture() async {
-        loading = true; captureFailed = false; message = nil
+        loading = true; captureFailed = false; message = nil; captureNotice = nil
         defer { loading = false }
         do {
             guard let items = context?.inputItems as? [NSExtensionItem] else { throw CollectorError.message("无法读取分享内容。尚未保存。") }
-            parts = try await ShareCapture.read(items)
+            let captured = try await ShareCapture.read(items)
+            parts = captured.parts
+            if captured.omittedAttachments > 0 {
+                captureNotice = "已读取下方文字与链接；另有 \(captured.omittedAttachments) 份图片、视频或其他附件未收录。请核对原文后保存。"
+            }
         } catch { captureFailed = true; message = safeMessage(error) }
     }
     func save() async {
@@ -110,6 +115,7 @@ struct ShareView: View {
             Form {
                 if model.loading { ProgressView("正在读取全部分享内容…") }
                 if let message = model.message { Section { Text(message).accessibilityIdentifier("share.status") } }
+                if let notice = model.captureNotice { Section { Text(notice).accessibilityIdentifier("share.captureNotice") } }
                 if model.captureFailed { Button("重新读取完整分享内容") { Task { await model.capture() } } }
                 Section("分享原文 · 不可改写") {
                     ForEach(Array(model.parts.enumerated()), id: \.offset) { _, part in

@@ -21,7 +21,10 @@ enum ReaderPolicy {
     })();
     """
     static func allows(_ url: URL, origin: ServerOrigin) -> Bool {
-        origin.contains(url) && url.path.hasPrefix("/library/")
+        // URL.path drops a trailing slash on iOS/macOS, so it turns the
+        // legitimate /library/ home page into /library. Preserve the URL path.
+        origin.contains(url)
+            && (URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.hasPrefix("/library/") == true)
     }
     static func rules(origin: ServerOrigin) throws -> String {
         let prefix = NSRegularExpression.escapedPattern(for: origin.value)
@@ -78,7 +81,7 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 configuration.websiteDataStore.httpCookieStore.setCookie(cookie) { continuation.resume() }
             }
             guard current == generation, !Task.isCancelled else {
-                configuration.websiteDataStore.httpCookieStore.delete(cookie); return
+                await configuration.websiteDataStore.httpCookieStore.deleteCookie(cookie); return
             }
             let view = WKWebView(frame: .zero, configuration: configuration)
             view.navigationDelegate = self; view.uiDelegate = self

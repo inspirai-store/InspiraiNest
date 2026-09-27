@@ -27,6 +27,7 @@ targets:
     sources:
       - App
       - Shared
+      - ShareExtension/ShareCapture.swift
       - Assets.xcassets
       - path: LICENSE
         buildPhase: resources

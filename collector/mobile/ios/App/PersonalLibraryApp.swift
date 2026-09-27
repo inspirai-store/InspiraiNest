@@ -22,6 +22,7 @@ struct PersonalLibraryApp: App {
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @State private var selectedTab = 0
     var body: some View {
         VStack(spacing: 0) {
             if let notice = model.notice {
@@ -31,11 +32,11 @@ struct RootView: View {
                     Button { model.notice = nil } label: { Image(systemName: "xmark.circle") }.accessibilityLabel("关闭提示")
                 }.padding().background(.thinMaterial)
             }
-            TabView {
-                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("任务", systemImage: "list.bullet.rectangle") }
-                NavigationStack { OutboxView() }.tabItem { Label("发件箱", systemImage: "tray.and.arrow.up") }
-                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }
-                NavigationStack { SettingsView() }.tabItem { Label("设备", systemImage: "iphone") }
+            TabView(selection: $selectedTab) {
+                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("任务", systemImage: "list.bullet.rectangle") }.tag(0)
+                NavigationStack { OutboxView() }.tabItem { Label("发件箱", systemImage: "tray.and.arrow.up") }.tag(1)
+                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(2)
+                NavigationStack { SettingsView() }.tabItem { Label("设备", systemImage: "iphone") }.tag(3)
             }
         }
     }
@@ -46,18 +47,41 @@ struct PairingForm: View {
     @State private var server = ""
     @State private var key = ""
     @State private var name = "我的 iPhone"
+    @State private var scanned: PairingQRCode?
+    @State private var showingScanner = false
+    @State private var showingManual = false
     var body: some View {
         Section("配对管理端") {
-            TextField("https://你的服务器", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-            TextField("设备名称", text: $name)
-            SecureField("管理端配对码或个人密钥", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
-            Text("推荐使用一次性 owner 管理端配对码。个人密钥仅用于交换设备 token；两者均不保存。worker 采集端配对码不能用于此应用。")
+            Text("在网页「授权设备」生成手机管理端二维码，然后用这台 iPhone 扫描。")
                 .font(.footnote).foregroundStyle(.secondary)
-            Button(model.busy ? "正在配对…" : "安全配对") {
-                let pairingKey = key; key = ""
-                Task { await model.pair(server: server, key: pairingKey, name: name) }
-            }.disabled(model.busy || key.isEmpty || server.isEmpty || name.isEmpty)
-        }.onDisappear { key = "" }
+            Button { showingScanner = true } label: { Label("扫码连接资料库", systemImage: "qrcode.viewfinder") }
+                .disabled(model.busy)
+            if let scanned {
+                Text("已识别服务器：\(scanned.server)").font(.footnote).textSelection(.enabled)
+                TextField("设备名称", text: $name)
+                Button(model.busy ? "正在配对…" : "确认服务器并配对") {
+                    self.scanned = nil
+                    Task { await model.pair(server: scanned.server, key: scanned.key, name: name) }
+                }.disabled(model.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("取消本次扫码") { self.scanned = nil }
+            }
+            DisclosureGroup("使用地址与配对码连接", isExpanded: $showingManual) {
+                TextField("https://你的服务器", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                TextField("设备名称", text: $name)
+                SecureField("手机管理端配对码或个人密钥", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button(model.busy ? "正在配对…" : "配对并登录") {
+                    let pairingKey = key; key = ""
+                    Task { await model.pair(server: server, key: pairingKey, name: name) }
+                }.disabled(model.busy || key.isEmpty || server.isEmpty || name.isEmpty)
+            }
+        }
+        .sheet(isPresented: $showingScanner) {
+            PairingScannerView { result in
+                scanned = result
+                showingScanner = false
+            }
+        }
+        .onDisappear { key = ""; scanned = nil }
     }
 }
 
