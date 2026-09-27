@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import UniformTypeIdentifiers
+import LinkPresentation
 
 /// NSItemProvider callbacks may arrive after timeout; resume the continuation once.
 private final class ProviderGate: @unchecked Sendable {
@@ -11,6 +12,11 @@ private final class ProviderGate: @unchecked Sendable {
         lock.lock(); let pending = continuation; continuation = nil; lock.unlock()
         pending?.resume(with: result)
     }
+}
+
+struct ShareCaptureResult {
+    let parts: [SharedPart]
+    let omittedAttachments: Int
 }
 
 enum ShareCapture {
@@ -28,8 +34,9 @@ enum ShareCapture {
     }
 
     @MainActor
-    static func read(_ items: [NSExtensionItem]) async throws -> [SharedPart] {
+    static func read(_ items: [NSExtensionItem]) async throws -> ShareCaptureResult {
         var parts: [SharedPart] = []
+        var omittedAttachments = 0
         for (index, item) in items.enumerated() {
             func add(_ kind: String, _ value: String?, attachment: Int? = nil, representation: String? = nil) {
                 if let value { parts.append(SharedPart(item: index, attachment: attachment, kind: kind, representation: representation, value: value)) }
@@ -39,10 +46,24 @@ enum ShareCapture {
             for (attachment, provider) in (item.attachments ?? []).enumerated() {
                 add("suggestedName", provider.suggestedName, attachment: attachment)
                 var supported = false
+                var hasBinaryRepresentation = false
                 // Inspect all advertised text and URL representations, including
                 // multiple attachments. Do not use URL-or-text else-if extraction.
                 for identifier in provider.registeredTypeIdentifiers {
+                    if identifier == "com.apple.linkpresentation.metadata" {
+                        if let metadata = try await load(provider, type: identifier) as? LPLinkMetadata {
+                            add("title", metadata.title, attachment: attachment, representation: identifier)
+                            if let url = metadata.originalURL ?? metadata.url, !url.isFileURL {
+                                add("url", url.absoluteString, attachment: attachment, representation: identifier)
+                            }
+                            supported = metadata.title != nil || (metadata.originalURL ?? metadata.url) != nil
+                        }
+                        continue
+                    }
                     guard let type = UTType(identifier) else { continue }
+                    if type.conforms(to: .image) || type.conforms(to: .movie) || type.conforms(to: .audiovisualContent) {
+                        hasBinaryRepresentation = true
+                    }
                     if type.conforms(to: .propertyList) {
                         let item = try await load(provider, type: identifier)
                         if let outer = item as? NSDictionary,
@@ -64,12 +85,18 @@ enum ShareCapture {
                         supported = true
                     }
                 }
-                guard supported else { throw CollectorError.message("这次分享含不支持的附件。当前只接收文字、标题和网页链接；尚未保存，请改为分享完整文字或链接。") }
+                if !supported || hasBinaryRepresentation { omittedAttachments += 1 }
             }
         }
         guard parts.contains(where: { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw CollectorError.message("来源应用没有提供文字、标题或链接。尚未保存。")
         }
-        return parts
+        // A share may carry a usable URL and a separate preview image. Keep the
+        // URL and title; report the omitted binary instead of rejecting the share.
+        guard parts.contains(where: { ["text", "url", "safari.text", "safari.url"].contains($0.kind) &&
+            !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) || omittedAttachments == 0 else {
+            throw CollectorError.message("来源应用只提供了当前无法收录的附件，没有可保存的完整文字或链接。尚未保存。")
+        }
+        return ShareCaptureResult(parts: parts, omittedAttachments: omittedAttachments)
     }
 }
