@@ -179,6 +179,20 @@ jobs:
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
         working-directory: collector
+      - name: Test packaged macOS update download
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if [[ "$(uname -m)" == arm64 ]]; then
+            arch=arm64
+            app=desktop/dist/mac-arm64/InspiraiNest.app
+          else
+            arch=x64
+            app=desktop/dist/mac/InspiraiNest.app
+          fi
+          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
+        working-directory: collector
       - uses: actions/upload-artifact@v4
         with:
           name: InspiraiNest-macOS
