@@ -7,6 +7,7 @@ name: Collector builds
         type: boolean
         default: false
   push:
+    branches: [main]
     paths:
       - collector/**
       - assets/library.js
@@ -102,13 +103,24 @@ jobs:
         run: |
           $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
           if ($file.Length -lt 1000000) { throw 'Worker package is unexpectedly small' }
+          $metadata = Get-Content collector/desktop/dist/latest.yml -Raw
+          if ($metadata -notmatch [regex]::Escape($file.Name) -or $metadata -notmatch 'sha512:') { throw 'Windows update metadata is missing the installer or checksum' }
+          $feed = Get-Content collector/desktop/dist/win-unpacked/resources/app-update.yml -Raw
+          if ($feed -notmatch 'provider: github' -or $feed -notmatch 'repo: InspiraiNest') { throw 'Windows update feed is missing' }
           (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -LiteralPath "$($file.FullName).sha256" -Encoding ascii
+      - name: Test packaged Windows update download
+        shell: pwsh
+        run: |
+          $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
+          node collector/scripts/test-packaged-update.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe $file.FullName
       - uses: actions/upload-artifact@v4
         with:
           name: InspiraiNest-Windows-x64
           path: |
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
+            collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.blockmap
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.sha256
+            collector/desktop/dist/latest.yml
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -161,9 +173,27 @@ jobs:
           done
           test "$(find desktop/dist -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.zip' | wc -l | tr -d ' ')" = 2
           test "$(find desktop/dist -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.dmg' | wc -l | tr -d ' ')" = 2
+          test -s desktop/dist/latest-mac.yml
+          grep -F "InspiraiNest-v${version}-macOS-arm64.zip" desktop/dist/latest-mac.yml
+          grep -F "InspiraiNest-v${version}-macOS-x64.zip" desktop/dist/latest-mac.yml
+          grep -F 'provider: github' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
           (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
+        working-directory: collector
+      - name: Test packaged macOS update download
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if [[ "$(uname -m)" == arm64 ]]; then
+            arch=arm64
+            app=desktop/dist/mac-arm64/InspiraiNest.app
+          else
+            arch=x64
+            app=desktop/dist/mac/InspiraiNest.app
+          fi
+          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
         working-directory: collector
       - uses: actions/upload-artifact@v4
         with:
@@ -171,11 +201,48 @@ jobs:
           path: |
             collector/desktop/dist/InspiraiNest-v*-macOS-*.zip
             collector/desktop/dist/InspiraiNest-v*-macOS-*.dmg
+            collector/desktop/dist/InspiraiNest-v*-macOS-*.blockmap
             collector/desktop/dist/SHASUMS256.txt
+            collector/desktop/dist/latest-mac.yml
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      CSC_FOR_PULL_REQUEST: 'true'
     timeout-minutes: 60
+  worker-macos-intel:
+    needs: worker-macos
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: collector/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: collector
+      - uses: actions/download-artifact@v4
+        with:
+          name: InspiraiNest-macOS
+          path: collector/desktop/dist
+      - name: Test x64 client from the shared macOS update artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          zip="desktop/dist/InspiraiNest-v${version}-macOS-x64.zip"
+          test -s "$zip"
+          test -s desktop/dist/latest-mac.yml
+          mkdir -p desktop/dist/intel-unpacked
+          ditto -x -k "$zip" desktop/dist/intel-unpacked
+          app=desktop/dist/intel-unpacked/InspiraiNest.app
+          codesign --verify --deep --strict "$app"
+          test "$(lipo -archs "$app/Contents/MacOS/InspiraiNest")" = x86_64
+          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "$zip"
+        working-directory: collector
+    timeout-minutes: 20
   web-image:
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.macos_only }}
     runs-on: ubuntu-latest

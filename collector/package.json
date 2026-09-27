@@ -1,6 +1,6 @@
 {
   "name": "inspirainest-collector",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -15,13 +15,14 @@
     "test": "node --test test/*.test.mjs",
     "doctor": "node src/worker.mjs doctor",
     "build:worker-template": "node scripts/stage-worker-template.mjs",
-    "build:worker:win": "npm run build:brand-icons && npm run build:worker-template && electron-builder --win portable --x64 --publish never",
+    "build:worker:win": "npm run build:brand-icons && npm run build:worker-template && electron-builder --win nsis --x64 --publish never",
     "build:worker:mac": "npm run build:brand-icons && npm run build:worker-template && electron-builder --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
     "build:worker:mac:release": "npm run build:brand-icons && npm run build:worker-template && electron-builder --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never"
   },
   "dependencies": {
     "ali-oss": "^6.23.0",
     "cross-spawn": "^7.0.6",
+    "electron-updater": "^6.8.10",
     "mysql2": "^3.24.4",
     "qrcode": "1.5.4"
   },
