@@ -11,3 +11,5 @@ The data format is documented in [AGENTS.md](AGENTS.md) and [templates](template
 General source code and third-party components have separate rights; retain [third-party notices](docs/THIRD_PARTY.md). Public CI tests synthetic fixtures and builds unsigned/ad-hoc test artifacts. It does not publish a release or connect to a production service.
 
 The desktop Worker supports in-app Windows/macOS update checks against public GitHub Releases. Release packaging, signing and verification are described in [desktop update instructions](collector/DESKTOP_UPDATES.md).
+
+The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).

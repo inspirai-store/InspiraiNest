@@ -2,7 +2,7 @@
 
 品牌名称为 **InspiraiNest**，版权主体为 **Wuhan Inspirai Technology Co., Ltd.**。
 
-沿用用户当前应用的书本、星光与嫩芽图标。网页、桌面、Android、iOS 文件已经与原工作区的当前应用逐字节核对一致，未重新生成、替换或改色。
+沿用用户当前应用的书本、星光与嫩芽图标。网页、桌面、Android 文件与原工作区的当前应用逐字节一致；iOS 图标为同一画面的无 alpha PNG，以符合 App Store 图标要求。
 
 | 用途 | 文件 |
 | --- | --- |
