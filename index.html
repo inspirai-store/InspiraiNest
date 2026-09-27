@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>InspiraiNest</title>
+  <link rel="icon" type="image/png" href="assets/brand-icon.png">
+  <link rel="stylesheet" href="assets/library.css">
+  <link rel="stylesheet" href="assets/client-prompt.css">
+  <link rel="stylesheet" href="assets/brand.css">
+  <script defer src="assets/vendor/lucide.js"></script>
+  <script defer src="assets/vendor/marked.js"></script>
+  <script defer src="assets/vendor/purify.js"></script>
+  <script defer src="assets/library-data.js"></script>
+  <script defer src="assets/library-time.js"></script>
+  <script defer src="assets/library.js"></script>
+  <script defer src="assets/client-prompt.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到资料列表</a>
+  <button id="nav-shade" class="nav-shade" aria-label="关闭分类导航" hidden></button>
+  <aside id="sidebar" class="sidebar" aria-label="资料分类">
+    <a class="brand" href="index.html"><span class="brand-icon"><img src="assets/brand-icon.png" alt=""></span><span>InspiraiNest<small>PERSONAL LIBRARY</small></span></a>
+    <div class="nav-label">资料空间</div>
+    <nav id="type-nav" aria-label="按类型浏览"></nav>
+    <div class="nav-divider"></div>
+    <button id="favorites-filter" class="nav-item"><i data-lucide="bookmark"></i><span>我的收藏</span><span id="favorites-count" class="count">0</span></button>
+    <div class="nav-label topic-label">常用主题</div>
+    <nav id="topic-nav" aria-label="按主题浏览"></nav>
+    <div class="sidebar-footer"><span class="local-dot"></span>本地资料<span id="total-count"></span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <button id="menu-button" class="icon-button menu-button" title="分类导航" aria-label="分类导航" aria-expanded="false" aria-controls="sidebar"><i data-lucide="panel-left"></i></button>
+      <div class="breadcrumb">个人空间<span>/</span><strong>资料库</strong></div>
+      <form id="search-form" role="search" class="search-box">
+        <label for="search" class="sr-only">搜索资料全文</label><i data-lucide="search"></i>
+        <input id="search" type="search" placeholder="搜索标题、标签或正文…" autocomplete="off">
+        <button id="clear-search" type="button" class="icon-button" aria-label="清空搜索" title="清空搜索" hidden><i data-lucide="x"></i></button>
+      </form>
+    </header>
+    <main id="main" tabindex="-1">
+      <div class="page-heading"><div><div class="eyebrow">LIBRARY</div><h1 id="view-title">全部资料</h1></div><span id="result-count" role="status" aria-live="polite"></span></div>
+      <div class="toolbar">
+        <div id="status-filter" class="segments" role="group" aria-label="归档完整度">
+          <button data-status="all" aria-pressed="true">全部<span id="count-all"></span></button>
+          <button data-status="archived" aria-pressed="false">已归档<span id="count-archived"></span></button>
+          <button data-status="partial" aria-pressed="false">待补齐<span id="count-partial"></span></button>
+          <button data-status="pending" aria-pressed="false" id="pending-filter" hidden>待处理<span id="count-pending"></span></button>
+        </div>
+        <div class="selects">
+          <label><span class="sr-only">主题</span><select id="tag-filter"><option value="">全部主题</option></select></label>
+          <label><span class="sr-only">排序</span><select id="sort"><option value="newest">最近收集</option><option value="oldest">最早收集</option><option value="title">标题排序</option></select></label>
+        </div>
+      </div>
+      <div id="active-filters" class="active-filters" hidden></div>
+      <div class="list-caption"><span>资料</span><span title="北京时间（UTC+08:00）">采集时间</span></div>
+      <div id="results" class="results"></div>
+      <div id="empty" class="empty-state" hidden><i data-lucide="search-x"></i><h2>没有找到相关资料</h2><p>试试其他关键词，或清除筛选。</p><button id="reset-filters" class="button">清除筛选</button></div>
+      <footer class="list-footer"><span id="footer-count"></span><span id="latest-date"></span></footer>
+      <noscript>请启用浏览器 JavaScript，或查看 <a href="INDEX.md">Markdown 资料索引</a>。</noscript>
+    </main>
+  </div>
+  <dialog id="reader" aria-labelledby="reader-title">
+    <div class="reader-top"><span id="reader-kind"></span><div class="reader-actions"><button id="reader-bookmark" class="icon-button" aria-label="收藏资料" title="收藏资料"><i data-lucide="bookmark"></i></button><button id="copy-address" class="icon-button" aria-label="复制地址" title="复制地址"><i data-lucide="copy"></i></button><a id="source-link" class="icon-button" target="_blank" rel="noopener noreferrer" aria-label="打开原始来源" title="打开原始来源"><i data-lucide="external-link"></i></a><button id="close-reader" class="icon-button" aria-label="关闭阅读" title="关闭阅读"><i data-lucide="x"></i></button></div></div>
+    <div class="reader-scroll" id="reader-scroll">
+      <div class="reader-heading"><h2 id="reader-title"></h2><div id="reader-meta" class="reader-meta"></div><p id="reader-summary"></p><div id="reader-tags" class="reader-tags"></div></div>
+      <div id="reader-tabs" class="reader-tabs" role="tablist" aria-label="资料内容"></div>
+      <div id="reader-content" role="tabpanel" tabindex="0"></div>
+      <section class="archive-details"><h3>归档信息</h3><p id="coverage"></p><div id="related"></div><a id="directory-link" target="_blank">打开本地目录<i data-lucide="folder-open"></i></a></section>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

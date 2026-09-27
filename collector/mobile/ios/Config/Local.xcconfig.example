@@ -1,0 +1,6 @@
+// Copy to Local.xcconfig and replace with identifiers registered to YOUR team.
+// App and extension must have the SAME App Group and Keychain access group.
+DEVELOPMENT_TEAM = YOURTEAMID
+COLLECTOR_BUNDLE_ID = com.example.personallibrary
+COLLECTOR_APP_GROUP = group.com.example.personallibrary
+COLLECTOR_KEYCHAIN_SUFFIX = com.example.personallibrary.shared

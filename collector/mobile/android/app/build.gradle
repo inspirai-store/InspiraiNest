@@ -1,0 +1,48 @@
+plugins { id 'com.android.application' }
+// Optional build-time default. Runtime pairing can select any validated origin.
+def collectorServer = providers.gradleProperty('collectorServer').orElse('https://library.example.com').get()
+def collectorUri = new URI(collectorServer)
+if (collectorUri.scheme != 'https' || !collectorUri.host || collectorUri.rawUserInfo || collectorUri.rawQuery || collectorUri.rawFragment || !(collectorUri.path in ['', '/'])) {
+    throw new GradleException('collectorServer must be an HTTPS origin')
+}
+android {
+    namespace 'store.inspirai.library'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'store.inspirai.library'
+        minSdk 26
+        targetSdk 36
+        versionCode 9
+        buildConfigField 'String', 'DEFAULT_SERVER', '"' + collectorServer + '"'
+        versionName '1.3.2'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildFeatures { buildConfig true }
+    testOptions {
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED', '--add-opens=java.base/java.util=ALL-UNNAMED', '--add-opens=java.base/java.io=ALL-UNNAMED', '--add-opens=java.base/java.net=ALL-UNNAMED', '--add-opens=java.base/java.security=ALL-UNNAMED', '--add-opens=java.base/java.text=ALL-UNNAMED', '--add-opens=java.base/jdk.internal.access=ALL-UNNAMED'
+            systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        release {
+            if (System.getenv('LIBRARY_SIGNING_STORE')) {
+                storeFile file(System.getenv('LIBRARY_SIGNING_STORE'))
+                storePassword System.getenv('LIBRARY_SIGNING_PASSWORD')
+                keyAlias 'personal-library'
+                keyPassword System.getenv('LIBRARY_SIGNING_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+}
+dependencies {
+    implementation 'androidx.core:core:1.15.0'
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    androidTestImplementation 'androidx.test:runner:1.7.0'
+    androidTestImplementation 'junit:junit:4.13.2'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.17'
+}

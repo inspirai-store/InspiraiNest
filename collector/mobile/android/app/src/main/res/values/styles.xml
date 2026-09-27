@@ -1,0 +1,9 @@
+<resources><style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:fontFamily">sans</item><item name="android:colorAccent">#245F52</item><item name="zxing_viewfinder_laser">#245F52</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:windowBackground">#F7F5F0</item><item name="android:statusBarColor">#F7F5F0</item><item name="android:navigationBarColor">#F7F5F0</item>
+</style><style name="AppTheme.Dark" parent="android:style/Theme.Material.NoActionBar">
+    <item name="android:fontFamily">sans</item><item name="android:colorAccent">#8DBBA9</item><item name="zxing_viewfinder_laser">#8DBBA9</item>
+    <item name="android:windowLightStatusBar">false</item><item name="android:windowBackground">#171C1A</item>
+    <item name="android:statusBarColor">#171C1A</item><item name="android:navigationBarColor">#171C1A</item>
+</style></resources>

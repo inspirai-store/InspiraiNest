@@ -1,0 +1,105 @@
+name: InspiraiNest CLI
+'on':
+  workflow_dispatch: null
+  push:
+    paths:
+      - collector/cli/**
+      - skills/lingnest-library/**
+      - .github/workflows/lingnest-cli.yml
+  pull_request:
+    paths:
+      - collector/cli/**
+      - skills/lingnest-library/**
+      - .github/workflows/lingnest-cli.yml
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: collector/cli
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: collector/cli/go.mod
+          cache-dependency-path: collector/cli/go.sum
+      - name: Native build and unit tests
+        run: |
+          go run ./tools/package -native -version ci
+          go test -count=1 ./...
+          go vet ./...
+      - name: Real Windows Credential Manager and executable fixture
+        if: runner.os == 'Windows'
+        env:
+          LINGNEST_KEYRING_INTEGRATION: '1'
+        run: go test -count=1 -v -run 'TestOSKeyring|TestCLIIntegration' .
+      - name: Real macOS Keychain and executable fixture
+        if: runner.os == 'macOS'
+        env:
+          LINGNEST_KEYRING_INTEGRATION: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/lingnest-cli-tests.keychain-db"
+          security create-keychain -p fixture-keychain-password "$keychain"
+          trap 'security delete-keychain "$keychain"' EXIT
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p fixture-keychain-password "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -d user -s "$keychain"
+          go test -count=1 -v -run 'TestOSKeyring|TestCLIIntegration' .
+      - name: Install Linux Secret Service
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y dbus-x11 gnome-keyring libsecret-tools
+      - name: Real Linux Secret Service and executable fixture
+        if: runner.os == 'Linux'
+        env:
+          LINGNEST_KEYRING_INTEGRATION: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/lingnest-keyring-data"
+          mkdir -p "$XDG_DATA_HOME"
+          dbus-run-session -- bash -euc '
+            printf "%s" "fixture-keyring-password" | gnome-keyring-daemon --unlock --components=secrets
+            go test -count=1 -v -run "TestOSKeyring|TestCLIIntegration" .
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lingnest-native-${{ runner.os }}-${{ runner.arch }}
+          path: collector/cli/dist/lingnest*
+  package:
+    needs: native
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: collector/cli
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: collector/cli/go.mod
+          cache-dependency-path: collector/cli/go.sum
+      - run: go run ./tools/package -version ci
+      - run: cd dist && sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lingnest-cli-distribution
+          path: |
+            collector/cli/dist/*.zip
+            collector/cli/dist/*.tar.gz
+            collector/cli/dist/SHA256SUMS
+            collector/cli/dist/manifest.json

@@ -1,0 +1,37 @@
+{
+  "name": "inspirainest-collector",
+  "version": "0.1.5",
+  "private": true,
+  "type": "module",
+  "main": "desktop/main.mjs",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "worker": "node src/worker.mjs",
+    "desktop": "node scripts/launch-desktop.mjs",
+    "build:brand-icons": "node scripts/build-brand-icons.mjs",
+    "test": "node --test test/*.test.mjs",
+    "doctor": "node src/worker.mjs doctor",
+    "build:worker-template": "node scripts/stage-worker-template.mjs",
+    "build:worker:win": "npm run build:brand-icons && npm run build:worker-template && electron-builder --win portable --x64 --publish never",
+    "build:worker:mac": "npm run build:brand-icons && npm run build:worker-template && electron-builder --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
+    "build:worker:mac:release": "npm run build:brand-icons && npm run build:worker-template && electron-builder --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never"
+  },
+  "dependencies": {
+    "ali-oss": "^6.23.0",
+    "cross-spawn": "^7.0.6",
+    "mysql2": "^3.24.4",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "js-yaml": "4.3.2",
+    "playwright": "1.55.1",
+    "sharp": "^0.35.4"
+  },
+  "license": "MIT",
+  "author": "Wuhan Inspirai Technology Co., Ltd."
+}

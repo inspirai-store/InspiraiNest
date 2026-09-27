@@ -1,0 +1,17 @@
+android/.gradle/
+android/**/build/
+android/local.properties
+android/*.log
+android/*.jks
+android/*.keystore
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+ios/build/
+ios/DerivedData/
+ios/*.xcodeproj/
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+test-output/
+dist/

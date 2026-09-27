@@ -1,0 +1,40 @@
+{
+  "server": "http://127.0.0.1:4317",
+  "dataDir": "./worker-data-prod",
+  "capabilities": [
+    "article",
+    "webpage",
+    "video"
+  ],
+  "defaultAgent": "codex",
+  "fallbackAgents": [],
+  "byType": {},
+  "agents": {
+    "codex": {
+      "command": "codex",
+      "args": [
+        "exec",
+        "--skip-git-repo-check",
+        "--json",
+        "--sandbox",
+        "workspace-write",
+        "-c",
+        "approval_policy=\"never\"",
+        "-"
+      ]
+    },
+    "codebuddy": {
+      "command": "codebuddy",
+      "args": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose"
+      ],
+      "enabled": false
+    }
+  },
+  "instructions": "",
+  "watchLibrary": null,
+  "taskTimeoutMs": 3600000
+}

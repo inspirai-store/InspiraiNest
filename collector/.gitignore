@@ -1,0 +1,15 @@
+node_modules/
+.runtime/
+data/
+worker-data/
+worker.local.json
+.env
+test-output/
+/desktop/template/
+/desktop/dist/
+/desktop/dist-*/
+/worker-data-*/
+*.p12
+*.pfx
+*.jks
+*.keystore

@@ -1,0 +1,36 @@
+name: InspiraiNest reader service
+'on':
+  workflow_dispatch: null
+  pull_request:
+    paths:
+      - collector/src/**
+      - collector/test/**
+      - collector/public/**
+      - collector/scripts/*reader*
+      - .github/workflows/lingnest-reader.yml
+permissions:
+  contents: read
+jobs:
+  service-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+        working-directory: collector
+      - run: npm test
+        working-directory: collector
+      - name: Verify synthetic indexing at production resource limits
+        run: |
+          mkdir -p collector/test-output
+          set -o pipefail
+          docker run --rm --cpus=1 --memory=768m --network none -v "$PWD:/workspace:ro" -w /workspace/collector node:24-bookworm-slim node scripts/probe-reader-budget.mjs | tee collector/test-output/reader-budget.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InspiraiNest-reader-resource-verification
+          path: collector/test-output/reader-budget.json
+          if-no-files-found: error

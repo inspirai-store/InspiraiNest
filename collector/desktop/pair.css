@@ -1,0 +1,6 @@
+.pair-worker{flex:none}
+.pair-fields{display:grid;grid-template-columns:minmax(130px,1.5fr) minmax(100px,1fr) minmax(130px,1fr) auto;gap:8px;align-items:end;padding:12px}
+.pair-fields label{display:grid;gap:4px;min-width:0;font-size:11px;color:var(--muted)}
+.pair-fields input{width:100%;height:28px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-size:12px}
+.pair-fields button{min-width:0}
+@media(max-width:900px){.pair-fields{grid-template-columns:1fr 1fr}.pair-fields label:first-child{grid-column:1/-1}.pair-fields button{width:100%}}

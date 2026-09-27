@@ -1,0 +1,122 @@
+{
+  "sizes": [
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192
+  ],
+  "runtimeSize": 128,
+  "assets": [
+    {
+      "name": "library",
+      "source": "library-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1213,
+        "32": 1812,
+        "48": 3350,
+        "64": 5280,
+        "96": 9904,
+        "128": 15981,
+        "192": 30285
+      }
+    },
+    {
+      "name": "collect",
+      "source": "collect-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1241,
+        "32": 1933,
+        "48": 3589,
+        "64": 5687,
+        "96": 10988,
+        "128": 18231,
+        "192": 34877
+      }
+    },
+    {
+      "name": "person",
+      "source": "person-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1225,
+        "32": 1886,
+        "48": 3428,
+        "64": 5433,
+        "96": 10200,
+        "128": 16557,
+        "192": 32210
+      }
+    },
+    {
+      "name": "bookmark",
+      "source": "bookmark-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1289,
+        "32": 1970,
+        "48": 3707,
+        "64": 5555,
+        "96": 10812,
+        "128": 17850,
+        "192": 35328
+      }
+    },
+    {
+      "name": "scan",
+      "source": "scan-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1606,
+        "32": 2551,
+        "48": 4654,
+        "64": 7185,
+        "96": 13262,
+        "128": 21560,
+        "192": 42330
+      }
+    },
+    {
+      "name": "update",
+      "source": "update-source.png",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "hasAlpha": true,
+      "variants": {
+        "24": 1356,
+        "32": 2149,
+        "48": 4230,
+        "64": 6710,
+        "96": 12671,
+        "128": 20158,
+        "192": 38176
+      }
+    }
+  ]
+}

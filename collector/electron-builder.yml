@@ -1,0 +1,38 @@
+appId: store.inspirai.library.worker
+productName: InspiraiNest
+asar: false
+directories:
+  output: desktop/dist
+files:
+  - package.json
+  - LICENSE
+  - desktop/main.mjs
+  - desktop/manager.mjs
+  - desktop/preload.cjs
+  - desktop/renderer.js
+  - desktop/index.html
+  - desktop/style.css
+  - desktop/pair.css
+  - desktop/brand.css
+  - desktop/icon.png
+  - desktop/tray.png
+  - src/**
+  - worker.production.example.json
+  - node_modules/**
+extraResources:
+  - from: desktop/template
+    to: library
+win:
+  icon: desktop/icon.ico
+  target: portable
+  artifactName: InspiraiNest-v${version}-Windows-${arch}.${ext}
+mac:
+  icon: desktop/icon.png
+  target:
+    - zip
+    - dmg
+  artifactName: InspiraiNest-v${version}-macOS-${arch}.${ext}
+  hardenedRuntime: true
+  entitlements: desktop/entitlements.mac.plist
+  entitlementsInherit: desktop/entitlements.mac.plist
+  notarize: true

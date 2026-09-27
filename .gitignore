@@ -1,0 +1,31 @@
+# Personal archive data and generated indexes stay outside source control.
+/articles/
+/audio/
+/documents/
+/images/
+/inbox/
+/maintenance/
+/notes/
+/other/
+/repositories/
+/videos/
+/webpages/
+/bin/
+/catalog.json
+/INDEX.md
+/VIDEO_INDEX.md
+/assets/library-data.js
+
+# Dependencies, local credentials, and runtime output.
+node_modules/
+.runtime/
+.env
+.env.*
+!.env.example
+worker.local.json
+worker-data/
+test-output/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

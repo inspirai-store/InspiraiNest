@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>授权只读连接 · InspiraiNest</title>
+  <link rel="icon" href="/brand-icon.png"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/brand.css">
+  <link rel="stylesheet" href="/authorize.css">
+  <script defer src="/vendor/lucide.js"></script>
+  <script defer src="/authorize.js"></script>
+</head>
+<body class="authorize-page">
+  <header class="authorize-header">
+    <a class="brand" href="/" aria-label="InspiraiNest首页"><img src="/brand-icon.png" alt=""><span>InspiraiNest</span></a>
+    <a class="back-link" href="/">返回资料库 <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+  </header>
+  <main class="authorize-main">
+  <article class="authorize-card" aria-labelledby="page-title">
+    <div class="card-intro">
+      <div class="connection-mark" aria-hidden="true"><span><i data-lucide="terminal"></i></span><i data-lucide="arrow-right"></i><img src="/brand-icon.png" alt=""></div>
+      <p class="eyebrow">LINGNEST CLI · 连接授权</p>
+      <h1 id="page-title" tabindex="-1">授权 CLI 读取资料库</h1>
+      <p id="page-description">确认连接信息，为你的工具开启资料库只读访问。</p>
+    </div>
+    <form id="auth-login" hidden>
+      <label for="owner-key">管理密钥或管理端配对码</label>
+      <input id="owner-key" name="key" type="password" autocomplete="current-password" aria-describedby="login-note" required>
+      <p id="login-note" class="field-note">使用资料库现有的管理登录凭据。登录后仍需核对并确认授权。</p>
+      <button type="submit" class="primary wide">登录并继续</button>
+    </form>
+    <form id="code-form" hidden>
+      <label for="user-code">终端显示的确认码</label>
+      <input id="user-code" name="code" required maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-1234" aria-describedby="code-note">
+      <p id="code-note" class="field-note">输入运行 lingnest auth login 后显示的确认码。</p>
+      <button type="submit" class="primary wide">查看授权请求</button>
+    </form>
+    <section id="loading-panel" class="loading-panel" hidden aria-label="正在加载授权请求">
+      <span class="spinner" aria-hidden="true"></span><p role="status">正在获取连接信息…</p>
+      <button id="loading-change" class="text-button" type="button">更换确认码</button>
+    </section>
+    <section id="consent" hidden>
+      <div class="client-row"><span class="client-icon" aria-hidden="true"><i data-lucide="monitor"></i></span><div><p class="field-note">申请连接的客户端</p><h2 id="client-name"></h2></div><span class="read-badge">只读连接</span></div>
+      <div class="confirmation-panel">
+        <div class="confirmation-heading"><span>请与终端中的确认码核对</span><button id="change-code" class="text-button" type="button">更换确认码</button></div>
+        <strong id="confirmation-code"></strong>
+        <p id="request-expiry"></p>
+      </div>
+      <div class="permission-section">
+        <h3>此连接将获得以下权限</h3>
+        <ul class="permission-list">
+          <li><i data-lucide="search" aria-hidden="true"></i><span>检索全部远端资料</span><i data-lucide="check" aria-hidden="true"></i></li>
+          <li><i data-lucide="book-open" aria-hidden="true"></i><span>阅读摘要、正文和转录</span><i data-lucide="check" aria-hidden="true"></i></li>
+          <li><i data-lucide="download" aria-hidden="true"></i><span>下载已上传附件</span><i data-lucide="check" aria-hidden="true"></i></li>
+        </ul>
+        <p class="restriction"><i data-lucide="shield-check" aria-hidden="true"></i><span>无法采集、上传、修改或删除资料。</span></p>
+      </div>
+      <div class="duration-row"><span>连接授权有效期</span><strong>30 天</strong></div>
+      <p class="field-note">可随时在资料库的“授权设备”中撤销此连接。</p>
+      <div class="consent-actions"><button id="deny" type="button">拒绝</button><button id="allow" type="button" class="primary">允许只读访问</button></div>
+      <p class="consent-note">仅在你主动发起连接且确认码一致时允许授权。</p>
+    </section>
+    <section id="result-panel" class="result-panel" hidden>
+      <div class="result-symbol" aria-hidden="true"><i id="result-icon" data-lucide="check"></i></div>
+      <h2 id="result-title" tabindex="-1"></h2>
+      <p id="result-description"></p>
+      <button id="retry" class="primary wide" type="button" hidden>重新获取请求</button>
+      <button id="result-change" class="text-button" type="button" hidden>输入其他确认码</button>
+      <a class="result-home" href="/">返回资料库 <i data-lucide="arrow-right" aria-hidden="true"></i></a>
+    </section>
+    <p id="auth-message" class="auth-message" role="status" aria-live="polite" hidden></p>
+    <noscript><p>请启用 JavaScript 后继续授权。</p></noscript>
+  </article>
+  <p class="page-footer"><i data-lucide="lock-keyhole" aria-hidden="true"></i>你的资料，由你决定如何连接</p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1468 @@
+{
+  "status": "mit-source-candidate",
+  "license": "MIT",
+  "brand": "InspiraiNest",
+  "copyright": "Copyright (c) 2026 Wuhan Inspirai Technology Co., Ltd.",
+  "generatedAt": "2026-09-27T05:30:22.851Z",
+  "pending": [
+    "binary-distribution-notices",
+    "hosting-release-configuration"
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/collector-build.yml",
+      "size": 7513,
+      "sha256": "da91955f333c03b1289305d42f1310dcfca029db6df4bed7c4b2798476eb6185"
+    },
+    {
+      "path": ".github/workflows/lingnest-cli.yml",
+      "size": 3613,
+      "sha256": "60df35ee22a54c6de00c551c3217972c7582a889a9811c6401372fd55389c763"
+    },
+    {
+      "path": ".github/workflows/lingnest-reader.yml",
+      "size": 1217,
+      "sha256": "010d7d08f28521447d5b8567dfbba2b32575cfd89fb982db52ab8fa3ae11a756"
+    },
+    {
+      "path": ".gitignore",
+      "size": 447,
+      "sha256": "9fbf0b4281e891b9e01c7bc7f28f9a23a8d6ec31eddb6173a2380d8669b1e742"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 6100,
+      "sha256": "5e056a636e740c62bb5b4564fbb6d65d427ca210d515803713a62d7e8f178cd4"
+    },
+    {
+      "path": "SECURITY.md",
+      "size": 3647,
+      "sha256": "a5577770c5a851995c416308adb9693ee71500ac7da516c3611a40d8341372df"
+    },
+    {
+      "path": "assets/brand-icon.png",
+      "size": 22982,
+      "sha256": "9924a32d278ba54e48dd069bee1d357d8a602f5b0914f6e7e0ddce6de5629916"
+    },
+    {
+      "path": "assets/brand.css",
+      "size": 95,
+      "sha256": "ca2e598b76e09f36e4084905d67bffcb4f687ee312d71f39619ef3844a05ed9d"
+    },
+    {
+      "path": "assets/client-prompt.css",
+      "size": 2653,
+      "sha256": "e6b2c78503c2273319c52421b090f43c47d910c48062955bca4ee0eab9981904"
+    },
+    {
+      "path": "assets/client-prompt.js",
+      "size": 2493,
+      "sha256": "3d9ff06aa44f9d56c2a578aaa72feace3d3e039221054f43b12e498244ad598c"
+    },
+    {
+      "path": "assets/library-time.js",
+      "size": 2470,
+      "sha256": "a71193d018e6f1b338ca3a36294534cb57d04a7b69391c7b12bc326bb41c38fa"
+    },
+    {
+      "path": "assets/library.css",
+      "size": 15443,
+      "sha256": "c60a3bf87d9a668939df468e1855d4008dde1fb4ec580f478610bddb822dd21c"
+    },
+    {
+      "path": "assets/library.js",
+      "size": 23075,
+      "sha256": "1cd8f641850f3d3528fcd54e238b0ffd12f8f9264a2e551ab7c85a3abae81b4b"
+    },
+    {
+      "path": "assets/vendor/README.md",
+      "size": 463,
+      "sha256": "181fc731a68a34569f48016771887c9c5ef7d33bf56f1379fcad5b4d443acd50"
+    },
+    {
+      "path": "assets/vendor/dompurify.LICENSE",
+      "size": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "assets/vendor/lucide.LICENSE",
+      "size": 3208,
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+    },
+    {
+      "path": "assets/vendor/lucide.js",
+      "size": 439465,
+      "sha256": "621aebb75317335da861ecaaf91faca006e60cdf6230d094804e12dfa8260301"
+    },
+    {
+      "path": "assets/vendor/marked.LICENSE",
+      "size": 2942,
+      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+    },
+    {
+      "path": "assets/vendor/marked.js",
+      "size": 45843,
+      "sha256": "b147274a9ce27d17276587167e49483d719f6893eeca3a3667a59797661d3556"
+    },
+    {
+      "path": "assets/vendor/purify.js",
+      "size": 29369,
+      "sha256": "f263b05369e050fa175d4ecb9c9358eb4253602d510297adfb31df48b2f1c4d5"
+    },
+    {
+      "path": "collector/.env.example",
+      "size": 591,
+      "sha256": "7571b8d24d4b8d2eca0815f1b534e3549adb8f2c3af344231b4738a2133583bc"
+    },
+    {
+      "path": "collector/.gitignore",
+      "size": 175,
+      "sha256": "d38db7995afd2afd0133876fd8d012ce82c40ff5a2c322dbf321dad845866190"
+    },
+    {
+      "path": "collector/Dockerfile",
+      "size": 740,
+      "sha256": "74b5980ad861e3303afc6babfa1765a7cab2ce4c289a399e677632a3d6c8d6ae"
+    },
+    {
+      "path": "collector/Dockerfile.dockerignore",
+      "size": 987,
+      "sha256": "d99adc88a131201a0ed0dbd506e37e3e0e7db97b4ec380aa4bf2de03411ec6f5"
+    },
+    {
+      "path": "collector/brand/inspiration-nook-source.png",
+      "size": 1180945,
+      "sha256": "8bbbbc478c27c7195e498ce8cc262a3ebddc0a5ffd80b89213b2e89721eff799"
+    },
+    {
+      "path": "collector/brand/ui-icons/README.md",
+      "size": 997,
+      "sha256": "f348f210627ae8cbf62b5fc1e4b0648670467ffa12fe593aed92b94e3a1ef580"
+    },
+    {
+      "path": "collector/brand/ui-icons/bookmark-source.png",
+      "size": 853182,
+      "sha256": "189544e062ffca70d035e3ad169473777f4f6bd9c0908835e4cf7c91871467ee"
+    },
+    {
+      "path": "collector/brand/ui-icons/collect-source.png",
+      "size": 970293,
+      "sha256": "a91e4596c76bdc3555c2f8603f10fcbfeca4c1670620f2721ebe7abfba010840"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-128.png",
+      "size": 17850,
+      "sha256": "78b048835330d7f2b0ecfcec025b0c06843e087f1b4431ae70408acbc3b4ca3c"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-192.png",
+      "size": 35328,
+      "sha256": "73f1944ce0d8e027a8ee7939be40766ca128c9ea58d485b1e982a91d2875b89e"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-24.png",
+      "size": 1289,
+      "sha256": "6be9d9c45711838c128f2c01a2427971bb1fc97c3a737f895f2bd7c619e40b57"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-32.png",
+      "size": 1970,
+      "sha256": "578fa938c217af8a8bbe7e55b5dfe1d1ea17b500f35938e8b968cd60d5b2de53"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-48.png",
+      "size": 3707,
+      "sha256": "351da8eb12ee2d14ae25c7a7f7c551a8df6a330632f25ad48e83f7345daef4c4"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-64.png",
+      "size": 5555,
+      "sha256": "1885a69397d7cd706bc24e17ce44fa6d101d332dc20195bef76c58b10e7929b3"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/bookmark-96.png",
+      "size": 10812,
+      "sha256": "c7a488ce0b119ad027ca0e2724c9f251d5c4a57f7229d6f9651049dd8226e4a1"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-128.png",
+      "size": 18231,
+      "sha256": "836936017355c152ce51a9a5ed8ed850088e49db815d6e9485d6ad8d32e98594"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-192.png",
+      "size": 34877,
+      "sha256": "25d03101ddbf87098dc26a4df9010feedd36fd11687b53f681e3daa05caea914"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-24.png",
+      "size": 1241,
+      "sha256": "cfd9c9ca2477e3846b7d5d93f24c13945ef47739fc8899d2c5bccd4f2922ddea"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-32.png",
+      "size": 1933,
+      "sha256": "649b39ebfb285d6f3fd7b43c5cd842a805cc3d0a144b6812dffd394cb118bc62"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-48.png",
+      "size": 3589,
+      "sha256": "ada012e8ef69e50be9b8b60c24e946a5c6ddf9ec6586043f88a1a4ba078094da"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-64.png",
+      "size": 5687,
+      "sha256": "8413361dad8a0c95d959ffc793c5331499a846493b484c4225f5a784b1cd73b9"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/collect-96.png",
+      "size": 10988,
+      "sha256": "2b1beb685da95865abe2615be0e711a976a68f66b8a3b0bc73f84131dd10a159"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-128.png",
+      "size": 15981,
+      "sha256": "26085fae76079c690fb85d544b872bcca728fa96776358145983e1134163e1f4"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-192.png",
+      "size": 30285,
+      "sha256": "79a64c2843feed7771dfac5e403c28ef25baf3b48a57e3a40fe38f8eebac650e"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-24.png",
+      "size": 1213,
+      "sha256": "884b78782a1f81350cde6bb092e0e0f334e9ad21c0c4ece0a79dc026d8bc9024"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-32.png",
+      "size": 1812,
+      "sha256": "e0e4e9d3f1bd48cd98e9658d31e70e2ad7bf84ce66d5b6f95a704f82b732519f"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-48.png",
+      "size": 3350,
+      "sha256": "6ea5475ec8d72227c2ed01f21a6e5fb7d05602e7520e34c2dd7e0814e96ccf76"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-64.png",
+      "size": 5280,
+      "sha256": "d269d9130ffa62caacf8424447bb0804f5bc8fc448b14b3e0859d273c9ae84b7"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/library-96.png",
+      "size": 9904,
+      "sha256": "c8d0d7eff12bb03dad1a14141ead03674768d4469571f1703bc6f60560bb3b6c"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-128.png",
+      "size": 16557,
+      "sha256": "44db74d7496bc36c4b39da8c0c174778547161b14c51d3bd0a60f772cb47d087"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-192.png",
+      "size": 32210,
+      "sha256": "42e6ac7ef93f0d9846fb97e01adfa2bff1f3e3862eec3f46167f1397dbf9ad23"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-24.png",
+      "size": 1225,
+      "sha256": "79ce978431336bc842356de9939b70c73a7ceece14c731298550a627fb831cb1"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-32.png",
+      "size": 1886,
+      "sha256": "08608edd1a036b802f20850e38a2d624d884a2688d4a7d0e7f503c38c319977b"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-48.png",
+      "size": 3428,
+      "sha256": "4995980857b78ac21ffa40af3bd2213d34f32fb0c73621d185f4ebf2c562da4b"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-64.png",
+      "size": 5433,
+      "sha256": "3a9a737fa65849d8df9148bcabc3a4edeba1b7d9923703c081e7d2c73c0e8226"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/person-96.png",
+      "size": 10200,
+      "sha256": "34b1ca4fc6e1bb09505a2377dc1b4477fea684bb40dfbc387eb78eae5705b87b"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-128.png",
+      "size": 21560,
+      "sha256": "8affc7fc65fc957c9d6dcc527023cdbeb7c01df76219ffd7f6932243305ede51"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-192.png",
+      "size": 42330,
+      "sha256": "8575782172ad46ea269cecf4ae154c7489d379a15d615bafa3a79a967c880a9a"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-24.png",
+      "size": 1606,
+      "sha256": "0028cde0b260a5aaec859979183d54998c76c97187ab3a41db019ad1d6729007"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-32.png",
+      "size": 2551,
+      "sha256": "f2812d3c9dc7a8bbc97f24b33be8ec1a755e058d5d005dd1970f90eac3d1f763"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-48.png",
+      "size": 4654,
+      "sha256": "0268bff1458f7a72ad297d19effca6ed43286918a2c45e8e1840072435c7ba4d"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-64.png",
+      "size": 7185,
+      "sha256": "edaf5ac144017663b4637b3e009e9b43140bcdd3a3f42b1e0adf49f0fb82cfdf"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/scan-96.png",
+      "size": 13262,
+      "sha256": "c1ef98941287bc979b8b59e5a395ee41b0b1215cb00f4afc6b85b50ab841e4a8"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-128.png",
+      "size": 20158,
+      "sha256": "07448787b5c923e242ec6e693510da3174d7e742be904019b95fec0973c791e5"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-192.png",
+      "size": 38176,
+      "sha256": "23eba8033409b85255e701d7850bd164c0ddfac160715d2e645fe483d2f104f8"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-24.png",
+      "size": 1356,
+      "sha256": "8670dce4119b15fcb52fd6daa98ef62d2b9b2f2bbb68d30e7c4cfb4b0d0d0dd5"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-32.png",
+      "size": 2149,
+      "sha256": "c5ea143676fe05a53db39a580df77f556a6eab97f2cc7b1e3bd70b0e980a7d7e"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-48.png",
+      "size": 4230,
+      "sha256": "8bd11696c0149c4bfda9cceae047530f48d685aa6e80cd00c7e6ebd145011438"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-64.png",
+      "size": 6710,
+      "sha256": "cf9677cf2afed8d0371c93fe5ea1f7424019d24a1801da2c7ed99e7dc707279d"
+    },
+    {
+      "path": "collector/brand/ui-icons/export/update-96.png",
+      "size": 12671,
+      "sha256": "3528726d04c14c7f67c795763e5df1234b60cd214857fe5d08ae1d7500253aa3"
+    },
+    {
+      "path": "collector/brand/ui-icons/library-source.png",
+      "size": 813132,
+      "sha256": "69592035fe58152ab77aeb36c9c45880c45982f0778282cda56fb3e78c6ffa29"
+    },
+    {
+      "path": "collector/brand/ui-icons/manifest.json",
+      "size": 2088,
+      "sha256": "4f15467e5f09f7e67140cf4e5194ce40e3208f3b36f2a052a29bcd1bd9a4310b"
+    },
+    {
+      "path": "collector/brand/ui-icons/person-source.png",
+      "size": 836444,
+      "sha256": "0ff1cf0f3ebcfec05e369f9eec3f75268b14940d9a1d541a202d99e7463629b5"
+    },
+    {
+      "path": "collector/brand/ui-icons/prompts.json",
+      "size": 6453,
+      "sha256": "570a36df358aabfe37aa439d95a974b668e49e8ef0b67850a9851108d6da2c42"
+    },
+    {
+      "path": "collector/brand/ui-icons/scan-source.png",
+      "size": 882326,
+      "sha256": "c4d4c98078e2598d59ade57154237694409a57ed9891b82ba1efbb31ad48a15d"
+    },
+    {
+      "path": "collector/brand/ui-icons/update-source.png",
+      "size": 1012652,
+      "sha256": "833f6b1e7e0c52b1c57653ad5c7ba450bf2cd87da74f617c17263a20f308f3ec"
+    },
+    {
+      "path": "collector/cli/.gitignore",
+      "size": 45,
+      "sha256": "437b407fcab78499ce5ea1c1c42739efa6457b578ca44abce74ded444e9d4cb9"
+    },
+    {
+      "path": "collector/cli/SECURITY.md",
+      "size": 3050,
+      "sha256": "b1c4bca30f286df1d4462a1b957fa3a0b3c623e1d16f93d15b5b01a275229126"
+    },
+    {
+      "path": "collector/cli/THIRD_PARTY_NOTICES.md",
+      "size": 765,
+      "sha256": "a2bedc96fee43eec7bf370aeb88098d95088ecf9b4b04cd424a23956237ca59f"
+    },
+    {
+      "path": "collector/cli/auth.go",
+      "size": 6267,
+      "sha256": "5d6042d702a8ce2fcf62ad090ea66843df9a50f2efce916a75f57df347a69e43"
+    },
+    {
+      "path": "collector/cli/browser_unix.go",
+      "size": 247,
+      "sha256": "aac67acc55ac8c026a0e7907f5ec154362598eef948123941c71ef2528d0ce17"
+    },
+    {
+      "path": "collector/cli/browser_windows.go",
+      "size": 320,
+      "sha256": "e99951bad833db3839f77c2ae93cc40e1a2552a742a1a87809eeea2598beb190"
+    },
+    {
+      "path": "collector/cli/cli_test.go",
+      "size": 15572,
+      "sha256": "476af7ccc317753c3a2e8df53530355fab02a9b46f8f8981b498dbd3fd835984"
+    },
+    {
+      "path": "collector/cli/client.go",
+      "size": 5879,
+      "sha256": "058ce69cf26cbc0d2c5a11731cafbd9ba4447e81d5b148d250973d8d94bc1072"
+    },
+    {
+      "path": "collector/cli/credentials.go",
+      "size": 1660,
+      "sha256": "e738884a0d1325a05addaf05f71e7009a33657e84a055c5fc531710a042bc3a8"
+    },
+    {
+      "path": "collector/cli/download.go",
+      "size": 3334,
+      "sha256": "b7f9eafa480337dd48889e5e33f59be3e460edc2c532c049156ac270a8a93a3a"
+    },
+    {
+      "path": "collector/cli/go.mod",
+      "size": 266,
+      "sha256": "f1d65784bdfd1ea6b6c5cad5d5c1327b4820521fb5b09a4580ff12a396ce7029"
+    },
+    {
+      "path": "collector/cli/go.sum",
+      "size": 1911,
+      "sha256": "66cbd66fa2a56be00f9154fcab71626c3a0d5f3f2d5c0b367985f92a88c63383"
+    },
+    {
+      "path": "collector/cli/integration_test.go",
+      "size": 7967,
+      "sha256": "ce64b68f835ab83133c1c35e39f5c3eecdb4bfdf8abf012375b76cab1ed3712b"
+    },
+    {
+      "path": "collector/cli/interop_test.go",
+      "size": 8530,
+      "sha256": "f3d08305bd6b494189c0711d55435db01de9a559df07d7e1c0ad4775d1e24f1e"
+    },
+    {
+      "path": "collector/cli/main.go",
+      "size": 12639,
+      "sha256": "9e96b94b6a57691912afb6ae9fc0c05cda47556e5dd6603c693b4ad04e1ef2d3"
+    },
+    {
+      "path": "collector/cli/server_config_test.go",
+      "size": 661,
+      "sha256": "1af4e3f6a1d47d04407d7ee413f388e11516448d730d328d47e348c5361eaffe"
+    },
+    {
+      "path": "collector/cli/tools/package/main.go",
+      "size": 7063,
+      "sha256": "e653ba6f1f0ed9ee86c86f87de0273a96983867f060ca2a52615b37d9fa1887a"
+    },
+    {
+      "path": "collector/cli/tools/package/main_test.go",
+      "size": 1655,
+      "sha256": "fb684f5d35a91f64ff21f874086f75733833365f5af9a71c8cfb094227199cf5"
+    },
+    {
+      "path": "collector/desktop/brand.css",
+      "size": 112,
+      "sha256": "2a7cb33252f71dcc19647f1e27fb43dad014bc1d99cafde785ffedbc36b1360c"
+    },
+    {
+      "path": "collector/desktop/entitlements.mac.plist",
+      "size": 315,
+      "sha256": "a5f723eadadae0a1876223df76940fcc86a9aa0c71cc2c11a064e0f0d2e18e90"
+    },
+    {
+      "path": "collector/desktop/icon.ico",
+      "size": 113033,
+      "sha256": "d336c813a1c135b709905a3bf24747dd83e4ed8765e5afb1480e0b0ca91e3542"
+    },
+    {
+      "path": "collector/desktop/icon.png",
+      "size": 255100,
+      "sha256": "c3edff9bfe2006b8dac58a562db64928c5d57cecf302eeff38cb8dd8427d2fe8"
+    },
+    {
+      "path": "collector/desktop/index.html",
+      "size": 5562,
+      "sha256": "7f0f6f52c08336664528963877e5c174422e85d0c0ee6656e9b77509377a92d8"
+    },
+    {
+      "path": "collector/desktop/main.mjs",
+      "size": 7735,
+      "sha256": "bd13e2705bec8acde6c22b5fa937177604b99c0de7d4491b61827799cb420277"
+    },
+    {
+      "path": "collector/desktop/manager.mjs",
+      "size": 6495,
+      "sha256": "393344fe232fa5547f5bef2148f6ee9af317cc184818d3e99ef969d27696c564"
+    },
+    {
+      "path": "collector/desktop/package-lock.json",
+      "size": 5806,
+      "sha256": "d39fc4b239d1585c6f3494aff4d009118834d44aa1da73b886f070a5d94e2ba9"
+    },
+    {
+      "path": "collector/desktop/package.json",
+      "size": 297,
+      "sha256": "35213919aced47770c1123867109701eff60d80118476b11aeeec5486e51a8af"
+    },
+    {
+      "path": "collector/desktop/pair.css",
+      "size": 608,
+      "sha256": "e35937d5ed548646a263a6320adda0438c4d17478cde6d5716c4a1b41aa2ca31"
+    },
+    {
+      "path": "collector/desktop/preload.cjs",
+      "size": 416,
+      "sha256": "a984ab54369500c497a78cc0592b18eee6cf13d0b68ffedd5b95cbc7c1f9cdde"
+    },
+    {
+      "path": "collector/desktop/renderer.js",
+      "size": 12414,
+      "sha256": "ae27d1f9f0d70f2f8db05eb69e79b9e6cdb7a58f7c350d13219b838d416d6784"
+    },
+    {
+      "path": "collector/desktop/style.css",
+      "size": 13887,
+      "sha256": "7e4f0b7e1b6b1980c44bfce23eeecf674b771a47751bed77780e64dc8c2fb477"
+    },
+    {
+      "path": "collector/desktop/tray.png",
+      "size": 4406,
+      "sha256": "5d108516f660b8d6677829fbba418abf6318b6f9c0f51ba2c985a38f656aff85"
+    },
+    {
+      "path": "collector/electron-builder.yml",
+      "size": 872,
+      "sha256": "47874f2ddecbedfdb331906fa82eba81961f92b81e8c3b8192c1b934e6c1117a"
+    },
+    {
+      "path": "collector/mobile/.gitignore",
+      "size": 252,
+      "sha256": "c9482f6f22305317b6eda174a0e33f587037e98cd8184e0056964abdd413fba1"
+    },
+    {
+      "path": "collector/mobile/android/app/build.gradle",
+      "size": 2448,
+      "sha256": "c16b11ea086f363699cf7790cf1123b1e399e769c334f323ae3b21e1fd9eff8a"
+    },
+    {
+      "path": "collector/mobile/android/app/src/androidTest/java/store/inspirai/library/core/CoreTest.java",
+      "size": 30173,
+      "sha256": "f3007d3fe5d312398e0cafe1e082f443fec9654576414d6672d6e7093658eff2"
+    },
+    {
+      "path": "collector/mobile/android/app/src/debug/AndroidManifest.xml",
+      "size": 224,
+      "sha256": "0032f10620d2a6ab8deebd44f076e17d4adc8123dc86955e4e4bb2a264abb73d"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/AndroidManifest.xml",
+      "size": 2671,
+      "sha256": "6e33bc84ca09197311cc6baf364ac82a78732be50c351e44df3c5d3068c6fffc"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/bookmark.png",
+      "size": 17850,
+      "sha256": "78b048835330d7f2b0ecfcec025b0c06843e087f1b4431ae70408acbc3b4ca3c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/collect.png",
+      "size": 18231,
+      "sha256": "836936017355c152ce51a9a5ed8ed850088e49db815d6e9485d6ad8d32e98594"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/library.png",
+      "size": 15981,
+      "sha256": "26085fae76079c690fb85d544b872bcca728fa96776358145983e1134163e1f4"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/person.png",
+      "size": 16557,
+      "sha256": "44db74d7496bc36c4b39da8c0c174778547161b14c51d3bd0a60f772cb47d087"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/scan.png",
+      "size": 21560,
+      "sha256": "8affc7fc65fc957c9d6dcc527023cdbeb7c01df76219ffd7f6932243305ede51"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/icons/update.png",
+      "size": 20158,
+      "sha256": "07448787b5c923e242ec6e693510da3174d7e742be904019b95fec0973c791e5"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/index.html",
+      "size": 4806,
+      "sha256": "d4194136750ad86ede93d9d1a3543208da52b0551784cfa3f17a4efcbfd52f41"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/mobile.css",
+      "size": 8989,
+      "sha256": "637ed4d0e724f22683d3529a4995afbc2c2d2d2faa37562c2c33109e6626f3e7"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/mobile.js",
+      "size": 13020,
+      "sha256": "24e23a3a0f85fa4df1018c2e284649118793dfb3f7ee037a32a10a26119c49b2"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/dompurify.LICENSE",
+      "size": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/lucide.LICENSE",
+      "size": 3208,
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/lucide.js",
+      "size": 439465,
+      "sha256": "621aebb75317335da861ecaaf91faca006e60cdf6230d094804e12dfa8260301"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/marked.LICENSE",
+      "size": 2942,
+      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/marked.js",
+      "size": 45843,
+      "sha256": "b147274a9ce27d17276587167e49483d719f6893eeca3a3667a59797661d3556"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/mobile/vendor/purify.js",
+      "size": 29369,
+      "sha256": "f263b05369e050fa175d4ecb9c9358eb4253602d510297adfb31df48b2f1c4d5"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/reader-bootstrap.js",
+      "size": 632,
+      "sha256": "15bbe15c939d0b68fcaab27487731491942f19ccb27fbcc40c2cc59e1980d093"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/Appearance.java",
+      "size": 1774,
+      "sha256": "3ca7414aa5c8c558fc49facc95f80241793aa0ca4337aa7f23151f8d5ddd1cf9"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/AttachmentActivity.java",
+      "size": 1779,
+      "sha256": "637625c487d83401c6f99ede835162ed97c9f58debbac07259caeee2b12ce3d1"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/BundleActivity.java",
+      "size": 3733,
+      "sha256": "83f572acd469c1c80c538610c64f586f75f2822349c5b7c83b2048debc148a9a"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/DevicesActivity.java",
+      "size": 1865,
+      "sha256": "48ceb026f0e9ddbf959455e4910779b3fea42833ce946f4d40d52589bb595983"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/Drafts.java",
+      "size": 1435,
+      "sha256": "ab839a50a17cacb46fbb57268774bab4cee6f7dfe1253b052921b270febd0ec7"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/Icons.java",
+      "size": 3096,
+      "sha256": "477609bb760b79da3824d1c4b92d15e0d0005031f0d3a8676df33f627cb43916"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/LibraryPane.java",
+      "size": 7534,
+      "sha256": "257e1211f9f8566944890a3e019f1de40af01cdabadb1999da211e76fff5dcb1"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/MainActivity.java",
+      "size": 15015,
+      "sha256": "185854bceba94e69659cc7dfa03b4c0bbb57b20d506d019d1666c65bba3e7fc8"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/PdfActivity.java",
+      "size": 4501,
+      "sha256": "9d2b1c5ee00a39c607e1bc998f4aaf3163594f1a5a350951f4263f6d36dcdf25"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/PendingActivity.java",
+      "size": 1702,
+      "sha256": "8030aee7d6cefb289e28265fd619503d4a7b27f1f566eebac5cce6e1d9a27b8c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/PrivateFiles.java",
+      "size": 1868,
+      "sha256": "20f81a3ea1b88d5c0bcc19b14d1a39aec7704427152247be921f3e83112bf860"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/ReaderActivity.java",
+      "size": 806,
+      "sha256": "f1dfc1745e4e3c15dd93db9ac583d90831425731b309efdf26c7ce4cb61634d8"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/ScanPairingActivity.java",
+      "size": 4883,
+      "sha256": "15495201fa823242cced4dd643aa9e1dd4869f1f854f197b2cee086a57822085"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/Screen.java",
+      "size": 8619,
+      "sha256": "ee71078e7573659e1eb280db9c5f94da32d68990512182c9adaedf2ad2853320"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/ShareActivity.java",
+      "size": 9885,
+      "sha256": "73b449ea6029cad4ab177837db9a3ab722cb117b99849e9bfda9b1e7bf78b19c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/TaskActivity.java",
+      "size": 3272,
+      "sha256": "dacc38e4cf9989cd27c88fc8c56c05321ba2f8b90c3640e02e70986f4a0aecfa"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/UpdateActivity.java",
+      "size": 4158,
+      "sha256": "6dcb41c7c547997f11461e434f6a0f395587e51c99cedaf14ce81b40566ee7ba"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/UpdateFileProvider.java",
+      "size": 200,
+      "sha256": "f7f44dde77f496d40e83bccf1e9385d7924c7328d30d15af589ca3ae09daafae"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/Api.java",
+      "size": 11373,
+      "sha256": "8b12991388a4baaa9dd6d856cbeee55315926d73d579a983416bffe0842a37ab"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/AppUpdate.java",
+      "size": 6545,
+      "sha256": "10d801eede0fc1e9f70975cad698e3fe67a538a858d6c4d21e49215df4906b6c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/Credentials.java",
+      "size": 10442,
+      "sha256": "1b806422649df607bbbaacdddb8fc5a042029b42b6d461724e426cfb4cd4c92a"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/DeviceIdentity.java",
+      "size": 1005,
+      "sha256": "281c4f71b580a1aaec59d3f33f8a78fa3fbab6aba08827674f11ba448cd3fe46"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/Outbox.java",
+      "size": 13728,
+      "sha256": "f12f1f44c3b5c886c19deeedfbd47fdef0acc30aa80485a0b6a807d1cb6fc132"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/PairingCode.java",
+      "size": 1499,
+      "sha256": "2b9afab0c39e6f057955811c85bbcb0c790a8a8ab2084ccd04da7b6d73c5c0f4"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/java/store/inspirai/library/core/QueueJob.java",
+      "size": 3098,
+      "sha256": "9688b0b26b4db126da5ae69d6639e8c929a4594748bace95327caaad20e8e365"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_bookmark.png",
+      "size": 17850,
+      "sha256": "78b048835330d7f2b0ecfcec025b0c06843e087f1b4431ae70408acbc3b4ca3c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_collect.png",
+      "size": 18231,
+      "sha256": "836936017355c152ce51a9a5ed8ed850088e49db815d6e9485d6ad8d32e98594"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_library.png",
+      "size": 15981,
+      "sha256": "26085fae76079c690fb85d544b872bcca728fa96776358145983e1134163e1f4"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_person.png",
+      "size": 16557,
+      "sha256": "44db74d7496bc36c4b39da8c0c174778547161b14c51d3bd0a60f772cb47d087"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_scan.png",
+      "size": 21560,
+      "sha256": "8affc7fc65fc957c9d6dcc527023cdbeb7c01df76219ffd7f6932243305ede51"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_brand_update.png",
+      "size": 20158,
+      "sha256": "07448787b5c923e242ec6e693510da3174d7e742be904019b95fec0973c791e5"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable-nodpi/ic_inspiration_nook.png",
+      "size": 195517,
+      "sha256": "07412e91554178c9d6e55f3b8bbd4dc5f18ede2057cdc1c29565131ac2b78107"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/drawable/ic_library.xml",
+      "size": 355,
+      "sha256": "36e5006c576f69f2d70fe510941dbb89df393fca9d31028cd8be773c547edfe6"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/values-night/styles.xml",
+      "size": 457,
+      "sha256": "c57dc343b20d43308c26699eb7b253ddf229049ab3afababeb754adaab181e96"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/values/styles.xml",
+      "size": 928,
+      "sha256": "818c2107c88bca87b1f05ad00c3a6cba3d5daaa3dfe4a7dc49320baea76a6594"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/res/xml/update_paths.xml",
+      "size": 165,
+      "sha256": "43067a3c7ab4e5097265f4e9781125ec7b6ec35805613c5f9c245f884126ca7c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/test/java/store/inspirai/library/AppUpdateTest.java",
+      "size": 2972,
+      "sha256": "a72358b15c36266684d13699d8c047a611791d97ce3799ea0ad67463ffbf6a7e"
+    },
+    {
+      "path": "collector/mobile/android/app/src/test/java/store/inspirai/library/AppearanceTest.java",
+      "size": 2210,
+      "sha256": "7407887b2921df01b0685cf03cb1e6f852ebbc9a2d9d08aa7b6cd2d9b50f0f34"
+    },
+    {
+      "path": "collector/mobile/android/app/src/test/java/store/inspirai/library/MobileTest.java",
+      "size": 16216,
+      "sha256": "78d90455d1783aa1ade8cea6c72e6b8a23bd57446687d29fe2e91c096a239d2c"
+    },
+    {
+      "path": "collector/mobile/android/app/src/test/java/store/inspirai/library/PairingCodeTest.java",
+      "size": 1874,
+      "sha256": "29dcd8b0c28971ce3afe6b02d13d441f4eb5c3da36139bad67b979b0d625822d"
+    },
+    {
+      "path": "collector/mobile/android/build.gradle",
+      "size": 70,
+      "sha256": "3c3fc43beca35fbf6d0ef33204bbfb8720624ae23219732c153a731c5351cb1d"
+    },
+    {
+      "path": "collector/mobile/android/gradle.properties",
+      "size": 76,
+      "sha256": "4d4c82226865844bdc85391d907a383da4a35d3a3f5348985d5ec3997ab932fe"
+    },
+    {
+      "path": "collector/mobile/android/gradle/wrapper/LICENSE",
+      "size": 23622,
+      "sha256": "9536d88ea948603d18e232a13f5958d67807cd80828036b082bff171d2cf0703"
+    },
+    {
+      "path": "collector/mobile/android/gradle/wrapper/NOTICE",
+      "size": 868,
+      "sha256": "c2de5fd9adc7ccc4e1382a0e1f38ec6e14f8ca6e28d3c20289fe80353b019aa1"
+    },
+    {
+      "path": "collector/mobile/android/gradle/wrapper/gradle-wrapper.jar",
+      "size": 43764,
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    {
+      "path": "collector/mobile/android/gradle/wrapper/gradle-wrapper.properties",
+      "size": 253,
+      "sha256": "9a479a85aa879bb55284fc16d0de5b81a745c3854f4e2d88c42e7debaf007435"
+    },
+    {
+      "path": "collector/mobile/android/gradlew",
+      "size": 8733,
+      "sha256": "b187b4c52e749f5760afdd6fadc31b2a98ad35fb249bf0dff03b72650f320409"
+    },
+    {
+      "path": "collector/mobile/android/gradlew.bat",
+      "size": 2843,
+      "sha256": "94102713eb8fb22d032397924c0f38ab2da783ba60d07054339f1190a0c4e2cd"
+    },
+    {
+      "path": "collector/mobile/android/settings.gradle",
+      "size": 276,
+      "sha256": "c04c9fcc4188598e114232112f34934d84118eb1d7e34429b9e382450b3744de"
+    },
+    {
+      "path": "collector/mobile/design-preview.html",
+      "size": 3546,
+      "sha256": "221a7b6a0e4cc19338a5d42a998bfec38b444f5b6353db6f7de551763581b853"
+    },
+    {
+      "path": "collector/mobile/icon-preview.html",
+      "size": 7150,
+      "sha256": "f82acd1058cbe22460820336763c524b617aa17ed87fa2f84a419c91e7a873da"
+    },
+    {
+      "path": "collector/mobile/ios/.gitignore",
+      "size": 98,
+      "sha256": "be329795f52a41b349f372bc85c7b6e5db4927275be1b2cc60fc829814cf4c93"
+    },
+    {
+      "path": "collector/mobile/ios/App/AppModel.swift",
+      "size": 5692,
+      "sha256": "31f5e1b2305039530d066563be426caae634a4d4a6fa628abfeee7207d2c2f42"
+    },
+    {
+      "path": "collector/mobile/ios/App/ArchiveAttachmentsView.swift",
+      "size": 4333,
+      "sha256": "7ac041cb1aef8cc08274997b57f42e0f95f6af1fbf55bea66a0d20c6f788a97c"
+    },
+    {
+      "path": "collector/mobile/ios/App/DeviceIdentity.swift",
+      "size": 1575,
+      "sha256": "f8e415ab0e944f4641648b5b5d08c4ecb5c032bbdc45a9490254857f441c31d3"
+    },
+    {
+      "path": "collector/mobile/ios/App/DraftReviewView.swift",
+      "size": 5311,
+      "sha256": "35057b78af184947564afc8019b1d364a065b7f1b647adeedef210c8575bad3f"
+    },
+    {
+      "path": "collector/mobile/ios/App/LibraryReaderView.swift",
+      "size": 9814,
+      "sha256": "f919a12a1fa3a352e248c8a824d4b9a830a874756445dd6d74cb6e390a85cd5e"
+    },
+    {
+      "path": "collector/mobile/ios/App/PersonalLibraryApp.swift",
+      "size": 12410,
+      "sha256": "6c967b3b117540ea944c8e9813bbf3036a5ae4dd0bf9828628652ed926a7f6a6"
+    },
+    {
+      "path": "collector/mobile/ios/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "size": 167,
+      "sha256": "144765a65d07d4f1ef701ce7fe5c7cfbd10c5e82a07c9350a7bd44f68dfa5404"
+    },
+    {
+      "path": "collector/mobile/ios/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "size": 740491,
+      "sha256": "bf2be5a16b521e59e3b82d14669141a015965b81d49f82e4a57b000cfca03b22"
+    },
+    {
+      "path": "collector/mobile/ios/Config/App-Info.plist",
+      "size": 1310,
+      "sha256": "d7897eff7dbfe0620cc91cc18b00811dc2761d51fa2b3312a80a47ad6d59b0d5"
+    },
+    {
+      "path": "collector/mobile/ios/Config/Local.xcconfig.example",
+      "size": 356,
+      "sha256": "756a5748648b2c128e64f1d4005f9302425a8618fa126a5c775f0a1a7fe2b253"
+    },
+    {
+      "path": "collector/mobile/ios/Config/Share-Info.plist",
+      "size": 1589,
+      "sha256": "cac6297743c10fa222fe08022ce09a1aac6d147e5d7cd329149bea3ca853bf9b"
+    },
+    {
+      "path": "collector/mobile/ios/Config/Shared.entitlements",
+      "size": 409,
+      "sha256": "636a917f0f41aedaef4970eaf01b533fd83e3ab38b28118e24aeb5391aeb808b"
+    },
+    {
+      "path": "collector/mobile/ios/ShareExtension/Preprocess.js",
+      "size": 382,
+      "sha256": "83ce2f8719308a348002918e18a3b17093e8cacb86c32e98b8c1f534bb50d4d1"
+    },
+    {
+      "path": "collector/mobile/ios/ShareExtension/ShareCapture.swift",
+      "size": 4659,
+      "sha256": "be8a4ee8e9d4b85dc9ea23dfe1b53f0b05aa620e7950bb3b03862ce9102d85b9"
+    },
+    {
+      "path": "collector/mobile/ios/ShareExtension/ShareViewController.swift",
+      "size": 9617,
+      "sha256": "dba6a453bd299539711c07979991c750197a7286f73cc54523a89faf2efbe515"
+    },
+    {
+      "path": "collector/mobile/ios/Shared/CollectorAPI.swift",
+      "size": 9759,
+      "sha256": "25b7c66f2e97c3c76351f039b5e5d892d9b98bd33ab56837176cc100624c51c8"
+    },
+    {
+      "path": "collector/mobile/ios/Shared/Credentials.swift",
+      "size": 3450,
+      "sha256": "238a61f4afb9a7dfd0bc5797f619f9678ee27652127410dd3114d9d6b363ac16"
+    },
+    {
+      "path": "collector/mobile/ios/Shared/Models.swift",
+      "size": 7882,
+      "sha256": "91b8835fb867ded1713d89abdf1f037dbe1525b2d048bccd3d3948a6c1b23540"
+    },
+    {
+      "path": "collector/mobile/ios/Shared/Outbox.swift",
+      "size": 8470,
+      "sha256": "3727bb1e1f4825189f3bc3eab1c7d29cfdb65dfc59e4efeedcb71405179be593"
+    },
+    {
+      "path": "collector/mobile/ios/Tests/APITests.swift",
+      "size": 4772,
+      "sha256": "b9a6cca92edff4233b83a6c69fd019db7c27604d692ec05885fe35ef77ab4fe9"
+    },
+    {
+      "path": "collector/mobile/ios/Tests/OutboxTests.swift",
+      "size": 3865,
+      "sha256": "50bf104c9deeb87aae2427ebb625252b74ccea223b67e5a55f4ba4ced5bd3b9c"
+    },
+    {
+      "path": "collector/mobile/ios/Tests/SubmissionTests.swift",
+      "size": 4576,
+      "sha256": "79d5bcd3c595f1b6bcaaf22b010df32b82ed6bd7e8cfac18da58b56b90850930"
+    },
+    {
+      "path": "collector/mobile/ios/project.yml",
+      "size": 2019,
+      "sha256": "6f2e24da150a914754668d7376bddc3b3a233e7e26a93d125c157831e623235c"
+    },
+    {
+      "path": "collector/mobile/ios/scripts/check_contract.py",
+      "size": 7552,
+      "sha256": "40f77f5341104e7059d3af5cde29d0eb32cf90991e9ecb116e481cc881f193aa"
+    },
+    {
+      "path": "collector/mobile/scripts/build-android.ps1",
+      "size": 1245,
+      "sha256": "f797c7014c3d5dfb82e0f90351a87f3a6bcaf65bc2774dc47ec27f5ae2f20d2c"
+    },
+    {
+      "path": "collector/mobile/scripts/build-release-android.ps1",
+      "size": 3326,
+      "sha256": "7db5f0d17df6dc3e64569e64c7a1f4f47949b2a85506146f8bfda29ec501b5c9"
+    },
+    {
+      "path": "collector/mobile/scripts/install-android.ps1",
+      "size": 1452,
+      "sha256": "0a8ef70970b59285c195ac98dcca9c3ef0ec3b400b0263803017e223465260eb"
+    },
+    {
+      "path": "collector/mobile/scripts/test-reader.cjs",
+      "size": 5160,
+      "sha256": "4d205064b615fecbb61ecce1845ee3a7a1d8c336e42faa45624b00db58442a8e"
+    },
+    {
+      "path": "collector/package-lock.json",
+      "size": 186261,
+      "sha256": "77541c3d7227867f52212bc546fa815dbdd9f0a5ba7cc5e784742977330641f0"
+    },
+    {
+      "path": "collector/package.json",
+      "size": 1398,
+      "sha256": "30dc4077386f3ee87f11cdaf9f15ba474be9e42f17ffd84241a3404d98cc783d"
+    },
+    {
+      "path": "collector/public/app.js",
+      "size": 18057,
+      "sha256": "dfe50902fde141de50ef5c5b3fc25df67783ee115c02a86bec5d0b861e607762"
+    },
+    {
+      "path": "collector/public/authorize.css",
+      "size": 7849,
+      "sha256": "7559f82920f8761781da71de8706d3a3c3bf607747f999f03b4ccd6d7c51be5d"
+    },
+    {
+      "path": "collector/public/authorize.html",
+      "size": 5322,
+      "sha256": "2e65748f2d24a689b6e54d39e5612293f47fc02fb6f0e11c1628a391f992b0c0"
+    },
+    {
+      "path": "collector/public/authorize.js",
+      "size": 10038,
+      "sha256": "f5a25966ef33cd097c71d42b667bc18eab4c3f965da537a720631585d53c235a"
+    },
+    {
+      "path": "collector/public/brand-icon.png",
+      "size": 22982,
+      "sha256": "9924a32d278ba54e48dd069bee1d357d8a602f5b0914f6e7e0ddce6de5629916"
+    },
+    {
+      "path": "collector/public/brand.css",
+      "size": 418,
+      "sha256": "ffba6241a1c7b3708b7f63061800ccf9a0d9676f55a81b1942d484b2ec523b9d"
+    },
+    {
+      "path": "collector/public/download.css",
+      "size": 9121,
+      "sha256": "7dc70a7a652a10721e4f17a525c5bd9ca3f3210e2fc138af484cf0ab1138403a"
+    },
+    {
+      "path": "collector/public/download.html",
+      "size": 11113,
+      "sha256": "80252036fcd9fcd5eddef0536ad42091820cb315ec7dde0706eb2c74d30b4b77"
+    },
+    {
+      "path": "collector/public/download.js",
+      "size": 4963,
+      "sha256": "66f56e9d5e08b8d67c3ce551ca81e110607a43d3c4c28a5c45d30bdad891b4c1"
+    },
+    {
+      "path": "collector/public/index.html",
+      "size": 6634,
+      "sha256": "753bcd8b6796e3ad5061179989bdb195c01c5f2e24e00360e8a3cf1b3f1ebd02"
+    },
+    {
+      "path": "collector/public/library-bootstrap.js",
+      "size": 3739,
+      "sha256": "34a9e04cf37ebb8fd9434508604bc4967dc4b69bd5e4ebb69d22ae7e0a6cf0b4"
+    },
+    {
+      "path": "collector/public/library-frame.css",
+      "size": 386,
+      "sha256": "56b420a24634c0fec48cac14fa4117097c15e74c4fda901e6014108054eec1f0"
+    },
+    {
+      "path": "collector/public/style.css",
+      "size": 7638,
+      "sha256": "582d2b7be5ee2b71ba9d51761ddace03bcbb2c9dd94668c5e516fe7db101073e"
+    },
+    {
+      "path": "collector/public/worker-download.css",
+      "size": 5225,
+      "sha256": "3940782ec2c64dae4966c9545994bb8e1442cb292aef11fcb83e2a369782fa8b"
+    },
+    {
+      "path": "collector/scripts/build-brand-icons.mjs",
+      "size": 2123,
+      "sha256": "c811eb4f714bd6f40259d99716d200f2bbf9ca91b9ac5c77850e101c21b52182"
+    },
+    {
+      "path": "collector/scripts/build-mobile-icons.mjs",
+      "size": 1868,
+      "sha256": "46f9d55f3fa4855a2674d3617437716a05e56eb04c00662512d50649483817ae"
+    },
+    {
+      "path": "collector/scripts/check-public-ci.mjs",
+      "size": 2049,
+      "sha256": "04d4fe5d3e68484767e14fa3fa7057450d82ca83cb9ba27ea17df4b394e9b72b"
+    },
+    {
+      "path": "collector/scripts/dependency-inventory.mjs",
+      "size": 742,
+      "sha256": "d6cf349fc4149e10f1374c464a5fed4e25a8500c7e6a2e178c920a2763e684f6"
+    },
+    {
+      "path": "collector/scripts/launch-desktop.mjs",
+      "size": 1132,
+      "sha256": "375af6b2473f7abad982d7ddb7452091b628446e070a577198d77e97b27653f9"
+    },
+    {
+      "path": "collector/scripts/probe-reader-budget.mjs",
+      "size": 3900,
+      "sha256": "78b0710419c696eacb6f06daa5a6b702d01bb9d5cf8ac07f3ca1e6cbc4b00c28"
+    },
+    {
+      "path": "collector/scripts/stage-reader-release.mjs",
+      "size": 3699,
+      "sha256": "4284630855db15f62233e66d18ed1025ecc8239d87292d02fa1731994295b10f"
+    },
+    {
+      "path": "collector/scripts/stage-worker-release.mjs",
+      "size": 1430,
+      "sha256": "b269055e90da790d8d1f69640866bb2d8ab0135750c23cdcabe67917ee27dd27"
+    },
+    {
+      "path": "collector/scripts/stage-worker-template.mjs",
+      "size": 755,
+      "sha256": "a6405a58fa35eac00132ab8f8e40d496babe140518e3956e56fc53d0c0827a88"
+    },
+    {
+      "path": "collector/scripts/test-offline.cjs",
+      "size": 1090,
+      "sha256": "6177776a8c9b1aff9fb29bf21055db3715db1b12fdbc3246288575fe2780bd6a"
+    },
+    {
+      "path": "collector/scripts/test-ui.cjs",
+      "size": 8309,
+      "sha256": "6faa75eb1c0053bb0da7f760f6933d4a7b80ac1976dcbb9f5d9a31074cadba6d"
+    },
+    {
+      "path": "collector/src/agents.mjs",
+      "size": 5528,
+      "sha256": "7ebaeb576d5d279d37cd4f7840d5b4170dec0fb89ee48edc83c0ed02312c9d44"
+    },
+    {
+      "path": "collector/src/archive.mjs",
+      "size": 5836,
+      "sha256": "ddd5e284ba4fcc7af88c7e268254bb1bea38ab9ee55c226e1c3738c90f2b9614"
+    },
+    {
+      "path": "collector/src/client-download.mjs",
+      "size": 6375,
+      "sha256": "e38001afba6358f01660a840de7d5e132b17baee85021d25bc2ccc2148f4240a"
+    },
+    {
+      "path": "collector/src/common.mjs",
+      "size": 2617,
+      "sha256": "cdb15e4ca6cd5c0d4459ee1db6c5b5084c0155037de619490a56c44715b27b00"
+    },
+    {
+      "path": "collector/src/config.mjs",
+      "size": 1189,
+      "sha256": "13dffa39d6e574daeb63969983c59405e9dbb0f9e3716b8b63d4c5553fdc7349"
+    },
+    {
+      "path": "collector/src/library-browser.mjs",
+      "size": 2538,
+      "sha256": "6e5fc564b8993fbfa2a8fb8126144a6ad7fa8a0a1fafe8f0699ff0a2de0cb3af"
+    },
+    {
+      "path": "collector/src/mysql-store.mjs",
+      "size": 2454,
+      "sha256": "b9a73d305d427b28253d7a8d27c478c37cd49ffbbfdb42e77aac28f44f38bea3"
+    },
+    {
+      "path": "collector/src/read-api.mjs",
+      "size": 20312,
+      "sha256": "9dae6907c13273b53a095918a9eb41abfcd51e059258974306dc022ee6cd5a7b"
+    },
+    {
+      "path": "collector/src/reader-auth.mjs",
+      "size": 7900,
+      "sha256": "f8453ab606885cd2902f93c50904814c6caa9f4c1dbb6dfda4e915461fd23b74"
+    },
+    {
+      "path": "collector/src/server.mjs",
+      "size": 31725,
+      "sha256": "797b4253fad7ff7e47ce5c45d4ed1322881edb7cdba3984e310d84e56e64aaaa"
+    },
+    {
+      "path": "collector/src/storage.mjs",
+      "size": 848,
+      "sha256": "99279f24c404d78211628ed7ea6be311756c3ead489cc4786b7cffbace331086"
+    },
+    {
+      "path": "collector/src/store.mjs",
+      "size": 2204,
+      "sha256": "463c847efc2b9889f20f01881da7a5e014817ab4ce9227c216eb2fd93ee26368"
+    },
+    {
+      "path": "collector/src/worker-control.mjs",
+      "size": 3980,
+      "sha256": "59cc5595b83ca8ca1872e05ba38b89cade4c5af5c2a37516098498b8f37b1370"
+    },
+    {
+      "path": "collector/src/worker.mjs",
+      "size": 20759,
+      "sha256": "45df7a321552b87fe86cacef3ec9d0f70bde48c1d4aed93f471250216e2a259b"
+    },
+    {
+      "path": "collector/start-worker-desktop.command",
+      "size": 78,
+      "sha256": "0c300597c664c76dbe8765297c1cdbaf782e7d31f50fccac8b349f7762d0ab9d"
+    },
+    {
+      "path": "collector/start-worker-desktop.vbs",
+      "size": 417,
+      "sha256": "137458c12e0b5c111e76a1e9a99a73b6977143fadb075825885c9b253e874c57"
+    },
+    {
+      "path": "collector/test/agent-security.test.mjs",
+      "size": 1044,
+      "sha256": "849850892bc7918f190734661da6aa03b36f9e08422204f0434e184a3a0ebfb6"
+    },
+    {
+      "path": "collector/test/client-download.test.mjs",
+      "size": 7305,
+      "sha256": "70575eca9fd8557169d5b539a189e7ed2c601528fd913a3288d3fa3380e903c3"
+    },
+    {
+      "path": "collector/test/fixtures/fake-agent.mjs",
+      "size": 2159,
+      "sha256": "f69f4d371bbe39bceb1a455dd1a022a6eaaf759ac94556ff038646d7324525d1"
+    },
+    {
+      "path": "collector/test/fixtures/slow-agent.mjs",
+      "size": 184,
+      "sha256": "cc6fadc7b61af2501b331893ccec1fc7a24e538ba0ccf5adf2d3c3306a2d4659"
+    },
+    {
+      "path": "collector/test/fixtures/waiting-agent.mjs",
+      "size": 370,
+      "sha256": "91e169ffd3436b96e9d1a3e57709c17beb7c7f9119ac47e2d76e1ad4800a2256"
+    },
+    {
+      "path": "collector/test/mysql-fixture.mjs",
+      "size": 1193,
+      "sha256": "b89e245e41c52643be28919b26159411e429d93d0d554a892fb3f8ad3ab4fccb"
+    },
+    {
+      "path": "collector/test/read-api.test.mjs",
+      "size": 20733,
+      "sha256": "c4f315550358dcc59a72fdf2296fc5ef22674917dd6b3003b02ed497704311d0"
+    },
+    {
+      "path": "collector/test/reader-auth.test.mjs",
+      "size": 12726,
+      "sha256": "f2102ecbe3368915e1a5c89cb5af2882c54f984375631e344b35943fb83846b7"
+    },
+    {
+      "path": "collector/test/service.test.mjs",
+      "size": 26088,
+      "sha256": "1cff980699aa1d2ffa9a4b4ce15379010e0a35b4f6901dc73aa793c5cc426eb0"
+    },
+    {
+      "path": "collector/test/worker-control.test.mjs",
+      "size": 10180,
+      "sha256": "0b475e1e3cf6c80065d5f386e4e333b0eafda7675107d911c93e24f93abc7f62"
+    },
+    {
+      "path": "collector/worker.capture.example.json",
+      "size": 1344,
+      "sha256": "2160e40f863fdd59783a1a2336e22e4e5fc55161f6c81938f7b897231e198eec"
+    },
+    {
+      "path": "collector/worker.example.json",
+      "size": 721,
+      "sha256": "eace42c6d737f95a0ffa55997f44614089fc1576a538113a5d1363250a99e065"
+    },
+    {
+      "path": "collector/worker.production.example.json",
+      "size": 739,
+      "sha256": "8b508b0420f57596cbb6aa7b89c8e6e8056879b9967241c6cf3d08a8f5145214"
+    },
+    {
+      "path": "docs/RIGHTS.md",
+      "size": 933,
+      "sha256": "18b5d7b41f60f4aa4286f673c9b5f8965613441c2b23c56d8f53f1acb7cc9bbb"
+    },
+    {
+      "path": "docs/SELF_HOSTING.md",
+      "size": 5500,
+      "sha256": "3e31f19c2ee796962adbec60d778ca08409937b7a04cc7d41f31a19a79d15ce2"
+    },
+    {
+      "path": "docs/THIRD_PARTY.md",
+      "size": 2320,
+      "sha256": "8881c9fe48fcc86e7980cf7f3ee43a45682ff55202a2d9fdeb8a0dcff3cc761b"
+    },
+    {
+      "path": "docs/android-dependencies.json",
+      "size": 7275,
+      "sha256": "0f6040136ca0ab928859aa824616fdb0013bcde8218f1d58e08229021688a7a3"
+    },
+    {
+      "path": "docs/npm-dependencies.json",
+      "size": 101888,
+      "sha256": "95c775460aa6e38f691b4c26b5fa2b725e3a2207a6794b51cd268409ab6f4725"
+    },
+    {
+      "path": "index.html",
+      "size": 5941,
+      "sha256": "baf1d1f15dde930c770aaf3ed2fc8880fe2c945d279d7351cd45bf92340c1584"
+    },
+    {
+      "path": "scripts/browser-data.mjs",
+      "size": 1530,
+      "sha256": "08519394ded7d7b7b897375486c352e5fb791dd8b53807e1b43f6fddcee4acc9"
+    },
+    {
+      "path": "scripts/catalog.mjs",
+      "size": 9928,
+      "sha256": "1502e5489ab06257db37b29333a6ace4e15aa7a79d6d2a97c6ed6955e3f06b72"
+    },
+    {
+      "path": "skills/lingnest-library/SKILL.md",
+      "size": 3012,
+      "sha256": "d38b87c2a59044c48579107894d97ce06dad16ebe9388aff42a7da1f9782735b"
+    },
+    {
+      "path": "skills/lingnest-library/agents/openai.yaml",
+      "size": 320,
+      "sha256": "acf8adc66538c1ee25d3a61d919d5a0a9f3f1412124ed24a1fc0f9d3523f697f"
+    },
+    {
+      "path": "skills/lingnest-library/references/cli.md",
+      "size": 2085,
+      "sha256": "e4b03d670e69c18fe283808996335bfba371e612977b4e20cb9b3225b245a571"
+    },
+    {
+      "path": "templates/README.md",
+      "size": 1695,
+      "sha256": "0d96a41d36026ec3bd1a98cf1035a12c3924ca07e52d644fba70df014aad023f"
+    },
+    {
+      "path": "templates/scenario.md",
+      "size": 645,
+      "sha256": "d6c36f94f03f17266369632b463aed4a0e39a90758d4e2957307d02f645af537"
+    },
+    {
+      "path": "templates/source.template.json",
+      "size": 580,
+      "sha256": "1d0e890a8faea72f9d5c199c5af3dacaaafdea69e6f652c197e790da465b6148"
+    },
+    {
+      "path": "templates/summary.md",
+      "size": 1013,
+      "sha256": "880bd7f1325dc08fedb1e53e9c5928e8c863da3ef3dcaeb5c59661f2de2d4f9f"
+    },
+    {
+      "path": "README.md",
+      "size": 1289,
+      "sha256": "4d45743f519fc86b00252acc18782d2f264fe47c7c219d56469a9f4a20d92f15"
+    },
+    {
+      "path": "collector/README.md",
+      "size": 510,
+      "sha256": "b92a7d6b384cced34b24e1be50c1fc3ec736e9ee1c6d253fa5f50ffda5c4ddcc"
+    },
+    {
+      "path": "collector/CI.md",
+      "size": 609,
+      "sha256": "1f1a14ad6a07a3ee30f4951da357a8a9f0bbbc2cad2625ac4874a22ba62c2015"
+    },
+    {
+      "path": "collector/cli/README.md",
+      "size": 1461,
+      "sha256": "29555b7617682c69aa86e329cdbf5c890666e73771f84517293f9c6bef3a8aeb"
+    },
+    {
+      "path": "LICENSE",
+      "size": 1092,
+      "sha256": "5902da4803c1efcb69b9610d9cc5dacee7e4efd97cf1ebd279b6abce589c4624"
+    },
+    {
+      "path": "collector/LICENSE",
+      "size": 1092,
+      "sha256": "5902da4803c1efcb69b9610d9cc5dacee7e4efd97cf1ebd279b6abce589c4624"
+    },
+    {
+      "path": "collector/cli/LICENSE",
+      "size": 1092,
+      "sha256": "5902da4803c1efcb69b9610d9cc5dacee7e4efd97cf1ebd279b6abce589c4624"
+    },
+    {
+      "path": "collector/mobile/android/app/src/main/assets/LICENSE",
+      "size": 1092,
+      "sha256": "5902da4803c1efcb69b9610d9cc5dacee7e4efd97cf1ebd279b6abce589c4624"
+    },
+    {
+      "path": "collector/mobile/ios/LICENSE",
+      "size": 1092,
+      "sha256": "5902da4803c1efcb69b9610d9cc5dacee7e4efd97cf1ebd279b6abce589c4624"
+    },
+    {
+      "path": "docs/BRAND.md",
+      "size": 1441,
+      "sha256": "9e6c0ec2c10b15d4e0db3555c687dfed8dd46990d2a9d9826aaedaa5d013bf89"
+    }
+  ]
+}

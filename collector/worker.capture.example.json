@@ -1,0 +1,23 @@
+{
+  "server": "http://127.0.0.1:4317",
+  "dataDir": "./worker-data",
+  "capabilities": ["article", "webpage"],
+  "defaultAgent": "codex",
+  "fallbackAgents": ["codebuddy"],
+  "byType": {},
+  "agents": {
+    "codex": {
+      "command": "./.runtime/codex/node_modules/.bin/codex",
+      "args": ["exec", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "-c", "approval_policy=never", "-"]
+    },
+    "codebuddy": {
+      "enabled": true,
+      "command": "codebuddy",
+      "instructions": "当前工作目录已是资料库根目录，不要 cd。目录查找用 Glob，读文件用 Read，创建修改用 Write/Edit，不使用 shell 操作文件。Windows 的 catalog 命令用 PowerShell 工具执行，macOS 用 Bash；一次只执行 node scripts/catalog.mjs now、build 或 check，不组合命令。",
+      "args": ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--allowedTools", "WebFetch", "Bash(ls:*)", "Bash(cd:*)", "Bash(echo:*)", "Bash(node scripts/catalog.mjs:*)", "PowerShell(node scripts/catalog.mjs:*)"]
+    }
+  },
+  "instructions": "不修改 scripts、AGENTS.md 和客户端配置；额外下载或转录工具需要授权时，停止并报告待操作。",
+  "watchLibrary": null,
+  "taskTimeoutMs": 3600000
+}

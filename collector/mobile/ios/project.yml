@@ -1,0 +1,80 @@
+name: PersonalLibrary
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: '16.0'
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Config/Local.xcconfig
+  Release: Config/Local.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    SWIFT_STRICT_CONCURRENCY: targeted
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  PersonalLibrary:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+      - Assets.xcassets
+      - path: LICENSE
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(COLLECTOR_BUNDLE_ID)
+        INFOPLIST_FILE: Config/App-Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Config/Shared.entitlements
+    dependencies:
+      - target: CollectorShare
+        embed: true
+      - sdk: libsqlite3.tbd
+      - sdk: WebKit.framework
+      - sdk: PDFKit.framework
+  CollectorShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShareExtension
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(COLLECTOR_BUNDLE_ID).share
+        INFOPLIST_FILE: Config/Share-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Config/Shared.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: libsqlite3.tbd
+  PersonalLibraryTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(COLLECTOR_BUNDLE_ID).tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: PersonalLibrary
+schemes:
+  PersonalLibrary:
+    build:
+      targets:
+        PersonalLibrary: all
+        CollectorShare: all
+    test:
+      targets:
+        - PersonalLibraryTests
+      gatherCoverageData: true

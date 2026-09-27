@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="description" content="下载个人资料库客户端，分享链接给自己的电脑采集，在手机上阅读整理后的资料。">
+  <title>客户端下载与 AI Skill · InspiraiNest</title>
+  <link rel="icon" type="image/png" href="/brand-icon.png">
+  <link rel="stylesheet" href="/download.css"><link rel="stylesheet" href="/worker-download.css"><link rel="stylesheet" href="/brand.css"><script defer src="/download.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到下载内容</a>
+  <header class="download-header"><a class="brand" href="/"><img class="brand-mark" src="/brand-icon.png" alt="">InspiraiNest</a><a class="back-link" href="/">继续使用网页版 <span aria-hidden="true">↗</span></a></header>
+  <main id="main">
+    <nav class="download-nav" aria-label="下载分类"><a href="#title">手机客户端</a><a href="#worker-title">电脑采集端</a><a href="#ai-tools">AI Skill 与只读 CLI <span aria-hidden="true">↓</span></a></nav>
+    <section class="hero" aria-labelledby="title">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> 个人资料库 · 移动客户端</div>
+        <h1 id="title">看到的好内容，<br>随手放进<span>资料库。</span></h1>
+        <p class="intro">文章、视频、一个突然想到的问题。<br>从手机分享，交给自己的电脑采集，<br>再带着整理好的资料，慢慢读。</p>
+        <div class="download-actions"><a id="android-download" class="download-button" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span>读取安装包信息…</span></a><a class="installation-link" href="#installation">如何安装 <span aria-hidden="true">↓</span></a></div>
+        <p id="release-meta" class="release-meta" role="status">正在确认最新版本</p>
+        <p id="platform-message" class="platform-message" hidden></p>
+        <div class="qr-block"><img src="/download/qr.svg" width="104" height="104" alt="用手机扫描，打开当前网站的客户端下载页"><div><strong>手机扫一扫，带走资料库</strong><p>扫码打开本页，然后下载安装。</p><small id="qr-note">手机需能访问当前资料库网站。</small></div></div>
+      </div>
+      <div class="product-visual" aria-label="客户端分享流程示意">
+        <div class="visual-label"><span>把分享变成收藏</span><span>01 — 03</span></div>
+        <div class="phone">
+          <div class="phone-top"><span>9:41</span><span aria-hidden="true">● ▰</span></div>
+          <div class="phone-content"><div class="phone-heading"><img class="tiny-mark" src="/brand-icon.png" alt=""><span>InspiraiNest</span><span class="phone-more" aria-hidden="true">···</span></div><div class="phone-rule"></div><span class="phone-kicker">系统分享 → InspiraiNest</span><h2>保存这次发现</h2><p class="phone-muted">原文完整保留，交给电脑整理。</p><div class="share-paper"><span>分享原文</span><strong>一篇想认真读完的文章</strong><p>标题、链接和你的想法<br>一起收进资料库。</p><div class="paper-line"></div><div class="paper-line short"></div></div><div class="phone-option"><span class="checkmark" aria-hidden="true">✓</span>完成分析后自动归档</div><div class="phone-submit">提交采集任务 <span aria-hidden="true">↗</span></div><p class="phone-caption">手机负责收藏，电脑负责采集</p></div>
+          <div class="home-indicator"></div>
+        </div>
+        <div class="process-note"><span class="note-symbol" aria-hidden="true">✓</span><div><strong>好内容，有了自己的位置</strong><p>原文 · 摘要 · 图片 · 附件</p></div></div>
+        <span class="visual-caption">分享界面示意</span>
+      </div>
+    </section>
+    <section class="workflow" aria-label="客户端能做什么"><div><span class="step-number">01</span><div><h2>从分享开始</h2><p>在其他 App 中分享文字和链接，<br>可再加一句你的采集要求。</p></div></div><div><span class="step-number">02</span><div><h2>电脑接着处理</h2><p>由已配对的电脑执行采集，<br>手机随时查看任务进度。</p></div></div><div><span class="step-number">03</span><div><h2>回来，认真读</h2><p>阅读摘要、原文与图片，<br>把附件保存到需要的地方。</p></div></div></section>
+    <section class="worker-platform" aria-labelledby="worker-title"><div class="worker-copy"><span class="eyebrow">电脑采集端</span><h2 id="worker-title">让自己的电脑<br>接着完成采集。</h2><p>Worker 常驻系统托盘，连接已配对的资料库。单击查看状态，双击打开管理窗口；原媒体只保留在处理它的电脑上。</p></div><div class="worker-actions"><a id="worker-windows" aria-disabled="true"><span>Windows 采集 Worker</span><span aria-hidden="true">↓</span></a><a id="worker-macos-arm64" aria-disabled="true"><span>macOS Worker · Apple Silicon</span><span aria-hidden="true">↓</span></a><a id="worker-macos-x64" aria-disabled="true"><span>macOS Worker · Intel</span><span aria-hidden="true">↓</span></a><p id="worker-status" role="status">正在确认可用版本</p><p>在网页版「配对设备」选择「电脑采集端」，把一次性配对码填入 Worker 窗口。首次运行前，请在电脑上准备好 Codex CLI 或 CodeBuddy CLI。</p><details id="worker-checks" hidden><summary>版本与校验</summary><dl><dt>Windows SHA-256</dt><dd id="worker-windows-sha"></dd><dt>macOS Apple Silicon SHA-256</dt><dd id="worker-macos-arm64-sha"></dd><dt>macOS Intel SHA-256</dt><dd id="worker-macos-x64-sha"></dd></dl></details></div></section>
+    <section id="ai-tools" class="ai-tools" aria-labelledby="ai-title">
+      <div class="ai-heading"><div><span class="eyebrow">连接你的 AI 工具</span><h2 id="ai-title">让收藏的资料，<br>成为回答的依据。</h2></div><p>Skill 告诉 AI 如何查阅与引用，CLI 负责连接你的资料库。<br>适用于支持 Skill 和终端调用的工具，如 Codex、CodeBuddy。</p></div>
+      <div class="ai-install-grid">
+        <div class="ai-install"><span class="ai-step">01 / 安装 Skill</span><h3>复制一句话，交给 AI 安装</h3><p>在你常用的 AI 工具中粘贴这句话。</p><label class="sr-only" for="skill-install-prompt">安装 Skill 的提示词</label><textarea id="skill-install-prompt" readonly rows="4">请从 https://github.com/inspirai-store/lingnest-library 安装 lingnest-library Skill，并按仓库说明安装适合我系统的 InspiraiNest CLI；连接资料库时由我在浏览器确认授权。</textarea><button type="button" class="ai-copy" data-copy="skill-install-prompt">复制安装话术</button><div class="ai-links"><a id="skill-download" aria-disabled="true">下载 Skill ZIP ↓</a><a href="https://github.com/inspirai-store/lingnest-library" target="_blank" rel="noopener noreferrer">GitHub 公开目录 ↗</a></div><details class="ai-command"><summary>也可以用一行命令安装</summary><p>需要 Node.js / npm；运行后选择你的 AI 工具。此命令只安装 Skill。</p><code id="skill-install-command">npx skills add inspirai-store/lingnest-library --skill lingnest-library -g</code><button type="button" class="ai-copy" data-copy="skill-install-command">复制命令</button></details><p id="skill-copy-status" role="status"></p></div>
+        <div class="ai-install"><span class="ai-step">02 / 下载只读 CLI</span><h3>选择你的系统和芯片</h3><p>独立程序，无需安装 Node.js 或 Go。解压后将程序加入 PATH，或让 AI 使用程序的完整路径。</p><div class="cli-downloads"><a data-cli="windows-amd64" aria-disabled="true"><span>Windows <small>x64</small></span><span>ZIP ↓</span></a><a data-cli="darwin-arm64" aria-disabled="true"><span>macOS <small>Apple Silicon</small></span><span>TAR.GZ ↓</span></a><a data-cli="darwin-amd64" aria-disabled="true"><span>macOS <small>Intel</small></span><span>TAR.GZ ↓</span></a><a data-cli="linux-amd64" aria-disabled="true"><span>Linux <small>x64</small></span><span>TAR.GZ ↓</span></a><a data-cli="linux-arm64" aria-disabled="true"><span>Linux <small>arm64</small></span><span>TAR.GZ ↓</span></a></div><p id="cli-status" role="status">正在确认可用版本…</p><a id="cli-checksums" class="checksum-link" aria-disabled="true">下载 SHA-256 校验文件 ↓</a></div>
+      </div>
+      <div class="ai-connect"><div><span class="ai-step">03 / 确认连接</span><h3>在浏览器确认，只授予读取权限。</h3><p>授权后，AI 即可按需搜索、阅读和引用。授权有效期 30 天，可在“授权设备”中随时撤销。</p></div><div><code>lingnest auth login</code><p>默认连接官网资料库；其他部署可通过 --server 指定 HTTPS 地址。登录与后续查询须使用同一系统账户。</p></div></div>
+      <p class="cli-preview-note">CLI v0.1.0 预览版：官网已支持浏览器确认的只读授权，首次连接需核对确认码。Windows x64 已实测，macOS / Linux 尚待原生运行验收；Linux 需要可用的 Secret Service。</p>
+    </section>
+    <section id="installation" class="installation"><div class="section-heading"><span class="eyebrow">第一次使用</span><h2>装好，再连接<br>自己的资料库。</h2><p>Android 8.0 及以上 · 手机需能访问资料库服务</p></div><ol><li><span>1</span><div><h3>下载安装包</h3><p>点击上方按钮下载 APK，在下载列表中打开。若系统询问，允许当前浏览器安装此应用。</p></div></li><li><span>2</span><div><h3>生成手机配对二维码</h3><p>登录网页版，在「授权设备」中选择「配对设备」，用途选择「手机 / 管理端」，生成二维码。</p></div></li><li><span>3</span><div><h3>打开 App，完成配对</h3><p>选择「扫码配对」，扫描网页二维码或从相册识别。服务地址和配对码会自动填入，确认后点击「配对并登录」。</p></div></li></ol></section>
+    <section class="other-platform"><div><span class="platform-label">iOS</span><h2>iPhone 版尚未发布</h2><p>现在可以继续用浏览器阅读资料和管理采集任务。</p></div><a href="/">打开网页版 <span aria-hidden="true">↗</span></a></section>
+    <details class="release-details" id="release-details" hidden><summary>版本与文件校验信息</summary><dl><dt>安装包</dt><dd id="release-file"></dd><dt>SHA-256</dt><dd id="release-sha"></dd></dl></details>
+    <noscript><p class="no-script">请启用 JavaScript 查看可用版本和下载按钮。你仍可<a href="/">使用网页版</a>。</p></noscript>
+  </main>
+  <footer><a class="brand" href="/">InspiraiNest</a><span>让每一次发现，都有迹可循。</span><a href="/">返回资料库 ↑</a></footer>
+</body></html>

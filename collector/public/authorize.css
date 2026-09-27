@@ -1,0 +1,81 @@
+.authorize-page { background: #f6f8f8; color: #222b30; }
+.authorize-page .authorize-header { justify-content: space-between; height: 72px; padding: 0 32px; }
+.authorize-page .brand { color: inherit; text-decoration: none; }
+.authorize-page .brand img { width: 34px; height: 34px; object-fit: contain; }
+.authorize-page .back-link { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.authorize-page .back-link:hover { color: var(--green); }
+.authorize-page .back-link svg { width: 16px; height: 16px; }
+.authorize-page .authorize-main { min-height: calc(100dvh - 72px); padding: 48px 16px 24px; background: transparent; }
+.authorize-page .authorize-card { width: 100%; max-width: 520px; margin: 0 auto; padding: 32px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 4px 20px #233b3106; }
+.authorize-page .card-intro { margin-bottom: 28px; }
+.authorize-page .connection-mark { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.authorize-page .connection-mark span { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 8px; background: #f8faf9; }
+.authorize-page .connection-mark span svg { width: 23px; height: 23px; color: var(--green); }
+.authorize-page .connection-mark > svg { width: 18px; color: #8c9995; }
+.authorize-page .connection-mark img { width: 43px; height: 43px; object-fit: contain; }
+.authorize-page .eyebrow { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.authorize-page h1 { font-size: 25px; line-height: 1.4; font-weight: 650; }
+.authorize-page #page-description { font-size: 13px; color: var(--muted); margin-top: 10px; line-height: 1.8; }
+.authorize-page form { display: grid; gap: 10px; }
+.authorize-page form label { font-size: 13px; font-weight: 600; }
+.authorize-page input { min-height: 46px; }
+.authorize-page #user-code { font: 23px/1.5 Consolas, monospace; letter-spacing: 2px; text-transform: uppercase; }
+.authorize-page .field-note { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.authorize-page .wide { width: 100%; margin-top: 12px; }
+.authorize-page button { min-height: 44px; }
+.authorize-page .client-row { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.authorize-page .client-icon { display: grid; place-items: center; flex: 0 0 38px; height: 38px; background: #f3f6f5; border-radius: 5px; color: var(--muted); }
+.authorize-page .client-row > div { flex: 1; min-width: 0; }
+.authorize-page #client-name { margin-top: 2px; font-size: 15px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.authorize-page .read-badge { flex-shrink: 0; align-self: flex-start; margin-top: 6px; font-size: 11px; color: var(--green); background: #e9f3ef; padding: 3px 7px; border-radius: 3px; }
+.authorize-page .confirmation-panel { padding: 16px 18px; background: #f5f7f6; border: 1px solid #e7ece9; border-radius: 5px; }
+.authorize-page .confirmation-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: #4c5960; }
+.authorize-page .text-button { min-height: 32px; padding: 4px 0; border: 0; background: transparent; color: var(--green); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.authorize-page .text-button:hover { color: #125744; }
+.authorize-page #confirmation-code { display: block; font: 600 32px/1.4 Consolas, monospace; letter-spacing: 3px; margin: 6px 0; }
+.authorize-page #request-expiry { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.authorize-page .permission-section { padding: 24px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.authorize-page h3 { margin: 0 0 13px; font-size: 13px; font-weight: 600; }
+.authorize-page .permission-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.authorize-page .permission-list li { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.authorize-page .permission-list svg { color: var(--muted); width: 17px; height: 17px; }
+.authorize-page .permission-list svg:last-child { color: var(--green); width: 16px; height: 16px; margin-left: auto; }
+.authorize-page .restriction { display: flex; gap: 8px; margin-top: 18px; font-size: 12px; color: var(--muted); }
+.authorize-page .restriction svg { width: 15px; height: 19px; }
+.authorize-page .duration-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 5px; }
+.authorize-page .duration-row strong { font-weight: 600; }
+.authorize-page .consent-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 24px; }
+.authorize-page .consent-note { color: var(--muted); font-size: 11px; text-align: center; margin-top: 12px; line-height: 1.7; }
+.authorize-page .page-footer { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 20px auto 0; font-size: 11px; color: var(--muted); }
+.authorize-page .page-footer svg { width: 13px; height: 13px; }
+.authorize-page .loading-panel { padding: 26px 0; display: grid; justify-items: center; gap: 18px; color: var(--muted); font-size: 13px; }
+.authorize-page .spinner { width: 26px; height: 26px; border: 2px solid #dbe8e2; border-top-color: var(--green); border-radius: 50%; animation: authorize-spin .8s linear infinite; }
+.authorize-page .result-panel { text-align: center; padding: 4px 0 8px; }
+.authorize-page .result-symbol { width: 56px; height: 56px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 50%; color: var(--green); background: #e9f3ef; }
+.authorize-page .result-symbol svg { width: 27px; height: 27px; }
+.authorize-page .result-panel[data-kind="error"] .result-symbol,
+.authorize-page .result-panel[data-kind="expired"] .result-symbol { color: #815800; background: #fff2d9; }
+.authorize-page .result-panel[data-kind="denied"] .result-symbol { color: var(--muted); background: #edf0f1; }
+.authorize-page #result-title { font-size: 21px; margin-bottom: 10px; }
+.authorize-page #result-description { font-size: 13px; line-height: 1.9; color: var(--muted); overflow-wrap: anywhere; white-space: pre-line; text-wrap: pretty; }
+.authorize-page .result-home { display: flex; width: fit-content; align-items: center; justify-content: center; gap: 6px; margin: 24px auto 0; font-size: 13px; text-decoration: none; }
+.authorize-page #result-change { display: block; margin: 16px auto 0; }
+.authorize-page .auth-message { margin-top: 18px; border: 1px solid #f0d8d9; background: #fdf5f5; padding: 10px 12px; border-radius: 5px; color: #a43845; font-size: 12px; overflow-wrap: anywhere; }
+.authorize-page [tabindex="-1"]:focus { outline: none; }
+@keyframes authorize-spin { to { transform: rotate(360deg); } }
+@media (max-width: 560px) {
+  .authorize-page .authorize-header { height: 64px; padding: 0 16px; }
+  .authorize-page .brand { gap: 8px; font-size: 16px; }
+  .authorize-page .brand img { width: 28px; height: 28px; }
+  .authorize-page .back-link { font-size: 12px; }
+  .authorize-page .authorize-main { min-height: calc(100dvh - 64px); padding-top: 24px; }
+  .authorize-page .authorize-card { padding: 24px 20px; }
+  .authorize-page h1 { font-size: 22px; }
+  .authorize-page .confirmation-panel { padding: 12px; }
+  .authorize-page .confirmation-heading { flex-wrap: wrap; gap: 0 8px; }
+  .authorize-page #confirmation-code { font-size: 28px; letter-spacing: 2px; }
+  .authorize-page .client-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: start; gap: 8px 10px; }
+  .authorize-page .read-badge { grid-column: 2; justify-self: start; margin: 0; }
+  .authorize-page .text-button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .authorize-page .spinner { animation: none; } }

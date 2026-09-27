@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>InspiraiNest · 采集 Worker</title><link rel="icon" href="icon.png"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="pair.css"><link rel="stylesheet" href="brand.css"></head>
+<body><main>
+  <header class="topbar">
+    <div class="brand"><img class="mark" src="icon.png" alt=""><span>InspiraiNest</span><b class="full">WORKER</b><span id="device" class="device"></span></div>
+    <span class="spacer"></span><span id="connection" class="badge">连接未知</span><span id="mode-badge" class="badge full">—</span>
+    <span id="heartbeat-top" class="header-heartbeat mono full">心跳 —</span><button id="theme-toggle" type="button" class="small-button theme-toggle" aria-label="切换到白天模式" title="切换到白天模式">白天</button><button data-action="hide" class="full subtle small-button">收起到托盘</button>
+  </header>
+  <div class="body">
+    <aside class="left">
+      <div class="block intro"><h1 id="headline">正在读取状态</h1><p id="description" class="desc">读取本机 Worker 状态…</p></div>
+      <div id="notice" class="notice full" role="status" hidden></div>
+      <div class="block compact-mini compact-only"><div>领取模式<strong id="mode-compact">—</strong></div><div>最近心跳<strong id="heartbeat-compact" class="mono">—</strong></div></div>
+      <div class="block status-block full"><h2 class="label">运行状态</h2><dl class="kv">
+        <dt>工作进程</dt><dd id="process" class="mono">—</dd>
+        <dt>阶段</dt><dd id="phase">—</dd>
+        <dt>领取模式</dt><dd id="mode">—</dd>
+        <dt>最近心跳</dt><dd id="heartbeat" class="mono">—</dd>
+        <dt>运行时长</dt><dd id="uptime" class="mono">—</dd>
+        <dt>默认 Agent</dt><dd id="default-agent" class="mono">—</dd>
+        <dt>服务地址</dt><dd id="server" class="wrap mono">—</dd>
+        <dt>数据目录</dt><dd id="data-dir" class="wrap mono">—</dd>
+      </dl></div>
+      <div class="block control-block"><h2 class="label full">控制</h2><div class="controls">
+        <button data-action="start" class="primary">启动 Worker</button><button data-action="pause">暂停领取</button>
+        <button data-action="resume">继续领取</button><button data-action="drain">完成后停止</button>
+      </div><p class="hint full">暂停与停止均保留当前任务；在途领取会完成。待操作任务需修复后在远端点“继续”。</p></div>
+      <div class="block agents-block full"><h2 class="label">本机 Agent</h2><div id="agents"></div></div>
+      <div class="block actions full"><button data-action="data" class="small-button">数据目录</button><button id="worker-logs" class="small-button">Worker 日志</button><button data-action="remote" class="small-button">远端任务 ↗</button><button data-action="quit" class="small-button subtle">仅退出管理器</button><button data-action="quit-after" class="small-button danger-button">完成后停止并退出</button></div>
+    </aside>
+    <section class="right">
+      <form id="pair-worker" class="card pair-worker full" hidden><div class="card-head"><h2>连接这台电脑</h2></div><div class="pair-fields"><label>服务地址<input name="server" type="url" required placeholder="https://library.example.com" autocomplete="url"></label><label>电脑名称<input name="name" required maxlength="100" autocomplete="off"></label><label>电脑采集端配对码<input name="key" type="password" required autocomplete="off"></label><button type="submit" class="primary">配对 Worker</button></div></form>
+      <section class="card task-card"><div class="card-head"><h2 id="task-heading">当前任务</h2><span id="stage" class="badge">空闲</span></div><div class="card-content"><h3 id="task-title">暂无任务</h3><p id="task-message" class="task-message">任务开始后，这里会显示执行阶段。</p><div class="task-meta"><span id="agent">Agent —</span><code id="task-id" class="mono"></code><span class="task-buttons full"><button id="task-folder" class="small-button">打开任务目录</button><button id="task-logs" class="small-button">Agent 日志</button></span></div></div></section>
+      <section class="card tasks-card full"><div class="card-head"><h2 id="tasks-heading">本次运行任务</h2><span id="tasks-summary" class="summary">0 个</span></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>状态</th><th>Agent</th><th></th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+      <section class="card logs-card full" id="logs-panel"><div class="card-head"><h2 id="log-title">Worker 日志 <span class="tag">末尾内容 · 凭据已隐藏</span></h2><button id="close-logs" class="small-button subtle">收起</button></div><pre id="logs" class="mono">正在读取日志…</pre></section>
+    </section>
+  </div>
+  <footer class="statusbar full"><span id="action-result" role="status"></span><span id="freshness" class="mono">正在读取状态 · 关闭窗口后继续托盘运行</span></footer>
+  <div class="compact-foot compact-only"><button data-action="show" class="primary">打开管理窗口</button></div>
+</main><script src="renderer.js"></script></body></html>

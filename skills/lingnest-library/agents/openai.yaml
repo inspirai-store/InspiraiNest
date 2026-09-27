@@ -1,0 +1,6 @@
+interface:
+  display_name: "InspiraiNest 资料库"
+  short_description: "通过只读授权检索个人资料库、阅读正文并给出可追溯的来源引用"
+  default_prompt: "使用 $lingnest-library 查找与当前问题有关的资料，阅读原文并附上出处。"
+policy:
+  allow_implicit_invocation: true

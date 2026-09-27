@@ -1,0 +1,5 @@
+#archives-view:has(#library-frame) > .heading,
+#archives-view:has(#library-frame) > #archives { display: none; }
+main:has(#archives-view:not([hidden]) #library-frame) { padding: 0; }
+#library-frame { display: block; border: 0; width: 100%; height: calc(100dvh - 73px); min-height: 480px; }
+@media(max-width:760px) { #library-frame { height: calc(100dvh - 123px); min-height: 400px; } }

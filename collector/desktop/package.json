@@ -1,0 +1,15 @@
+{
+  "name": "inspirainest-worker-desktop",
+  "version": "0.1.5",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "44.4.5"
+  },
+  "license": "MIT",
+  "author": "Wuhan Inspirai Technology Co., Ltd."
+}
