@@ -10,6 +10,7 @@
   <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
   <key>CollectorAppGroup</key><string>$(COLLECTOR_APP_GROUP)</string>
   <key>CollectorKeychainGroup</key><string>$(AppIdentifierPrefix)$(COLLECTOR_KEYCHAIN_SUFFIX)</string>
+  <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><false/></dict>
   <key>NSExtension</key><dict>
     <key>NSExtensionPointIdentifier</key><string>com.apple.share-services</string>
