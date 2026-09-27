@@ -209,6 +209,40 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       CSC_FOR_PULL_REQUEST: 'true'
     timeout-minutes: 60
+  worker-macos-intel:
+    needs: worker-macos
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: collector/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: collector
+      - uses: actions/download-artifact@v4
+        with:
+          name: InspiraiNest-macOS
+          path: collector/desktop/dist
+      - name: Test x64 client from the shared macOS update artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          zip="desktop/dist/InspiraiNest-v${version}-macOS-x64.zip"
+          test -s "$zip"
+          test -s desktop/dist/latest-mac.yml
+          mkdir -p desktop/dist/intel-unpacked
+          ditto -x -k "$zip" desktop/dist/intel-unpacked
+          app=desktop/dist/intel-unpacked/InspiraiNest.app
+          codesign --verify --deep --strict "$app"
+          test "$(lipo -archs "$app/Contents/MacOS/InspiraiNest")" = x86_64
+          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "$zip"
+        working-directory: collector
+    timeout-minutes: 20
   web-image:
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.macos_only }}
     runs-on: ubuntu-latest
