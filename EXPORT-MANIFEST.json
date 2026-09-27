@@ -3,7 +3,7 @@
   "license": "MIT",
   "brand": "InspiraiNest",
   "copyright": "Copyright (c) 2026 Wuhan Inspirai Technology Co., Ltd.",
-  "generatedAt": "2026-09-27T05:30:22.851Z",
+  "generatedAt": "2026-09-27T06:04:53.214Z",
   "pending": [
     "binary-distribution-notices",
     "hosting-release-configuration"
@@ -11,8 +11,8 @@
   "files": [
     {
       "path": ".github/workflows/collector-build.yml",
-      "size": 7513,
-      "sha256": "da91955f333c03b1289305d42f1310dcfca029db6df4bed7c4b2798476eb6185"
+      "size": 7613,
+      "sha256": "3cd4466a66700b05cbc4bf9d0e088e8d3111df8a1f4daeeb57f6e5ca26a0ec4c"
     },
     {
       "path": ".github/workflows/lingnest-cli.yml",
