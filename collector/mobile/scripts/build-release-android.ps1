@@ -1,4 +1,7 @@
-param([string]$SigningDirectory = "$env:LOCALAPPDATA/PersonalLibrary/signing")
+param(
+    [string]$SigningDirectory = "$env:LOCALAPPDATA/PersonalLibrary/signing",
+    [string]$CollectorServer
+)
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../android'))
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$env:LOCALAPPDATA/Android/Sdk" }
@@ -23,7 +26,9 @@ try {
         & "$env:JAVA_HOME/bin/keytool.exe" -genkeypair -keystore $store -storetype PKCS12 -alias personal-library -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=Personal Library Android' -storepass:env LIBRARY_SIGNING_PASSWORD -keypass:env LIBRARY_SIGNING_PASSWORD
         if ($LASTEXITCODE -ne 0) { throw 'Signing key creation failed.' }
     }
-    & ./gradlew.bat --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
+    $gradleArgs = @('--no-daemon', ':app:assembleRelease', ':app:testReleaseUnitTest', ':app:lintRelease')
+    if ($CollectorServer) { $gradleArgs += "-PcollectorServer=$CollectorServer" }
+    & ./gradlew.bat @gradleArgs
     if ($LASTEXITCODE -ne 0) { throw 'Release build/check failed.' }
     $dist = [IO.Path]::GetFullPath((Join-Path $project '../dist'))
     $buildConfig = Get-Content -LiteralPath "$project/app/build.gradle" -Raw
