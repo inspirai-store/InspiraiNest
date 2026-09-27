@@ -118,7 +118,9 @@ jobs:
           name: InspiraiNest-Windows-x64
           path: |
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
+            collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.blockmap
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.sha256
+            collector/desktop/dist/latest.yml
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -199,7 +201,9 @@ jobs:
           path: |
             collector/desktop/dist/InspiraiNest-v*-macOS-*.zip
             collector/desktop/dist/InspiraiNest-v*-macOS-*.dmg
+            collector/desktop/dist/InspiraiNest-v*-macOS-*.blockmap
             collector/desktop/dist/SHASUMS256.txt
+            collector/desktop/dist/latest-mac.yml
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
