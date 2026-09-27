@@ -22,8 +22,9 @@ function installationKey(input, role) {
   return value ? hash(`${role}:${value.toLowerCase()}`) : null;
 }
 
-export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL }) {
+export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT }) {
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
+  requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
   const locks = new Map();
   async function serialized(key, work) {
@@ -141,6 +142,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       const route = url.pathname;
       if (await download(req, res, route)) return;
       if (req.method === 'GET' && route === '/healthz') return send(res, 200, { status: 'ok' });
+      if (reviewExpiresAt && Date.now() >= Date.parse(reviewExpiresAt)) fail('Review demo has expired', 410);
       if (await readerAuth.handle(req, res, url)) return;
       if (route === '/api/library-session' && req.method === 'POST') {
         owner(await authenticate(req));

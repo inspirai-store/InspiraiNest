@@ -62,6 +62,16 @@ async function setup(t, overrides = {}) {
   return { app, root, owner, server, key, pairWorker, submit };
 }
 
+test('temporary review service refuses all access after its expiry', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-review-test-'));
+  const app = createService({ dataDir: root, masterKey: secret(), reviewExpiresAt: new Date(Date.now() - 1000).toISOString() });
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  t.after(() => app.close());
+  const server = `http://127.0.0.1:${app.server.address().port}`;
+  assert.equal((await fetch(server + '/healthz')).status, 200);
+  assert.equal((await fetch(server + '/api/pair', { method: 'POST', body: '{}' })).status, 410);
+});
+
 test('installation identity replaces stale authorization and revoke removes its record', async t => {
   const { owner, app } = await setup(t);
   const ownerInstallation = crypto.randomUUID();
