@@ -8,6 +8,7 @@ files:
   - LICENSE
   - desktop/main.mjs
   - desktop/manager.mjs
+  - desktop/updater.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
   - desktop/index.html
@@ -24,8 +25,11 @@ extraResources:
     to: library
 win:
   icon: desktop/icon.ico
-  target: portable
+  target: nsis
   artifactName: InspiraiNest-v${version}-Windows-${arch}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
 mac:
   icon: desktop/icon.png
   target:
@@ -36,3 +40,7 @@ mac:
   entitlements: desktop/entitlements.mac.plist
   entitlementsInherit: desktop/entitlements.mac.plist
   notarize: true
+publish:
+  provider: github
+  owner: inspirai-store
+  repo: InspiraiNest

@@ -7,6 +7,7 @@ name: Collector builds
         type: boolean
         default: false
   push:
+    branches: [main]
     paths:
       - collector/**
       - assets/library.js
@@ -102,7 +103,16 @@ jobs:
         run: |
           $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
           if ($file.Length -lt 1000000) { throw 'Worker package is unexpectedly small' }
+          $metadata = Get-Content collector/desktop/dist/latest.yml -Raw
+          if ($metadata -notmatch [regex]::Escape($file.Name) -or $metadata -notmatch 'sha512:') { throw 'Windows update metadata is missing the installer or checksum' }
+          $feed = Get-Content collector/desktop/dist/win-unpacked/resources/app-update.yml -Raw
+          if ($feed -notmatch 'provider: github' -or $feed -notmatch 'repo: InspiraiNest') { throw 'Windows update feed is missing' }
           (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -LiteralPath "$($file.FullName).sha256" -Encoding ascii
+      - name: Test packaged Windows update download
+        shell: pwsh
+        run: |
+          $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
+          node collector/scripts/test-packaged-update.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe $file.FullName
       - uses: actions/upload-artifact@v4
         with:
           name: InspiraiNest-Windows-x64
@@ -161,6 +171,10 @@ jobs:
           done
           test "$(find desktop/dist -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.zip' | wc -l | tr -d ' ')" = 2
           test "$(find desktop/dist -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.dmg' | wc -l | tr -d ' ')" = 2
+          test -s desktop/dist/latest-mac.yml
+          grep -F "InspiraiNest-v${version}-macOS-arm64.zip" desktop/dist/latest-mac.yml
+          grep -F "InspiraiNest-v${version}-macOS-x64.zip" desktop/dist/latest-mac.yml
+          grep -F 'provider: github' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
           (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)

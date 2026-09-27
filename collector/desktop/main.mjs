@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { WorkerManager } from './manager.mjs';
+import electronUpdater from 'electron-updater';
+import { DesktopUpdater } from './updater.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 if (app.isPackaged) {
@@ -22,9 +24,10 @@ const scope = createHash('sha256').update(manager.dataDir.toLowerCase()).digest(
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
+let updates, updateTimer, initialUpdateTimer;
 let main, popover, tray, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
-if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray });
+if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, updates });
 const trace = event => {
   if (process.env.COLLECTOR_DESKTOP_TRACE) fs.appendFileSync(process.env.COLLECTOR_DESKTOP_TRACE, JSON.stringify({ event, at: new Date().toISOString() }) + '\n');
 };
@@ -81,6 +84,10 @@ function registerIPC() {
     pair: input => manager.pair(input),
     'task-folder': async task => { const error = await shell.openPath(manager.taskDirectory(task)); if (error) throw new Error(error); },
   })) ipcMain.handle(`worker:${name}`, async (event, argument) => { trusted(event); return fn(argument); });
+  for (const [name, fn] of Object.entries({
+    status: () => updates.snapshot(), check: () => updates.check(),
+    download: () => updates.download(), install: () => updates.install(),
+  })) ipcMain.handle(`updates:${name}`, async event => { trusted(event); if (event.sender !== main?.webContents) throw new Error('请在主窗口管理客户端更新'); return fn(); });
 }
 async function menuAction(action) { try { await perform(action); } catch (error) { await dialog.showMessageBox(main, { type: 'info', message: error.message }); } }
 function refreshTray() {
@@ -91,6 +98,7 @@ function refreshTray() {
   const menu = Menu.buildFromTemplate([
     { label: `InspiraiNest · ${label}`, enabled: false },
     { label: '打开管理窗口', click: openManager }, { type: 'separator' },
+    { label: '检查客户端更新', click: () => { openManager(); main.webContents.send('updates:open'); } },
     { label: '启动 Worker', enabled: !s.running && !s.starting && s.paired, click: () => menuAction('start') },
     { label: s.mode === 'paused' ? '继续领取' : '暂停领取（当前任务继续）', enabled: s.managed && !s.stale && s.mode !== 'draining', click: () => menuAction(s.mode === 'paused' ? 'resume' : 'pause') },
     { label: '完成当前任务后停止', enabled: s.managed && !s.stale && s.mode !== 'draining', click: () => menuAction('drain') },
@@ -105,9 +113,11 @@ else {
   app.on('second-instance', openManager);
   app.on('window-all-closed', () => {});
   app.on('activate', openManager);
-  app.on('before-quit', () => { quitting = true; clearInterval(refreshTimer); clearTimeout(clickTimer); });
+  app.on('before-quit', () => { quitting = true; clearInterval(refreshTimer); clearInterval(updateTimer); clearTimeout(initialUpdateTimer); clearTimeout(clickTimer); updates?.dispose(); });
   app.whenReady().then(() => {
+    updates = new DesktopUpdater({ app, manager, updater: electronUpdater.autoUpdater });
     main = makeWindow(); popover = makeWindow(true);
+    updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });
     main.on('close', event => { if (!quitting) { event.preventDefault(); main.hide(); trace('close-to-tray'); } });
     main.on('minimize', event => { event.preventDefault(); main.hide(); trace('minimize-to-tray'); });
     popover.on('blur', () => popover.hide());
@@ -116,6 +126,10 @@ else {
     tray.on('double-click', () => { clearTimeout(clickTimer); trace('tray-double-open'); openManager(); });
     tray.on('right-click', () => { clearTimeout(clickTimer); refreshTray(); tray.popUpContextMenu(tray.menu); });
     registerIPC(); refreshTray(); refreshTimer = setInterval(refreshTray, 2000);
+    if (process.env.COLLECTOR_DESKTOP_TEST !== '1') {
+      initialUpdateTimer = setTimeout(() => updates.check(), 15000);
+      updateTimer = setInterval(() => updates.check(), 6 * 60 * 60 * 1000);
+    }
     main.once('ready-to-show', openManager);
   }).catch(error => { dialog.showErrorBox('管理器启动失败', error.message); app.quit(); });
 }

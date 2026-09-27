@@ -24,6 +24,38 @@ const phases = { starting: '启动中', idle: '空闲', claiming: '领取任务'
 const compact = new URLSearchParams(location.search).has('compact');
 if (compact) { document.body.classList.add('compact'); document.title = 'Worker 状态'; }
 let snapshot, busy = false, logsOpen = !compact, logsTaskId = null, logsLoading = false, refreshing = false;
+const updateMessages = {
+  idle: '可检查是否有新版本。', checking: '正在检查新版本…', current: '已是最新版本。',
+  available: '新版本已就绪，下载后可安装。', downloading: '正在下载并校验更新包…',
+  downloaded: '已下载并校验，可安装并重启。', waiting_worker: '当前任务完成后将停止 Worker 并安装更新。',
+  installing: '正在安装更新，客户端即将重启。', unsupported: '请安装正式版客户端以使用应用内更新。',
+};
+function renderUpdate(s) {
+  if (compact || !s) return;
+  text('#update-version', `当前版本 v${s.version}`);
+  text('#update-headline', s.availableVersion && ['available', 'downloading', 'downloaded', 'waiting_worker', 'installing'].includes(s.phase)
+    ? `新版本 v${s.availableVersion}` : '客户端版本');
+  text('#update-description', s.error || updateMessages[s.phase] || '更新状态未知');
+  $('#update-check').disabled = !s.supported || ['checking', 'downloading', 'downloaded', 'waiting_worker', 'installing'].includes(s.phase);
+  $('#update-download').hidden = s.phase !== 'available';
+  $('#update-install').hidden = s.phase !== 'downloaded';
+  $('#update-progress').hidden = !['downloading', 'downloaded'].includes(s.phase);
+  const progress = Math.max(0, Math.min(100, Number(s.progress) || 0));
+  $('#update-progress').setAttribute('aria-valuenow', String(progress));
+  $('#update-progress-fill').style.width = `${progress}%`;
+  $('#update-card').dataset.phase = s.phase;
+}
+if (!compact) {
+  window.updates.onChanged(renderUpdate);
+  window.updates.onOpen(() => { $('#update-card').scrollIntoView({ block: 'center' }); $('#update-check').focus(); window.updates.check().then(renderUpdate).catch(error => text('#update-description', error.message)); });
+  for (const [id, action] of [['update-check', 'check'], ['update-download', 'download'], ['update-install', 'install']]) {
+    $(`#${id}`).addEventListener('click', async () => {
+      try { renderUpdate(await window.updates[action]()); }
+      catch (error) { text('#update-description', error.message.replace(/^Error invoking remote method '[^']+': Error: /, '')); }
+    });
+  }
+  window.updates.status().then(renderUpdate).catch(error => text('#update-description', error.message));
+}
 const text = (selector, value) => { $(selector).textContent = value ?? '—'; };
 const selectedTask = () => snapshot?.current || snapshot?.lastTask;
 const timestamp = value => { const n = Date.parse(value); return Number.isFinite(n) ? n : null; };
