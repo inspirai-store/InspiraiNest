@@ -39,7 +39,11 @@ const { _electron } = require('playwright');
     const env = { ...process.env, COLLECTOR_CONFIG: workerConfig, COLLECTOR_DESKTOP_TEST: '1' };
     delete env.ELECTRON_RUN_AS_NODE;
     app = await _electron.launch({ executablePath: executable, env });
-    await app.evaluate((_, url) => globalThis.workerDesktop().updates.updater.setFeedURL({ provider: 'generic', url, useMultipleRangeRequest: false }), base);
+    await app.evaluate((_, { url, cache }) => {
+      const updater = globalThis.workerDesktop().updates.updater;
+      Object.defineProperty(updater.app, 'baseCachePath', { value: cache });
+      updater.setFeedURL({ provider: 'generic', url, useMultipleRangeRequest: false });
+    }, { url: base, cache: path.join(root, 'updater-cache') });
     await app.firstWindow();
     let page;
     for (let i = 0; i < 100 && !page; i++) {
@@ -58,7 +62,11 @@ const { _electron } = require('playwright');
     await page.locator('#update-download').click();
     await page.locator('#update-install').waitFor({ state: 'visible', timeout: 120000 });
     assert.match(await page.locator('#update-description').innerText(), /已下载并校验/);
-    console.log(`Packaged updater checked and downloaded v${next} fixture with real ${process.platform} package bytes`);
+    const packageRequests = requests.map(url => new URL(url, 'http://localhost').pathname)
+      .filter(route => /^\/InspiraiNest-v\d+\.\d+\.\d+-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(route));
+    assert.ok(packageRequests.includes('/' + path.basename(installer)), `Updater selected the wrong package: ${packageRequests.join(', ')}`);
+    assert.ok(packageRequests.every(route => route === '/' + path.basename(installer)), `Updater requested another architecture: ${packageRequests.join(', ')}`);
+    console.log(`Packaged updater checked and downloaded ${path.basename(installer)} for ${process.platform}`);
   } finally {
     if (app) { try { await app.evaluate(({ app }) => app.quit()); } catch {} await app.close().catch(() => {}); }
     await new Promise(resolve => server.close(resolve));
