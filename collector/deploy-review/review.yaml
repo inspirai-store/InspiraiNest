@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: library-review-data
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: alicloud-disk-topology-alltype
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: library-review
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: library-review}
+  template:
+    metadata:
+      labels: {app: library-review}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:review-20260928-expiry2@sha256:b0034a50a3790782cb3f37e9a07b64b0fb67cca54409edd098a7691be04cefc5
+          ports:
+            - containerPort: 4317
+          envFrom:
+            - secretRef:
+                name: library-review-key
+          env:
+            - name: COLLECTOR_PUBLIC_URL
+              value: https://review-library.inspirai.store
+            - name: COLLECTOR_REVIEW_EXPIRES_AT
+              value: '2026-11-12T08:00:00Z'
+          readinessProbe:
+            httpGet: {path: /healthz, port: 4317}
+          livenessProbe:
+            httpGet: {path: /healthz, port: 4317}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: '1', memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: library-review-data}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: library-review
+spec:
+  selector: {app: library-review}
+  ports:
+    - port: 80
+      targetPort: 4317
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: library-review-tls
+  annotations:
+    alb.ingress.kubernetes.io/address-type: internet
+    alb.ingress.kubernetes.io/certificate-id: inspirai-store-tls
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  ingressClassName: alb
+  tls:
+    - hosts: [review-library.inspirai.store]
+      secretName: inspirai-store-tls
+  rules:
+    - host: review-library.inspirai.store
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: library-review
+                port:
+                  number: 80

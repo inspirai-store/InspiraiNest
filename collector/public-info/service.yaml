@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: library-app-info
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: library-app-info}
+  template:
+    metadata:
+      labels: {app: library-app-info}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: web
+          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:review-20260928-expiry2@sha256:b0034a50a3790782cb3f37e9a07b64b0fb67cca54409edd098a7691be04cefc5
+          command: [node, /pages/server.mjs]
+          ports:
+            - containerPort: 4318
+          readinessProbe:
+            httpGet: {path: /healthz, port: 4318}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - name: pages
+              mountPath: /pages
+              readOnly: true
+      volumes:
+        - name: pages
+          configMap:
+            name: library-app-info-pages
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: library-app-info
+spec:
+  selector: {app: library-app-info}
+  ports:
+    - port: 80
+      targetPort: 4318
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: library-app-info-tls
+  annotations:
+    alb.ingress.kubernetes.io/address-type: internet
+    alb.ingress.kubernetes.io/certificate-id: inspirai-store-tls
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  ingressClassName: alb
+  tls:
+    - hosts: [library.inspirai.store]
+      secretName: inspirai-store-tls
+  rules:
+    - host: library.inspirai.store
+      http:
+        paths:
+          - path: /privacy
+            pathType: Exact
+            backend:
+              service:
+                name: library-app-info
+                port:
+                  number: 80
+          - path: /support
+            pathType: Exact
+            backend:
+              service:
+                name: library-app-info
+                port:
+                  number: 80

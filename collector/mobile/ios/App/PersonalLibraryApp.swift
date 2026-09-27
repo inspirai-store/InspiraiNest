@@ -231,6 +231,10 @@ struct SettingsView: View {
                 Text("分享扩展仅做短时间发送尝试。离线或系统终止时，请回到发件箱重试；无需重新分享。电脑上的采集 Agent 负责分析与归档。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+            Section("帮助与隐私") {
+                Link("使用帮助与联系支持", destination: URL(string: "https://library.inspirai.store/support")!)
+                Link("隐私政策", destination: URL(string: "https://library.inspirai.store/privacy")!)
+            }
         }.navigationTitle("设备与配对").refreshable { await model.refresh() }
         .confirmationDialog("撤销 \(revoking?.name ?? "") 的服务器访问？", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }), titleVisibility: .visible) {
             if let device = revoking { Button("撤销设备", role: .destructive) { Task { await model.revoke(device) }; revoking = nil } }
