@@ -31,7 +31,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: api
-          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-mobile-refresh-20260930@sha256:57fa6979b1dfa9198474e907ee2c7d02987d331f1dba2cd1ad8745353b767aa7
+          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-library-nozoom-20260930@sha256:c671bb7ef1a322edba2eb7ada6f3780ebbe2b7bbe4b6856c3cb8b57d1237033e
           ports:
             - containerPort: 4317
           envFrom:
