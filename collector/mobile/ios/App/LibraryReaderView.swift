@@ -50,6 +50,7 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     @Published var requestedArchive: RequestedArchive?
     private var origin: ServerOrigin?
     private var generation = UUID()
+    private var legacyNavigation: WKNavigation?
 
     func start() async {
         guard !loading else { return }
@@ -94,7 +95,7 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         } catch { if current == generation { message = safeMessage(error) } }
     }
     func stop() {
-        generation = UUID(); loading = false; requestedArchive = nil; legacy = false
+        generation = UUID(); loading = false; requestedArchive = nil; legacy = false; legacyNavigation = nil
         if let view = webView {
             view.stopLoading(); view.navigationDelegate = nil; view.uiDelegate = nil
             let store = view.configuration.websiteDataStore
@@ -138,7 +139,8 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             if response.statusCode == 404, url.path == "/library/mobile-next/index.html",
                let fallback = try? origin.url("/library/") {
                 legacy = true
-                webView.load(URLRequest(url: fallback))
+                message = nil
+                legacyNavigation = webView.load(URLRequest(url: fallback))
                 decisionHandler(.cancel); return
             }
             message = response.statusCode == 401 ? "阅读授权已失效，请重新配对。" : "资料暂时不可读取。"
@@ -154,11 +156,14 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         return nil
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if legacy && navigation !== legacyNavigation { return }
         if (error as NSError).code != NSURLErrorCancelled { message = "无法载入资料，请检查连接后重试。" }
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if legacy && navigation !== legacyNavigation { return }
         if (error as NSError).code != NSURLErrorCancelled { message = "阅读连接中断，请重试。" }
     }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { message = nil }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { message = "系统已结束阅读进程，请重新载入。" }
 }
 
