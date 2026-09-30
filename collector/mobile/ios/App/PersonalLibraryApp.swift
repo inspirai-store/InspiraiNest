@@ -52,8 +52,6 @@ struct PairingForm: View {
     @State private var showingManual = false
     var body: some View {
         Section("配对管理端") {
-            Text("在网页「授权设备」生成手机管理端二维码，然后用这台 iPhone 扫描。")
-                .font(.footnote).foregroundStyle(.secondary)
             Button { showingScanner = true } label: { Label("扫码连接资料库", systemImage: "qrcode.viewfinder") }
                 .disabled(model.busy)
             if let scanned {
@@ -139,8 +137,6 @@ struct OutboxView: View {
     var body: some View {
         List {
             Section {
-                Text("“已保存”表示原文在本机；只有收到服务器确认后才显示“已提交”。重试始终沿用原提交 ID。")
-                    .font(.footnote).foregroundStyle(.secondary)
                 Button("重试当前服务器的待发送记录") { Task { await model.retryQueued() } }
                     .disabled(model.busy || !model.paired)
             }
@@ -195,13 +191,13 @@ struct OutboxDetailView: View {
                         if item.origin != model.serverName { Text("记录属于另一台服务器。请配对到原服务器后再重试。") }
                     }
                 }
-                Text("为避免超时后重复创建任务，已保存内容不可就地改写。超过服务端限制的内容完整保留在此，可选择复制。")
-                    .font(.footnote).foregroundStyle(.secondary)
-                .confirmationDialog("将完整分享内容发送到 \(model.serverName)？绑定后不会自动迁移到其他服务器。", isPresented: $binding, titleVisibility: .visible) {
+            }
+        }.navigationTitle("已保存的分享")
+            .confirmationDialog("将完整分享内容发送到 \(model.serverName)？绑定后不会自动迁移到其他服务器。", isPresented: $binding, titleVisibility: .visible) {
+                if let item = model.items.first(where: { $0.id == itemID }) {
                     Button("绑定并提交") { Task { await model.send(item, bindUnassigned: true) } }
                 }
             }
-        }.navigationTitle("已保存的分享")
     }
 }
 
