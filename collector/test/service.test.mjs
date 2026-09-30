@@ -6,13 +6,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createService } from '../src/server.mjs';
 import { api, processTask, syncLibrary } from '../src/worker.mjs';
-import { packageEntry, unpackArchive, validateArchive, permitted } from '../src/archive.mjs';
+import { packageEntry, unpackArchive, validateArchive, requireReadableMetadata, permitted } from '../src/archive.mjs';
 import { agentOrder, detectAgents, unavailableBeforeWork, execute } from '../src/agents.mjs';
 import { secret, hash, safePath } from '../src/common.mjs';
 import { loadWorkerConfig, initializeWorkerConfig } from '../src/config.mjs';
 
 const fixture = fileURLToPath(new URL('./fixtures/fake-agent.mjs', import.meta.url));
 const profiles = { codex: { command: process.execPath, args: [fixture], versionArgs: [fixture, '--version'] }, codebuddy: { enabled: false } };
+test('new uploads reject visibly damaged metadata without blocking historical snapshots', () => {
+  const meta = { title: '武术工作流', summary: '三步生成视频。', coverage_note: '已看完整视频。', tags: ['TaoMate', 'AI??'] };
+  assert.throws(() => requireReadableMetadata(meta), /Unreadable tags/);
+  assert.throws(() => requireReadableMetadata({ ...meta, tags: ['TaoMate'], summary: '??? TaoMate' }), /Unreadable summary/);
+  assert.doesNotThrow(() => requireReadableMetadata({ ...meta, tags: ['TaoMate', '武术动作'] }));
+});
 test('worker configuration paths are anchored to the configuration, not launch cwd', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-config-'));
   const file = path.join(root, 'worker.json');

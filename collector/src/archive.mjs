@@ -46,6 +46,15 @@ export function validateArchive(bundle) {
   return bundle;
 }
 
+// Existing snapshots may contain damaged metadata, so keep their read path
+// compatible. Reject replacement placeholders only when creating a new upload.
+export function requireReadableMetadata(meta) {
+  for (const field of ['title', 'summary', 'coverage_note']) {
+    requireValue(!/\uFFFD|\?{3,}/.test(meta[field]), `Unreadable ${field}`);
+  }
+  requireValue(meta.tags.every(tag => !/\uFFFD|\?{2,}/.test(tag)), 'Unreadable tags');
+}
+
 export function packageEntry(entryRoot) {
   const root = fs.realpathSync(entryRoot);
   const meta = readJson(path.join(root, 'source.json'));
@@ -74,7 +83,9 @@ export function packageEntry(entryRoot) {
   const keys = ['schema_version', 'id', 'title', 'type', 'platform', 'source_url', 'canonical_url', 'aliases', 'creator', 'published_at', 'collected_at', 'organized_at', 'mode', 'scenario', 'tags', 'summary', 'status', 'verification_status', 'verified_at', 'coverage_note', 'related'];
   const clean = Object.fromEntries(keys.map(key => [key, meta[key]]));
   clean.files = files.map(({ path, role }) => ({ path, role }));
-  return validateArchive({ version: 1, meta: clean, files, omitted });
+  const bundle = validateArchive({ version: 1, meta: clean, files, omitted });
+  requireReadableMetadata(bundle.meta);
+  return bundle;
 }
 
 export function unpackArchive(bundle, destination) {

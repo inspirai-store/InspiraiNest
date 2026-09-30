@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
 import { MySqlStore } from './mysql-store.mjs';
 import { LocalStorage, OssStorage } from './storage.mjs';
-import { validateArchive } from './archive.mjs';
+import { validateArchive, requireReadableMetadata } from './archive.mjs';
 import { libraryBrowser } from './library-browser.mjs';
 import { clientDownload } from './client-download.mjs';
 import { readerAuthorization } from './reader-auth.mjs';
@@ -107,6 +107,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const taskRecord = taskId ? await assigned(device, taskId) : null;
     if (taskRecord?.tags?.length) bundle = { ...bundle, meta: { ...bundle.meta, tags: [...new Set([...(bundle.meta?.tags || []), ...taskRecord.tags])] } };
     validateArchive(bundle);
+    requireReadableMetadata(bundle.meta);
     const buffer = Buffer.from(JSON.stringify(bundle));
     const digest = hash(buffer);
     if (taskId) {
