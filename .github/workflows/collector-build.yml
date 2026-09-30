@@ -267,4 +267,5 @@ jobs:
           load: true
           tags: personal-library-collector:ci
       - run: docker image inspect personal-library-collector:ci --format '{{.Id}}'
+      - run: docker run --rm --entrypoint sh personal-library-collector:ci -c 'test -s /app/collector/mobile/android/app/src/main/assets/mobile-next/index.html && test -s /app/collector/mobile/android/app/src/main/assets/mobile-next/mobile.js'
     timeout-minutes: 30

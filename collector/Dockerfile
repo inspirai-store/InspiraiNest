@@ -7,6 +7,7 @@ COPY collector/package.json collector/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY collector/src ./src
 COPY collector/public ./public
+COPY collector/mobile/android/app/src/main/assets/mobile-next ./mobile/android/app/src/main/assets/mobile-next
 COPY assets/vendor /app/assets/vendor
 COPY assets/library.js assets/library.css assets/library-time.js /app/assets/
 COPY assets/client-prompt.js assets/client-prompt.css /app/assets/
