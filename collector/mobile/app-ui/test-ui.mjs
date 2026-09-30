@@ -36,7 +36,9 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/library/mobile-next/index.html`);
-  await page.getByRole('heading', { name: '最近收藏' }).waitFor();
+  await page.getByRole('heading', { name: '资料库' }).waitFor();
+  assert.match(await page.locator('meta[name="viewport"]').getAttribute('content'), /maximum-scale=1, user-scalable=no/);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).touchAction), 'pan-x pan-y');
   assert.equal(await page.locator('.entry-card').count(), 10);
   assert.deepEqual(await page.locator('.entry-tags').first().locator('span').allInnerTexts(), ['#设计', '#阅读']);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

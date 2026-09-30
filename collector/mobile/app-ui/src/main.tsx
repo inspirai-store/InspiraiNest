@@ -196,7 +196,7 @@ function App() {
   return <div className="mobile-app">
     {!selected ? <>
       <header className="library-header">
-        <div className="library-title"><img src="./brand.png" alt="" /><h1>最近收藏</h1></div>
+        <div className="library-title"><img src="./brand.png" alt="" /><h1>资料库</h1></div>
         <div className="library-actions">
           <Select.Root value={type} onValueChange={value => setType(value as TypeFilter)}>
             <Select.Trigger className="type-select" aria-label="筛选资料类型"><Select.Value /><Select.Icon><ChevronDown size={14} aria-hidden="true" /></Select.Icon></Select.Trigger>

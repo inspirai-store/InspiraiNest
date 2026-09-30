@@ -20,6 +20,17 @@ enum ReaderPolicy {
       new MutationObserver(clean).observe(document.documentElement, {childList:true, subtree:true});
     })();
     """
+    static let lockZoom = """
+    (function() {
+      var viewport = document.querySelector('meta[name="viewport"]');
+      if (!viewport) {
+        viewport = document.createElement('meta');
+        viewport.name = 'viewport';
+        document.head.appendChild(viewport);
+      }
+      viewport.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+    })();
+    """
     static func allows(_ url: URL, origin: ServerOrigin) -> Bool {
         // URL.path drops a trailing slash on iOS/macOS, so it turns the
         // legitimate /library/ home page into /library. Preserve the URL path.
@@ -76,6 +87,8 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 injectionTime: .atDocumentStart, forMainFrameOnly: true))
             configuration.userContentController.addUserScript(WKUserScript(source: ReaderPolicy.removeManagement,
                 injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+            configuration.userContentController.addUserScript(WKUserScript(source: ReaderPolicy.lockZoom,
+                injectionTime: .atDocumentEnd, forMainFrameOnly: true))
             configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
             configuration.allowsInlineMediaPlayback = false
             // No script receives a token. The existing bootstrap sees no token in
@@ -89,6 +102,7 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             let view = WKWebView(frame: .zero, configuration: configuration)
             view.navigationDelegate = self; view.uiDelegate = self
             view.allowsBackForwardNavigationGestures = true
+            view.scrollView.pinchGestureRecognizer?.isEnabled = false
             if #available(iOS 16.4, *) { view.isInspectable = false }
             origin = server; webView = view
             view.load(URLRequest(url: try server.url("/library/mobile-next/index.html"))) // No Authorization.

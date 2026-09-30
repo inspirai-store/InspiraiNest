@@ -24,7 +24,7 @@
   color: var(--ink);
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; touch-action: pan-x pan-y; }
 body { margin: 0; }
 button, input, select { font: inherit; }
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
