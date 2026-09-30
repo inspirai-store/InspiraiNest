@@ -52,6 +52,9 @@ try {
   await page.locator('.entry-card').first().click();
   await page.getByText('可阅读的正文。').waitFor();
   assert.match(await page.locator('.attachments a').first().getAttribute('href'), /^nook:\/\/attachment\?/);
+  entries[0].tags = ['已修复', '阅读'];
+  await page.getByRole('button', { name: '返回资料库' }).click();
+  await page.locator('.entry-tags').first().getByText('#已修复').waitFor();
   assert.deepEqual(errors, []);
   await page.screenshot({ path: '/tmp/lingnest-mobile-ui-reader.png' });
   console.log('Mobile UI: list, tags, sticky header, filter, reader and attachment route passed at 375px.');

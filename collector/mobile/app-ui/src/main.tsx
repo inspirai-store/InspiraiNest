@@ -123,18 +123,27 @@ function App() {
     catch { return new Set(); }
   });
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(false);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(false); }
     try {
       const response = await fetch('/library/data', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok) throw new Error('library data unavailable');
       const payload = await response.json() as LibraryData;
       setData({ entries: Array.isArray(payload.entries) ? payload.entries : [], documents: payload.documents || {} });
-    } catch { setError(true); }
-    finally { setLoading(false); }
+    } catch { if (!silent) setError(true); }
+    finally { if (!silent) setLoading(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load(true); };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [load]);
   useEffect(() => {
     const root = document.documentElement;
     const preference = matchMedia('(prefers-color-scheme: dark)');
@@ -146,10 +155,13 @@ function App() {
     return () => { preference.removeEventListener('change', applySystem); delete window.NookTheme; };
   }, []);
   useEffect(() => {
-    const onPopState = () => setEntryID(new URLSearchParams(location.hash.slice(1)).get('entry'));
+    const onPopState = () => {
+      setEntryID(new URLSearchParams(location.hash.slice(1)).get('entry'));
+      void load(true);
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [load]);
   useEffect(() => {
     window.NookBack = () => {
       if (entryID) { history.back(); return; }
