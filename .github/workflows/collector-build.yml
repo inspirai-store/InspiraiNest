@@ -45,6 +45,11 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - run: npm ci --ignore-scripts
         working-directory: collector
+      - run: npm ci --ignore-scripts
+        working-directory: collector/mobile/app-ui
+      - run: npm run build
+        working-directory: collector/mobile/app-ui
+      - run: git diff --exit-code -- collector/mobile/android/app/src/main/assets/mobile-next
       - run: node scripts/check-public-ci.mjs
         working-directory: collector
       - run: npm test

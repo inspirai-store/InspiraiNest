@@ -62,6 +62,22 @@ async function setup(t, overrides = {}) {
   return { app, root, owner, server, key, pairWorker, submit };
 }
 
+test('shared mobile reader assets load without exposing library data', async t => {
+  const { server } = await setup(t);
+  for (const [file, contentType] of [
+    ['index.html', 'text/html'], ['mobile.js', 'text/javascript'],
+    ['mobile.css', 'text/css'], ['brand.png', 'image/png'],
+    ['vendor/marked.js', 'text/javascript'], ['vendor/purify.js', 'text/javascript'],
+  ]) {
+    const response = await fetch(`${server}/library/mobile-next/${file}`);
+    assert.equal(response.status, 200, file);
+    assert.match(response.headers.get('content-type'), new RegExp('^' + contentType));
+    assert.ok((await response.arrayBuffer()).byteLength > 0, file);
+  }
+  assert.equal((await fetch(`${server}/library/data`)).status, 401);
+  assert.equal((await fetch(`${server}/library/mobile-next/unlisted.js`)).status, 401);
+});
+
 test('temporary review service refuses all access after its expiry', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-review-test-'));
   const app = createService({ dataDir: root, masterKey: secret(), reviewExpiresAt: new Date(Date.now() - 1000).toISOString() });

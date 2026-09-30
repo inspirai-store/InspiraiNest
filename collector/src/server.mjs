@@ -163,6 +163,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           return res.end(html);
         }
+        const mobileAsset = route.match(/^\/library\/mobile-next\/(index\.html|mobile\.(?:css|js)|brand\.png|vendor\/(?:marked|purify)\.js)$/);
+        if (mobileAsset) {
+          const file = mobileAsset[1];
+          res.setHeader('Content-Type', file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : 'text/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          return res.end(fs.readFileSync(path.join(project, 'mobile/android/app/src/main/assets/mobile-next', file)));
+        }
         const assets = { '/library/bootstrap.js': 'collector/public/library-bootstrap.js', ...Object.fromEntries(['library.js', 'library.css', 'library-time.js', 'client-prompt.js', 'client-prompt.css', 'brand-icon.png', 'brand.css', 'vendor/lucide.js', 'vendor/marked.js', 'vendor/purify.js'].map(f => ['/library/assets/' + f, 'assets/' + f])) };
         if (assets[route]) {
           res.setHeader('Content-Type', route.endsWith('.css') ? 'text/css' : route.endsWith('.png') ? 'image/png' : 'text/javascript');

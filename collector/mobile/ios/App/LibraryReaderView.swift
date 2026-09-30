@@ -46,6 +46,8 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     @Published private(set) var webView: WKWebView?
     @Published private(set) var message: String?
     @Published private(set) var loading = false
+    @Published private(set) var legacy = false
+    @Published var requestedArchive: RequestedArchive?
     private var origin: ServerOrigin?
     private var generation = UUID()
 
@@ -88,11 +90,11 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             view.allowsBackForwardNavigationGestures = true
             if #available(iOS 16.4, *) { view.isInspectable = false }
             origin = server; webView = view
-            view.load(URLRequest(url: try server.url("/library/"))) // No Authorization.
+            view.load(URLRequest(url: try server.url("/library/mobile-next/index.html"))) // No Authorization.
         } catch { if current == generation { message = safeMessage(error) } }
     }
     func stop() {
-        generation = UUID(); loading = false
+        generation = UUID(); loading = false; requestedArchive = nil; legacy = false
         if let view = webView {
             view.stopLoading(); view.navigationDelegate = nil; view.uiDelegate = nil
             let store = view.configuration.websiteDataStore
@@ -104,13 +106,20 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         webView = nil; origin = nil
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let url = navigationAction.request.url, url.scheme == "nook", url.host == "attachment",
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let archive = components.queryItems?.first(where: { $0.name == "archive" })?.value,
+           archive.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil {
+            requestedArchive = RequestedArchive(id: archive)
+            decisionHandler(.cancel); return
+        }
         guard let url = navigationAction.request.url, let origin,
               ReaderPolicy.allows(url, origin: origin) else {
-            message = "外部链接已阻止；可通过“附件”阅读当前服务器的原件。"
+            message = "外部链接已阻止。"
             decisionHandler(.cancel); return
         }
         if navigationAction.shouldPerformDownload {
-            message = "请打开上方“附件”，在原生阅读器查看该归档的全部文件。"
+            message = "请从“附件与来源”打开文件。"
             decisionHandler(.cancel); return
         }
         if navigationAction.targetFrame == nil {
@@ -122,10 +131,16 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         guard let url = navigationResponse.response.url, let origin, ReaderPolicy.allows(url, origin: origin),
               navigationResponse.canShowMIMEType else {
-            message = "请在上方“附件”使用原生 PDF、图片或文本阅读器打开文件。"
+            message = "请从“附件与来源”打开文件。"
             decisionHandler(.cancel); return
         }
         if let response = navigationResponse.response as? HTTPURLResponse, response.statusCode >= 400 {
+            if response.statusCode == 404, url.path == "/library/mobile-next/index.html",
+               let fallback = try? origin.url("/library/") {
+                legacy = true
+                webView.load(URLRequest(url: fallback))
+                decisionHandler(.cancel); return
+            }
             message = response.statusCode == 401 ? "阅读授权已失效，请重新配对。" : "资料暂时不可读取。"
             decisionHandler(.cancel); return
         }
@@ -135,7 +150,7 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url, let origin, ReaderPolicy.allows(url, origin: origin), !navigationAction.shouldPerformDownload {
             webView.load(URLRequest(url: url))
-        } else { message = "此链接未打开。当前服务器的文件可从“附件”读取。" }
+        } else { message = "此链接未打开。" }
         return nil
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -147,6 +162,10 @@ final class ReaderModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { message = "系统已结束阅读进程，请重新载入。" }
 }
 
+struct RequestedArchive: Identifiable {
+    let id: String
+}
+
 struct LibraryReaderView: View {
     @EnvironmentObject var model: AppModel
     @StateObject private var reader = ReaderModel()
@@ -154,16 +173,32 @@ struct LibraryReaderView: View {
         VStack(spacing: 0) {
             if !model.paired { Text("请先在设备页完成配对。").padding() }
             if reader.loading { ProgressView("正在建立安全阅读会话…").padding() }
-            if let message = reader.message { Text(message).font(.footnote).padding() }
+            if let message = reader.message {
+                HStack {
+                    Text(message)
+                    Spacer()
+                    Button("重试") { Task { await reader.start() } }
+                }.font(.subheadline).padding()
+            }
             if let view = reader.webView { ReaderWebView(view: view) }
-            Text("只读资料浏览；删除、回收站操作需在管理页面完成。").font(.caption).foregroundStyle(.secondary).padding(6)
-        }.navigationTitle("资料库").navigationBarTitleDisplayMode(.inline)
+        }.toolbar(reader.legacy ? .visible : .hidden, for: .navigationBar)
         .toolbar {
-            NavigationLink("附件") { ArchiveListView().id(model.sessionID) }.disabled(!model.paired)
-            Button("重新载入") { Task { await reader.start() } }.disabled(!model.paired || reader.loading)
+            if reader.legacy {
+                NavigationLink("附件") { ArchiveListView().id(model.sessionID) }
+                Button("重新载入") { Task { await reader.start() } }
+            }
         }
         .task { if model.paired { await reader.start() } }
         .onDisappear { reader.stop() }
+        .sheet(item: $reader.requestedArchive) { request in
+            NavigationStack {
+                if let archive = model.snapshot?.archives.first(where: { $0.id == request.id }) {
+                    ArchiveAttachmentsView(archive: archive).id(model.sessionID)
+                } else {
+                    Text("归档暂时不可读取").padding()
+                }
+            }
+        }
     }
 }
 

@@ -22,6 +22,7 @@ final class LibraryPane {
    @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){
     String address=r.getUrl().toString();if(!PrivateFiles.allowed(credentials.server(),address))return response("text/plain",403,"外部资源不可用".getBytes(StandardCharsets.UTF_8));
     String p=r.getUrl().getPath();try{
+     if(p.startsWith("/library/mobile-next/")){String name=p.substring("/library/".length());if(!name.matches("mobile-next/(index\\.html|mobile\\.(css|js)|brand\\.png|vendor/(marked|purify)\\.js)"))return response("text/plain",404,new byte[0]);try(InputStream in=host.getAssets().open(name)){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[8192];int n;while((n=in.read(block))!=-1)out.write(block,0,n);byte[] bytes=out.toByteArray();if(name.endsWith("index.html"))bytes=new String(bytes,StandardCharsets.UTF_8).replace("<html lang=\"zh-CN\">","<html lang=\"zh-CN\" data-theme=\""+(Appearance.dark(host)?"dark":"light")+"\">").getBytes(StandardCharsets.UTF_8);return response(mime(p),200,bytes);}}
      if(p.startsWith("/library/mobile/")){String name=p.substring("/library/".length());if(!name.matches("mobile/(index\\.html|mobile\\.(css|js)|icons/(library|collect|person|bookmark|scan|update)\\.png|vendor/(marked|purify|lucide)\\.js)"))return response("text/plain",404,new byte[0]);try(InputStream in=host.getAssets().open(name)){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[8192];int n;while((n=in.read(block))!=-1)out.write(block,0,n);byte[] bytes=out.toByteArray();if(name.endsWith("index.html"))bytes=new String(bytes,StandardCharsets.UTF_8).replace("<html lang=\"zh-CN\">","<html lang=\"zh-CN\" data-theme=\""+(Appearance.dark(host)?"dark":"light")+"\" data-mode=\""+Appearance.mode(host)+"\">").getBytes(StandardCharsets.UTF_8);return response(mime(p),200,bytes);}}
      return response(mime(p),200,PrivateFiles.read(credentials,address));
     }catch(Exception e){return response("text/plain",401,"读取失败，请检查连接或重新配对".getBytes(StandardCharsets.UTF_8));}
@@ -35,7 +36,7 @@ final class LibraryPane {
    }
   });
   web.setDownloadListener((u,a,d,m,l)->save(u));
-  web.loadUrl(credentials.server()+"/library/mobile/index.html"+(entry==null?"":"#entry="+Uri.encode(entry)));
+  web.loadUrl(credentials.server()+"/library/mobile-next/index.html"+(entry==null?"":"#entry="+Uri.encode(entry)));
  }
  private void updateDepth(String address){deep=Uri.parse(address).getFragment()!=null&&!Uri.parse(address).getFragment().isEmpty();depth.accept(deep);}
  private void action(Uri uri){try{switch(uri.getHost()){

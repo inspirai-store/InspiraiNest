@@ -33,11 +33,11 @@ struct RootView: View {
                 }.padding().background(.thinMaterial)
             }
             TabView(selection: $selectedTab) {
-                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("任务", systemImage: "list.bullet.rectangle") }.tag(0)
-                NavigationStack { OutboxView() }.tabItem { Label("发件箱", systemImage: "tray.and.arrow.up") }.tag(1)
-                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(2)
-                NavigationStack { SettingsView() }.tabItem { Label("设备", systemImage: "iphone") }.tag(3)
+                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(0)
+                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("采集", systemImage: "plus.circle") }.tag(1)
+                NavigationStack { SettingsView() }.tabItem { Label("我的", systemImage: "person.crop.circle") }.tag(2)
             }
+            .tint(.primary)
         }
     }
 }
@@ -90,7 +90,7 @@ struct TasksView: View {
     var body: some View {
         List {
             if !model.paired { PairingForm() }
-            if let last = model.lastRefresh { Text("最近更新 \(last.formatted(date: .omitted, time: .standard))").font(.caption).foregroundStyle(.secondary) }
+            NavigationLink { OutboxView() } label: { Label("待提交", systemImage: "tray.and.arrow.up") }
             ForEach(model.snapshot?.tasks ?? []) { task in
                 NavigationLink { TaskDetailView(taskID: task.id).id(model.sessionID) } label: {
                     VStack(alignment: .leading, spacing: 6) {
@@ -100,8 +100,8 @@ struct TasksView: View {
                     }
                 }
             }
-            if model.paired && model.snapshot?.tasks.isEmpty == true { Text("暂无任务。通过其他应用的分享菜单收集资料。") }
-        }.navigationTitle("采集任务").refreshable { await model.refresh() }
+            if model.paired && model.snapshot?.tasks.isEmpty == true { Text("暂无任务") }
+        }.navigationTitle("采集").refreshable { await model.refresh() }
     }
 }
 
@@ -227,15 +227,11 @@ struct SettingsView: View {
                     }
                 }
             } else { PairingForm() }
-            Section {
-                Text("分享扩展仅做短时间发送尝试。离线或系统终止时，请回到发件箱重试；无需重新分享。电脑上的采集 Agent 负责分析与归档。")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
             Section("帮助与隐私") {
                 Link("使用帮助与联系支持", destination: URL(string: "https://library.inspirai.store/support")!)
                 Link("隐私政策", destination: URL(string: "https://library.inspirai.store/privacy")!)
             }
-        }.navigationTitle("设备与配对").refreshable { await model.refresh() }
+        }.navigationTitle("我的").refreshable { await model.refresh() }
         .confirmationDialog("撤销 \(revoking?.name ?? "") 的服务器访问？", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }), titleVisibility: .visible) {
             if let device = revoking { Button("撤销设备", role: .destructive) { Task { await model.revoke(device) }; revoking = nil } }
         }

@@ -30,7 +30,7 @@ public class MainActivity extends Screen {
  @Override protected void onAppearanceChanged(){if(library!=null)library.applyTheme();if(homeVisible)home();else login();}
  private void home(){
   homeVisible=true;if(library!=null&&library.web.getParent()!=null)((ViewGroup)library.web.getParent()).removeView(library.web);
-  page(tab,tab.equals("采集")?"把灵感交给电脑，进度在这里查看":"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
+  page(tab,"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
   if(library==null&&credentials.isPaired())library=new LibraryPane(this,null,deep->{if(navigation!=null)navigation.setVisibility(deep?View.GONE:View.VISIBLE);});
   if(library!=null){root.addView(library.web,root.indexOfChild(scroll),new LinearLayout.LayoutParams(-1,0,1));library.web.setVisibility(tab.equals("资料库")?View.VISIBLE:View.GONE);library.applyTheme();}
   scroll.setVisibility(tab.equals("资料库")&&library!=null?View.GONE:View.VISIBLE);
@@ -45,7 +45,7 @@ public class MainActivity extends Screen {
   listing=new LinearLayout(this);listing.setOrientation(LinearLayout.VERTICAL);body.addView(listing);lastRender="";renderData(true);refresh();
  }
  private void mine(){
-  LinearLayout info=card(body);info.addView(label("我的资料空间",21,true));info.addView(label(credentials.isPaired()?credentials.server():"尚未连接资料库",14,false));
+  LinearLayout info=card(body);info.addView(label(credentials.isPaired()?credentials.server():"尚未连接资料库",16,false));
   settingsRow("授权设备",()->startActivity(new Intent(this,DevicesActivity.class)));
   settingsRow("外观 · "+Appearance.title(this),this::appearance);
   settingsRow("应用更新 · v"+BuildConfig.VERSION_NAME,()->startActivity(new Intent(this,UpdateActivity.class)));
