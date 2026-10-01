@@ -198,3 +198,10 @@ body.compact main{grid-template-rows:36px minmax(0,1fr) auto}
 .compact:not(.running) .controls{grid-template-columns:1fr}
 .compact-foot{padding:0 12px 10px}
 .compact-foot button{width:100%}
+
+.compact .notice{order:2;margin:0 12px;padding:6px 8px;font-size:11px}
+#compact-action-result{font-size:11px;color:var(--warn);overflow-wrap:anywhere;margin-bottom:6px}
+#compact-action-result:empty{display:none}
+.macos:not(.compact) [data-action=drain]{height:auto;min-height:28px;padding:4px;white-space:normal}
+
+.macos .action-reasons{white-space:pre-line;overflow-wrap:anywhere;color:var(--muted)}

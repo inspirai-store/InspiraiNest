@@ -78,6 +78,11 @@ export class WorkerManager {
       throw new Error(this.error);
     } finally { fs.closeSync(out); fs.closeSync(err); this.starting = false; }
   }
+  async stop() {
+    const state = this.snapshot();
+    if (!state.running || (state.managed && !state.stale && state.mode === 'draining')) return state;
+    return this.control('drain');
+  }
   async control(action) {
     const commandId = sendControl(this.dataDir, action);
     const deadline = Date.now() + 5000;

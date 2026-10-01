@@ -9,6 +9,7 @@ files:
   - desktop/main.mjs
   - desktop/manager.mjs
   - desktop/updater.mjs
+  - desktop/macos-policy.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
   - desktop/index.html
@@ -17,6 +18,8 @@ files:
   - desktop/brand.css
   - desktop/icon.png
   - desktop/tray.png
+  - desktop/trayTemplate.png
+  - desktop/trayTemplate@2x.png
   - src/**
   - worker.production.example.json
   - node_modules/**

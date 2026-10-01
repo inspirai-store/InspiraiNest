@@ -11,7 +11,7 @@
   <div class="body">
     <aside class="left">
       <div class="block intro"><h1 id="headline">正在读取状态</h1><p id="description" class="desc">读取本机 Worker 状态…</p></div>
-      <div id="notice" class="notice full" role="status" hidden></div>
+      <div id="notice" class="notice" role="status" hidden></div>
       <div class="block compact-mini compact-only"><div>领取模式<strong id="mode-compact">—</strong></div><div>最近心跳<strong id="heartbeat-compact" class="mono">—</strong></div></div>
       <div class="block status-block full"><h2 class="label">运行状态</h2><dl class="kv">
         <dt>工作进程</dt><dd id="process" class="mono">—</dd>
@@ -25,8 +25,8 @@
       </dl></div>
       <div class="block control-block"><h2 class="label full">控制</h2><div class="controls">
         <button data-action="start" class="primary">启动 Worker</button><button data-action="pause">暂停领取</button>
-        <button data-action="resume">继续领取</button><button data-action="drain">完成后停止</button>
-      </div><p class="hint full">暂停与停止均保留当前任务；在途领取会完成。待操作任务需修复后在远端点“继续”。</p></div>
+        <button data-action="resume">继续领取</button><button data-action="drain" title="完成当前任务及同步后停止 Worker，不再领取新任务">完成后停止</button>
+      </div><p id="controls-hint" class="hint action-reasons" role="status" hidden></p><p class="hint full">暂停与停止均保留当前任务；在途领取会完成。待操作任务需修复后在远端点“继续”。</p></div>
       <div class="block agents-block full"><h2 class="label">本机 Agent</h2><div id="agents"></div></div>
       <div class="block actions full"><button data-action="data" class="small-button">数据目录</button><button id="worker-logs" class="small-button">Worker 日志</button><button data-action="remote" class="small-button">远端任务 ↗</button><button data-action="quit" class="small-button subtle">仅退出管理器</button><button data-action="quit-after" class="small-button danger-button">完成后停止并退出</button></div>
     </aside>
@@ -39,5 +39,5 @@
     </section>
   </div>
   <footer class="statusbar full"><span id="action-result" role="status"></span><span id="freshness" class="mono">正在读取状态 · 关闭窗口后继续托盘运行</span></footer>
-  <div class="compact-foot compact-only"><button data-action="show" class="primary">打开管理窗口</button></div>
+  <div class="compact-foot compact-only"><p id="compact-action-result" role="status"></p><button data-action="show" class="primary">打开管理窗口</button></div>
 </main><script src="renderer.js"></script></body></html>
