@@ -7,7 +7,10 @@ import { spawn } from 'node:child_process';
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(path.join(project, 'desktop/package.json'));
 try {
-  const electron = require('electron');
+  const electron = process.env.COLLECTOR_DESKTOP_EXECUTABLE || (() => {
+    try { return require('electron'); }
+    catch { return createRequire(path.join(project, 'package.json'))('electron'); }
+  })();
   const data = path.join(project, 'worker-data');
   fs.mkdirSync(data, { recursive: true });
   const log = fs.openSync(path.join(data, 'desktop.log'), 'a', 0o600);

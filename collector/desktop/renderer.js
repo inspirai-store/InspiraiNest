@@ -21,7 +21,16 @@ addEventListener('storage', event => {
 });
 const labels = { assigned: '准备采集', running: 'Agent 采集中', validating: '本机校验', uploading: '上传轻量资料', waiting_action: '等待操作', completed: '已完成', awaiting_review: '等待归档确认', cancelled: '已取消', failed: '失败', interrupted: '已中断' };
 const phases = { starting: '启动中', idle: '空闲', claiming: '领取任务', working: '执行中', syncing: '同步资料', paused: '已暂停', stopped: '已停止' };
-const compact = new URLSearchParams(location.search).has('compact');
+const parameters = new URLSearchParams(location.search);
+const compact = parameters.has('compact');
+const macOS = parameters.get('platform') === 'darwin';
+if (macOS) {
+  document.body.classList.add('macos');
+  $('[data-action=quit]').hidden = true;
+  $('[data-action=hide]').textContent = '关闭管理窗口';
+  $('[data-action=quit-after]').textContent = '完成当前任务后停止并退出应用';
+  $('[data-action=drain]').textContent = compact ? '完成后停止' : '停止 Worker（完成当前任务后）';
+}
 if (compact) { document.body.classList.add('compact'); document.title = 'Worker 状态'; }
 let snapshot, busy = false, logsOpen = !compact, logsTaskId = null, logsLoading = false, refreshing = false;
 const updateMessages = {
@@ -56,8 +65,10 @@ if (!compact) {
   }
   window.updates.status().then(renderUpdate).catch(error => text('#update-description', error.message));
 }
+const actionTitles = new Map([...document.querySelectorAll('[data-action]')].map(button => [button, button.title]));
 const text = (selector, value) => { $(selector).textContent = value ?? '—'; };
 const selectedTask = () => snapshot?.current || snapshot?.lastTask;
+const actionResult = value => { text('#action-result', value); text('#compact-action-result', value); };
 const timestamp = value => { const n = Date.parse(value); return Number.isFinite(n) ? n : null; };
 const clock = value => { const n = timestamp(value); return n === null ? '—' : new Date(n).toLocaleTimeString('zh-CN', { hour12: false }); };
 function elapsed(value) {
@@ -129,8 +140,8 @@ function render(s) {
   const task = selectedTask();
   const mode = !s.running ? '未领取' : s.legacy ? '旧版进程 · 未接管' : s.mode === 'draining' ? '完成后停止' : s.mode === 'paused' ? '已暂停领取' : '允许领取';
   text('#device', s.device || '本机');
-  text('#headline', !s.running ? 'Worker 已停止' : s.legacy ? '现有 Worker 正在运行' : s.stale ? '状态更新中断' : s.mode === 'draining' ? '完成当前任务后停止' : s.current ? '正在处理资料' : s.mode === 'paused' ? '已暂停领取新任务' : task?.state === 'waiting_action' ? '需要你处理一下' : '准备接收采集任务');
-  text('#description', !s.running ? '启动后会连接服务，并领取分配给这台电脑的任务。' : s.legacy ? '已避免重复启动；当前采集继续运行。' : s.mode === 'draining' ? '当前 Agent 与上传完成后退出，不再领取后续任务。' : s.mode === 'paused' ? '当前任务继续执行；恢复领取后再接收后续任务。' : '原文与媒体保留本机，校验后上传轻量资料。');
+  text('#headline', !s.running ? 'Worker 已停止' : s.legacy ? '现有 Worker 正在运行' : s.stale ? '状态更新中断' : s.quitAfterTask ? '完成当前任务后停止并退出应用' : s.mode === 'draining' ? '完成当前任务后停止' : s.current ? '正在处理资料' : s.mode === 'paused' ? '已暂停领取新任务' : task?.state === 'waiting_action' ? '需要你处理一下' : '准备接收采集任务');
+  text('#description', !s.running ? '启动后会连接服务，并领取分配给这台电脑的任务。' : s.legacy ? '已避免重复启动；当前采集继续运行。' : s.quitAfterTask ? '当前任务与上传完成后，Worker 和应用一同退出；等待期间菜单栏保留。' : s.mode === 'draining' ? '当前 Agent 与上传完成后停止 Worker，不再领取后续任务。' : s.mode === 'paused' ? '当前任务继续执行；恢复领取后再接收后续任务。' : '原文与媒体保留本机，校验后上传轻量资料。');
   badge('#connection', !s.running ? '已停止' : s.legacy || s.stale ? '连接未知' : s.online ? '在线' : '离线 · 正在重连', !s.running ? '' : s.online && !s.stale ? 'ok' : 'warning');
   badge('#mode-badge', mode, !s.running ? '' : s.mode === 'running' ? 'active' : 'warning');
   text('#process', s.running ? '运行中 · PID ' + (s.pid || '—') : '未运行');
@@ -156,15 +167,36 @@ function render(s) {
   renderAgents(s.agents); renderTasks(s);
   for (const button of document.querySelectorAll('[data-action]')) {
     const action = button.dataset.action;
-    button.disabled = busy || (action === 'start' && (s.running || s.starting || !s.paired)) ||
-      (['pause', 'resume', 'drain'].includes(action) && (!s.managed || s.stale || s.mode === 'draining')) ||
-      (action === 'pause' && s.mode === 'paused') || (action === 'resume' && s.mode !== 'paused') ||
-      (action === 'quit-after' && s.running && (!s.managed || s.stale)) || (action === 'remote' && !s.server);
+    if (macOS) {
+      const state = s.actions?.[action];
+      const reason = busy ? '操作处理中，请稍候。' : state?.reason || '';
+      button.disabled = busy || Boolean(state && !state.enabled);
+      button.title = reason || actionTitles.get(button);
+      button.dataset.disabledReason = reason;
+      if (reason) button.setAttribute('aria-description', reason);
+      else button.removeAttribute('aria-description');
+    } else {
+      button.disabled = busy || (action === 'start' && (s.running || s.starting || !s.paired || s.quitAfterTask)) ||
+        (['pause', 'resume', 'drain'].includes(action) && (!s.managed || s.stale || s.mode === 'draining')) ||
+        (action === 'pause' && s.mode === 'paused') || (action === 'resume' && s.mode !== 'paused') ||
+        (action === 'quit-after' && (s.running && (!s.managed || s.stale))) || (action === 'remote' && !s.server);
+    }
+  }
+  if (macOS) {
+    const groups = new Map();
+    for (const button of document.querySelectorAll('[data-action]')) {
+      const action = button.dataset.action, reason = button.dataset.disabledReason;
+      if (!reason || button.hidden || (compact && !['start', 'pause', 'resume', 'drain'].includes(action)) || getComputedStyle(button).display === 'none') continue;
+      const names = groups.get(reason) || [];
+      names.push(button.textContent); groups.set(reason, names);
+    }
+    text('#controls-hint', [...groups].map(([reason, names]) => `${names.join(' / ')}：${reason}`).join('\n'));
+    $('#controls-hint').hidden = groups.size === 0;
   }
   $('#task-folder').disabled = !task?.id;
   $('#task-logs').disabled = !task?.id;
   const age = s.updatedAt ? elapsed(s.updatedAt) : '未知';
-  text('#freshness', '状态 ' + age + '更新 · 关闭窗口后继续托盘运行');
+  text('#freshness', '状态 ' + age + '更新 · 关闭窗口后继续' + (macOS ? '菜单栏' : '托盘') + '运行');
   $('#freshness').classList.toggle('stale', Boolean(s.stale));
 }
 async function refreshLogs() {
@@ -182,14 +214,14 @@ async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try { render(await window.worker.snapshot()); await refreshLogs(); }
-  catch (error) { text('#action-result', error.message); }
+  catch (error) { actionResult(error.message); }
   finally { refreshing = false; }
 }
 async function act(fn, success = '') {
   if (busy) return;
   busy = true; if (snapshot) render(snapshot);
-  try { await fn(); text('#action-result', success); }
-  catch (error) { text('#action-result', error.message.replace(/^Error invoking remote method '[^']+': Error: /, '')); }
+  try { await fn(); actionResult(success); }
+  catch (error) { actionResult(error.message.replace(/^Error invoking remote method '[^']+': Error: /, '')); }
   finally { busy = false; await refresh(); }
 }
 async function showLogs(taskId = null) {

@@ -35,11 +35,12 @@ async function fixture(t) {
 
 test('pause/resume/drain acknowledge commands; in-flight task completes and queued task stays untouched', async t => {
   const { config, file, owner, submit } = await fixture(t);
-  const first = await submit(); const second = await submit();
+  const first = await submit();
   const abort = new AbortController();
   const running = runWorker(config, { signal: abort.signal, paused: true });
   t.after(async () => { abort.abort(); await running; });
   await until(() => workerSnapshot(config.dataDir).phase === 'paused');
+  const second = await submit();
   assert.equal((await api(owner, '/api/state')).tasks.find(x => x.id === first.id).state, 'queued');
   const manager = new WorkerManager(file, process.execPath);
   await assert.rejects(manager.start(), /已在运行/);
@@ -110,8 +111,9 @@ test('manager starts a detached synthetic worker, survives a new manager, and dr
   const second = new WorkerManager(file, process.execPath);
   await until(() => second.snapshot().phase === 'paused');
   assert.equal(second.snapshot().pid, first.snapshot().pid);
-  await second.control('drain');
+  await second.stop();
   await until(() => !second.snapshot().running);
+  await second.stop(); // Stopping an already stopped Worker never sends a new command.
   assert.deepEqual(fs.readFileSync(file), original);
 });
 
@@ -131,11 +133,13 @@ test('waiting-action reason is visible and survives restart without consuming th
   const { config, owner, submit } = await fixture(t);
   const script = fileURLToPath(new URL('./fixtures/waiting-agent.mjs', import.meta.url));
   config.agents.codex.args = [script];
-  const first = await submit(); const second = await submit();
+  const first = await submit();
   const abort = new AbortController();
   let running = runWorker(config, { signal: abort.signal });
   t.after(async () => { abort.abort(); await running; });
   await until(() => workerSnapshot(config.dataDir).lastTask?.state === 'waiting_action');
+  // Submit only after the first task is retained, avoiding same-millisecond FIFO ties.
+  const second = await submit();
   assert.match(workerSnapshot(config.dataDir).lastTask.message, /补齐本机测试工具/);
   sendControl(config.dataDir, 'drain'); await running;
   running = runWorker(config, { signal: abort.signal, paused: true });
