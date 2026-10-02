@@ -43,6 +43,10 @@ mac:
   entitlements: desktop/entitlements.mac.plist
   entitlementsInherit: desktop/entitlements.mac.plist
   notarize: true
+  publish:
+    provider: generic
+    url: https://library.inspirai.store/updates/macos
+    useMultipleRangeRequest: false
 publish:
   provider: github
   owner: inspirai-store

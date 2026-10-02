@@ -194,7 +194,7 @@ else {
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
     // A status panel may activate this accessory app without requesting its manager.
-    if (!openingManager && (!isMac || ((main?.isVisible() || main?.isMinimized()) && !popover?.isVisible()))) openManager();
+    if (!openingManager && (!isMac || !popover?.isVisible())) openManager();
   });
   app.on('before-quit', event => {
     if (isMac && !quitting) { event.preventDefault(); void menuAction('quit-after'); return; }

@@ -57,8 +57,22 @@ export function clientDownload({ releaseDir, publicUrl }) {
       return { cli, skill: asset('skill', `lingnest-library-${version}.zip`), checksums: asset('checksums', `lingnest-${version}-SHA256SUMS.txt`) };
     } catch { return empty; }
   }
+  function macUpdates(workers) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(releaseDir, 'macos-update.json'), 'utf8'));
+      if (!/^\d+\.\d+\.\d+$/.test(manifest.version) || !['macos_arm64', 'macos_x64'].every(key => workers[key]?.version === manifest.version)) return [];
+      const allowed = ['latest-mac.yml', ...['arm64', 'x64'].map(arch => `InspiraiNest-v${manifest.version}-macOS-${arch}.zip.blockmap`)];
+      const metadata = allowed.map(filename => {
+        const item = manifest.assets?.[filename];
+        if (!item || item.filename !== filename || !/^[a-f0-9]{64}$/i.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size <= 0
+          || fs.statSync(path.join(releaseDir, filename)).size !== item.size) throw new Error('Invalid update asset');
+        return item;
+      });
+      return [...metadata, workers.macos_arm64, workers.macos_x64].map(item => ({ ...item, url: '/updates/macos/' + item.filename }));
+    } catch { return []; }
+  }
   return async (req, res, route) => {
-    if (!['/client-release.json', '/download/qr.svg'].includes(route) && !route.startsWith('/downloads/')) return false;
+    if (!['/client-release.json', '/download/qr.svg'].includes(route) && !route.startsWith('/downloads/') && !route.startsWith('/updates/macos/')) return false;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return true; }
     const meta = release();
     const workers = workerReleases();
@@ -74,14 +88,15 @@ export function clientDownload({ releaseDir, publicUrl }) {
       const svg = await QRCode.toString(origin + '/download', { type: 'svg', margin: 2, width: 168, color: { dark: '#176f5b', light: '#ffffff' } });
       res.setHeader('Content-Type', 'image/svg+xml'); res.end(req.method === 'HEAD' ? undefined : svg); return true;
     }
-    const selected = [meta, ...Object.values(workers), ...Object.values(reader.cli), reader.skill, reader.checksums].find(item => item &&
+    const selected = [meta, ...Object.values(workers), ...Object.values(reader.cli), reader.skill, reader.checksums, ...macUpdates(workers)].find(item => item &&
       (item.url === route || item.browserUrl === route || item.legacyUrl === route || item.aliases?.includes(route)));
     if (!selected) { res.writeHead(404); res.end('Release not available'); return true; }
     const file = path.join(releaseDir, selected.filename);
     const digest = createHash('sha256');
     for await (const chunk of fs.createReadStream(file)) digest.update(chunk);
     if (digest.digest('hex') !== selected.sha256) { res.writeHead(503); res.end('Release verification failed'); return true; }
-    res.setHeader('Content-Type', selected.filename.endsWith('.apk') ? 'application/vnd.android.package-archive' : 'application/octet-stream');
+    if (route.startsWith('/updates/macos/')) res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', selected.filename.endsWith('.apk') ? 'application/vnd.android.package-archive' : selected.filename.endsWith('.yml') ? 'text/yaml; charset=utf-8' : 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${selected.filename}"`);
     res.setHeader('Content-Length', selected.size);
     if (req.method === 'HEAD') res.end(); else fs.createReadStream(file).pipe(res);

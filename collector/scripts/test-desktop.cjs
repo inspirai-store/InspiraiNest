@@ -147,6 +147,10 @@ const { _electron } = require('playwright');
       await app.evaluate(() => globalThis.workerDesktop().main.close());
       await wait(() => app.evaluate(({ app }) => !app.dock.isVisible()));
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().main.isDestroyed()), false, 'red close keeps manager alive');
+      await app.evaluate(({ app }) => app.emit('activate'));
+      await wait(() => app.evaluate(() => globalThis.workerDesktop().main.isVisible()));
+      await app.evaluate(() => globalThis.workerDesktop().main.close());
+      await wait(() => app.evaluate(({ app }) => !app.dock.isVisible()));
     } else await page.locator('[data-action=hide]').click();
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getTitle() === 'InspiraiNest · 采集 Worker').isVisible()), false);
     await app.evaluate(() => {
