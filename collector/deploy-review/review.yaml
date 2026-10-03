@@ -31,7 +31,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: api
-          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-library-nozoom-20260930@sha256:c671bb7ef1a322edba2eb7ada6f3780ebbe2b7bbe4b6856c3cb8b57d1237033e
+          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:review-basic-20261003@sha256:b3df41248153523b8f6b26b28560199e76cb8fb03cef3eb6486b2834d2e2b5e7
           ports:
             - containerPort: 4317
           envFrom:
@@ -50,6 +50,29 @@ spec:
           resources:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: '1', memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+        - name: basic-worker
+          image: yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:review-basic-20261003@sha256:b3df41248153523b8f6b26b28560199e76cb8fb03cef3eb6486b2834d2e2b5e7
+          command: [node, deploy-review/basic-worker.mjs]
+          envFrom:
+            - secretRef:
+                name: library-review-key
+          env:
+            - name: COLLECTOR_REVIEW_SERVER
+              value: http://127.0.0.1:4317
+            - name: COLLECTOR_REVIEW_WORKER_DATA
+              value: /data/review-basic-worker
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

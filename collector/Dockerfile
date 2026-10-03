@@ -6,6 +6,7 @@ COPY LICENSE ./LICENSE
 COPY collector/package.json collector/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY collector/src ./src
+COPY collector/deploy-review/basic-worker.mjs ./deploy-review/basic-worker.mjs
 COPY collector/public ./public
 COPY collector/mobile/android/app/src/main/assets/mobile-next ./mobile/android/app/src/main/assets/mobile-next
 COPY assets/vendor /app/assets/vendor

@@ -336,7 +336,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         worker(device);
         const input = await body(req);
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
-        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
+        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy', 'basic'].includes(x)), 'Invalid agents');
         const key = installationKey(input, device.role);
         requireValue(!device.installationKey || !key || key === device.installationKey, 'Installation ID does not match this authorization', 409);
         await store.put('device', { ...device, lastSeen: now(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], platform: input.platform ? text(input.platform, 'platform', 40) : device.platform || null,
@@ -361,7 +361,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           const target = await store.get('device', preferredDeviceId);
           requireValue(target && target.role === 'worker' && !target.revokedAt, 'Invalid dispatch device');
         }
-        requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
+        requireValue(!input.agent || ['codex', 'codebuddy', 'basic'].includes(input.agent), 'Unknown agent');
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {
