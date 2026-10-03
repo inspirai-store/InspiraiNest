@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "review-demo:note",
+  "title": "周六的城市漫步记录",
+  "type": "note",
+  "platform": "原创内容",
+  "source_url": null,
+  "canonical_url": null,
+  "aliases": [],
+  "creator": "灵感小窝编辑团队",
+  "published_at": null,
+  "collected_at": "2026-10-03T18:24:54+08:00",
+  "organized_at": "2026-10-03",
+  "mode": "general",
+  "scenario": null,
+  "tags": ["生活记录", "城市漫步", "观察"],
+  "summary": "记录一段不赶行程的城市步行：从街道声音、店铺变化和行人节奏观察熟悉的地方。",
+  "status": "archived",
+  "verification_status": "source_only",
+  "verified_at": null,
+  "coverage_note": "团队原创短文，原文和摘要均已保存；没有外部来源。",
+  "files": [
+    { "path": "original.md", "role": "original" },
+    { "path": "summary.md", "role": "summary" }
+  ],
+  "related": []
+}

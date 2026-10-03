@@ -30,7 +30,7 @@ public class MainActivity extends Screen {
  @Override protected void onAppearanceChanged(){if(library!=null)library.applyTheme();if(homeVisible)home();else login();}
  private void home(){
   homeVisible=true;if(library!=null&&library.web.getParent()!=null)((ViewGroup)library.web.getParent()).removeView(library.web);
-  page(tab,tab.equals("采集")?"把灵感交给电脑，进度在这里查看":"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
+  page(tab,"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
   if(library==null&&credentials.isPaired())library=new LibraryPane(this,null,deep->{if(navigation!=null)navigation.setVisibility(deep?View.GONE:View.VISIBLE);});
   if(library!=null){root.addView(library.web,root.indexOfChild(scroll),new LinearLayout.LayoutParams(-1,0,1));library.web.setVisibility(tab.equals("资料库")?View.VISIBLE:View.GONE);library.applyTheme();}
   scroll.setVisibility(tab.equals("资料库")&&library!=null?View.GONE:View.VISIBLE);
@@ -45,7 +45,7 @@ public class MainActivity extends Screen {
   listing=new LinearLayout(this);listing.setOrientation(LinearLayout.VERTICAL);body.addView(listing);lastRender="";renderData(true);refresh();
  }
  private void mine(){
-  LinearLayout info=card(body);info.addView(label("我的资料空间",21,true));info.addView(label(credentials.isPaired()?credentials.server():"尚未连接资料库",14,false));
+  LinearLayout info=card(body);info.addView(label(credentials.isPaired()?credentials.server():"尚未连接资料库",16,false));
   settingsRow("授权设备",()->startActivity(new Intent(this,DevicesActivity.class)));
   settingsRow("外观 · "+Appearance.title(this),this::appearance);
   settingsRow("应用更新 · v"+BuildConfig.VERSION_NAME,()->startActivity(new Intent(this,UpdateActivity.class)));
@@ -59,7 +59,7 @@ public class MainActivity extends Screen {
   if(collectionTab.equals("待提交")){outbox();scroll.post(()->scroll.scrollTo(0,y));return;}
   if(snapshot==null){listing.addView(label("正在连接资料库…",16,false));button(listing,"重试连接",this::refresh);return;}
   JSONArray tasks=snapshot.getJSONArray("tasks");int shown=0;for(int i=0;i<tasks.length();i++){JSONObject t=tasks.getJSONObject(i);String state=t.optString("state");boolean match=taskFilter.equals("all")||taskFilter.equals(state)||(taskFilter.equals("running")&&java.util.Arrays.asList("queued","assigned","uploading").contains(state))||(taskFilter.equals("failed")&&state.equals("waiting_action"));if(!match)continue;shown++;LinearLayout c=card(listing);TextView badge=label(stateName(state),12,true);badge.setTextColor(green);c.addView(badge);TextView title=label(t.optString("content",t.optString("url")),17,true);title.setMaxLines(3);c.addView(title);JSONArray events=t.optJSONArray("events");if(events!=null&&events.length()>0)c.addView(label(events.getJSONObject(events.length()-1).optString("message"),13,false));c.setContentDescription("查看任务："+title.getText());c.setFocusable(true);c.setOnClickListener(v->startActivity(new Intent(this,TaskActivity.class).putExtra("taskId",t.optString("id"))));}
-  if(shown==0){listing.addView(label("这里还没有任务",21,true));listing.addView(label("保存一段文字或链接，让采集电脑整理成可阅读的资料。",15,false));}scroll.post(()->scroll.scrollTo(0,y));
+  if(shown==0)listing.addView(label("暂无任务",17,false));scroll.post(()->scroll.scrollTo(0,y));
  }catch(Exception e){fail(e);}}
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(library!=null)library.result(request,result,data);if(request==71&&result==RESULT_OK&&data!=null)try{PairingCode code=PairingCode.parse(data.getStringExtra("pairingCode"));if(pairingServer==null||homeVisible){homeVisible=false;login();}pairingManual.setVisibility(View.VISIBLE);pairingServer.setText(code.server);pairingKey.setText(code.key);notice("已识别 "+code.server+"，请确认地址后连接。");}catch(Exception e){fail(e);}}
  @Override protected void backAction(){if(homeVisible&&tab.equals("资料库")&&library!=null&&library.back())return;if(!homeVisible&&credentials.isPaired()){home();return;}if(homeVisible&&!tab.equals("资料库")){tab="资料库";home();return;}super.backAction();}
@@ -83,12 +83,10 @@ public class MainActivity extends Screen {
             notice("正在连接…");work(()->{try{JSONObject result=Api.pair(this,address,secret,deviceName);JSONObject d=result.getJSONObject("device");if(!"owner".equals(d.getString("role")))throw new Exception("这是电脑 Worker 配对码，请生成手机管理端配对码。");credentials.save(address,result.getString("token"),d.getString("id"));return result;}finally{pairing.set(false);}},r->{key.setText("");if(library!=null){library.destroy();library=null;}home();refresh();scheduleQueue();work(()->Outbox.flush(this),v->{});});
         });
         body=originalBody;body.addView(manual);manual.setVisibility(View.GONE);pairingManual=manual;
-        body.addView(label("在已登录的采集中心「授权设备」中创建管理端配对码。密钥仅用于换取本机独立授权，保存在 Android Keystore 保护的存储中。",14,false));
         button(body,"查看本机草稿和待提交项",()->{tab="采集";collectionTab="待提交";home();});
         button(body,"应用更新 · v"+BuildConfig.VERSION_NAME,()->startActivity(new Intent(this,UpdateActivity.class)));
     }
     private void outbox()throws Exception{
-        listing.addView(label("未提交的内容保存在手机，网络恢复后自动重试。",14,false));
         JSONArray drafts=new Drafts(this).list();for(int i=0;i<drafts.length();i++){JSONObject d=drafts.getJSONObject(i);pendingRow(d.optString("id"),"草稿 · 尚未提交",d.optString("content"),true);}
         JSONArray rows=new Outbox(this).list();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);pendingRow(row.optString("id"),row.optString("state").equals("sent")?"已提交":"等待提交",row.getJSONObject("payload").optString("content"),false);}
         if(rows.length()+drafts.length()==0)listing.addView(label("没有待提交内容",18,true));

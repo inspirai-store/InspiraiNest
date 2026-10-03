@@ -21,6 +21,7 @@ files:
   - desktop/trayTemplate.png
   - desktop/trayTemplate@2x.png
   - src/**
+  - mobile/android/app/src/main/assets/mobile-next/**
   - worker.production.example.json
   - node_modules/**
 extraResources:

@@ -45,6 +45,11 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - run: npm ci --ignore-scripts
         working-directory: collector
+      - run: npm ci --ignore-scripts
+        working-directory: collector/mobile/app-ui
+      - run: npm run build
+        working-directory: collector/mobile/app-ui
+      - run: git diff --exit-code -- collector/mobile/android/app/src/main/assets/mobile-next
       - run: node scripts/check-public-ci.mjs
         working-directory: collector
       - run: npm test
@@ -263,4 +268,5 @@ jobs:
           load: true
           tags: personal-library-collector:ci
       - run: docker image inspect personal-library-collector:ci --format '{{.Id}}'
+      - run: docker run --rm --entrypoint sh personal-library-collector:ci -c 'test -s /app/collector/mobile/android/app/src/main/assets/mobile-next/index.html && test -s /app/collector/mobile/android/app/src/main/assets/mobile-next/mobile.js'
     timeout-minutes: 30

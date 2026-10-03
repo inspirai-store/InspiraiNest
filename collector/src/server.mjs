@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
 import { MySqlStore } from './mysql-store.mjs';
 import { LocalStorage, OssStorage } from './storage.mjs';
-import { validateArchive } from './archive.mjs';
+import { validateArchive, requireReadableMetadata } from './archive.mjs';
 import { libraryBrowser } from './library-browser.mjs';
 import { clientDownload } from './client-download.mjs';
 import { readerAuthorization } from './reader-auth.mjs';
@@ -107,6 +107,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const taskRecord = taskId ? await assigned(device, taskId) : null;
     if (taskRecord?.tags?.length) bundle = { ...bundle, meta: { ...bundle.meta, tags: [...new Set([...(bundle.meta?.tags || []), ...taskRecord.tags])] } };
     validateArchive(bundle);
+    requireReadableMetadata(bundle.meta);
     const buffer = Buffer.from(JSON.stringify(bundle));
     const digest = hash(buffer);
     if (taskId) {
@@ -162,6 +163,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           html = html.replace('<script defer src="assets/library-data.js"></script>', '').replace('<script defer src="assets/library.js"></script>', '<script defer src="/library/bootstrap.js"></script>').replace('href="index.html"', 'href="/" target="_top"').replace('本地资料<span', 'Dev 资料<span');
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           return res.end(html);
+        }
+        const mobileAsset = route.match(/^\/library\/mobile-next\/(index\.html|mobile\.(?:css|js)|brand\.png|vendor\/(?:marked|purify)\.js)$/);
+        if (mobileAsset) {
+          const file = mobileAsset[1];
+          res.setHeader('Content-Type', file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : 'text/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          return res.end(fs.readFileSync(path.join(project, 'mobile/android/app/src/main/assets/mobile-next', file)));
         }
         const assets = { '/library/bootstrap.js': 'collector/public/library-bootstrap.js', ...Object.fromEntries(['library.js', 'library.css', 'library-time.js', 'client-prompt.js', 'client-prompt.css', 'brand-icon.png', 'brand.css', 'vendor/lucide.js', 'vendor/marked.js', 'vendor/purify.js'].map(f => ['/library/assets/' + f, 'assets/' + f])) };
         if (assets[route]) {
@@ -328,7 +336,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         worker(device);
         const input = await body(req);
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
-        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
+        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy', 'basic'].includes(x)), 'Invalid agents');
         const key = installationKey(input, device.role);
         requireValue(!device.installationKey || !key || key === device.installationKey, 'Installation ID does not match this authorization', 409);
         await store.put('device', { ...device, lastSeen: now(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], platform: input.platform ? text(input.platform, 'platform', 40) : device.platform || null,
@@ -353,7 +361,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           const target = await store.get('device', preferredDeviceId);
           requireValue(target && target.role === 'worker' && !target.revokedAt, 'Invalid dispatch device');
         }
-        requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
+        requireValue(!input.agent || ['codex', 'codebuddy', 'basic'].includes(input.agent), 'Unknown agent');
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {
