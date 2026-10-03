@@ -82,6 +82,19 @@ pre{margin:0;padding:10px 12px;font-size:11px;line-height:1.6;white-space:pre-wr
 pre .t{color:var(--dim)}pre .w{color:var(--warn)}pre .g{color:var(--ok)}
 .logs-card{flex:1;display:flex;flex-direction:column;min-height:0}
 .logs-card pre{flex:1}
+.log-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.log-tabs{display:flex;gap:4px}.log-tabs button{height:30px;font-size:12px;padding:0 10px}.log-tabs button[aria-selected=true]{color:var(--workspace-accent,var(--active));background:var(--active-bg,var(--raised));border-color:var(--workspace-accent,var(--active))}
+.log-order,.log-footnote{font-size:11px;color:var(--muted)}.log-footnote{padding:7px 12px;border-top:1px solid var(--line)}
+#log-issue-count{font-variant-numeric:tabular-nums;margin-left:4px}.log-status{padding:8px 12px;color:var(--danger);font-size:12px;border-bottom:1px solid var(--line)}
+.logs-card .event-list{min-height:150px;max-height:420px;overflow:auto;user-select:text;padding:0 12px;scrollbar-gutter:stable;font-size:12px}
+.log-event{border-bottom:1px solid var(--line)}.log-event summary{list-style:none;display:grid;grid-template-columns:90px minmax(0,1fr) 30px;gap:12px;padding:12px 0;cursor:pointer}.log-event summary::-webkit-details-marker{display:none}
+.log-event time{font-family:Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--fg)}.log-event time strong{display:block;font-size:14px;letter-spacing:.02em}.log-event time span{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
+.event-body{min-width:0;display:grid;gap:5px}.event-meta{font-size:10px;color:var(--muted);overflow-wrap:anywhere}.event-message{line-height:1.55;overflow-wrap:anywhere}.event-expand{font-size:10px;color:var(--muted);align-self:center}
+.log-event.error .event-meta{color:var(--danger)}.log-event.warn .event-meta{color:var(--warn)}.log-event[open] .event-expand{color:var(--workspace-accent,var(--active))}
+.event-detail{padding:0 0 12px 102px}.logs-card .event-detail pre{min-height:0;max-height:220px;margin:0 0 8px;padding:10px;border:1px solid var(--line);border-radius:6px;font-size:11px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.raw-diagnostics{padding:10px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}.raw-diagnostics summary{cursor:pointer}.raw-diagnostics p{margin:8px 0;line-height:1.5}.logs-card .raw-diagnostics pre{min-height:0;max-height:220px;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
+.log-event summary:focus-visible,.raw-diagnostics summary:focus-visible{outline:2px solid var(--workspace-accent,var(--active));outline-offset:-2px}
+@media(max-width:850px){.log-event summary{grid-template-columns:75px minmax(0,1fr) 25px;gap:8px}.event-detail{padding-left:0}.log-event time strong{font-size:13px}}
 .pair{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:8px;align-items:end}
 .pair label{display:grid;gap:4px;font-size:11px;color:var(--muted)}
 .pair input{height:28px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-size:12px}

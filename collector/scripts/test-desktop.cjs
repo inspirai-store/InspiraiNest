@@ -45,7 +45,8 @@ const { _electron } = require('playwright');
   try {
     await wait(() => app.windows().some(page => page.url().startsWith('file:') && !page.url().includes('compact=1')));
     const page = app.windows().find(page => page.url().startsWith('file:') && !page.url().includes('compact=1'));
-    await page.waitForFunction(() => document.querySelector('#headline').textContent === 'Worker 已停止');
+    await page.locator('[data-view=worker]').click();
+    await page.waitForFunction(() => document.querySelector('#headline').textContent === '工作节点已停止');
     if (macOS) {
       const buttons = await page.locator('[data-action=drain], [data-action=quit-after]').evaluateAll(elements => elements.map(button => ({ action: button.dataset.action, width: button.clientWidth, contentWidth: button.scrollWidth })));
       for (const button of buttons) assert.ok(button.contentWidth <= button.width, `${button.action} label overflows its button: ${button.contentWidth} > ${button.width}`);
@@ -65,7 +66,7 @@ const { _electron } = require('playwright');
         { name: 'running', patch: { running: true, managed: true, mode: 'running' }, expected: { start: [false, '已运行'], pause: [true, ''], resume: [false, '未暂停'], drain: [true, ''], 'quit-after': [true, ''] } },
         { name: 'paused', patch: { running: true, managed: true, mode: 'paused' }, expected: { start: [false, '已运行'], pause: [false, '已暂停'], resume: [true, ''], drain: [true, ''], 'quit-after': [true, ''] } },
         { name: 'stale', patch: { running: true, managed: true, stale: true }, expected: { start: [false, '已运行'], pause: [false, '状态已过期'], resume: [false, '状态已过期'], drain: [false, '状态已过期'], 'quit-after': [false, '状态已过期'] } },
-        { name: 'legacy', patch: { running: true, managed: false, legacy: true }, expected: { start: [false, '已运行'], pause: [false, '旧版 Worker'], resume: [false, '旧版 Worker'], drain: [false, '旧版 Worker'], 'quit-after': [false, '旧版 Worker'] } },
+        { name: 'legacy', patch: { running: true, managed: false, legacy: true }, expected: { start: [false, '已运行'], pause: [false, '旧版工作节点'], resume: [false, '旧版工作节点'], drain: [false, '旧版工作节点'], 'quit-after': [false, '旧版工作节点'] } },
         { name: 'draining', patch: { running: true, managed: true, mode: 'draining' }, expected: { start: [false, '已运行'], pause: [false, '当前任务后停止'], resume: [false, '当前任务后停止'], drain: [false, '当前任务后停止'], 'quit-after': [true, ''] } },
         { name: 'safe-quit pending', patch: { running: true, managed: true, mode: 'draining', quitAfterTask: true }, expected: { start: [false, '退出应用'], pause: [false, '退出应用'], resume: [false, '退出应用'], drain: [false, '退出应用'], 'quit-after': [false, '退出应用'] } },
       ];
@@ -114,7 +115,8 @@ const { _electron } = require('playwright');
     await wait(async () => await compactPage.locator('html').getAttribute('data-theme') === 'light');
     assert.equal(await page.locator('#theme-toggle').getAttribute('aria-label'), '切换到黑夜模式');
     await page.reload();
-    await page.waitForFunction(() => document.querySelector('#headline').textContent === 'Worker 已停止');
+    await page.locator('[data-view=worker]').click();
+    await page.waitForFunction(() => document.querySelector('#headline').textContent === '工作节点已停止');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
     await compactPage.locator('#theme-toggle').click();
     await wait(async () => await page.locator('html').getAttribute('data-theme') === 'dark');
@@ -152,7 +154,7 @@ const { _electron } = require('playwright');
       await app.evaluate(() => globalThis.workerDesktop().main.close());
       await wait(() => app.evaluate(({ app }) => !app.dock.isVisible()));
     } else await page.locator('[data-action=hide]').click();
-    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getTitle() === 'InspiraiNest · 采集 Worker').isVisible()), false);
+    assert.equal(await app.evaluate(() => globalThis.workerDesktop().main.isVisible()), false);
     await app.evaluate(() => {
       const { tray } = globalThis.workerDesktop();
       if (tray.isDestroyed() || tray.getBounds().width <= 0) throw new Error('No native tray icon');

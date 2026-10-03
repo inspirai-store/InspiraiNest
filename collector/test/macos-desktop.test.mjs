@@ -45,7 +45,7 @@ test('running and paused modes retain distinct pause and resume availability', (
 test('legacy Workers retain duplicate-start protection and explain unavailable control or safe Quit', () => {
   const actions = macosWorkerActions({ ...activeWorker, managed: false, legacy: true });
   assert.equal(actions.start.enabled, false);
-  for (const action of ['pause', 'resume', 'drain', 'quit-after']) { assert.equal(actions[action].enabled, false); assert.match(actions[action].reason, /旧版 Worker/); }
+  for (const action of ['pause', 'resume', 'drain', 'quit-after']) { assert.equal(actions[action].enabled, false); assert.match(actions[action].reason, /旧版工作节点/); }
 });
 test('stale Workers disable control and safe Quit until their status recovers', () => {
   const actions = macosWorkerActions({ ...activeWorker, stale: true });

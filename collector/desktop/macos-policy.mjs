@@ -20,14 +20,14 @@ const clamp = (value, min, max) => Math.max(min, Math.min(value, Math.max(min, m
 // Shared by the macOS native menu and the renderer snapshot. A disabled action
 // always carries a specific reason; WorkerManager still validates every command.
 export function macosWorkerActions(s) {
-  const starting = 'Worker 正在启动，请稍候。';
-  const pending = '正在完成当前任务后退出应用，请等待 Worker 停止。';
-  const legacy = '旧版 Worker 没有本地控制接口，请等待其结束后重新启动。';
-  const stale = 'Worker 状态已过期，请等待状态恢复后操作。';
-  const control = s.quitAfterTask ? pending : s.starting ? starting : !s.running ? 'Worker 已停止，请先启动。' :
+  const starting = '工作节点正在启动，请稍候。';
+  const pending = '正在完成当前任务后退出应用，请等待工作节点停止。';
+  const legacy = '旧版工作节点没有本地控制接口，请等待其结束后重新启动。';
+  const stale = '工作节点状态已过期，请等待状态恢复后操作。';
+  const control = s.quitAfterTask ? pending : s.starting ? starting : !s.running ? '工作节点已停止，请先启动。' :
     s.legacy || !s.managed ? legacy : s.stale ? stale : s.mode === 'draining' ? '正在完成当前任务后停止，不再领取新任务。' : '';
   const reasons = {
-    start: s.quitAfterTask ? pending : s.starting ? starting : s.running ? 'Worker 已运行，无需重复启动。' : !s.paired ? '尚未配对，请先在管理窗口连接这台电脑。' : '',
+    start: s.quitAfterTask ? pending : s.starting ? starting : s.running ? '工作节点已运行，无需重复启动。' : !s.paired ? '尚未配对，请先在管理窗口连接这台电脑。' : '',
     pause: control || (s.mode === 'paused' ? '已暂停领取，当前任务继续执行。' : ''),
     resume: control || (s.mode !== 'paused' ? '当前未暂停，无需恢复领取。' : ''),
     drain: control,

@@ -1,9 +1,10 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { WorkerManager } from './manager.mjs';
+import { OwnerClient } from './owner-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
 import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from './macos-policy.mjs';
@@ -26,7 +27,7 @@ const scope = createHash('sha256').update(manager.dataDir.toLowerCase()).digest(
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
-let updates, updateTimer, initialUpdateTimer;
+let owner, updates, updateTimer, initialUpdateTimer;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
@@ -48,9 +49,9 @@ const macQuit = isMac ? createDrainQuitController({ snapshot: () => manager.snap
 } }) : null;
 const pageURL = pathToFileURL(path.join(here, 'index.html')).href;
 function makeWindow(compact = false) {
-  const window = new BrowserWindow({ width: compact ? 390 : 1020, height: compact ? 350 : 760,
+  const window = new BrowserWindow({ width: compact ? 390 : 1240, height: compact ? 350 : 820,
     minWidth: compact ? 390 : 740, minHeight: compact ? 350 : 580,
-    title: compact ? 'InspiraiNest · 状态' : 'InspiraiNest · 采集 Worker', icon: path.join(here, 'icon.png'), backgroundColor: '#0f1114', show: false,
+    title: compact ? '灵藏 · 状态' : '灵藏 · 桌面工作台', icon: path.join(here, 'icon.png'), backgroundColor: '#0f1114', show: false,
     frame: !compact, resizable: !compact, skipTaskbar: compact, alwaysOnTop: compact,
     ...(isMac && compact ? { type: 'panel', fullscreenable: false } : {}),
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
@@ -111,7 +112,7 @@ function icon() {
 }
 async function perform(action) {
   if (action === 'start') {
-    if (macQuit?.pending) throw new Error('正在完成当前任务后退出应用，请等待 Worker 停止。');
+    if (macQuit?.pending) throw new Error('正在完成当前任务后退出应用，请等待工作节点停止。');
     return manager.start();
   }
   if (['pause', 'resume'].includes(action)) return manager.control(action);
@@ -132,13 +133,49 @@ function trusted(event) {
   const sender = event.senderFrame?.url;
   if (![main?.webContents, popover?.webContents].includes(event.sender) || !sender || sender.split('?')[0] !== pageURL) throw new Error('不允许的页面');
 }
+function trustedMain(event) {
+  trusted(event);
+  if (event.sender !== main?.webContents) throw new Error('此功能只允许在主窗口使用');
+}
+async function pairDesktop(input) {
+  owner.serverForPair(input);
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
+  const result = await manager.pair(input, { clientType: 'desktop', onPaired: ({ server, installationId, result }) =>
+    owner.saveCredential({ server, installationId, deviceId: result.device.id, token: result.ownerToken }) });
+  main.webContents.send('library:changed', owner.status());
+  return result;
+}
 function registerIPC() {
   for (const [name, fn] of Object.entries({
     snapshot: desktopSnapshot, action: action => perform(action),
-    logs: task => manager.logs(task),
-    pair: input => manager.pair(input),
+    logs: task => manager.logs(task), activity: task => manager.activity(task),
+    pair: input => pairDesktop(input),
     'task-folder': async task => { const error = await shell.openPath(manager.taskDirectory(task)); if (error) throw new Error(error); },
-  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { trusted(event); return fn(argument); });
+  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (name === 'pair') trustedMain(event); else trusted(event); return fn(argument); });
+  const library = {
+    status: () => owner.status(), pair: async input => { await pairDesktop(input); return owner.status(); }, logout: () => owner.logout(),
+    state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
+    content: input => owner.content(input), preview: input => owner.preview(input),
+    task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
+    draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id),
+    trash: () => owner.trash(), remove: id => owner.removeArchive(id), restore: id => owner.restoreArchive(id),
+    download: async input => {
+      const file = await owner.fileBytes(input);
+      const saved = await dialog.showSaveDialog(main, { defaultPath: file.name });
+      if (saved.canceled || !saved.filePath) return { saved: false };
+      fs.writeFileSync(saved.filePath, file.bytes);
+      return { saved: true, path: saved.filePath };
+    },
+    source: async id => {
+      const entry = await owner.entry(id);
+      const raw = entry.canonical_url || entry.source_url;
+      if (!raw) throw new Error('这条资料没有来源链接');
+      const url = new URL(raw);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('来源链接无效');
+      await shell.openExternal(url.href);
+    },
+  };
+  for (const [name, fn] of Object.entries(library)) ipcMain.handle(`library:${name}`, async (event, argument) => { trustedMain(event); return fn(argument); });
   for (const [name, fn] of Object.entries({
     status: () => updates.snapshot(), check: () => updates.check(),
     download: () => updates.download(), install: () => updates.install(),
@@ -159,17 +196,17 @@ function refreshTray() {
     enabled: s.actions[action].enabled, toolTip: s.actions[action].reason,
   } : { label, enabled };
   const label = s.quitAfterTask ? '完成后停止并退出' : !s.running ? '已停止' : s.legacy ? '旧版运行中' : s.mode === 'draining' ? '完成后停止' : s.mode === 'paused' ? '暂停领取' : s.online ? '在线' : '连接中断';
-  tray.setToolTip(`InspiraiNest · ${label}`);
+  tray.setToolTip(`灵藏 · ${label}`);
   // On macOS, keep the click handler independent from the supplemental right-click menu.
   const menu = Menu.buildFromTemplate([
-    { label: `InspiraiNest · ${label}`, enabled: false },
+    { label: `灵藏 · ${label}`, enabled: false },
     { label: '打开管理窗口', click: () => openManager() }, { type: 'separator' },
     { label: '检查客户端更新', click: () => { openManager(); main.webContents.send('updates:open'); } },
-    { id: 'worker-start', ...itemState('start', '启动 Worker', !s.running && !s.starting && s.paired && !macQuit?.pending), click: () => menuAction('start') },
+    { id: 'worker-start', ...itemState('start', '启动工作节点', !s.running && !s.starting && s.paired && !macQuit?.pending), click: () => menuAction('start') },
     { id: 'worker-pause-resume', ...itemState(s.mode === 'paused' ? 'resume' : 'pause', s.mode === 'paused' ? '继续领取' : '暂停领取（当前任务继续）', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction(s.mode === 'paused' ? 'resume' : 'pause') },
-    { id: 'worker-drain', ...itemState('drain', isMac ? '停止 Worker（完成当前任务后）' : '完成当前任务后停止', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction('drain') },
+    { id: 'worker-drain', ...itemState('drain', isMac ? '停止工作节点（完成当前任务后）' : '完成当前任务后停止', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction('drain') },
     { type: 'separator' },
-    ...(!isMac ? [{ label: '退出管理器，Worker 继续', click: () => menuAction('quit') }] : []),
+    ...(!isMac ? [{ label: '退出管理器，工作节点继续', click: () => menuAction('quit') }] : []),
     { id: 'quit-after', ...itemState('quit-after', isMac ? '完成当前任务后停止并退出应用' : '完成任务后停止并退出', !s.running || s.managed), click: () => menuAction('quit-after') },
   ]);
   tray.menu = menu;
@@ -183,7 +220,7 @@ function applicationMenu() {
       { role: 'about' }, { type: 'separator' },
       { label: '打开管理窗口', click: () => openManager() },
       { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
-      { id: 'safe-quit', label: '完成当前任务后停止并退出 InspiraiNest', accelerator: 'Command+Q', click: () => menuAction('quit-after') },
+      { id: 'safe-quit', label: '完成当前任务后停止并退出灵藏', accelerator: 'Command+Q', click: () => menuAction('quit-after') },
     ] },
     { role: 'editMenu' }, { role: 'windowMenu' },
   ]));
@@ -201,6 +238,8 @@ else {
     quitting = true; clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
   app.whenReady().then(() => {
+    owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
+      workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: safeStorage, identityDir: manager.dataDir });
     updates = new DesktopUpdater({ app, manager, updater: electronUpdater.autoUpdater });
     main = makeWindow(); popover = makeWindow(true);
     updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });

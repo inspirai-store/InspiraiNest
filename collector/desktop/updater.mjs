@@ -57,7 +57,7 @@ export class DesktopUpdater extends EventEmitter {
     if (this.state.phase !== 'downloaded') throw new Error('请先下载并校验客户端更新');
     if (this.manager.snapshot().running) {
       const worker = this.manager.snapshot();
-      if (!worker.managed || worker.stale) throw new Error('Worker 正在运行但无法安全控制，请先手动停止 Worker 再安装');
+      if (!worker.managed || worker.stale) throw new Error('工作节点正在运行但无法安全控制，请先手动停止工作节点再安装');
       await this.manager.control('drain');
       this.set({ phase: 'waiting_worker' });
       this.workerTimer = setInterval(() => this.installWhenStopped(), this.pollMs);

@@ -8,18 +8,23 @@ files:
   - LICENSE
   - desktop/main.mjs
   - desktop/manager.mjs
+  - desktop/owner-client.mjs
   - desktop/updater.mjs
   - desktop/macos-policy.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
   - desktop/index.html
   - desktop/style.css
+  - desktop/workspace.css
+  - desktop/workspace.js
   - desktop/pair.css
   - desktop/brand.css
   - desktop/icon.png
   - desktop/tray.png
   - desktop/trayTemplate.png
   - desktop/trayTemplate@2x.png
+  - desktop/vendor/**
+  - public/device-view.js
   - src/**
   - worker.production.example.json
   - node_modules/**
