@@ -33,7 +33,9 @@ final class AppModel: ObservableObject {
         defer { busy = false }
         do {
             let api = CollectorAPI(origin: try ServerOrigin(server))
-            let credential = try await api.pair(key: key, name: name, installationId: try DeviceIdentity.id(), platform: "ios", system: DeviceIdentity.system)
+            let scoped = try DeviceIdentity.scoped(await api.devicePolicy())
+            let credential = try await api.pair(key: key, name: name, installationId: try DeviceIdentity.id(), platform: "ios", system: DeviceIdentity.system,
+                identity: scoped, deviceInfo: DeviceIdentity.information)
             try credentials.save(credential)
             sessionID = UUID(); snapshot = nil; lastRefresh = nil
             reloadLocal()
@@ -46,16 +48,22 @@ final class AppModel: ObservableObject {
         refreshing = true; let generation = sessionID
         defer { refreshing = false }
         do {
+            var identityNotice: String?
             if let credential = try credentials.load(), reportedDeviceID != credential.deviceID {
-                if let identity = try? DeviceIdentity.id() {
-                    try? await client().updateDeviceInfo(installationId: identity, system: DeviceIdentity.system)
+                do {
+                    let api = try client()
+                    let scoped = try DeviceIdentity.scoped(await api.devicePolicy())
+                    try await api.updateDeviceInfo(installationId: DeviceIdentity.id(), system: DeviceIdentity.system, identity: scoped, deviceInfo: DeviceIdentity.information)
+                    reportedDeviceID = credential.deviceID
+                } catch {
+                    identityNotice = "设备标识暂未补齐；若身份冲突，请检查授权后重新配对。"
                 }
-                reportedDeviceID = credential.deviceID
             }
             let result = try await client().state()
             guard generation == sessionID, !Task.isCancelled else { return }
             guard result.me.role == "owner", result.me.revokedAt == nil else { throw CollectorError.http(403) }
             snapshot = result; lastRefresh = Date()
+            notice = identityNotice
             try Outbox.shared().cacheDevices(result.devices, origin: serverName)
         } catch {
             guard generation == sessionID, !Task.isCancelled else { return }

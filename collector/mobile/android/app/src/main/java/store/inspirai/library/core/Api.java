@@ -32,12 +32,18 @@ public final class Api {
     public static JSONObject pair(String server, String key, String name) throws Exception {
         requireBackground();
         return request(Credentials.normalizeServer(server), null, "/api/pair", "POST",
-                new JSONObject().put("key", key).put("name", name)).body;
+                new JSONObject().put("key", key).put("name", name).put("clientType", "android")).body;
     }
     public static JSONObject pair(Context context, String server, String key, String name) throws Exception {
         requireBackground();
-        JSONObject payload = DeviceIdentity.payload(context).put("key", key).put("name", name);
+        JSONObject payload = devicePayload(context, server, true).put("key", key).put("name", name);
         return request(Credentials.normalizeServer(server), null, "/api/pair", "POST", payload).body;
+    }
+    public static JSONObject devicePayload(Context context, String server, boolean allowChange) throws Exception {
+        JSONObject policy;
+        try { policy = request(Credentials.normalizeServer(server), null, "/api/device-policy", "GET", null).body; }
+        catch (Failure failure) { if (failure.status != 404) throw failure; policy = null; }
+        return DeviceIdentity.payload(context, policy, allowChange);
     }
 
     /** Returns the server's complete Set-Cookie value, preserving its scope and security flags. */

@@ -12,7 +12,7 @@ public final class PairingCode {
             if(raw==null||raw.length()>4096)throw new IllegalArgumentException();
             JSONObject value=new JSONObject(raw);
             if(!"personal-library-pairing".equals(value.optString("protocol"))||value.optInt("version")!=1)throw new IllegalArgumentException();
-            if(!"owner".equals(value.optString("role")))throw new Exception("这是电脑采集端配对码，请在网页生成手机 / 管理端二维码。");
+            if(!"owner".equals(value.optString("role")))throw new Exception("请在网页生成新的设备配对二维码。");
             String server=Credentials.normalizeServer(value.getString("server"));
             if(!server.startsWith("https://"))throw new IllegalArgumentException();
             String key=value.getString("key");

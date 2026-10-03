@@ -33,12 +33,29 @@ final class APITests: XCTestCase {
         }
         return result
     }
+    func testIdentityPolicyIsPublicAndOldServerRemainsCompatible() async throws {
+        StubProtocol.handler = { request in
+            XCTAssertEqual(request.url?.path, "/api/device-policy")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            return (200, Data("{\"version\":2,\"namespace\":\"11111111-1111-4111-8111-111111111111\"}".utf8))
+        }
+        let policy = try await api().devicePolicy()
+        XCTAssertEqual(policy?.version, 2)
+        let first = try DeviceIdentity.scoped(policy)
+        XCTAssertEqual(first, try DeviceIdentity.scoped(policy))
+        XCTAssertEqual(first?.source, "keychain")
+        XCTAssertEqual(first?.digest.count, 64)
+        XCTAssertNotEqual(first?.digest, try DeviceIdentity.scoped(DevicePolicy(version: 2, namespace: "22222222-2222-4222-8222-222222222222"))?.digest)
+        StubProtocol.handler = { _ in (404, Data("{\"error\":\"Not found\"}".utf8)) }
+        let missing = try await api().devicePolicy()
+        XCTAssertNil(missing)
+    }
     func testPairUsesKeyAndNameAndRejectsWorker() async throws {
         StubProtocol.handler = { request in
             XCTAssertEqual(request.url?.path, "/api/pair"); XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
             let body = try JSONSerialization.jsonObject(with: self.requestBody(request)) as! [String: String]
-            XCTAssertEqual(body, ["key": "fixture-once", "name": "Test phone"])
+            XCTAssertEqual(body, ["key": "fixture-once", "name": "Test phone", "clientType": "ios"])
             return (201, Data("{\"device\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":\"Test phone\",\"role\":\"worker\"},\"token\":\"fixture-device\"}".utf8))
         }
         do { _ = try await api().pair(key: "fixture-once", name: "Test phone"); XCTFail("worker accepted") }

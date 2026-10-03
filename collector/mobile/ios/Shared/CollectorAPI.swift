@@ -49,26 +49,36 @@ final class CollectorAPI: @unchecked Sendable {
         do { return try JSONDecoder().decode(type, from: data) }
         catch { throw CollectorError.message("响应格式不匹配。未确认提交，可使用相同提交 ID 重试。") }
     }
-    func pair(key: String, name: String, installationId: String? = nil, platform: String? = nil, system: String? = nil) async throws -> DeviceCredential {
+    func devicePolicy() async throws -> DevicePolicy? {
+        do { return try await decoded(DevicePolicy.self, path: "/api/device-policy") }
+        catch CollectorError.http(404) { return nil }
+    }
+    func pair(key: String, name: String, installationId: String? = nil, platform: String? = nil, system: String? = nil,
+              identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil) async throws -> DeviceCredential {
         guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, key.utf16.count <= 200,
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.utf16.count <= 100 else {
-            throw CollectorError.message("请输入管理端配对码或个人密钥，以及设备名称。")
+            throw CollectorError.message("请输入设备配对码或个人密钥，以及设备名称。")
         }
-        var fields: [String: String] = ["key": key, "name": name]
+        var fields: [String: Any] = ["key": key, "name": name, "clientType": "ios"]
         if let installationId { fields["installationId"] = installationId }
         if let platform { fields["platform"] = platform }
         if let system { fields["system"] = system }
+        if let identity { fields["identity"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(identity)) }
+        if let deviceInfo { fields["deviceInfo"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(deviceInfo)) }
         let body = try JSONSerialization.data(withJSONObject: fields)
         let result = try await decoded(PairResponse.self, path: "/api/pair", method: "POST", body: body)
-        guard result.device.role == "owner" else { throw CollectorError.message("该配对码属于 worker。请在管理页面生成 owner 配对码；错误配对码可能已经消耗。") }
+        guard result.device.role == "owner" else { throw CollectorError.message("配对权限不匹配，服务返回 worker 权限；请在客户端生成新的设备配对码。") }
         guard UUID(uuidString: result.device.id) != nil, !result.token.isEmpty,
               result.token != key, result.token.utf8.allSatisfy({ (33...126).contains($0) }) else {
             throw CollectorError.message("配对返回的设备凭据无效。")
         }
         return DeviceCredential(origin: origin.value, deviceID: result.device.id, name: result.device.name, token: result.token)
     }
-    func updateDeviceInfo(installationId: String, system: String) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["installationId": installationId, "platform": "ios", "system": system])
+    func updateDeviceInfo(installationId: String, system: String, identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil) async throws {
+        var fields: [String: Any] = ["installationId": installationId, "platform": "ios", "system": system, "clientType": "ios"]
+        if let identity { fields["identity"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(identity)) }
+        if let deviceInfo { fields["deviceInfo"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(deviceInfo)) }
+        let body = try JSONSerialization.data(withJSONObject: fields)
         _ = try await request("/api/devices/me/info", method: "POST", body: body)
     }
     func state() async throws -> ServerState { try await decoded(ServerState.self, path: "/api/state") }

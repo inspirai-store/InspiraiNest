@@ -53,7 +53,7 @@ public class MainActivity extends Screen {
   if(credentials.isPaired())settingsRow("退出本机登录",()->confirm("清除本机凭据？草稿与待提交记录会保留。",()->work(()->{credentials.clear();return true;},v->{if(library!=null){library.destroy();library=null;}CookieManager.getInstance().removeAllCookies(null);snapshot=null;homeVisible=false;login();})));
  }
  private void settingsRow(String title,Runnable action){Button b=button(body,title+"  ›",action);b.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);b.setMinHeight(dp(60));b.setTextColor(ink);b.setBackgroundColor(android.graphics.Color.TRANSPARENT);rule(body);}
- private void refresh(){if(refreshing||!credentials.isPaired())return;refreshing=true;io.execute(()->{try{Api api=new Api(credentials);String id=credentials.deviceId();if(!id.equals(reportedDeviceId)){try{api.call("/api/devices/me/info","POST",DeviceIdentity.payload(this));reportedDeviceId=id;}catch(Exception ignored){}}JSONObject fresh=api.call("/api/state","GET",null);ui(()->{refreshing=false;snapshot=fresh;notice("");if(homeVisible&&tab.equals("采集"))renderData(false);});}catch(Exception e){ui(()->{refreshing=false;notice(e instanceof Api.Failure&&((Api.Failure)e).status==401?"授权已失效，请到“我的”重新连接。":"连接暂不可用，正在等待网络恢复。");});}});}
+ private void refresh(){if(refreshing||!credentials.isPaired())return;refreshing=true;io.execute(()->{try{Api api=new Api(credentials);String id=credentials.deviceId();String warning="";if(!id.equals(reportedDeviceId)){try{api.call("/api/devices/me/info","POST",Api.devicePayload(this,credentials.server(),false));reportedDeviceId=id;}catch(Exception ignored){warning="设备标识暂未补齐；若身份冲突，请检查授权后重新配对。";}}JSONObject fresh=api.call("/api/state","GET",null);String identityWarning=warning;ui(()->{refreshing=false;snapshot=fresh;notice(identityWarning);if(homeVisible&&tab.equals("采集"))renderData(false);});}catch(Exception e){ui(()->{refreshing=false;notice(e instanceof Api.Failure&&((Api.Failure)e).status==401?"授权已失效，请到“我的”重新连接。":"连接暂不可用，正在等待网络恢复。");});}});}
  private void renderData(boolean force){if(!homeVisible||!tab.equals("采集")||listing==null)return;try{
   String key=collectionTab+taskFilter+(collectionTab.equals("待提交")?new Drafts(this).list().toString()+new Outbox(this).list():snapshot==null?"":snapshot.optJSONArray("tasks").toString());if(!force&&key.equals(lastRender))return;lastRender=key;int y=scroll.getScrollY();listing.removeAllViews();
   if(collectionTab.equals("待提交")){outbox();scroll.post(()->scroll.scrollTo(0,y));return;}
@@ -67,7 +67,7 @@ public class MainActivity extends Screen {
  static String stateName(String s){return switch(s){case "queued"->"待分配";case "assigned"->"待开始";case "running"->"采集中";case "uploading"->"上传中";case "waiting_action"->"待操作";case "awaiting_review"->"待审核";case "completed"->"已完成";case "cancelled"->"已取消";case "failed"->"需处理";default->s;};}
  @Override protected void onDestroy(){if(library!=null)library.destroy();super.onDestroy();}
     private void login(){
-        homeVisible=false;page("InspiraiNest","浏览、分享、采集，交给自己的电脑处理");listing=null;
+        homeVisible=false;page("灵藏","浏览、分享、采集，交给自己的电脑处理");listing=null;
         try{Credentials.Snapshot saved=credentials.snapshot();loginGeneration=saved==null?null:saved.generation;}catch(Exception e){loginGeneration=null;}
         body.addView(label("让收藏的内容，成为随时可读的资料。",20,true));
 
@@ -75,15 +75,15 @@ public class MainActivity extends Screen {
         LinearLayout manual=new LinearLayout(this);manual.setOrientation(LinearLayout.VERTICAL);button(body,"使用地址与配对码连接",()->manual.setVisibility(manual.getVisibility()==View.GONE?View.VISIBLE:View.GONE));LinearLayout originalBody=body;body=manual;
         EditText server=input("HTTPS 服务地址",Credentials.DEFAULT_SERVER,false);server.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
         EditText name=input("设备名称",Build.MODEL+" 手机",false);
-        EditText key=input("手机管理端配对码或个人密钥","",false);key.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);key.setSaveEnabled(false);
+        EditText key=input("设备配对码或个人密钥","",false);key.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);key.setSaveEnabled(false);
         pairingServer=server;pairingKey=key;
         button(body,"配对并登录",()->{
             String address=server.getText().toString().trim(),secret=key.getText().toString().trim(),deviceName=name.getText().toString();
             if(!pairing.compareAndSet(false,true)){notice("配对正在进行，请稍候。旋转屏幕后会自动恢复。");return;}
-            notice("正在连接…");work(()->{try{JSONObject result=Api.pair(this,address,secret,deviceName);JSONObject d=result.getJSONObject("device");if(!"owner".equals(d.getString("role")))throw new Exception("这是电脑 Worker 配对码，请生成手机管理端配对码。");credentials.save(address,result.getString("token"),d.getString("id"));return result;}finally{pairing.set(false);}},r->{key.setText("");if(library!=null){library.destroy();library=null;}home();refresh();scheduleQueue();work(()->Outbox.flush(this),v->{});});
+            notice("正在连接…");work(()->{try{JSONObject result=Api.pair(this,address,secret,deviceName);JSONObject d=result.getJSONObject("device");if(!"owner".equals(d.getString("role")))throw new Exception("配对权限不匹配，请生成新的设备配对码。");credentials.save(address,result.getString("token"),d.getString("id"));return result;}finally{pairing.set(false);}},r->{key.setText("");if(library!=null){library.destroy();library=null;}home();refresh();scheduleQueue();work(()->Outbox.flush(this),v->{});});
         });
         body=originalBody;body.addView(manual);manual.setVisibility(View.GONE);pairingManual=manual;
-        body.addView(label("在已登录的采集中心「授权设备」中创建管理端配对码。密钥仅用于换取本机独立授权，保存在 Android Keystore 保护的存储中。",14,false));
+        body.addView(label("在已登录的采集中心「授权设备」中创建设备配对码。密钥仅用于换取本机独立授权，保存在 Android Keystore 保护的存储中。",14,false));
         button(body,"查看本机草稿和待提交项",()->{tab="采集";collectionTab="待提交";home();});
         button(body,"应用更新 · v"+BuildConfig.VERSION_NAME,()->startActivity(new Intent(this,UpdateActivity.class)));
     }

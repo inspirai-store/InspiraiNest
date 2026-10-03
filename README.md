@@ -1,4 +1,4 @@
-# InspiraiNest
+# 灵藏 · InspiraiNest
 
 A local-first personal research library with offline browsing, a self-hosted collection service, desktop Agent Workers, mobile sharing clients and a read-only CLI.
 
