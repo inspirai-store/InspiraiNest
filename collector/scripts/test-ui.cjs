@@ -59,9 +59,13 @@ async function main() {
     await page.locator('#detail-dialog').waitFor({ state: 'hidden' });
     await page.locator('[data-view=devices]').click();
     await page.locator('#pair-device').click();
+    assert.equal(await page.locator('#pair-form select').count(), 0);
     await page.locator('#pair-form button').click();
     await page.locator('#pair-result').waitFor({ state: 'visible' });
     assert.ok((await page.locator('#pair-key').inputValue()).length >= 32);
+    await page.locator('#pair-qr').evaluate(img => img.decode());
+    assert.equal(await page.locator('#pair-qr').evaluate(img => img.naturalWidth > 0), true);
+    await page.screenshot({ path: path.join(output, 'desktop-universal-pairing.png') });
     await page.locator('#pair-dialog [data-close]').click();
     await page.screenshot({ path: path.join(output, 'desktop-devices.png') });
     await page.locator('[data-view=archives]').click();

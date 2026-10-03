@@ -111,7 +111,6 @@ for (const brand of ['InspiraiNest', 'LingNest']) test(`${brand} releases preser
 
 test('macOS update feed serves only verified current release assets', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'macos-update-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const version = '0.1.7', workers = {}, assets = {};
   const stage = filename => {
     const bytes = Buffer.from('fixture:' + filename);
@@ -128,7 +127,10 @@ test('macOS update feed serves only verified current release assets', async t =>
   fs.writeFileSync(path.join(root, 'macos-update.json'), JSON.stringify({ version, assets }));
   const app = createService({ dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
-  t.after(() => app.close());
+  t.after(async () => {
+    await app.close();
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
   const base = `http://127.0.0.1:${app.server.address().port}/updates/macos/`;
   for (const item of [...Object.values(workers), ...Object.values(assets)]) {
     const response = await fetch(base + item.filename);

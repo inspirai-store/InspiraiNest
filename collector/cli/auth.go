@@ -77,7 +77,7 @@ func (a *app) login(ctx context.Context, c *client, o options) (map[string]any, 
 			return nil, e
 		}
 	}
-	fmt.Fprintf(a.err, "Authorize this device at %s\nCode: %s\n", verify, terminal(user))
+	fmt.Fprintf(a.err, "Authorize this device at %s\nCode: %s\n", browserURL, terminal(user))
 	if !o.noBrowser {
 		if e = a.open(browserURL); e != nil {
 			fmt.Fprintln(a.err, "Browser could not be opened; use the verification URL above.")

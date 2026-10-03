@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>账户安全 · 灵藏</title>
+  <link rel="icon" href="/brand-icon.png"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/brand.css"><link rel="stylesheet" href="/security.css">
+  <script defer src="/vendor/lucide.js"></script><script defer src="/browser-session.js"></script><script defer src="/security.js"></script>
+</head>
+<body class="security-page">
+  <header><a class="brand" href="/"><img src="/brand-icon.png" alt=""><span>灵藏</span></a><a href="/">返回资料库</a><a href="/authorize">CLI 授权</a></header>
+  <main class="security-main">
+    <h1>账户安全</h1>
+    <p id="security-message" role="status" aria-live="polite">正在载入安全设置</p>
+    <p id="login-required" hidden>请先<a href="/login">登录资料库</a>。</p>
+    <div id="security-settings" hidden>
+      <section class="security-row">
+        <div class="security-row-title"><i data-lucide="key-round" aria-hidden="true"></i><div><h2>登录凭据</h2><p id="credential-status"></p></div></div>
+        <button id="edit-credential" type="button"><i data-lucide="pencil"></i>修改凭据</button>
+      </section>
+      <section class="security-row">
+        <div class="security-row-title"><i data-lucide="shield-check" aria-hidden="true"></i><div><h2>二次认证</h2><p id="totp-status"></p></div></div>
+        <div class="security-row-actions"><button id="setup-factor" type="button" class="primary"><i data-lucide="qr-code"></i>绑定认证器</button><button id="disable-factor" type="button" class="danger" hidden><i data-lucide="shield-off"></i>解除绑定</button></div>
+      </section>
+      <section id="recovery-setting" class="security-row" hidden>
+        <div class="security-row-title"><i data-lucide="file-key" aria-hidden="true"></i><div><h2>恢复码</h2><p id="recovery-status"></p></div></div>
+        <button id="rotate-recovery" type="button"><i data-lucide="refresh-cw"></i>重新生成</button>
+      </section>
+    </div>
+  </main>
+  <dialog id="credential-dialog" aria-labelledby="credential-title">
+    <div class="dialog-heading"><h2 id="credential-title">修改登录凭据</h2><button class="icon" data-close type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button></div>
+    <form id="credential-form">
+      <label>新登录凭据<input name="newKey" type="password" autocomplete="new-password" required minlength="8" maxlength="200" autofocus></label>
+      <label>确认新登录凭据<input name="confirmKey" type="password" autocomplete="new-password" required minlength="8" maxlength="200"></label>
+      <label class="factor-field" hidden>动态码或恢复码<input name="factor" autocomplete="one-time-code" maxlength="80" spellcheck="false"></label>
+      <p class="security-note">至少 8 个字符。已有设备授权和任务保持不变。</p>
+      <p class="dialog-message" role="status" aria-live="polite"></p>
+      <div class="actions"><button type="button" data-close>取消</button><button class="primary" type="submit"><i data-lucide="check"></i>保存凭据</button></div>
+    </form>
+  </dialog>
+  <dialog id="setup-dialog" aria-labelledby="setup-title">
+    <div class="dialog-heading"><h2 id="setup-title">绑定认证器</h2><button class="icon" data-close type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button></div>
+    <div id="setup-loading" class="security-dialog-body" role="status">正在生成绑定二维码</div>
+    <p id="setup-message" class="dialog-message" role="status" aria-live="polite"></p>
+    <div id="setup-panel" class="security-dialog-body" hidden>
+      <img id="totp-qr" width="260" height="260" alt="认证器绑定二维码">
+      <label>手动绑定密钥<input id="totp-secret" readonly spellcheck="false"></label>
+      <p id="setup-expiry" class="security-note"></p>
+    </div>
+    <form id="confirm-factor-form" hidden>
+      <label>认证器 6 位动态码<input name="otp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label>
+      <div class="actions"><button id="cancel-setup" type="button" data-close>取消</button><button type="submit" class="primary"><i data-lucide="shield-check"></i>确认绑定</button></div>
+    </form>
+  </dialog>
+  <dialog id="factor-dialog" aria-labelledby="factor-title">
+    <div class="dialog-heading"><h2 id="factor-title">二次认证验证</h2><button class="icon" data-close type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button></div>
+    <form id="factor-form">
+      <p id="factor-note" class="security-note"></p>
+      <label>动态码或恢复码<input name="factor" autocomplete="one-time-code" required maxlength="80" spellcheck="false" autofocus></label>
+      <p class="dialog-message" role="status" aria-live="polite"></p>
+      <div class="actions"><button type="button" data-close>取消</button><button id="factor-submit" type="submit" class="primary"><i data-lucide="check"></i><span>确认</span></button></div>
+    </form>
+  </dialog>
+  <dialog id="recovery-dialog" aria-labelledby="recovery-title">
+    <div class="dialog-heading"><h2 id="recovery-title">保存恢复码</h2><button class="icon" data-close type="button" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button></div>
+    <div class="security-dialog-body"><p class="security-note">恢复码仅显示一次，每枚只能使用一次。请妥善保存。</p><pre id="recovery-codes"></pre><div class="actions"><button id="download-recovery" type="button"><i data-lucide="download"></i>下载恢复码</button><button id="close-recovery" type="button" data-close class="primary"><i data-lucide="check"></i>已保存</button></div></div>
+  </dialog>
+</body>
+</html>

@@ -46,6 +46,13 @@ export function validateArchive(bundle) {
   return bundle;
 }
 
+export function requireReadableMetadata(meta) {
+  for (const field of ['title', 'summary', 'coverage_note']) {
+    requireValue(!/\uFFFD|\?{3,}/.test(meta[field]), `Unreadable ${field}`);
+  }
+  requireValue(meta.tags.every(tag => !/\uFFFD|\?{2,}/.test(tag)), 'Unreadable tags');
+}
+
 export function packageEntry(entryRoot) {
   const root = fs.realpathSync(entryRoot);
   const meta = readJson(path.join(root, 'source.json'));

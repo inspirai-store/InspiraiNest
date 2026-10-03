@@ -1,0 +1,24 @@
+.security-page header { flex-wrap: wrap; height: auto; min-height: 72px; gap: 20px; }
+.security-page header .brand { margin-right: auto; }
+.security-page header a { color: var(--green); text-decoration: none; }
+.security-main { max-width: 860px; margin: 0 auto; padding: 36px 24px 64px; min-height: calc(100dvh - 72px); }
+.security-main h1 { font-size: 28px; }
+.security-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 0; border-bottom: 1px solid var(--line); }
+.security-row-title { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.security-row-title > svg { width: 22px; height: 22px; margin-top: 4px; color: #627078; }
+.security-row h2 { font-size: 18px; margin: 0 0 6px; }
+.security-row p { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.security-row > button, .security-row-actions { flex-shrink: 0; }
+.security-row-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.security-note { color: var(--muted); line-height: 1.7; }
+#security-message { min-height: 26px; color: var(--green); overflow-wrap: anywhere; margin-top: 8px; }
+#security-message[data-error=true], .dialog-message[data-error=true] { color: #b33939; }
+.dialog-message { min-height: 22px; color: var(--green); overflow-wrap: anywhere; }
+.security-dialog-body { padding: 20px; }
+#setup-message { padding: 0 20px; }
+.security-dialog-body label { margin: 14px 0; }
+#setup-panel { padding-bottom: 0; }
+#totp-qr { display: block; width: 260px; max-width: 100%; height: auto; aspect-ratio: 1; margin: 0 auto; }
+#recovery-codes { overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; line-height: 1.8; background: #f4f6f7; padding: 16px; margin: 16px 0; }
+.security-page dialog .actions { flex-wrap: wrap; }
+@media(max-width: 600px) { .security-main { padding: 24px 16px 48px; } .security-page header { padding: 16px; gap: 12px; } .security-row { align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 24px 0; } .security-row-title { width: 100%; } .security-row > button, .security-row-actions { margin-left: 38px; } }

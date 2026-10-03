@@ -5,7 +5,8 @@ const CLIENT = 'lingnest-cli';
 const SCOPE = 'library:read';
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const lifetime = 30 * 86400;
-const publicReader = ({ tokenHash, ...device }) => device;
+const publicReader = ({ tokenHash, ownerTokenHash, ...device }) => device;
+const canIssue = device => device && (device.role === 'owner' || (device.role === 'worker' && device.clientType === 'desktop' && device.ownerTokenHash));
 
 // Opaque grants and tokens are hashed at rest. Browser consent never sees device_code.
 export function readerAuthorization({ store, authenticate, serialized, publicUrl, body, send }) {
@@ -80,7 +81,7 @@ export function readerAuthorization({ store, authenticate, serialized, publicUrl
           if (tooFast) return { error: 'slow_down' };
           if (grant.state !== 'approved') return { error: 'authorization_pending' };
           const issuer = await tx.getForUpdate('device', grant.ownerId);
-          if (!issuer || issuer.revokedAt || issuer.role !== 'owner') return { error: 'access_denied' };
+          if (!canIssue(issuer) || issuer.revokedAt) return { error: 'access_denied' };
           if (Date.parse(grant.expiresAt) <= Date.now()) return { error: 'expired_token' };
           const token = secret();
           await tx.put('device', { id: id(), name: grant.name, role: 'reader', scope: SCOPE, tokenHash: hash(token),
@@ -111,7 +112,7 @@ export function readerAuthorization({ store, authenticate, serialized, publicUrl
         await store.transaction(async tx => {
           const latest = await tx.getForUpdate('reader_grant', grant.id);
           const currentIssuer = await tx.getForUpdate('device', issuer.id);
-          requireValue(currentIssuer && !currentIssuer.revokedAt && currentIssuer.role === 'owner', 'Device authorization required', 401);
+          requireValue(canIssue(currentIssuer) && !currentIssuer.revokedAt, 'Device authorization required', 401);
           requireValue(latest && latest.state === 'pending' && Date.parse(latest.expiresAt) > Date.now(), 'Authorization is no longer pending', 409);
           await tx.put('reader_grant', { ...latest, state: input.decision === 'allow' ? 'approved' : 'denied', ownerId: issuer.id });
         });
