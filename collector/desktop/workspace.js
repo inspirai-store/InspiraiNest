@@ -162,7 +162,19 @@
     if (signature === lastDeviceSignature) return;
     lastDeviceSignature = signature;
     const identityNames = { smbios:'硬件标识', ioplatform:'硬件标识', 'android-id':'系统标识', keychain:'Keychain 标识', 'browser-profile':'浏览器档案', local:'本地标识' };
-    $('#device-list').innerHTML = window.deviceView.groups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h2>${g.title} · ${g.devices.length}</h2>${g.devices.map(d => `<article class="device-card"><div><strong>${esc(d.displayName || d.name)}</strong><p>${esc(d.name)} · ${window.deviceView.status(d)}${d.id === state.me.id ? ' · 当前设备' : ''}</p><p>${esc([d.deviceInfo?.model,d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '',d.identity ? `${identityNames[d.identity.source] || '设备标识'} ${d.identity.shortId}` : '等待客户端补齐标识',d.browserExpiresAt ? '有效至 '+date(d.browserExpiresAt) : '',window.deviceView.dispatchable(d) ? 'Agent · '+(d.agents?.join(' / ') || '无可用 Agent') : '', '最近活动 '+date(d.lastSeen)].filter(Boolean).join(' · '))}</p></div><button data-revoke="${esc(d.id)}" class="danger-button" ${d.id === state.me.id ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销</button></article>`).join('') || '<p class="quiet">暂无授权</p>'}</section>`).join('');
+    const deviceIcons = { desktop:'monitor', mobile:'smartphone', browser:'globe', integration:'key-round', unknown:'monitor-smartphone' };
+    $('#device-list').innerHTML = window.deviceView.groups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h3>${g.title}<span>${g.devices.length}</span></h3>${g.devices.map(d => {
+      const current = d.id === state.me.id, status = window.deviceView.status(d);
+      const fields = [
+        ['型号', d.deviceInfo?.model],
+        ['客户端', d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '未上报'],
+        [d.identity ? identityNames[d.identity.source] || '设备标识' : '设备标识', d.identity?.shortId || '未上报'],
+        ...(window.deviceView.dispatchable(d) ? [['Agent', d.agents?.join(' / ') || '无可用 Agent']] : []),
+        ...(d.browserExpiresAt ? [['有效至', date(d.browserExpiresAt)]] : [])
+      ].filter(([,value]) => value);
+      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
+    }).join('') || '<p class="quiet">暂无授权设备</p>'}</section>`).join('');
+    icons();
     $('#device-list').querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => {
       if (!confirm('撤销该设备的访问权限？')) return;
       try { await window.library.revoke(b.dataset.revoke); toast('设备已撤销'); await refresh(); } catch (error) { toast(errorText(error)); }

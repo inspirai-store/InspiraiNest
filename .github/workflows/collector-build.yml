@@ -111,6 +111,9 @@ jobs:
       - name: Test packaged Windows settings and nodes
         shell: pwsh
         run: node collector/scripts/test-desktop-settings-nodes.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows pairing layout
+        shell: pwsh
+        run: node collector/scripts/test-desktop-pairing.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Worker and reader
         shell: pwsh
         run: node collector/scripts/test-packaged-worker.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -210,6 +213,7 @@ jobs:
             app=desktop/dist/mac/InspiraiNest.app
           fi
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/InspiraiNest"
+          node scripts/test-desktop-pairing.cjs "$app/Contents/MacOS/InspiraiNest"
           node scripts/test-packaged-worker.cjs "$app/Contents/MacOS/InspiraiNest"
           node scripts/test-worker-logs-ui.cjs "$app/Contents/MacOS/InspiraiNest"
           node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"

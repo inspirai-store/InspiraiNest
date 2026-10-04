@@ -5,6 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const { _electron } = require('playwright');
 const QRCode = require('qrcode');
+const {showSettings,setTheme} = require('./desktop-test-helpers.cjs');
 
 // A separate desktop scope and synthetic IPC replies never use production credentials.
 (async () => {
@@ -13,7 +14,7 @@ const QRCode = require('qrcode');
   fs.writeFileSync(config, JSON.stringify({ server: 'https://fixture.invalid', dataDir: path.join(root, 'data') }));
   const env = { ...process.env, COLLECTOR_CONFIG: config, COLLECTOR_DESKTOP_TEST: '1' };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await _electron.launch({ executablePath: require('electron'), args: [path.resolve(__dirname, '../desktop')], env });
+  const app = await _electron.launch({ executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'), args: process.argv[2] ? [] : [path.resolve(__dirname, '../desktop')], env });
   const output = path.resolve(__dirname, '../test-output/desktop-pairing');
   fs.mkdirSync(output, { recursive: true });
   let webServer;
@@ -31,8 +32,10 @@ const QRCode = require('qrcode');
       };
       handle('status', () => ({ paired: true, server: 'https://fixture.invalid', deviceId: 'fixture-owner' }));
       handle('state', () => ({ me: { id: 'fixture-owner' }, tasks: [], archives: [], devices: Array.from({ length: 16 }, (_, i) => ({
-        id: 'fixture-' + i, name: '合成电脑 ' + i, role: 'worker', category: 'desktop', online: false,
+        id: i === 0 ? 'fixture-owner' : 'fixture-' + i, name: i === 1 ? '很长的设备名称 <script>unsafe</script> 用于验证截断和转义' : '合成电脑 ' + i, role: 'worker', category: 'desktop', online: i === 0,
         workerAuthorized: true, agents: ['codex'], capabilities: ['article'],
+        displayName: 'Windows 11 · 客户端登录', lastSeen: new Date().toISOString(),
+        deviceInfo: { model:'System Product Name', client:{ version:'0.1.11' } }, identity:{source:'smbios',shortId:'fixture123456'},
       })) }));
       handle('entries', () => ({ items: [], total: 0 }));
       handle('pairing', async () => {
@@ -49,8 +52,24 @@ const QRCode = require('qrcode');
     assert.ok(page);
     await page.reload();
     await page.locator('#overview-data').waitFor({ state: 'visible' });
-    await page.locator('[data-view=devices]').click();
+    await setTheme(page,'dark');await showSettings(page,'devices');
     assert.equal(await page.locator('.device-card').count(), 16);
+    assert.equal(await page.locator('.device-card script').count(), 0);
+    assert.equal(await page.locator('.device-current').count(), 1);
+    const geometry = async () => {
+      const layout = await page.evaluate(() => {
+        const rect = selector => { const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}; };
+        return {headingDisplay:getComputedStyle(document.querySelector('.pairing-heading')).display,codeDisplay:getComputedStyle(document.querySelector('.pairing-code')).display,
+          heading:rect('.pairing-heading'),close:rect('[data-close-dialog=pair-dialog]'),key:rect('#pair-key'),copy:rect('#copy-key'),qr:rect('#pair-qr'),
+          closeIcon:rect('[data-close-dialog=pair-dialog] svg'),copyIcon:rect('#copy-key svg'),dialog:rect('#pair-dialog'),viewport:{width:innerWidth,height:innerHeight}};
+      });
+      assert.equal(layout.headingDisplay,'flex','pairing stylesheet must actually load');assert.equal(layout.codeDisplay,'flex');
+      assert.ok(layout.close.x>layout.heading.x+layout.heading.width/2&&layout.close.bottom<=layout.heading.bottom,'close stays in the top right of the header');
+      assert.ok(Math.abs(layout.copy.y-layout.key.y)<=4&&layout.copy.x>=layout.key.right,'copy stays beside the input');
+      assert.equal(layout.closeIcon.width,18);assert.equal(layout.copyIcon.width,18);
+      assert.ok(layout.dialog.x>=0&&layout.dialog.right<=layout.viewport.width&&layout.dialog.y>=0&&layout.dialog.bottom<=layout.viewport.height,'dialog fits the viewport');
+      return layout;
+    };
     await page.setViewportSize({ width: 740, height: 580 });
     await page.locator('#pair-device').click();
     await page.locator('#pair-dialog[open]').waitFor({ state: 'visible' });
@@ -70,15 +89,28 @@ const QRCode = require('qrcode');
     assert.ok(box.y >= 0 && box.y + box.height <= height, 'pairing must be visible above a long device list');
     const desktopLayout = await page.locator('#pair-dialog').evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
     assert.ok(desktopLayout.width <= 400 && desktopLayout.height < 460, 'pairing stays compact');
+    await geometry();
+    const pairActionIcon=await page.locator('#pair-device svg').boundingBox();assert.equal(pairActionIcon.width,16);
+    for(let i=0;i<6;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>!!document.activeElement.closest('#pair-dialog')),true,'modal traps keyboard focus');}
     await page.screenshot({ path: path.join(output, 'pairing-narrow-fixture.png') });
-    await page.evaluate(() => document.documentElement.dataset.theme = 'light');
+    await page.evaluate(() => window.desktopSettings.update({themeMode:'light'}));
     await page.waitForTimeout(220);
     await page.screenshot({ path: path.join(output, 'pairing-light-fixture.png') });
-    await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
+    await geometry();
+    await page.setViewportSize({width:1240,height:820});
+    await page.screenshot({path:path.join(output,'pairing-standard-light-fixture.png')});
+    await page.evaluate(() => window.desktopSettings.update({themeMode:'dark'}));
+    await page.screenshot({path:path.join(output,'pairing-standard-dark-fixture.png')});
+    await geometry();
     await page.locator('[data-close-dialog=pair-dialog]').click();
     await page.waitForFunction(() => document.querySelector('#pair-key').value === '');
     assert.equal(await page.locator('#pair-key').inputValue(), '');
     assert.equal(await page.locator('#pair-qr').getAttribute('src'), null);
+    await page.screenshot({path:path.join(output,'devices-dark-fixture.png')});
+    await page.evaluate(() => window.desktopSettings.update({themeMode:'light'}));await page.screenshot({path:path.join(output,'devices-light-fixture.png')});
+    await page.setViewportSize({width:740,height:580});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.screenshot({path:path.join(output,'devices-minimum-light-fixture.png')});
+    await page.evaluate(() => window.desktopSettings.update({themeMode:'dark'}));
 
     await page.locator('#pair-device').click();
     await page.locator('#pair-status').waitFor({ state: 'visible' });
@@ -130,7 +162,7 @@ const QRCode = require('qrcode');
     await new Promise(resolve => webServer.listen(0, '127.0.0.1', resolve));
     const webURL = `http://127.0.0.1:${webServer.address().port}/`;
     await app.evaluate(async ({ BrowserWindow }, url) => {
-      const window = new BrowserWindow({ show: false, width: 740, height: 580, webPreferences: { contextIsolation: true, nodeIntegration: false } });
+      const window = new BrowserWindow({ show: true, width: 740, height: 580, webPreferences: { contextIsolation: true, nodeIntegration: false } });
       await window.loadURL(url);
     }, webURL);
     const webPage = app.windows().find(p => p.url() === webURL);
@@ -152,7 +184,7 @@ const QRCode = require('qrcode');
     await webPage.waitForFunction(() => document.querySelector('#pair-key').value === '');
     fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, platform: process.platform,
       checks: ['immediate modal and loading feedback', 'pairing visible with 16 devices at minimum width',
-        'one request while busy', 'QR rendering', 'masked key and copy feedback', 'shared compact Web and desktop layout', 'close and Escape clear credentials', 'late reply discarded',
+        'one request while busy', 'QR rendering', 'masked key and copy feedback', 'loaded stylesheet and close/copy geometry', 'dark/light standard and minimum dialog', 'device card grouping and escaping', 'modal keyboard focus', 'shared compact Web and desktop layout', 'close and Escape clear credentials', 'late reply discarded',
         'error retry', 'expiration clears credentials'], limitation: 'Synthetic IPC and QR fixtures; no production pairing or device authorization.' }, null, 2));
     console.log('Desktop pairing regression: passed');
   } finally {

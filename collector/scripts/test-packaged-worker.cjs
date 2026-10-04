@@ -45,6 +45,7 @@ const { _electron } = require('playwright');
     assert.equal(await page.title(), '灵藏 · 桌面工作台');
     const appPath = await app.evaluate(({ app }) => app.getAppPath());
     assert.equal(fs.existsSync(path.join(appPath, 'public/device-view.js')), true, 'Missing authorization presentation helper');
+    assert.equal(fs.existsSync(path.join(appPath, 'public/pairing-dialog.css')), true, 'Missing pairing dialog stylesheet');
     assert.equal(fs.existsSync(path.join(appPath, '..', 'library', 'scripts', 'catalog.mjs')), true);
     for (const file of ['settings.mjs','settings-renderer.js','nodes.js','owner-client.mjs','updater.mjs','workspace.css','workspace.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
       assert.equal(fs.existsSync(path.join(appPath, 'desktop', file)), true, `Missing packaged resource: ${file}`);
