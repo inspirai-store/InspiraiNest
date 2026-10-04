@@ -2,6 +2,7 @@
   const button = document.querySelector('#android-download');
   const status = document.querySelector('#release-meta');
   const message = document.querySelector('#platform-message');
+  const fileSize = bytes => bytes < 1048576 ? (bytes / 1024).toFixed(0) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB';
   for (const copy of document.querySelectorAll('[data-copy]')) copy.addEventListener('click', async () => {
     const source = document.getElementById(copy.dataset.copy);
     const text = source.value || source.textContent;
@@ -24,9 +25,13 @@
     const available = [];
     for (const [platform, selector, checksum, label] of [['windows_x64', '#worker-windows', '#worker-windows-sha', 'Windows'], ['macos_arm64', '#worker-macos-arm64', '#worker-macos-arm64-sha', 'macOS Apple Silicon'], ['macos_x64', '#worker-macos-x64', '#worker-macos-x64-sha', 'macOS Intel']]) {
       const release = platform.startsWith('macos_') ? worker[`${platform}_dmg`] || worker[platform] : worker[platform];
-      if (!release) continue;
       const link = document.querySelector(selector);
+      if (!release) { link.querySelector('.desktop-release-meta').textContent = '安装包暂未发布'; continue; }
       link.href = release.url; link.download = release.filename; link.removeAttribute('aria-disabled');
+      link.querySelector('.desktop-release-meta').textContent = `v${release.version} · ${fileSize(release.size)} · ${platform === 'windows_x64' ? 'NSIS 安装包' : '正式发布版'}`;
+      const fileType = link.querySelector('.desktop-file-type');
+      if (fileType) fileType.textContent = `${release.filename.endsWith('.dmg') ? 'DMG' : 'ZIP'} ↓`;
+      document.querySelector(selector + '-file').textContent = release.filename;
       document.querySelector(checksum).textContent = release.sha256;
       available.push(`${label} v${release.version}`);
     }
@@ -49,11 +54,11 @@
     if (!release) { button.querySelector('span').textContent = '安装包暂未提供'; status.textContent = '请选择其他已发布的客户端，或稍后重试。'; return; }
     button.href = release.browserUrl; button.setAttribute('download', release.filename); button.removeAttribute('aria-disabled');
     button.querySelector('span').textContent = '下载 Android 客户端';
-    const size = release.size < 1048576 ? (release.size / 1024).toFixed(0) + ' KB' : (release.size / 1048576).toFixed(1) + ' MB';
+    const size = fileSize(release.size);
     status.textContent = `v${release.version} · Android ${release.minimumAndroid}+ · ${size} · 签名安装包`;
     if (release.publishedAt && Number.isFinite(Date.parse(release.publishedAt))) status.textContent += ' · 更新于 ' + new Date(release.publishedAt).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
     document.querySelector('#release-file').textContent = release.filename;
     document.querySelector('#release-sha').textContent = release.sha256;
     document.querySelector('#release-details').hidden = false;
-  }).catch(() => { button.querySelector('span').textContent = '暂时无法获取安装包'; status.textContent = '请检查连接后刷新页面。'; document.querySelector('#cli-status').textContent = '暂时无法获取下载信息，请刷新重试；Skill 可从 GitHub 安装。'; });
+  }).catch(() => { button.querySelector('span').textContent = '暂时无法获取安装包'; status.textContent = '请检查连接后刷新页面。'; document.querySelector('#worker-status').textContent = '暂时无法获取桌面版本，请检查连接后刷新页面。'; document.querySelectorAll('.desktop-release-meta').forEach(meta => { meta.textContent = '暂时无法获取版本'; }); document.querySelector('#cli-status').textContent = '暂时无法获取下载信息，请刷新重试；Skill 可从 GitHub 安装。'; });
 })();

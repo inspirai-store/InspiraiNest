@@ -11,7 +11,7 @@
   <a class="skip" href="#main">跳到下载内容</a>
   <header class="download-header"><a class="brand" href="/"><img class="brand-mark" src="/brand-icon.png" alt="">灵藏</a><a class="back-link" href="/login">网页登录 <span aria-hidden="true">↗</span></a></header>
   <main id="main">
-    <nav class="download-nav" aria-label="下载分类"><a href="#title">手机客户端</a><a href="#worker-title">电脑采集端</a><a href="#ai-tools">AI Skill 与只读 CLI <span aria-hidden="true">↓</span></a></nav>
+    <nav class="download-nav" aria-label="下载分类"><a href="#title">手机客户端</a><a href="#worker-title">桌面工作台</a><a href="#ai-tools">AI Skill 与只读 CLI <span aria-hidden="true">↓</span></a></nav>
     <section class="hero" aria-labelledby="title">
       <div class="hero-copy">
         <div class="eyebrow"><span></span> 个人资料库 · 移动客户端</div>
@@ -34,7 +34,20 @@
       </div>
     </section>
     <section class="workflow" aria-label="客户端能做什么"><div><span class="step-number">01</span><div><h2>从分享开始</h2><p>在其他 App 中分享文字和链接，<br>可再加一句你的采集要求。</p></div></div><div><span class="step-number">02</span><div><h2>电脑接着处理</h2><p>由已配对的电脑执行采集，<br>手机随时查看任务进度。</p></div></div><div><span class="step-number">03</span><div><h2>回来，认真读</h2><p>阅读摘要、原文与图片，<br>把附件保存到需要的地方。</p></div></div></section>
-    <section class="worker-platform" aria-labelledby="worker-title"><div class="worker-copy"><span class="eyebrow">电脑采集端</span><h2 id="worker-title">让自己的电脑<br>接着完成采集。</h2><p>工作节点 常驻系统托盘，连接已配对的资料库。单击查看状态，双击打开管理窗口；原媒体只保留在处理它的电脑上。</p></div><div class="worker-actions"><a id="worker-windows" aria-disabled="true"><span>Windows 采集 工作节点</span><span aria-hidden="true">↓</span></a><a id="worker-macos-arm64" aria-disabled="true"><span>macOS 工作节点 · Apple Silicon</span><span aria-hidden="true">↓</span></a><a id="worker-macos-x64" aria-disabled="true"><span>macOS 工作节点 · Intel</span><span aria-hidden="true">↓</span></a><p id="worker-status" role="status">正在确认可用版本</p><p>使用已有客户端的「授权设备」配对码，或使用资料库管理员密钥连接。首次运行前，请在电脑上准备好 Codex CLI 或 CodeBuddy CLI。</p><details id="worker-checks" hidden><summary>版本与校验</summary><dl><dt>Windows SHA-256</dt><dd id="worker-windows-sha"></dd><dt>macOS Apple Silicon SHA-256</dt><dd id="worker-macos-arm64-sha"></dd><dt>macOS Intel SHA-256</dt><dd id="worker-macos-x64-sha"></dd></dl></details></div></section>
+    <section class="worker-platform" aria-labelledby="worker-title">
+      <div class="worker-copy"><span class="eyebrow">桌面工作台</span><h2 id="worker-title">从采集到阅读，<br>在电脑上接着完成。</h2><p>连接自己的资料库，在桌面管理采集任务、阅读归档内容，并查看已授权的工作节点。采集可在后台继续，原始媒体保留在处理它的电脑上。</p>
+        <ul class="desktop-features"><li><strong>采集与阅读</strong><span>任务进度与审核 · 全文搜索 · 分栏阅读 · 本机收藏</span></li><li><strong>工作节点</strong><span>本机控制 · 授权节点状态 · 指定节点派发</span></li><li><strong>随你的习惯</strong><span>随系统 / 白天 / 黑夜 · 可关闭的开机自启动 · 运行状态恢复</span></li><li><strong>看懂采集过程</strong><span>中文日志 · 时间倒序 · 业务与系统日志分开 · 展开查看详情</span></li></ul>
+        <p class="desktop-feature-note">以上为 Windows 最新工作台功能。macOS 当前下载保留正式发布版，功能以对应版本为准。</p>
+      </div>
+      <div class="worker-actions">
+        <a id="worker-windows" aria-disabled="true"><span class="desktop-link-copy"><strong>Windows 桌面工作台 <small>x64</small></strong><span class="desktop-release-meta">正在确认版本…</span></span><span aria-hidden="true">EXE ↓</span></a>
+        <a id="worker-macos-arm64" aria-disabled="true"><span class="desktop-link-copy"><strong>macOS <small>Apple Silicon</small></strong><span class="desktop-release-meta">正在确认版本…</span></span><span class="desktop-file-type" aria-hidden="true">↓</span></a>
+        <a id="worker-macos-x64" aria-disabled="true"><span class="desktop-link-copy"><strong>macOS <small>Intel</small></strong><span class="desktop-release-meta">正在确认版本…</span></span><span class="desktop-file-type" aria-hidden="true">↓</span></a>
+        <p id="worker-status" role="status">正在确认可用版本…</p>
+        <div class="desktop-install-guide"><h3>安装后，连接自己的资料库</h3><ol><li>Windows 打开 EXE 完成安装；macOS 打开 DMG，将应用拖入“应用程序”。</li><li>在已登录的官网或客户端「授权设备」生成配对码，再在工作台完成配对。</li><li>阅读与管理任务可直接使用；让本机执行采集前，准备好 Codex CLI 或 CodeBuddy CLI。</li></ol><p>在「设置」调整主题、关闭行为和开机自启动。采集已启动时关闭工作台，Worker 会继续后台处理。</p></div>
+        <details id="worker-checks" hidden><summary>文件与 SHA-256 校验</summary><dl><dt>Windows</dt><dd><span id="worker-windows-file"></span><br><span id="worker-windows-sha"></span></dd><dt>macOS Apple Silicon</dt><dd><span id="worker-macos-arm64-file"></span><br><span id="worker-macos-arm64-sha"></span></dd><dt>macOS Intel</dt><dd><span id="worker-macos-x64-file"></span><br><span id="worker-macos-x64-sha"></span></dd></dl></details>
+      </div>
+    </section>
     <section id="ai-tools" class="ai-tools" aria-labelledby="ai-title">
       <div class="ai-heading"><div><span class="eyebrow">连接你的 AI 工具</span><h2 id="ai-title">让收藏的资料，<br>成为回答的依据。</h2></div><p>Skill 告诉 AI 如何查阅与引用，CLI 负责连接你的资料库。<br>适用于支持 Skill 和终端调用的工具，如 Codex、CodeBuddy。</p></div>
       <div class="ai-install-grid">
@@ -42,7 +55,7 @@
         <div class="ai-install"><span class="ai-step">02 / 下载只读 CLI</span><h3>选择你的系统和芯片</h3><p>独立程序，无需安装 Node.js 或 Go。解压后将程序加入 PATH，或让 AI 使用程序的完整路径。</p><div class="cli-downloads"><a data-cli="windows-amd64" aria-disabled="true"><span>Windows <small>x64</small></span><span>ZIP ↓</span></a><a data-cli="darwin-arm64" aria-disabled="true"><span>macOS <small>Apple Silicon</small></span><span>TAR.GZ ↓</span></a><a data-cli="darwin-amd64" aria-disabled="true"><span>macOS <small>Intel</small></span><span>TAR.GZ ↓</span></a><a data-cli="linux-amd64" aria-disabled="true"><span>Linux <small>x64</small></span><span>TAR.GZ ↓</span></a><a data-cli="linux-arm64" aria-disabled="true"><span>Linux <small>arm64</small></span><span>TAR.GZ ↓</span></a></div><p id="cli-status" role="status">正在确认可用版本…</p><a id="cli-checksums" class="checksum-link" aria-disabled="true">下载 SHA-256 校验文件 ↓</a></div>
       </div>
       <div class="ai-connect"><div><span class="ai-step">03 / 确认连接</span><h3>在浏览器确认，只授予读取权限。</h3><p>授权后，AI 即可按需搜索、阅读和引用。授权有效期 30 天，可在“授权设备”中随时撤销。</p></div><div><code>lingnest auth login</code><p>默认连接官网资料库；其他部署可通过 --server 指定 HTTPS 地址。登录与后续查询须使用同一系统账户。</p></div></div>
-      <p class="cli-preview-note">CLI v0.1.0 预览版：官网已支持浏览器确认的只读授权，首次连接需核对确认码。Windows x64 已实测，macOS / Linux 尚待原生运行验收；Linux 需要可用的 Secret Service。</p>
+      <p class="cli-preview-note">CLI 预览版：官网已支持浏览器确认的只读授权，首次连接需核对确认码。Windows x64 已实测，macOS / Linux 尚待原生运行验收；Linux 需要可用的 Secret Service。</p>
     </section>
     <section id="installation" class="installation"><div class="section-heading"><span class="eyebrow">第一次使用</span><h2>装好，再连接<br>自己的资料库。</h2><p>Android 8.0 及以上 · 手机需能访问资料库服务</p></div><ol><li><span>1</span><div><h3>下载安装包</h3><p>点击上方按钮下载 APK，在下载列表中打开。若系统询问，允许当前浏览器安装此应用。</p></div></li><li><span>2</span><div><h3>取得设备配对码</h3><p>在已有客户端的「授权设备」中生成一次性配对码；首次连接也可使用管理员密钥。</p></div></li><li><span>3</span><div><h3>打开 App，完成配对</h3><p>扫描二维码或从相册识别，也可手动填写服务地址和配对码，确认后点击「配对并登录」。</p></div></li></ol></section>
     <section class="other-platform"><div><span class="platform-label">iOS</span><h2>iPhone 版尚未发布</h2><p>正式下载渠道准备中，现有已授权客户端不受影响。</p></div><a href="#worker-title">电脑客户端 <span aria-hidden="true">↑</span></a></section>

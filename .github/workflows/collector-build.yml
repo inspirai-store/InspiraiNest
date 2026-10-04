@@ -98,6 +98,8 @@ jobs:
         working-directory: collector
       - run: npm run build:worker:win
         working-directory: collector
+      - name: Test download page
+        run: node collector/scripts/test-download-ui.cjs
       - name: Check Worker package
         shell: pwsh
         run: |

@@ -9,6 +9,21 @@
 .worker-actions #worker-status { min-height: 20px; font-variant-numeric: tabular-nums; }
 .worker-actions details { font-size: 12px; color: var(--muted); }
 .worker-actions summary { cursor: pointer; }
+.desktop-features { display: grid; gap: 16px; list-style: none; margin: 24px 0; padding: 0; }
+.desktop-features li { display: grid; gap: 4px; }
+.desktop-features strong { font-size: 14px; font-weight: 600; }
+.desktop-features span { font-size: 13px; color: var(--muted); line-height: 1.8; }
+.worker-copy .desktop-feature-note { font-size: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.desktop-link-copy { display: grid; gap: 5px; min-width: 0; }
+.desktop-link-copy strong { font-size: 14px; font-weight: 600; }
+.desktop-link-copy small { font-size: 12px; font-weight: 400; margin-left: 6px; }
+.desktop-release-meta { font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.worker-actions>a>span:last-child { white-space: nowrap; font-size: 12px; }
+.desktop-install-guide { margin-top: 12px; padding: 20px; background: #eef5f0; border: 1px solid var(--line); border-radius: 6px; }
+.desktop-install-guide h3 { font-size: 14px; font-weight: 600; }
+.desktop-install-guide ol { padding-left: 19px; margin: 12px 0; font-size: 13px; color: var(--muted); line-height: 1.9; }
+.desktop-install-guide li+li { margin-top: 8px; }
+.desktop-install-guide p { font-size: 12px; color: var(--muted); line-height: 1.8; }
 .worker-actions dl { display: grid; grid-template-columns: 115px 1fr; gap: 5px 12px; }
 .worker-actions dd { margin: 0; overflow-wrap: anywhere; font-family: Consolas, monospace; }
 @media(max-width:760px) { .worker-platform { display: block; padding: 42px 0; } .worker-copy h2 { font-size: 24px; } .worker-actions { margin-top: 25px; } .worker-actions>a { min-height: 50px; } .worker-actions dl { grid-template-columns: 1fr; } .worker-actions dd { margin-bottom: 8px; } }
