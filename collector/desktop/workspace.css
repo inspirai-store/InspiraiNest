@@ -155,6 +155,7 @@ body.compact main{grid-template-rows:36px minmax(0,1fr) auto}
 .node-list-pane .pane-head{padding:25px 20px 19px}.node-list-pane .pane-list{padding:10px 12px}
 .node-item{margin-bottom:8px;padding:14px;border:1px solid var(--line);background:var(--panel)}
 .node-item[aria-pressed=true]{border-color:var(--workspace-accent);background:var(--workspace-soft)}
+.node-item[aria-pressed=true] .node-item-status{color:var(--fg)}
 .node-item-title{display:flex;gap:8px;align-items:center;min-width:0}.node-item-title svg{width:15px;height:15px;flex-shrink:0;color:var(--muted)}
 .node-item-title strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .node-local-tag{margin-left:auto;white-space:nowrap;color:var(--workspace-accent);font-size:10px}.node-item-status{display:flex;gap:6px;align-items:center;margin:8px 0 5px!important}
