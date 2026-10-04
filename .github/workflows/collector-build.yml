@@ -108,11 +108,26 @@ jobs:
           $feed = Get-Content collector/desktop/dist/win-unpacked/resources/app-update.yml -Raw
           if ($feed -notmatch 'provider: github' -or $feed -notmatch 'repo: InspiraiNest') { throw 'Windows update feed is missing' }
           (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -LiteralPath "$($file.FullName).sha256" -Encoding ascii
+      - name: Test packaged Windows settings and nodes
+        shell: pwsh
+        run: node collector/scripts/test-desktop-settings-nodes.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Worker and reader
+        shell: pwsh
+        run: node collector/scripts/test-packaged-worker.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Worker logs
+        shell: pwsh
+        run: node collector/scripts/test-worker-logs-ui.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows update download
         shell: pwsh
         run: |
           $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
           node collector/scripts/test-packaged-update.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe $file.FullName
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: InspiraiNest-Windows-workbench-checks
+          path: collector/test-output/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: InspiraiNest-Windows-x64
@@ -194,8 +209,17 @@ jobs:
             arch=x64
             app=desktop/dist/mac/InspiraiNest.app
           fi
+          node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/InspiraiNest"
+          node scripts/test-packaged-worker.cjs "$app/Contents/MacOS/InspiraiNest"
+          node scripts/test-worker-logs-ui.cjs "$app/Contents/MacOS/InspiraiNest"
           node scripts/test-packaged-update.cjs "$app/Contents/MacOS/InspiraiNest" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
         working-directory: collector
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: InspiraiNest-macOS-workbench-checks
+          path: collector/test-output/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: InspiraiNest-macOS

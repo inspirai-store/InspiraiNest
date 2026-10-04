@@ -49,7 +49,7 @@ export class WorkerManager {
     // Legacy processes have no status channel. Never infer connectivity from a PID.
     if (state.legacy) state.error = '检测到旧版工作节点，正在保留其运行。它尚无本地控制接口；结束后重新启动即可接入。当前阶段与联网状态未知。';
     return JSON.parse(redact(JSON.stringify({ ...state, starting: this.starting,
-      device: config.name || os.hostname(), server: config.server ? remoteURL(config.server) : '',
+      device: config.name || os.hostname(), deviceId: config.deviceId || null, server: config.server ? remoteURL(config.server) : '',
       paired: Boolean(config.token && config.server), defaultAgent: config.defaultAgent || 'codex',
       dataDir: this.dataDir, launchError: this.error }), config.token));
   }

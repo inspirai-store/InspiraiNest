@@ -10,6 +10,9 @@ files:
   - desktop/manager.mjs
   - desktop/owner-client.mjs
   - desktop/updater.mjs
+  - desktop/settings.mjs
+  - desktop/settings-renderer.js
+  - desktop/nodes.js
   - desktop/macos-policy.mjs
   - desktop/preload.cjs
   - desktop/renderer.js

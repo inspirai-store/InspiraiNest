@@ -1,4 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('desktopSettings', {
+  get: () => ipcRenderer.invoke('desktop-settings:get'),
+  update: input => ipcRenderer.invoke('desktop-settings:update', input),
+  onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('desktop-settings:changed', listener); return () => ipcRenderer.removeListener('desktop-settings:changed', listener); },
+});
 contextBridge.exposeInMainWorld('worker', {
   snapshot: () => ipcRenderer.invoke('worker:snapshot'),
   action: action => ipcRenderer.invoke('worker:action', action),

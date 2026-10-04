@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -7,6 +7,7 @@ import { WorkerManager } from './manager.mjs';
 import { OwnerClient } from './owner-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
+import { DesktopSettings } from './settings.mjs';
 import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from './macos-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -27,11 +28,12 @@ const scope = createHash('sha256').update(manager.dataDir.toLowerCase()).digest(
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
-let owner, updates, updateTimer, initialUpdateTimer;
+let owner, updates, settings, updateTimer, initialUpdateTimer;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
 if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates,
+  ownerState: () => owner.state(),
   setSnapshot: value => { snapshotForTest = value; refreshTray(); },
 });
 function desktopSnapshot() {
@@ -51,7 +53,7 @@ const pageURL = pathToFileURL(path.join(here, 'index.html')).href;
 function makeWindow(compact = false) {
   const window = new BrowserWindow({ width: compact ? 390 : 1240, height: compact ? 350 : 820,
     minWidth: compact ? 390 : 740, minHeight: compact ? 350 : 580,
-    title: compact ? '灵藏 · 状态' : '灵藏 · 桌面工作台', icon: path.join(here, 'icon.png'), backgroundColor: '#0f1114', show: false,
+    title: compact ? '灵藏 · 状态' : '灵藏 · 桌面工作台', icon: path.join(here, 'icon.png'), backgroundColor: settings.background(), show: false,
     frame: !compact, resizable: !compact, skipTaskbar: compact, alwaysOnTop: compact,
     ...(isMac && compact ? { type: 'panel', fullscreenable: false } : {}),
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
@@ -146,6 +148,8 @@ async function pairDesktop(input) {
   return result;
 }
 function registerIPC() {
+  ipcMain.handle('desktop-settings:get', event => { trusted(event); return settings.snapshot(); });
+  ipcMain.handle('desktop-settings:update', (event, input) => { trustedMain(event); return settings.update(input); });
   for (const [name, fn] of Object.entries({
     snapshot: desktopSnapshot, action: action => perform(action),
     logs: task => manager.logs(task), activity: task => manager.activity(task),
@@ -235,15 +239,30 @@ else {
   });
   app.on('before-quit', event => {
     if (isMac && !quitting) { event.preventDefault(); void menuAction('quit-after'); return; }
-    quitting = true; clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
+    quitting = true; clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
   app.whenReady().then(() => {
+    settings = new DesktopSettings({ file: path.join(app.getPath('userData'), 'desktop-settings.json'), nativeTheme });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: safeStorage, identityDir: manager.dataDir });
     updates = new DesktopUpdater({ app, manager, updater: electronUpdater.autoUpdater });
     main = makeWindow(); popover = makeWindow(true);
+    settings.on('changed', value => {
+      for (const window of [main, popover]) if (window && !window.isDestroyed()) {
+        window.setBackgroundColor(settings.background());
+        window.webContents.send('desktop-settings:changed', value);
+      }
+    });
     updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });
-    main.on('close', event => { if (!quitting) { event.preventDefault(); hideManager(); trace('close-to-tray'); } });
+    main.on('close', event => {
+      if (quitting) return;
+      event.preventDefault();
+      if (settings.snapshot().closeBehavior === 'quit') {
+        // This explicit window preference exits only the manager, including on macOS.
+        // Command+Q, drain-and-quit and updater installation keep their safe-stop paths.
+        quitting = true; trace('close-manager-worker-kept'); setImmediate(() => app.quit());
+      } else { hideManager(); trace('close-to-tray'); }
+    });
     if (!isMac) main.on('minimize', event => { event.preventDefault(); hideManager(); trace('minimize-to-tray'); });
     trayImage = icon();
     if (isMac) {
