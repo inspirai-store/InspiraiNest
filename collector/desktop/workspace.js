@@ -12,6 +12,7 @@
   let activeView = 'overview', entriesSeq = 0, currentEntry = null, currentFile = null, currentText = '', nextCursor = null;
   let refreshBusy = false, toastTimer, searchTimer, lastTaskSignature = '', lastDeviceSignature = '', lastRefreshError = '';
   let workspaceEpoch = 0, detailSeq = 0, documentSeq = 0, readBusy = false;
+  let pairingSeq = 0, pairingExpiryTimer;
   let favorites = new Set();
   const favoriteKey = () => 'lingnest-desktop-favorites:' + auth.server;
   function loadFavorites() { try { favorites = new Set(JSON.parse(localStorage.getItem(favoriteKey()) || '[]')); } catch { favorites = new Set(); } }
@@ -31,6 +32,7 @@
     for (const id of ['nav-task-count','nav-entry-count']) $('#'+id).textContent = '';
     $('#pair-result').hidden = $('#trash-panel').hidden = true; $('#pair-qr').removeAttribute('src');
     $('#capture-dialog').close();
+    $('#pair-dialog').close(); clearPairing();
     $('#capture-form').reset(); delete $('#capture-form').dataset.submission; delete $('#capture-form').dataset.payload;
     $('#capture-error').textContent = '';
     $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
@@ -282,8 +284,45 @@
       form.reset(); delete form.dataset.submission; delete form.dataset.payload; $('#capture-dialog').close(); go('tasks'); toast('任务已提交'); await refresh(); }
     catch (error) { if (epoch === workspaceEpoch) $('#capture-error').textContent = errorText(error); } finally { button.disabled = false; }
   });
-  async function pairing() { const epoch = workspaceEpoch; try { const result = await window.library.pairing(); if (epoch !== workspaceEpoch) return; $('#pair-result').hidden = false; $('#pair-key').textContent = result.key; $('#pair-expiry').textContent = `到期 ${date(result.expiresAt)}`; $('#pair-qr').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl; else $('#pair-qr').removeAttribute('src'); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }
-  $('#pair-device').onclick = () => pairing();
+  function clearPairing() {
+    pairingSeq++; clearTimeout(pairingExpiryTimer);
+    $('#pair-result').hidden = true; $('#pair-key').textContent = ''; $('#pair-expiry').textContent = '';
+    $('#pair-qr').hidden = true; $('#pair-qr').removeAttribute('src');
+    $('#pair-status').hidden = $('#pair-error').hidden = true;
+    $('#pair-status').textContent = $('#pair-error').textContent = '';
+    $('#pair-generate').disabled = $('#pair-device').disabled = false;
+    $('#pair-dialog').removeAttribute('aria-busy');
+  }
+  async function pairing() {
+    clearPairing();
+    const epoch = workspaceEpoch, seq = pairingSeq, dialog = $('#pair-dialog');
+    const current = () => epoch === workspaceEpoch && seq === pairingSeq && dialog.open;
+    $('#pair-generate').disabled = $('#pair-device').disabled = true;
+    dialog.setAttribute('aria-busy', 'true');
+    $('#pair-status').textContent = '正在生成配对码…'; $('#pair-status').hidden = false;
+    try {
+      const result = await window.library.pairing(); if (!current()) return;
+      $('#pair-status').hidden = true; $('#pair-result').hidden = false;
+      $('#pair-key').textContent = result.key; $('#pair-expiry').textContent = `到期 ${date(result.expiresAt)}`;
+      $('#pair-qr').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl;
+      $('#pair-generate').textContent = '重新生成';
+      pairingExpiryTimer = setTimeout(() => {
+        if (!current()) return;
+        clearPairing(); $('#pair-status').textContent = '配对码已过期'; $('#pair-status').hidden = false;
+      }, Math.max(0, Date.parse(result.expiresAt) - Date.now()));
+    } catch (error) {
+      if (!current()) return;
+      $('#pair-status').hidden = true; $('#pair-error').textContent = errorText(error); $('#pair-error').hidden = false;
+      $('#pair-generate').textContent = '重试';
+    } finally {
+      if (current()) {
+        $('#pair-generate').disabled = $('#pair-device').disabled = false; dialog.removeAttribute('aria-busy');
+      }
+    }
+  }
+  $('#pair-device').onclick = () => { $('#pair-dialog').showModal(); void pairing(); };
+  $('#pair-generate').onclick = () => pairing();
+  $('#pair-dialog').addEventListener('close', clearPairing);
   $('#open-trash').onclick = async () => { const epoch = workspaceEpoch, panel = $('#trash-panel'), list = $('#trash-list'); panel.hidden = false; list.textContent = '正在读取回收站…'; try { const items = await window.library.trash(); if (epoch !== workspaceEpoch) return; list.innerHTML = items.length ? items.map(item => `<div class="file-row"><span>${esc(item.title)}</span><button data-restore="${esc(item.archiveId)}">恢复</button></div>`).join('') : '回收站为空'; list.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => { try { await window.library.restore(b.dataset.restore); if (epoch !== workspaceEpoch) return; toast('已恢复资料'); await refresh(); await loadEntries(); $('#open-trash').click(); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }); } catch (error) { if (epoch === workspaceEpoch) list.textContent = errorText(error); } };
   $('#close-trash').onclick = () => $('#trash-panel').hidden = true;
   function renderUpdate(s) {

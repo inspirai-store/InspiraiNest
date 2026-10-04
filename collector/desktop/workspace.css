@@ -103,10 +103,15 @@ main{grid-template-rows:48px minmax(0,1fr) 28px}
 .device-group h2{grid-column:1/-1;font-size:13px;margin:12px 0 2px;padding-bottom:10px;border-bottom:1px solid var(--line);font-weight:600}
 .device-card{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:17px;min-width:0}
 .device-card div{min-width:0;flex:1}.device-card strong{display:block;font-size:13px;overflow-wrap:anywhere}.device-card p{font-size:11px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}.device-card button{height:27px}
-.pair-result,#trash-panel{margin:0 30px 16px}
+#trash-panel{margin:0 30px 16px}
 #pair-key{display:block;font-size:18px;overflow-wrap:anywhere;user-select:all}
-.pair-result p{font-size:11px;color:var(--muted);margin-top:8px}
-.pair-result img{display:block;max-width:100%;height:auto;margin-bottom:12px;background:#fff;padding:8px;border-radius:6px}
+#pair-dialog{width:min(480px,calc(100% - 30px))}
+.pair-dialog-body{display:grid;gap:20px;padding:24px}
+.pair-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.pair-meta h3{font-size:14px}
+#pair-result img{display:block;max-width:100%;height:auto;margin:0 auto 18px;background:#fff;padding:8px;border-radius:6px}
+#pair-status,#pair-error{font-size:14px;overflow-wrap:anywhere}
+#pair-error{color:var(--danger)}
 .update-card{margin:0 30px;max-width:680px}.update-card .card-head{justify-content:space-between}.update-card .card-content{display:grid;gap:12px}.update-card strong{font-size:16px}.update-card p{font-size:12px;color:var(--muted);line-height:1.6}.update-actions{display:flex;gap:8px;flex-wrap:wrap}.update-actions button{height:34px}.update-progress{height:5px;background:var(--raised);border-radius:99px;overflow:hidden}.update-progress span{display:block;height:100%;background:var(--workspace-accent);border-radius:inherit;transition:width .18s}
 .update-progress span{width:100%;transform:scaleX(0);transform-origin:left;transition:transform .18s}
 .document-error{color:var(--danger)}
