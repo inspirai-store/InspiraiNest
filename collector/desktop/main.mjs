@@ -36,6 +36,11 @@ let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, q
 let snapshotForTest;
 if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates,
   loginItem,
+  checkNativeLoginItem: () => {
+    const item = new DesktopLoginItem({ app, name: 'InspiraiNest-Test-' + process.pid });
+    try { item.configure(true); const on = item.snapshot(); item.configure(false, { explicit: true }); return { on, off: item.snapshot() }; }
+    finally { item.configure(false, { explicit: true }); }
+  },
   ownerState: () => owner.state(),
   setSnapshot: value => { snapshotForTest = value; refreshTray(); },
 });

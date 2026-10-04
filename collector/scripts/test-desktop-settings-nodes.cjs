@@ -33,6 +33,10 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['overview','tasks','library','nodes','settings']);
     await showSettings(page,'appearance');
     if(await app.evaluate(({app})=>app.isPackaged)){
+      if(process.platform==='win32'){
+        const native=await app.evaluate(()=>globalThis.workerDesktop().checkNativeLoginItem());
+        assert.equal(native.on.registered,true);assert.equal(native.on.enabled,true);assert.equal(native.off.registered,false);
+      }
       assert.equal(await page.locator('#launch-at-login').isChecked(),true);
       await page.locator('#launch-at-login').uncheck();await page.reload();await showSettings(page,'appearance');
       assert.equal(await page.locator('#launch-at-login').isChecked(),false);

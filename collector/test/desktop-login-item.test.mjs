@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import { DesktopLoginItem } from '../desktop/login-item.mjs';
 
 test('Windows registers only the fixed installed executable and startup flag', () => {
-  let item = { openAtLogin: false, executableWillLaunchAtLogin: false }, call;
-  const app = { isPackaged: true, getLoginItemSettings() { return item; }, setLoginItemSettings(value) { call = value; item = { openAtLogin: value.openAtLogin, executableWillLaunchAtLogin: value.openAtLogin }; } };
+  let item = { openAtLogin: false, launchItems: [] }, call, query;
+  const app = { isPackaged: true, getLoginItemSettings(value) { query = value; return item; }, setLoginItemSettings(value) { call = value; item = { openAtLogin: false, launchItems: value.openAtLogin ? [{name:value.name,path:value.path,args:[],scope:'user',enabled:value.enabled!==false}] : [] }; } };
   const login = new DesktopLoginItem({ app, platform: 'win32', executable: 'C:/Program Files/InspiraiNest.exe' });
   login.configure(true); assert.deepEqual(call, { openAtLogin: true, path: 'C:/Program Files/InspiraiNest.exe', args: ['--startup'], name: 'InspiraiNest' });
-  assert.equal(login.snapshot().enabled, true); login.configure(false, { explicit: true }); assert.equal(login.snapshot().registered, false);
+  assert.equal(login.snapshot().enabled, true); assert.equal(login.snapshot().registered, true); assert.equal(query.path, '"C:/Program Files/InspiraiNest.exe"'); login.configure(false, { explicit: true }); assert.equal(login.snapshot().registered, false);
   assert.equal(call.enabled, false); assert.equal('path' in login.snapshot(), false);
 });
 test('OS disabling an existing login item is respected until the user explicitly enables it', () => {
-  let calls = 0, item = { openAtLogin: true, executableWillLaunchAtLogin: false };
-  const app = { isPackaged: true, getLoginItemSettings: () => item, setLoginItemSettings() { calls++; item.executableWillLaunchAtLogin = true; } };
+  let calls = 0, item = { openAtLogin: false, executableWillLaunchAtLogin: true, launchItems:[{name:'InspiraiNest',path:process.execPath,scope:'user',args:[],enabled:false},{name:'Other',path:process.execPath,scope:'user',args:[],enabled:true}] };
+  const app = { isPackaged: true, getLoginItemSettings: () => item, setLoginItemSettings() { calls++; item.launchItems[0].enabled = true; } };
   const login = new DesktopLoginItem({ app, platform: 'win32' }); login.configure(true); assert.equal(calls, 0); assert.equal(login.snapshot().status, 'disabled-by-system');
   login.configure(true, { explicit: true }); assert.equal(calls, 1); assert.equal(login.snapshot().enabled, true);
 });
