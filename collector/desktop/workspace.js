@@ -286,8 +286,9 @@
   });
   function clearPairing() {
     pairingSeq++; clearTimeout(pairingExpiryTimer);
-    $('#pair-result').hidden = true; $('#pair-key').textContent = ''; $('#pair-expiry').textContent = '';
-    $('#pair-qr').hidden = true; $('#pair-qr').removeAttribute('src');
+    $('#copy-key').innerHTML = '<i data-lucide="copy"></i>'; $('#copy-key').setAttribute('aria-label', '复制配对码'); icons();
+    $('#pair-result').hidden = true; $('#pair-key').value = ''; $('#pair-key').type = 'password'; $('#pair-expiry').textContent = '';
+    $('#pair-qr-wrap').hidden = true; $('#pair-qr').removeAttribute('src');
     $('#pair-status').hidden = $('#pair-error').hidden = true;
     $('#pair-status').textContent = $('#pair-error').textContent = '';
     $('#pair-generate').disabled = $('#pair-device').disabled = false;
@@ -303,8 +304,8 @@
     try {
       const result = await window.library.pairing(); if (!current()) return;
       $('#pair-status').hidden = true; $('#pair-result').hidden = false;
-      $('#pair-key').textContent = result.key; $('#pair-expiry').textContent = `到期 ${date(result.expiresAt)}`;
-      $('#pair-qr').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl;
+      $('#pair-key').value = result.key; $('#pair-expiry').textContent = '有效至 ' + new Date(result.expiresAt).toLocaleTimeString('zh-CN', { timeZone:'Asia/Shanghai', hour12:false, hour:'2-digit', minute:'2-digit' }); $('#pair-expiry').title = date(result.expiresAt);
+      $('#pair-qr-wrap').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl;
       $('#pair-generate').textContent = '重新生成';
       pairingExpiryTimer = setTimeout(() => {
         if (!current()) return;
@@ -323,6 +324,11 @@
   $('#pair-device').onclick = () => { $('#pair-dialog').showModal(); void pairing(); };
   $('#pair-generate').onclick = () => pairing();
   $('#pair-dialog').addEventListener('close', clearPairing);
+  $('#copy-key').onclick = async () => {
+    const field = $('#pair-key'), button = $('#copy-key'); if (!field.value) return;
+    try { await navigator.clipboard.writeText(field.value); button.innerHTML = '<i data-lucide="check"></i>'; button.setAttribute('aria-label', '配对码已复制'); icons(); }
+    catch { field.type = 'text'; field.focus(); field.select(); }
+  };
   $('#open-trash').onclick = async () => { const epoch = workspaceEpoch, panel = $('#trash-panel'), list = $('#trash-list'); panel.hidden = false; list.textContent = '正在读取回收站…'; try { const items = await window.library.trash(); if (epoch !== workspaceEpoch) return; list.innerHTML = items.length ? items.map(item => `<div class="file-row"><span>${esc(item.title)}</span><button data-restore="${esc(item.archiveId)}">恢复</button></div>`).join('') : '回收站为空'; list.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => { try { await window.library.restore(b.dataset.restore); if (epoch !== workspaceEpoch) return; toast('已恢复资料'); await refresh(); await loadEntries(); $('#open-trash').click(); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }); } catch (error) { if (epoch === workspaceEpoch) list.textContent = errorText(error); } };
   $('#close-trash').onclick = () => $('#trash-panel').hidden = true;
   function renderUpdate(s) {

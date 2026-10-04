@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const http = require('node:http');
 const { _electron } = require('playwright');
 const QRCode = require('qrcode');
 
@@ -15,6 +16,7 @@ const QRCode = require('qrcode');
   const app = await _electron.launch({ executablePath: require('electron'), args: [path.resolve(__dirname, '../desktop')], env });
   const output = path.resolve(__dirname, '../test-output/desktop-pairing');
   fs.mkdirSync(output, { recursive: true });
+  let webServer;
   try {
     await app.firstWindow();
     await app.evaluate(async ({ ipcMain }, qrDataUrl) => {
@@ -57,20 +59,32 @@ const QRCode = require('qrcode');
     await page.locator('#pair-key').waitFor({ state: 'visible' });
     assert.equal(await app.evaluate(() => globalThis.pairingFixture.calls), 1);
     assert.equal(await page.locator('#pair-qr').isVisible(), true);
+    await page.locator('#pair-qr').evaluate(img => img.decode());
+    assert.equal(await page.locator('#pair-key').getAttribute('type'), 'password');
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.fixtureCopiedKey = value; } } }));
+    await page.locator('#copy-key').click();
+    assert.equal(await page.evaluate(() => window.fixtureCopiedKey), await page.locator('#pair-key').inputValue());
+    await page.locator('#copy-key[aria-label="配对码已复制"]').waitFor();
     const box = await page.locator('#pair-key').boundingBox();
     const height = await page.evaluate(() => innerHeight);
     assert.ok(box.y >= 0 && box.y + box.height <= height, 'pairing must be visible above a long device list');
+    const desktopLayout = await page.locator('#pair-dialog').evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+    assert.ok(desktopLayout.width <= 400 && desktopLayout.height < 460, 'pairing stays compact');
     await page.screenshot({ path: path.join(output, 'pairing-narrow-fixture.png') });
+    await page.evaluate(() => document.documentElement.dataset.theme = 'light');
+    await page.waitForTimeout(220);
+    await page.screenshot({ path: path.join(output, 'pairing-light-fixture.png') });
+    await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
     await page.locator('[data-close-dialog=pair-dialog]').click();
-    await page.waitForFunction(() => document.querySelector('#pair-key').textContent === '');
-    assert.equal(await page.locator('#pair-key').textContent(), '');
+    await page.waitForFunction(() => document.querySelector('#pair-key').value === '');
+    assert.equal(await page.locator('#pair-key').inputValue(), '');
     assert.equal(await page.locator('#pair-qr').getAttribute('src'), null);
 
     await page.locator('#pair-device').click();
     await page.locator('#pair-status').waitFor({ state: 'visible' });
     await page.locator('[data-close-dialog=pair-dialog]').click();
     await page.waitForTimeout(850);
-    assert.equal(await page.locator('#pair-key').textContent(), '', 'closed dialogs discard late replies');
+    assert.equal(await page.locator('#pair-key').inputValue(), '', 'closed dialogs discard late replies');
     assert.equal(await page.locator('#pair-qr').getAttribute('src'), null);
 
     await app.evaluate(() => { globalThis.pairingFixture.failures = 1; });
@@ -82,22 +96,67 @@ const QRCode = require('qrcode');
     await page.locator('#pair-key').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#pair-error').isVisible(), false);
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => document.querySelector('#pair-key').textContent === '');
-    assert.equal(await page.locator('#pair-key').textContent(), '');
+    await page.waitForFunction(() => document.querySelector('#pair-key').value === '');
+    assert.equal(await page.locator('#pair-key').inputValue(), '');
 
     await app.evaluate(() => { globalThis.pairingFixture.lifetime = 250; });
     await page.locator('#pair-device').click();
     await page.locator('#pair-key').waitFor({ state: 'visible' });
     await page.waitForFunction(() => document.querySelector('#pair-status').textContent === '配对码已过期');
-    assert.equal(await page.locator('#pair-key').textContent(), '');
+    assert.equal(await page.locator('#pair-key').inputValue(), '');
     assert.equal(await page.locator('#pair-qr').getAttribute('src'), null);
     await page.keyboard.press('Escape');
+
+    const qrDataUrl = await QRCode.toDataURL('fixture-only-no-authority');
+    webServer = http.createServer((req, res) => {
+      const route = new URL(req.url, 'http://localhost').pathname;
+      const json = value => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(value)); };
+      if (route === '/api/state') return json({ me: { id: 'fixture-owner' }, devices: [], tasks: [], archives: [] });
+      if (route === '/api/devices/me/info') return json({});
+      if (route === '/api/pairings') return json({ key: 'fixture-web-pairing', expiresAt: new Date(Date.now() + 900000).toISOString(), qrDataUrl });
+      if (route === '/browser-session.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end('window.browserSession={ready:async()=>true,logout:async()=>{},adopt:()=>{}};'); }
+      if (route === '/client-prompt.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(''); }
+      if (/^\/vendor\/(lucide|marked|purify)\.js$/.test(route)) {
+        res.setHeader('Content-Type', 'text/javascript');
+        return res.end(fs.readFileSync(path.resolve(__dirname, '../../assets', route.slice(1))));
+      }
+      const relative = route === '/' ? 'index.html' : route.slice(1);
+      const publicDir = path.resolve(__dirname, '../public');
+      const file = path.resolve(publicDir, relative);
+      if (!file.startsWith(publicDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.statusCode = 404; return res.end(); }
+      res.setHeader('Content-Type', ({ '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png' })[path.extname(file)] || 'application/octet-stream');
+      res.end(fs.readFileSync(file));
+    });
+    await new Promise(resolve => webServer.listen(0, '127.0.0.1', resolve));
+    const webURL = `http://127.0.0.1:${webServer.address().port}/`;
+    await app.evaluate(async ({ BrowserWindow }, url) => {
+      const window = new BrowserWindow({ show: false, width: 740, height: 580, webPreferences: { contextIsolation: true, nodeIntegration: false } });
+      await window.loadURL(url);
+    }, webURL);
+    const webPage = app.windows().find(p => p.url() === webURL);
+    assert.ok(webPage);
+    await webPage.locator('#app').waitFor({ state: 'visible' });
+    await webPage.locator('[data-view=devices]').click();
+    await webPage.locator('#pair-device').click();
+    await webPage.locator('#pair-generate').click();
+    await webPage.locator('#pair-key').waitFor({ state: 'visible' });
+    assert.equal(await webPage.locator('#pair-key').getAttribute('type'), 'password');
+    const webLayout = await webPage.locator('#pair-dialog').evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+    assert.equal(webLayout.width, desktopLayout.width);
+    assert.ok(Math.abs(webLayout.height - desktopLayout.height) <= 4, 'Web and desktop share the same dialog layout');
+    await webPage.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.fixtureCopiedKey = value; } } }));
+    await webPage.locator('#copy-key').click();
+    assert.equal(await webPage.evaluate(() => window.fixtureCopiedKey), 'fixture-web-pairing');
+    await webPage.screenshot({ path: path.join(output, 'pairing-web-fixture.png') });
+    await webPage.keyboard.press('Escape');
+    await webPage.waitForFunction(() => document.querySelector('#pair-key').value === '');
     fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, platform: process.platform,
       checks: ['immediate modal and loading feedback', 'pairing visible with 16 devices at minimum width',
-        'one request while busy', 'QR rendering', 'close and Escape clear credentials', 'late reply discarded',
+        'one request while busy', 'QR rendering', 'masked key and copy feedback', 'shared compact Web and desktop layout', 'close and Escape clear credentials', 'late reply discarded',
         'error retry', 'expiration clears credentials'], limitation: 'Synthetic IPC and QR fixtures; no production pairing or device authorization.' }, null, 2));
     console.log('Desktop pairing regression: passed');
   } finally {
+    webServer?.close();
     await app.evaluate(({ app }) => app.quit()).catch(() => {});
     await app.close().catch(() => {});
   }

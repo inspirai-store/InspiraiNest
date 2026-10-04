@@ -25,6 +25,7 @@ files:
   - desktop/trayTemplate@2x.png
   - desktop/vendor/**
   - public/device-view.js
+  - public/pairing-dialog.css
   - src/**
   - worker.production.example.json
   - node_modules/**

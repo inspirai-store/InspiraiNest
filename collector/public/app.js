@@ -148,23 +148,39 @@
     try { await api('/tasks', 'POST', { ...Object.fromEntries(new FormData(event.target)), autoArchive: event.target.elements.autoArchive.checked, tags: [...new Set(event.target.elements.tags.value.split(/[,，\n]/).map(t => t.trim()).filter(Boolean))], submissionId: event.target.dataset.submission }); event.target.reset(); $('#task-dialog').close(); await refresh(); notice('任务已提交'); }
     catch (error) { $('#task-error').textContent = error.message; } finally { event.submitter.disabled = false; }
   });
-  let pairingExpiryTimer;
-  function clearPairing() { clearTimeout(pairingExpiryTimer); $('#pair-result').hidden = true; $('#pair-key').value = ''; $('#pair-key').type = 'password'; $('#pair-qr').removeAttribute('src'); $('#pair-qr-wrap').hidden = true; }
-  $('#pair-device').onclick = () => { clearPairing(); $('#pair-dialog').showModal(); };
+  let pairingExpiryTimer, pairingSeq = 0;
+  function clearPairing() {
+    pairingSeq++; clearTimeout(pairingExpiryTimer); $('#pair-result').hidden = true;
+    $('#pair-key').value = ''; $('#pair-key').type = 'password'; $('#pair-expiry').textContent = '';
+    $('#pair-qr').removeAttribute('src'); $('#pair-qr-wrap').hidden = true;
+    $('#pair-status').hidden = $('#pair-error').hidden = true;
+    $('#pair-status').textContent = $('#pair-error').textContent = '';
+    $('#copy-key').innerHTML = '<i data-lucide="copy"></i>'; $('#copy-key').setAttribute('aria-label', '复制配对码'); icons();
+    $('#pair-generate').disabled = false; $('#pair-dialog').removeAttribute('aria-busy');
+  }
+  $('#pair-device').onclick = () => { clearPairing(); $('#pair-generate').textContent = '生成配对码'; $('#pair-dialog').showModal(); };
   $('#pair-dialog').addEventListener('close', clearPairing);
   $('#pair-form').addEventListener('submit', async event => {
-    event.preventDefault(); event.submitter.disabled = true;
-    clearPairing();
+    event.preventDefault(); clearPairing();
+    const seq = pairingSeq, current = () => seq === pairingSeq && $('#pair-dialog').open;
+    $('#pair-generate').disabled = true; $('#pair-dialog').setAttribute('aria-busy', 'true');
+    $('#pair-status').textContent = '正在生成配对码…'; $('#pair-status').hidden = false;
     try {
-      const result = await api('/pairings', 'POST', {});
-      if (!$('#pair-dialog').open) return;
-      $('#pair-key').value = result.key; $('#pair-expiry').textContent = '一次性使用 · 有效至 ' + date(result.expiresAt); $('#pair-result').hidden = false;
+      const result = await api('/pairings', 'POST', {}); if (!current()) return;
+      $('#pair-status').hidden = true; $('#pair-key').value = result.key; $('#pair-result').hidden = false;
+      $('#pair-expiry').textContent = '有效至 ' + new Date(result.expiresAt).toLocaleTimeString('zh-CN', { timeZone:'Asia/Shanghai', hour12:false, hour:'2-digit', minute:'2-digit' }); $('#pair-expiry').title = date(result.expiresAt);
       if (result.qrDataUrl) { $('#pair-qr').src = result.qrDataUrl; $('#pair-qr-wrap').hidden = false; }
-      pairingExpiryTimer = setTimeout(() => { $('#pair-key').value = ''; $('#pair-qr').removeAttribute('src'); $('#pair-qr-wrap').hidden = true; $('#pair-expiry').textContent = '配对码已过期，请重新生成'; }, Math.max(0, Date.parse(result.expiresAt) - Date.now()));
-    }
-    catch (error) { notice(error.message); } finally { event.submitter.disabled = false; }
+      $('#pair-generate').textContent = '重新生成';
+      pairingExpiryTimer = setTimeout(() => { if (!current()) return; clearPairing(); $('#pair-status').textContent = '配对码已过期'; $('#pair-status').hidden = false; }, Math.max(0, Date.parse(result.expiresAt) - Date.now()));
+    } catch (error) {
+      if (!current()) return; $('#pair-status').hidden = true; $('#pair-error').textContent = error.message; $('#pair-error').hidden = false; $('#pair-generate').textContent = '重试';
+    } finally { if (current()) { $('#pair-generate').disabled = false; $('#pair-dialog').removeAttribute('aria-busy'); } }
   });
-  $('#copy-key').onclick = async () => { try { await navigator.clipboard.writeText($('#pair-key').value); notice('配对码已复制'); } catch { $('#pair-key').type = 'text'; $('#pair-key').select(); notice('请复制选中的配对码'); } };
+  $('#copy-key').onclick = async () => {
+    const field = $('#pair-key'), button = $('#copy-key'); if (!field.value) return;
+    try { await navigator.clipboard.writeText(field.value); button.innerHTML = '<i data-lucide="check"></i>'; button.setAttribute('aria-label', '配对码已复制'); icons(); }
+    catch { field.type = 'text'; field.focus(); field.select(); }
+  };
   $('#document-picker').onchange = renderDocument;
   $('#download').onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(currentBundle, null, 2)], { type: 'application/json' })); download(url, 'archive.json'); setTimeout(() => URL.revokeObjectURL(url), 10000); };
   $('#status-filter').onchange = render; $('#search').oninput = render;
