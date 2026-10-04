@@ -5,7 +5,7 @@
 ## 构建范围
 
 - 工程：`collector/mobile/ios/project.yml`，XcodeGen 生成 `PersonalLibrary.xcodeproj`。
-- 首发版本：iOS `1.0.0 (1)`，iPhone、iOS 16.0 或更新系统。包含主应用和分享扩展。
+- 首发版本：iOS `1.0.0 (3)`，iPhone、iOS 16.0 或更新系统。包含主应用和分享扩展。
 - 发布 Bundle ID 使用构建者注册的 `COLLECTOR_BUNDLE_ID`；主应用与分享扩展必须共用 App Group 和 Keychain access group。`Config/Local.xcconfig` 只存本机配置，不提交到仓库。
 - 首发功能：扫码或手动配对用户选择的 HTTPS 资料库；从其他应用收集文字、标题和链接；本机发件箱保留原文；查看任务进度、阅读资料库、管理授权设备。图片和视频附件暂不能直接收集。
 - 应用图标是 1024×1024、无 alpha 通道的 PNG。主应用和扩展的版本号应一致。
@@ -18,11 +18,14 @@
 xcodegen generate --spec project.yml
 python3 scripts/check_contract.py
 xcodebuild -project PersonalLibrary.xcodeproj -scheme PersonalLibrary \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' test CODE_SIGNING_ALLOWED=NO
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 xcodebuild -project PersonalLibrary.xcodeproj -scheme PersonalLibrary \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath build/InspiraiNest-1.0.0.xcarchive archive -allowProvisioningUpdates
 ```
+
+模拟器 XCTest 使用 ad-hoc 签名，使设备标识测试能够访问 Keychain；未签名测试宿主会在此项失败。此签名不代表真机开发签名或 App Store 发行签名。当前公开基线的测试与迁移分析见 [iOS 迁移复核](IOS_MIGRATION_REVIEW_2026-10-04.md)。
 
 归档后检查主应用和 `PlugIns/CollectorShare.appex` 的 Bundle ID、版本、签名证书、描述文件、App Group、Keychain access group，并运行 `codesign --verify --strict --deep`。使用 Xcode Organizer 或 `xcodebuild -exportArchive` 的 `app-store-connect` 方法导出，检查 IPA 内相同信息及 dSYM。上传前先在 App Store Connect 建立与 IPA Bundle ID 一致的 iOS App 记录；上传后等待 Apple 处理完成。
 

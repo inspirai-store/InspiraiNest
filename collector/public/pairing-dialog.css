@@ -1,0 +1,22 @@
+.pairing-dialog{width:min(400px,calc(100% - 28px));max-height:calc(100dvh - 32px);overflow:auto;padding:0;border:1px solid var(--line,#dde4e4);border-radius:12px;background:var(--panel,#fff);color:var(--fg,#222b30);box-shadow:0 20px 70px #0003;font-size:14px;line-height:1.5}
+.pairing-dialog::backdrop{background:#13251e66;backdrop-filter:none}
+.pairing-heading{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line,#dde4e4)}
+.pairing-heading h2{flex:1;margin:0;font-size:18px;font-weight:650}
+.pairing-dialog .pairing-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;min-width:32px;height:32px;min-height:32px;padding:6px;border:0;border-radius:6px;background:transparent;color:var(--muted,#627078);cursor:pointer}
+.pairing-dialog .pairing-icon:hover{background:var(--hover,#f0f5f4);color:inherit}
+.pairing-dialog .pairing-icon svg{width:18px;height:18px;stroke-width:1.8}
+.pairing-dialog .pairing-body{display:grid;gap:16px;padding:20px;margin:0}
+.pairing-dialog #pair-result{display:grid;gap:18px;padding:0}
+.pairing-dialog #pair-qr-wrap{margin:0;text-align:center}
+.pairing-dialog #pair-qr{display:block;width:196px;max-width:100%;height:auto;margin:0 auto;padding:10px;border-radius:8px;background:#fff}
+.pairing-key-field{display:grid;gap:8px}
+.pairing-dialog .pairing-key-label{margin:0;color:var(--muted,#627078);font-size:13px}
+.pairing-code{display:flex;align-items:center;gap:6px;min-width:0;border:1px solid var(--line,#dde4e4);border-radius:6px;background:var(--raised,#f6f8f8);padding:3px}
+.pairing-dialog #pair-key{flex:1;width:0;min-width:0;height:32px;margin:0;padding:0 9px;border:0;background:transparent;color:inherit;font:13px ui-monospace,"SF Mono",monospace;letter-spacing:0;box-shadow:none}
+.pairing-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px}
+.pairing-dialog #pair-expiry{margin:0;color:var(--muted,#627078);font-size:12px}
+.pairing-dialog #pair-generate{height:34px;min-height:34px;padding:0 12px;border:1px solid var(--pairing-primary-bg,#176f5b);border-radius:6px;background:var(--pairing-primary-bg,#176f5b);color:var(--pairing-primary-fg,#fff);font-size:13px;white-space:nowrap}
+.pairing-dialog #pair-generate:hover{opacity:.85}
+.pairing-dialog #pair-status,.pairing-dialog #pair-error{margin:0;font-size:13px;overflow-wrap:anywhere}
+.pairing-dialog #pair-error{color:var(--danger,#a43845)}
+.pairing-dialog [hidden]{display:none!important}
