@@ -12,6 +12,12 @@
     document.querySelectorAll('[name=themeMode]').forEach(input => { input.checked = input.value === state.themeMode; input.disabled = saving; });
     $('#close-behavior').value = state.closeBehavior;
     $('#close-behavior').disabled = saving;
+    $('#launch-at-login').checked = state.launchAtLogin;
+    $('#launch-at-login').disabled = saving || !state.loginItem.supported;
+    $('#launch-at-login-hint').textContent = state.loginError || !state.loginItem.supported ? state.loginError || '请在安装版客户端中设置开机启动。'
+      : state.loginItem.status === 'requires-approval' ? '请在系统设置的登录项中允许灵藏开机启动。'
+      : state.loginItem.status === 'disabled-by-system' ? '开机启动已被系统禁用；重新开启此选项可启用。'
+      : state.launchAtLogin ? '登录电脑后启动并收起到托盘；工作节点按上次状态恢复。' : '开机不自动打开工作台；手动打开时仍恢复上次的工作节点状态。';
     $('#close-behavior-hint').textContent = state.closeBehavior === 'tray'
       ? '收起到托盘，随时可以重新打开；工作节点继续运行。'
       : '退出桌面工作台；工作节点在后台继续采集。重新打开后可继续查看与控制。';
@@ -26,6 +32,7 @@
   }
   document.querySelectorAll('[name=themeMode]').forEach(input => input.addEventListener('change', () => { if (input.checked) void update({ themeMode: input.value }); }));
   $('#close-behavior').addEventListener('change', event => void update({ closeBehavior: event.target.value }));
+  $('#launch-at-login').addEventListener('change', event => void update({ launchAtLogin: event.target.checked }));
   window.desktopSettings.onChanged(apply);
   (async () => {
     let state = await window.desktopSettings.get();

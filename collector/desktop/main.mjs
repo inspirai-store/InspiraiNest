@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -8,6 +8,8 @@ import { OwnerClient } from './owner-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
 import { DesktopSettings } from './settings.mjs';
+import { DesktopLoginItem } from './login-item.mjs';
+import { WorkerSession } from './worker-session.mjs';
 import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from './macos-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,22 +30,24 @@ const scope = createHash('sha256').update(manager.dataDir.toLowerCase()).digest(
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
-let owner, updates, settings, updateTimer, initialUpdateTimer;
+let owner, updates, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
 if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates,
+  loginItem,
   ownerState: () => owner.state(),
   setSnapshot: value => { snapshotForTest = value; refreshTray(); },
 });
 function desktopSnapshot() {
-  const state = snapshotForTest || { ...manager.snapshot(), quitAfterTask: Boolean(macQuit?.pending) };
+  const snapshot = manager.snapshot();
+  const state = snapshotForTest || { ...snapshot, launchError: snapshot.launchError || workerSession?.error, quitAfterTask: Boolean(macQuit?.pending) };
   return isMac ? { ...state, actions: macosWorkerActions(state) } : state;
 }
 const trace = event => {
   if (process.env.COLLECTOR_DESKTOP_TRACE) fs.appendFileSync(process.env.COLLECTOR_DESKTOP_TRACE, JSON.stringify({ event, at: new Date().toISOString() }) + '\n');
 };
-const macQuit = isMac ? createDrainQuitController({ snapshot: () => manager.snapshot(), stop: () => manager.stop(), quit: () => {
+const macQuit = isMac ? createDrainQuitController({ snapshot: () => manager.snapshot(), stop: () => workerSession.stop(), quit: () => {
   quitting = true; trace('drained-and-quit');
   // A stopped Worker can reach here synchronously from before-quit. Let that
   // prevented quit finish before starting the real quit, avoiding reentrancy.
@@ -115,18 +119,19 @@ function icon() {
 async function perform(action) {
   if (action === 'start') {
     if (macQuit?.pending) throw new Error('正在完成当前任务后退出应用，请等待工作节点停止。');
-    return manager.start();
+    if (['waiting_worker', 'installing'].includes(updates?.snapshot().phase)) throw new Error('正在安装客户端更新，请等待安装完成。');
+    return workerSession.start();
   }
-  if (['pause', 'resume'].includes(action)) return manager.control(action);
-  if (action === 'drain') return isMac ? manager.stop() : manager.control('drain');
+  if (['pause', 'resume'].includes(action)) return workerSession.control(action);
+  if (action === 'drain') return workerSession.stop();
   if (action === 'show') { await openManager(); return; }
   if (action === 'hide') { hideManager(); return; }
   if (action === 'remote') { const url = manager.snapshot().server; if (url) await shell.openExternal(url); return; }
   if (action === 'data') { fs.mkdirSync(manager.dataDir, { recursive: true }); const error = await shell.openPath(manager.dataDir); if (error) throw new Error(error); return; }
-  if (isMac && ['quit', 'quit-after'].includes(action)) { await macQuit.request(); refreshTray(); return; }
+  if (isMac && ['quit', 'quit-after'].includes(action)) { await macQuit.request(); workerSession.record('stopped'); refreshTray(); return; }
   if (action === 'quit') { quitting = true; trace('manager-quit-worker-kept'); app.quit(); return; }
   if (action === 'quit-after') {
-    if (manager.snapshot().running) await manager.control('drain');
+    await workerSession.stop();
     exitWhenStopped = true; return;
   }
   throw new Error('不支持的操作');
@@ -194,6 +199,7 @@ async function menuAction(action) {
 }
 function refreshTray() {
   if (!tray || quitting) return;
+  if (!snapshotForTest) workerSession?.observe();
   const s = desktopSnapshot();
   const itemState = (action, label, enabled) => isMac ? {
     label: s.actions[action].reason ? `${label} — ${s.actions[action].reason}` : label,
@@ -231,21 +237,24 @@ function applicationMenu() {
 }
 if (!ownsLock) app.quit();
 else {
-  app.on('second-instance', () => openManager());
+  app.on('second-instance', (_event, argv) => { if (!argv.includes('--startup')) openManager(); });
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
     // A status panel may activate this accessory app without requesting its manager.
     if (!openingManager && (!isMac || !popover?.isVisible())) openManager();
   });
   app.on('before-quit', event => {
-    if (isMac && !quitting) { event.preventDefault(); void menuAction('quit-after'); return; }
+    workerSession?.observe();
+    if (isMac && !quitting && !endingSession && updates?.snapshot().phase !== 'installing') { event.preventDefault(); void menuAction('quit-after'); return; }
     quitting = true; clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
   app.whenReady().then(() => {
-    settings = new DesktopSettings({ file: path.join(app.getPath('userData'), 'desktop-settings.json'), nativeTheme });
+    loginItem = new DesktopLoginItem({ app, test: process.env.COLLECTOR_DESKTOP_TEST === '1' });
+    settings = new DesktopSettings({ file: path.join(app.getPath('userData'), 'desktop-settings.json'), nativeTheme, loginItem });
+    workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: safeStorage, identityDir: manager.dataDir });
-    updates = new DesktopUpdater({ app, manager, updater: electronUpdater.autoUpdater });
+    updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater });
     main = makeWindow(); popover = makeWindow(true);
     settings.on('changed', value => {
       for (const window of [main, popover]) if (window && !window.isDestroyed()) {
@@ -255,7 +264,8 @@ else {
     });
     updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });
     main.on('close', event => {
-      if (quitting) return;
+      if (quitting || endingSession) return;
+      workerSession.observe();
       event.preventDefault();
       if (settings.snapshot().closeBehavior === 'quit') {
         // This explicit window preference exits only the manager, including on macOS.
@@ -263,6 +273,9 @@ else {
         quitting = true; trace('close-manager-worker-kept'); setImmediate(() => app.quit());
       } else { hideManager(); trace('close-to-tray'); }
     });
+    const sessionEnding = () => { endingSession = true; workerSession.observe(); };
+    main.on('query-session-end', sessionEnding); main.on('session-end', sessionEnding);
+    powerMonitor.on('shutdown', sessionEnding);
     if (!isMac) main.on('minimize', event => { event.preventDefault(); hideManager(); trace('minimize-to-tray'); });
     trayImage = icon();
     if (isMac) {
@@ -285,10 +298,11 @@ else {
     }
     tray.on('right-click', () => { clearTimeout(clickTimer); if (isMac) hideStatus(); refreshTray(); tray.popUpContextMenu(tray.menu); });
     registerIPC(); applicationMenu(); refreshTray(); refreshTimer = setInterval(refreshTray, 2000);
+    void workerSession.restore().then(() => refreshTray());
     if (process.env.COLLECTOR_DESKTOP_TEST !== '1') {
       initialUpdateTimer = setTimeout(() => updates.check(), 15000);
       updateTimer = setInterval(() => updates.check(), 6 * 60 * 60 * 1000);
     }
-    main.once('ready-to-show', () => openManager());
+    main.once('ready-to-show', () => process.argv.includes('--startup') || loginItem.openedAtLogin ? hideManager() : openManager());
   }).catch(error => { dialog.showErrorBox('管理器启动失败', error.message); quitting = true; app.quit(); });
 }

@@ -11,6 +11,8 @@ files:
   - desktop/owner-client.mjs
   - desktop/updater.mjs
   - desktop/settings.mjs
+  - desktop/login-item.mjs
+  - desktop/worker-session.mjs
   - desktop/settings-renderer.js
   - desktop/nodes.js
   - desktop/macos-policy.mjs

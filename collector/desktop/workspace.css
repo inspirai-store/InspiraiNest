@@ -143,6 +143,10 @@ body.compact main{grid-template-rows:36px minmax(0,1fr) auto}
 .setting-row{display:flex;justify-content:space-between;align-items:center;gap:28px;padding:22px 20px}
 .setting-row>div{min-width:0}.setting-row h3{font-size:13px;font-weight:600}.setting-row p{font-size:12px;color:var(--muted);margin-top:5px;max-width:420px}
 .setting-row select{flex-shrink:0;max-width:100%;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--raised);color:var(--fg);font:inherit;font-size:12px}
+.setting-row+.setting-row{border-top:1px solid var(--line)}
+.login-toggle{display:inline-flex;align-items:center;gap:9px;flex-shrink:0;min-height:34px;padding:0 10px;font-size:12px;cursor:pointer}
+.login-toggle input{width:18px;height:18px;min-width:0;padding:0;accent-color:var(--workspace-accent)}
+.login-toggle:has(input:disabled){opacity:.65;cursor:default}
 .theme-options{display:flex;flex-shrink:0;gap:3px;margin:0;padding:3px;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
 .theme-options label{position:relative;cursor:pointer}.theme-options input{position:absolute;opacity:0;width:1px;height:1px}
 .theme-options span{display:block;padding:6px 14px;border-radius:4px;font-size:12px;white-space:nowrap}
