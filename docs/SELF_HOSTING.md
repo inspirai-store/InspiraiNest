@@ -23,7 +23,7 @@ npm test
 npm start
 ```
 
-Windows PowerShell 如果限制 npm 脚本，使用 `npm.cmd`。默认监听 `http://127.0.0.1:4317`；默认 SQLite 和对象文件都在 `collector/data/`。首次启动生成 `data/admin-key.txt`。在本机打开上述地址，用该文件中的密钥配对第一个管理端；不要把密钥放进 URL、工单或 Git。管理端可以创建一次性 owner/worker 配对码、提交任务、撤销设备。
+Windows PowerShell 如果限制 npm 脚本，使用 `npm.cmd`。默认监听 `http://127.0.0.1:4317`；默认 SQLite 和对象文件都在 `collector/data/`。首次启动生成 `data/admin-key.txt`。网站首页或 `/login` 可用该文件中的密钥登录；`/download` 保留客户端下载。也可以在桌面或手机客户端填写上述服务地址，用该密钥配对第一个管理端，不要把密钥放进 URL、工单或 Git。管理端可以创建通用的一次性设备配对码、提交任务、撤销设备。设备类型由客户端在连接时登记，不需要选择配对码用途。`/authorize` 仍需登录并明确确认专项只读 CLI 授权，根目录 `index.html` 的离线资料阅读方式不变。
 
 `.env.example` 是变量说明，服务不会自动加载 `.env`。用启动环境传入变量。数据目录和密钥要一起备份，备份也必须保密。
 
@@ -44,9 +44,13 @@ node src/worker.mjs doctor
 
 编辑新建的 `worker.local.json`：将 `server` 设置为自己的 HTTPS origin（同机调试可用 loopback HTTP），保留 `watchLibrary: null`。默认 Codex 明确使用 workspace-write 沙箱，默认示例不启用 CodeBuddy 回退。默认未打开沙箱网络访问；需要联网采集时在隔离账户内自行选择经过检查的本机 Agent 配置。`init --capture-profile` 是单独的联网/编辑权限示例，会扩大能力，不能当成隔离保证。
 
-在管理页面创建设备角色为 worker 的一次性配对码。用环境变量 `COLLECTOR_PAIR_KEY` 传入后运行 `node src/worker.mjs pair`，随后从当前 shell 环境删除它。不要将密钥写入命令行参数。运行 `node src/worker.mjs run --paused` 检查状态；准备好接收任务后可通过桌面管理端恢复，或者停止进程后运行 `node src/worker.mjs run`。`doctor` 只验证 CLI 启动和版本，不代表模型登录、权限或采集成功。
+在已有客户端生成一次性设备配对码。用环境变量 `COLLECTOR_PAIR_KEY` 传入后运行 `node src/worker.mjs pair`，随后从当前 shell 环境删除它。不要将密钥写入命令行参数。运行 `node src/worker.mjs run --paused` 检查状态；准备好接收任务后可通过桌面管理端恢复，或者停止进程后运行 `node src/worker.mjs run`。`doctor` 只验证 CLI 启动和版本，不代表模型登录、权限或采集成功。
+
+桌面工作台使用一个通用码完成阅读、管理和采集配对，服务端只登记一台设备。管理凭据使用系统安全存储加密，后台 Worker 配置只保留采集凭据；撤销该设备同时使两份凭据失效。独立命令行 Worker 仍只有采集权限。手机和浏览器使用同一种码连接。旧版客户端和未过期的旧版专用码仍可使用，但桌面统一配对需要新生成的通用码。
 
 桌面管理端可在 `npm ci` 后通过 `npm run desktop` 启动；首次可能需要安装 Electron 二进制（`node node_modules/electron/install.js`）。连接页面手动输入服务地址。Worker 配对配置和任务日志留在本机；断线后任务仍归原电脑所有。示例路径 `worker.production.example.json` 是打包兼容文件名，内容也是本机默认值。使用 CodeBuddy 的既有自定义配置需要显式设置 `agents.codebuddy.enabled: true`；本次没有改写用户本机配置文件。
+
+设备身份及迁移边界见 [Device Identity v2](DEVICE_IDENTITY.md)。数据库中的身份命名空间必须保留；原始硬件 UUID 不上传。旧客户端的授权、令牌和任务 ID 不会因升级服务端而改变，升级后的客户端凭现有凭据补齐信息。发生身份冲突时需要人工处理，不自动合并或撤销。
 
 ## 移动端和只读 CLI
 

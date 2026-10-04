@@ -107,3 +107,42 @@ for (const brand of ['InspiraiNest', 'LingNest']) test(`${brand} releases preser
   fs.unlinkSync(path.join(root, filename));
   assert.equal((await (await fetch(base + '/client-release.json')).json()).android, null);
 });
+
+
+test('macOS update feed serves only verified current release assets', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'macos-update-'));
+  const version = '0.1.7', workers = {}, assets = {};
+  const stage = filename => {
+    const bytes = Buffer.from('fixture:' + filename);
+    fs.writeFileSync(path.join(root, filename), bytes);
+    return { filename, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+  };
+  for (const arch of ['arm64', 'x64']) {
+    workers['macos_' + arch] = { version, ...stage(`InspiraiNest-v${version}-macOS-${arch}.zip`) };
+    const filename = `InspiraiNest-v${version}-macOS-${arch}.zip.blockmap`;
+    assets[filename] = stage(filename);
+  }
+  assets['latest-mac.yml'] = stage('latest-mac.yml');
+  fs.writeFileSync(path.join(root, 'worker-release.json'), JSON.stringify(workers));
+  fs.writeFileSync(path.join(root, 'macos-update.json'), JSON.stringify({ version, assets }));
+  const app = createService({ dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    await app.close();
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
+  const base = `http://127.0.0.1:${app.server.address().port}/updates/macos/`;
+  for (const item of [...Object.values(workers), ...Object.values(assets)]) {
+    const response = await fetch(base + item.filename);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join(root, item.filename)));
+    assert.equal((await fetch(base + item.filename, { method: 'HEAD' })).status, 200);
+  }
+  assert.equal((await fetch(base + 'macos-update.json')).status, 404);
+  assert.equal((await fetch(base + 'latest-mac.yml', { method: 'POST' })).status, 405);
+  fs.writeFileSync(path.join(root, 'latest-mac.yml'), Buffer.alloc(assets['latest-mac.yml'].size, 65));
+  assert.equal((await fetch(base + 'latest-mac.yml')).status, 503);
+  fs.writeFileSync(path.join(root, 'macos-update.json'), JSON.stringify({ version: '0.1.8', assets }));
+  assert.equal((await fetch(base + 'latest-mac.yml')).status, 404);
+});

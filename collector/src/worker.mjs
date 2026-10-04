@@ -5,21 +5,36 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { atomicJson, readJson, requireValue, remoteURL, hash, id, safePath, contained } from './common.mjs';
 import { packageEntry, unpackArchive } from './archive.mjs';
-import { defaults, detectAgents, agentOrder, runAgent, execute, unavailableBeforeWork } from './agents.mjs';
+import { defaults, detectAgents, agentOrder, runAgent, execute, unavailableBeforeWork, describeAgentFailure } from './agents.mjs';
 import { loadWorkerConfig, initializeWorkerConfig } from './config.mjs';
 import { createWorkerControl } from './worker-control.mjs';
+import { createWorkerEvents, errorDetails } from './worker-events.mjs';
+import { watchCollectionSteps } from './collection-steps.mjs';
+import { computerMetadata } from './device-identity.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || path.join(project, '..'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function api(config, route, method = 'GET', value) {
-  const response = await fetch(`${remoteURL(config.server)}${route}`, {
-    method, headers: { 'Content-Type': 'application/json', ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
-    body: value === undefined ? undefined : JSON.stringify(value), signal: AbortSignal.timeout(120000), redirect: 'error',
-  });
-  const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(data.error || 'Request failed'), { status: response.status });
+  let response;
+  try {
+    response = await fetch(`${remoteURL(config.server)}${route}`, {
+      method, headers: { 'Content-Type': 'application/json', ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
+      body: value === undefined ? undefined : JSON.stringify(value), signal: AbortSignal.timeout(120000), redirect: 'error',
+    });
+  } catch (cause) {
+    throw Object.assign(new Error('无法连接服务，请检查网络；本机成果已保留', { cause }), { code: 'NETWORK', route, method });
+  }
+  const context = { route, method, status: response.status, contentType: response.headers.get('content-type') || '未提供' };
+  let data;
+  try { data = await response.json(); }
+  catch (cause) {
+    throw Object.assign(new Error(response.ok ? '服务返回了无法解析的响应，请检查服务端接口或代理配置' : `服务请求失败（HTTP ${response.status}），返回内容不是有效 JSON`, { cause }),
+      context, { code: response.ok ? 'REMOTE_FORMAT' : 'REMOTE_HTTP' });
+  }
+  if (!response.ok) throw Object.assign(new Error(data?.error || `服务请求失败（HTTP ${response.status}）`), context, { code: [401, 403].includes(response.status) ? 'AUTH' : 'REMOTE_HTTP' });
+  if (data === null || typeof data !== 'object') throw Object.assign(new Error('服务响应结构异常'), context, { code: 'REMOTE_FORMAT' });
   return data;
 }
 
@@ -48,10 +63,11 @@ export function taskPrompt(task, localInstructions = '') {
     `按 AGENTS.md 创建类型目录/source.json 和中文报告，采集时间精确到秒和时区。尽量保存正文、转录、关键图片。不要把标题简介推演成全文分析。\n` +
     `files 角色：正文文本用 source 或 original，摘要用 summary，转录用 transcript，图片用 image，场景分析用 scenario；文件必须登记后才会上传。\n` +
     `媒体可留在本机，后台只上传允许的轻量附件。登录凭据绝不能写入 source.json、报告、附件或输出结果。\n` +
+    `在实际开始获取来源、字幕/转录、分析、归档或遇到来源障碍时，将中文过程追加到工作目录 collector-events.jsonl，每行 JSON：{"stage":"fetching|transcribing|analyzing|archiving 中的一个","level":"info 或 warn","message":"实际发生的操作及结果，最多500字"}。不要记录计划中的动作、全文内容、登录凭据或重复轮询。此文件不是成果清单。\n` +
     `不要上传资料，后台会校验上传；不要启动后台子任务，所有文件写完后再结束。不得创建定时任务。\n` +
     `单个获取途径失败不等于整个任务需要登录。原生字幕要求登录或不存在时，先尝试匿名公开下载视频或音频，再使用本机可用的 Whisper/faster-whisper 转录并结合关键画面分析。弹幕不替代字幕；将本地 ASR 与原生字幕明确区分。\n` +
     `工具名称找不到或入口启动失败时，检查已安装工具的真实路径、Python 模块方式及可用替代入口；不要仅凭一个 PATH 入口就断言工具缺失。复查历史失败原因是否仍成立，避免沿用旧暂停结论。不得绕过付费、登录或访问控制，不得擅自读取浏览器凭据。\n` +
-    `只有允许的公开获取与本地处理途径仍无法取得必要内容，确实需要用户登录授权或补齐必要工具时，才在工作目录 collector-result.json 写入 {"status":"waiting_action","message":"已经尝试的途径及需要用户完成的具体操作，不包含凭据"} 后结束；不要对同一失败途径无休止重试。\n` +
+    `只有允许的公开获取与本地处理途径仍无法取得必要内容，确实需要用户登录授权或补齐必要工具时，才在工作目录 collector-result.json 写入 {"status":"waiting_action","category":"source（来源限制或登录）或 environment（程序、权限、工具配置）","message":"已经尝试的途径及需要用户完成的具体操作，不包含凭据"} 后结束；不要对同一失败途径无休止重试。\n` +
     `完成后运行 node scripts/catalog.mjs build 和 node scripts/catalog.mjs check。最后写 collector-result.json：{"status":"ready","entry":"类型目录/条目目录"}。entry 必须是本工作目录内相对路径。\n` +
     `如果已有 collector-result.json 或条目，核对并复用内容，不覆盖原始快照。\n` +
     (localInstructions ? `本机用户配置的补充采集约定：\n${localInstructions}\n` : '');
@@ -61,8 +77,8 @@ export async function processTask(config, task, available, signal, onProgress = 
   const dataDir = path.resolve(config.dataDir || path.join(project, 'worker-data'));
   const workspace = prepareWorkspace(task, dataDir);
   const checkpoint = path.join(workspace, 'collector-result.json');
-  const progress = (state, message, agent) => {
-    onProgress({ state, message, agent });
+  const progress = (state, message, agent, diagnostic) => {
+    onProgress({ state, message, agent, ...(diagnostic ? { diagnostic } : {}) });
     return api(config, `/api/tasks/${task.id}/progress`, 'POST', { state, message, agent });
   };
   if (fs.existsSync(checkpoint) && readJson(checkpoint).status !== 'ready') {
@@ -74,19 +90,24 @@ export async function processTask(config, task, available, signal, onProgress = 
       chosen = name;
       await progress('running', `使用 ${name} 采集；本机保留中间成果`, name);
       const instructions = [config.instructions, config.agents?.[name]?.instructions].filter(Boolean).join('\n');
-      const result = await runAgent(name, config.agents || {}, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 });
+      const stopSteps = watchCollectionSteps(workspace, step => onProgress({ state: 'running', agent: name, ...step }), error => onProgress({ state: 'running', agent: name,
+        message: '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: 'STEP_LOG_READ', details: errorDetails(error) } }));
+      let result;
+      try { result = await runAgent(name, config.agents || {}, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
+      finally { stopSteps(); }
       if (result.aborted) return;
-      if (result.permissionBlocked) { await progress('waiting_action', `${name} 的非交互权限不足，已停止执行。请在本机客户端配置权限后继续。`, name); return; }
+      if (result.permissionBlocked) { await progress('waiting_action', `${name} 的非交互权限不足，已停止执行。请在本机客户端配置权限后继续。`, name, { code: 'AGENT_PERMISSION', details: { agent: name } }); return; }
       // Only failure to start can fall back automatically. Do not repeat a partially executed task on another agent.
-      if (unavailableBeforeWork(result)) { await progress('running', `${name} 启动不可用，尝试已配置的候选 Agent`, name); continue; }
-      if (result.timedOut) { await progress('waiting_action', 'Agent 超时，成果已保留。请检查本机日志后继续。', name); return; }
-      if (result.code !== 0) { await progress('waiting_action', `${name} 执行退出（${result.code}）。请在本机检查登录、权限与日志后继续。`, name); return; }
+      if (unavailableBeforeWork(result)) { await progress('running', `${name} 启动不可用，尝试已配置的候选 Agent`, name, { code: 'AGENT_START', details: { agent: name, exitCode: result.code, spawnError: result.spawnError || null } }); continue; }
+      if (result.timedOut) { await progress('waiting_action', '采集程序执行超时，成果已保留。请展开执行详情检查后继续。', name, { code: 'AGENT_TIMEOUT', details: { timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 } }); return; }
+      if (result.code !== 0) { const diagnostic = describeAgentFailure(name, result); await progress('waiting_action', diagnostic.message, name, diagnostic); return; }
       break;
     }
   }
-  if (!fs.existsSync(checkpoint)) { await progress('waiting_action', 'Agent 未生成结果文件。请检查本机 Agent 配置、权限或日志。', chosen); return; }
+  if (!fs.existsSync(checkpoint)) { await progress('waiting_action', '采集程序未生成结果文件，请检查本机程序配置、权限或执行详情。', chosen, { code: 'AGENT_RESULT', details: { expectedFile: 'collector-result.json' } }); return; }
   const result = readJson(checkpoint);
-  if (result.status === 'waiting_action') { await progress('waiting_action', String(result.message || '需要本机操作').slice(0, 1000), chosen); return; }
+  if (result.status === 'waiting_action') { await progress('waiting_action', String(result.message || '需要本机操作').slice(0, 1000), chosen,
+    result.category === 'environment' ? { code: 'AGENT_ENVIRONMENT', details: { source: '采集程序上报的本机环境问题' } } : undefined); return; }
   requireValue(result.status === 'ready', 'Invalid Agent result');
   safePath(result.entry);
   const entryRoot = fs.realpathSync(path.join(workspace, result.entry));
@@ -145,9 +166,17 @@ export async function runWorker(config, { once = false, signal, paused = false }
     fs.unlinkSync(lock);
   }
   fs.writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
+  const journal = createWorkerEvents(dataDir, { token: config.token });
+  const fault = (key, error, message, taskId) => journal.fault(key, { code: error.code || 'INTERNAL', message: message || error.message,
+    taskId, details: errorDetails(error) });
   let control;
-  try { control = createWorkerControl(dataDir, { paused, token: config.token }); }
+  try { control = createWorkerControl(dataDir, { paused, token: config.token, runId: journal.runId,
+    onDiagnostic: ({ error, recovered }) => recovered ? journal.recover('status-write', '本机状态保存已恢复') :
+      fault('status-write', error, '本机状态暂时无法保存，正在重试；采集执行不受影响'),
+    onMode: mode => journal.event({ domain: 'system', code: 'CONTROL', message: { paused: '已暂停领取，当前任务继续执行', running: '已恢复领取任务', draining: '当前任务完成后停止，不再领取新任务' }[mode] }),
+  }); }
   catch (error) { fs.unlinkSync(lock); throw error; }
+  journal.event({ domain: 'system', code: 'WORKER_START', message: paused ? '采集服务已启动，暂不领取任务' : '采集服务已启动，准备领取任务' });
   let current;
   let timer;
   let forbidden = false;
@@ -156,21 +185,27 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let lastSync = 0;
   let heartbeatPending = false;
   let lastHeartbeatAttempt = 0;
+  let deviceMetadata;
   const heartbeat = async () => {
     if (heartbeatPending || Date.now() - lastHeartbeatAttempt < 9000) return;
     heartbeatPending = true;
     lastHeartbeatAttempt = Date.now();
     try {
-      const result = await api(config, '/api/heartbeat', 'POST', { platform: process.platform, system: `${os.type()} ${os.release()} · ${os.arch()}`, installationId: config.installationId, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available) });
+      deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available) });
+      if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
+      if (!result.tasks.every(task => task && typeof task.id === 'string')) throw Object.assign(new Error('心跳任务列表结构异常'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (current && result.tasks.some(task => task.id === current.id && task.state === 'cancelled')) current.controller.abort();
       const lastTask = control.state.lastTask;
       const remoteTask = lastTask && result.tasks.find(task => task.id === lastTask.id);
       const terminal = remoteTask && ['completed', 'awaiting_review', 'cancelled', 'failed'].includes(remoteTask.state);
       control.update({ connection: 'online', lastHeartbeat: new Date().toISOString(), tasks: result.tasks, error: null,
         ...(terminal && !current ? { lastTask: { ...lastTask, state: remoteTask.state } } : {}) });
+      journal.recover('heartbeat', '服务连接已恢复，心跳正常');
     } catch (error) {
-      if ([401, 403].includes(error.status)) { forbidden = true; current?.controller.abort(); }
-      control.update({ connection: 'offline', error: [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : `无法连接服务（${error.status || error.name}），本机成果已保留` });
+      if ([401, 403].includes(error.status) || error.status === 409 || error.code === 'IDENTITY_CHANGED') { forbidden = true; current?.controller.abort(); }
+      control.update({ connection: 'offline', error: error.status === 409 || error.code === 'IDENTITY_CHANGED' ? '设备身份冲突或硬件变化，请确认授权并重新配对；原任务已保留' : [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : `无法连接服务（${error.status || error.name}），本机成果已保留` });
+      fault('heartbeat', error, [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : '心跳失败，正在重连；本机成果已保留');
     } finally {
       heartbeatPending = false;
     }
@@ -190,36 +225,62 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (control.state.mode === 'paused') { if (control.state.phase !== 'paused') control.update({ phase: 'paused' }); await sleep(250); continue; }
         control.update({ phase: 'claiming' });
-        const { task } = await api(config, '/api/claim', 'POST', {});
+        const claimed = await api(config, '/api/claim', 'POST', {});
+        if (!Object.hasOwn(claimed, 'task')) throw Object.assign(new Error('领取响应缺少任务字段，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
+        const { task } = claimed;
+        if (task !== null && (!task || typeof task !== 'object' || !/^[a-zA-Z0-9-]{1,100}$/.test(task.id))) throw Object.assign(new Error('领取任务结构异常'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
+        journal.recover('poll', '任务领取接口已恢复');
         if (task) {
           current = { id: task.id, controller: new AbortController() };
           const displayTask = { id: task.id, title: String(task.content || task.url || task.id).slice(0, 400), state: task.state, agent: task.agent || null, message: '准备任务工作目录' };
           control.update({ phase: 'working', current: displayTask });
-          const progress = patch => { Object.assign(displayTask, patch); control.update({ current: displayTask, lastTask: { ...displayTask } }); };
+          journal.event({ taskId: task.id, code: 'TASK_CLAIMED', stage: 'preparing', message: '已领取任务，准备本机采集目录' });
+          const progress = ({ diagnostic, logStage, level, ...patch }) => {
+            Object.assign(displayTask, patch, { errorDomain: diagnostic ? 'system' : null });
+            control.update({ current: displayTask, lastTask: { ...displayTask } });
+            if (diagnostic) journal.fault(`task:${task.id}:${diagnostic.code}`, { ...diagnostic, taskId: task.id, stage: patch.state, message: patch.message });
+            // The business stream describes the effect; technical causes live in system issues.
+            journal.event({ taskId: task.id, code: diagnostic ? 'TASK_SYSTEM_BLOCKED' : `TASK_${patch.state.toUpperCase()}`, stage: patch.state,
+              level: level || (patch.state === 'waiting_action' ? 'warn' : 'info'), message: diagnostic ? patch.state === 'waiting_action' ? '系统问题阻塞了采集，请查看「系统问题」和执行详情' : '采集程序遇到系统问题，正在尝试继续；技术原因见「系统问题」' : patch.message,
+              ...(logStage ? { stage: logStage, reportedBy: 'agent' } : {}),
+              ...(patch.agent ? { agent: patch.agent } : {}) });
+          };
           try { await processTask(config, task, available, current.controller.signal, progress); }
           catch (error) {
             if (error.status === 401 || error.status === 403) forbidden = true;
             else if (error.status === 400 || (!error.status && error.name !== 'TypeError' && error.name !== 'TimeoutError')) {
-              await api(config, `/api/tasks/${task.id}/progress`, 'POST', { state: 'waiting_action', message: String(error.message).slice(0, 1000) }).catch(() => {});
-              progress({ state: 'waiting_action', message: String(error.message).slice(0, 1000) });
+              const message = '系统问题阻塞了采集，成果已保留；请查看系统诊断后继续';
+              await api(config, `/api/tasks/${task.id}/progress`, 'POST', { state: 'waiting_action', message }).catch(() => {});
+              Object.assign(displayTask, { state: 'waiting_action', message, errorDomain: 'system' });
             }
-            console.error('Task retained on this computer:', task.id, error.status || error.name);
+            if (displayTask.state !== 'waiting_action') Object.assign(displayTask, { state: 'interrupted', message: '系统问题中断采集，本机成果已保留；服务恢复后可继续', errorDomain: 'system' });
+            fault(`task:${task.id}:execution`, error, '采集管线发生系统错误，本机成果已保留', task.id);
+            journal.event({ taskId: task.id, code: 'TASK_SYSTEM_BLOCKED', stage: 'waiting_action', level: 'warn', message: '采集中断于系统问题，成果保留本机；请查看系统诊断' });
           } finally {
-            if (current.controller.signal.aborted) Object.assign(displayTask, { state: 'interrupted', message: '执行已中断，文件保留本机；请到远端页面确认任务状态。' });
+            if (current.controller.signal.aborted) {
+              Object.assign(displayTask, { state: 'interrupted', message: '执行已中断，文件保留本机；请到远端页面确认任务状态。' });
+              journal.event({ taskId: task.id, code: 'TASK_INTERRUPTED', stage: 'interrupted', level: 'warn', message: displayTask.message });
+            }
+            if (['completed', 'awaiting_review'].includes(displayTask.state)) {
+              for (const code of ['AGENT_START', 'AGENT_TIMEOUT', 'AGENT_EXIT', 'AGENT_MODEL', 'AGENT_LOGIN', 'AGENT_RESULT', 'AGENT_PERMISSION', 'AGENT_ENVIRONMENT', 'STEP_LOG_READ', 'execution']) journal.recover(`task:${task.id}:${code}`, '本次采集已完成，执行问题不再阻塞');
+            }
             current = null; control.update({ current: null, lastTask: { ...displayTask }, phase: 'idle' });
           }
         }
         control.readCommand();
         if (Date.now() - lastSync > 60000 && !forbidden && control.state.mode === 'running') {
           control.update({ phase: 'syncing' });
-          await syncLibrary(config).catch(error => console.error('Library sync postponed:', error.message));
+          await syncLibrary(config).then(result => {
+            journal.recover('library-sync', '本机资料同步已恢复');
+            if (result.uploaded) journal.event({ code: 'LIBRARY_SYNC', stage: 'uploading', message: `已同步 ${result.uploaded} 条本机资料` });
+          }).catch(error => fault('library-sync', error, '本机资料同步失败，已保留成果，稍后重试'));
           lastSync = Date.now();
         }
         control.update({ phase: 'idle' });
       } catch (error) {
         if ([401, 403].includes(error.status)) forbidden = true;
-        console.error('Connection unavailable:', error.status || error.name);
-        control.update({ connection: 'offline', error: `连接暂不可用（${error.status || error.name}）` });
+        fault('poll', error, { NETWORK: '网络请求失败，正在重连；本机成果已保留', REMOTE_HTTP: `服务请求失败（HTTP ${error.status}），请展开接口诊断`, REMOTE_FORMAT: '服务响应格式异常，请检查接口或代理配置', AUTH: '设备授权已失效，请重新配对' }[error.code] || '采集服务内部错误，请展开系统诊断');
+        control.update({ ...(['NETWORK', 'REMOTE_HTTP', 'REMOTE_FORMAT', 'AUTH'].includes(error.code) ? { connection: 'offline' } : {}), error: [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : '系统问题阻塞运行，请查看系统诊断' });
       }
       const until = Date.now() + (config.pollMs || 5000);
       while (!once && !forbidden && !signal?.aborted && Date.now() < until && control.state.mode !== 'draining') { await sleep(250); control.readCommand(); }
@@ -228,6 +289,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
     clearInterval(timer);
     signal?.removeEventListener('abort', abort);
     control.close();
+    journal.event({ domain: 'system', code: 'WORKER_STOP', message: forbidden ? '设备授权失效，采集服务已停止' : '采集服务已停止，本机成果保留' });
+    journal.flush();
     fs.unlinkSync(lock);
   }
   if (forbidden) throw new Error('Device authorization revoked or expired; worker stopped');
@@ -245,11 +308,12 @@ async function main() {
   if (command === 'pair') {
     const server = remoteURL(process.env.COLLECTOR_SERVER || config.server || 'http://127.0.0.1:4317');
     const key = process.env.COLLECTOR_PAIR_KEY;
-    requireValue(key, 'Set COLLECTOR_PAIR_KEY to a one-use worker pairing key');
+    requireValue(key, 'Set COLLECTOR_PAIR_KEY to a one-use device pairing key');
     const identityFile = path.join(config.dataDir || path.join(project, 'worker-data'), 'installation-id');
     const installationId = config.installationId || (fs.existsSync(identityFile) ? fs.readFileSync(identityFile, 'utf8').trim() : randomUUID());
-    const result = await api({ server }, '/api/pair', 'POST', { key, name: process.env.COLLECTOR_DEVICE_NAME || os.hostname(), installationId, platform: process.platform, system: `${os.type()} ${os.release()} · ${os.arch()}` });
-    requireValue(result.device.role === 'worker', 'Use a worker pairing key, not the administrator key');
+    const device = await computerMetadata({ server, dataDir: path.dirname(identityFile), installationId, clientType: 'worker', allowChange: true });
+    const result = await api({ server }, '/api/pair', 'POST', { key, name: process.env.COLLECTOR_DEVICE_NAME || os.hostname(), ...device });
+    requireValue(result.device.role === 'worker', 'Generate a new universal device pairing key');
     atomicJson(file, { capabilities: ['article', 'webpage'], defaultAgent: 'codex', fallbackAgents: ['codebuddy'], byType: {}, agents: defaults, ...config, installationId, server, token: result.token, deviceId: result.device.id });
     console.log(`Paired ${result.device.name}; credentials stored in ${file}`);
     return;

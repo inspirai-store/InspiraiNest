@@ -15,7 +15,7 @@ struct PersonalLibraryApp: App {
                     }
                 }
                 // Cover native previews and the web view in the app-switcher.
-                .overlay { if scenePhase != .active { Color(.systemBackground).ignoresSafeArea().overlay(Text("个人资料库")) } }
+                .overlay { if scenePhase != .active { Color(.systemBackground).ignoresSafeArea().overlay(Text("灵藏")) } }
         }
     }
 }
@@ -66,7 +66,7 @@ struct PairingForm: View {
             DisclosureGroup("使用地址与配对码连接", isExpanded: $showingManual) {
                 TextField("https://你的服务器", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 TextField("设备名称", text: $name)
-                SecureField("手机管理端配对码或个人密钥", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                SecureField("手机设备配对码或个人密钥", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button(model.busy ? "正在配对…" : "配对并登录") {
                     let pairingKey = key; key = ""
                     Task { await model.pair(server: server, key: pairingKey, name: name) }
@@ -212,14 +212,25 @@ struct SettingsView: View {
                     Text(model.deviceName); Text(model.serverName).font(.footnote)
                     Button("移除本机登录", role: .destructive) { forget = true }.disabled(model.busy)
                 }
-                Section("已授权设备") {
-                    ForEach(model.snapshot?.devices ?? []) { device in
+                ForEach(["desktop", "mobile", "browser", "integration", "unknown"], id: \.self) { category in
+                    let devices = (model.snapshot?.devices ?? []).filter { $0.authorizationCategory == category }
+                    if !devices.isEmpty || ["desktop", "mobile", "browser"].contains(category) {
+                    Section("\(["desktop": "电脑客户端", "mobile": "移动端", "browser": "浏览器登录", "integration": "应用授权", "unknown": "待识别"][category] ?? category) · \(devices.count)") {
+                    ForEach(devices) { device in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(device.name + (device.id == model.snapshot?.me.id ? " · 本机" : ""))
-                            Text("\(device.role) · \(device.revokedAt != nil ? "已撤销" : device.role == "owner" ? "已授权" : device.online == true ? "在线" : "离线")")
+                            Text((device.displayName ?? device.name) + (device.id == model.snapshot?.me.id ? " · 本机" : ""))
+                            Text("\(device.name) · \(device.statusLabel)")
                                 .font(.caption).foregroundStyle(.secondary)
+                            if let model = device.deviceInfo?.model { Text(model).font(.caption).foregroundStyle(.secondary) }
+                            if let version = device.deviceInfo?.client.version { Text("版本 \(version)").font(.caption).foregroundStyle(.secondary) }
+                            if let identity = device.identity { Text("\(identity.sourceName) \(identity.shortId)").font(.caption).foregroundStyle(.secondary) }
+                            if let seen = device.lastSeen { Text("最近活动：\(seen)").font(.caption).foregroundStyle(.secondary) }
+                            if let expires = device.browserExpiresAt { Text("有效至：\(expires)").font(.caption).foregroundStyle(.secondary) }
+                            if device.canDispatch { Text("Agent：\(device.agents?.joined(separator: " / ") ?? "无可用 Agent")").font(.caption).foregroundStyle(.secondary) }
                             if device.revokedAt == nil { Button("撤销设备", role: .destructive) { revoking = device }.disabled(model.busy) }
                         }
+                    }
+                    }
                     }
                 }
             } else { PairingForm() }

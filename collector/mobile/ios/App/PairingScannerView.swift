@@ -41,8 +41,8 @@ private enum QRPairingError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalid: return "这不是有效的资料库手机配对二维码。"
-        case .worker: return "这是电脑采集端二维码，请在网页生成手机管理端二维码。"
+        case .invalid: return "这不是有效的资料库设备配对二维码。"
+        case .worker: return "请在网页生成新的设备配对二维码。"
         case .expired: return "配对二维码已过期，请在网页重新生成。"
         }
     }
@@ -57,7 +57,7 @@ struct PairingScannerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                Text("扫描网页「授权设备」中的手机管理端二维码")
+                Text("扫描网页「授权设备」中的配对二维码")
                     .font(.footnote).foregroundStyle(.secondary)
                 PairingCameraView(onCode: accept, onError: { error = $0 })
                     .frame(maxWidth: .infinity, maxHeight: 360)

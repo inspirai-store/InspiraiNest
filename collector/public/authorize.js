@@ -1,12 +1,13 @@
 (() => {
   const $ = selector => document.querySelector(selector);
-  let token = sessionStorage.getItem('collector-token');
+  let token = null;
   let reviewedCode = null;
   let generation = 0;
   let expiresAt = 0;
   let timer;
   let submitting = false;
   let state = '';
+  let identityReported = false;
   const codeInput = $('#code-form').elements.code;
   const icons = () => window.lucide?.createIcons();
   const normalize = code => code.trim().toUpperCase().replace(/^([A-F0-9]{4})([A-F0-9]{4})$/, '$1-$2');
@@ -22,6 +23,7 @@
   }
   function show(next, focus = false) {
     state = next;
+    $('#auth-session').hidden = !token;
     for (const [id, value] of Object.entries({ 'auth-login': 'login', 'code-form': 'code', 'loading-panel': 'loading', consent: 'consent', 'result-panel': 'result' })) {
       $('#' + id).hidden = value !== next;
     }
@@ -70,15 +72,17 @@
     if (token) codeInput.select();
   }
   function failure(error, { login = false } = {}) {
+    if (login && error.code) { show('login'); message(error.message); $('#login-factor').focus(); return; }
     if (error.status === 401) {
       token = null;
       sessionStorage.removeItem('collector-token');
+      identityReported = false;
       invalidate();
       show('login', true);
       message(login ? '登录凭据无效，请检查管理密钥或配对码。' : '管理登录已失效，请重新登录后继续。');
     } else if (login) {
       show('login');
-      message(error.status === 403 ? '请使用管理端的登录凭据。' : error.status === 429 ? '尝试过于频繁，请稍后再登录。' : '暂时无法登录资料库，请检查网络后重试。');
+      message(error.status === 409 ? '设备身份冲突，请在已有客户端检查授权后重新配对。' : error.status === 403 ? '请使用管理端的登录凭据。' : error.status === 429 ? '尝试过于频繁，请稍后再登录。' : '暂时无法登录资料库，请检查网络后重试。');
     } else if (error.status === 404) {
       result('expired', '确认码已过期或不存在', '请检查终端中的确认码；若请求已过期，请返回终端重新发起连接。', { change: true });
     } else if (error.status === 409) {
@@ -97,10 +101,24 @@
     }
   }
   async function api(route, method = 'GET', body) {
-    const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     // Keep authorization and UI side effects in the generation-checked caller.
-    if (!response.ok) throw Object.assign(new Error('Authorization request failed'), { status: response.status });
-    return response.json();
+    const value = await response.json();
+    if (!response.ok) throw Object.assign(new Error(value.error || 'Authorization request failed'), { status: response.status, code: value.code });
+    return value;
+  }
+  async function reportIdentity() {
+    const device = await api('/api/devices/me/info', 'POST', await window.browserDevice.metadata());
+    if (device.role !== 'owner') throw Object.assign(new Error('Owner required'), { status: 403 });
+  }
+  async function logout() {
+    try { await window.browserSession.logout(); } catch { message('退出未完成，请检查网络后重试'); return; }
+    invalidate();
+    token = null;
+    identityReported = false;
+    sessionStorage.removeItem('collector-token');
+    $('#auth-login').reset();
+    show('login', true);
   }
   function tick() {
     const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
@@ -127,6 +145,10 @@
     const current = generation;
     show('loading');
     try {
+      if (!identityReported) {
+        try { await reportIdentity(); if (current !== generation) return; identityReported = true; }
+        catch (error) { if (current !== generation) return; if (error.status === 409) { show('code', true); message('设备身份冲突，请检查已有授权后重新配对。'); return; } throw error; }
+      }
       const request = await api('/api/reader-authorizations?code=' + encodeURIComponent(code));
       if (current !== generation || code !== normalize(codeInput.value)) return;
       if (request.state !== 'pending') {
@@ -155,11 +177,12 @@
     button.textContent = '正在登录…';
     message('');
     try {
-      const response = await api('/api/pair', 'POST', { key: event.target.elements.key.value, name: '浏览器只读授权确认' });
+      const factor = event.target.elements.factor.value.trim();
+      const response = await api('/api/pair', 'POST', { key: event.target.elements.key.value, ...(/^\d{6}$/.test(factor) ? { otp: factor } : { recoveryCode: factor }), name: '浏览器只读授权确认', ...await window.browserDevice.metadata() });
       if (current !== generation) return;
       if (response.device.role !== 'owner') throw Object.assign(new Error('Owner required'), { status: 403 });
-      token = response.token;
-      sessionStorage.setItem('collector-token', token);
+      window.browserSession.adopt(); token = 'cookie';
+      identityReported = true;
       event.target.reset();
       if (codeInput.value) await inspect(); else show('code', true);
     } catch (error) { if (current === generation) failure(error, { login: true }); }
@@ -184,6 +207,7 @@
   }
   $('#allow').onclick = () => decide('allow');
   $('#deny').onclick = () => decide('deny');
+  $('#auth-logout').onclick = logout;
   for (const selector of ['#change-code', '#loading-change', '#result-change']) $(selector).onclick = editCode;
   $('#retry').onclick = inspect;
   function readHash() {
@@ -201,6 +225,22 @@
   });
   codeInput.value = normalize(readHash() || '');
   icons();
-  show(token ? 'code' : 'login');
-  if (token && codeInput.value) inspect();
+  async function restoreSession() {
+    token = await window.browserSession.ready() ? 'cookie' : null;
+    if (!token) { show('login'); return; }
+    const current = generation;
+    show('loading');
+    try {
+      await reportIdentity();
+      if (current !== generation) return;
+      identityReported = true;
+      if (codeInput.value) await inspect(); else show('code', true);
+    } catch (error) {
+      if (current !== generation) return;
+      if (error.status === 409) { show('code', true); message('设备身份冲突，请检查已有授权后重新配对。'); }
+      else failure(error);
+    }
+  }
+  restoreSession();
+  window.addEventListener('browser-session-expired', () => failure({ status: 401 }));
 })();

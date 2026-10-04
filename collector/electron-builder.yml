@@ -8,15 +8,23 @@ files:
   - LICENSE
   - desktop/main.mjs
   - desktop/manager.mjs
+  - desktop/owner-client.mjs
   - desktop/updater.mjs
+  - desktop/macos-policy.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
   - desktop/index.html
   - desktop/style.css
+  - desktop/workspace.css
+  - desktop/workspace.js
   - desktop/pair.css
   - desktop/brand.css
   - desktop/icon.png
   - desktop/tray.png
+  - desktop/trayTemplate.png
+  - desktop/trayTemplate@2x.png
+  - desktop/vendor/**
+  - public/device-view.js
   - src/**
   - mobile/android/app/src/main/assets/mobile-next/**
   - worker.production.example.json
@@ -41,6 +49,10 @@ mac:
   entitlements: desktop/entitlements.mac.plist
   entitlementsInherit: desktop/entitlements.mac.plist
   notarize: true
+  publish:
+    provider: generic
+    url: https://library.inspirai.store/updates/macos
+    useMultipleRangeRequest: false
 publish:
   provider: github
   owner: inspirai-store

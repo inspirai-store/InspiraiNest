@@ -629,7 +629,7 @@
       "version": "2.0.1",
       "license": "Python-2.0",
       "integrity": "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/asn1js",
@@ -741,7 +741,7 @@
       "version": "9.7.0",
       "license": "MIT",
       "integrity": "sha512-g/kR520giAFYkSXTzcmF3kqQq7wi8F6N6SzeDgZrqTBN+VHdmgWOyTdD1yD7AATDId/yXLvuP34CxW46/BwCdw==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/builtin-status-codes",
@@ -1164,6 +1164,20 @@
       "dev": true
     },
     {
+      "path": "node_modules/electron-updater",
+      "version": "6.8.10",
+      "license": "MIT",
+      "integrity": "sha512-6ZSwTUoBNtI1f9Pp8y6zCigD8LKV18Rb1+1A7sZzvKvA17o2sqSqKmm0t6uvKeF+HZqA4vsmw4qq0JSS241USQ==",
+      "dev": false
+    },
+    {
+      "path": "node_modules/electron-updater/node_modules/semver",
+      "version": "7.7.4",
+      "license": "ISC",
+      "integrity": "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==",
+      "dev": false
+    },
+    {
       "path": "node_modules/electron-winstaller",
       "version": "5.4.0",
       "license": "MIT",
@@ -1385,7 +1399,7 @@
       "version": "10.1.0",
       "license": "MIT",
       "integrity": "sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/fs.realpath",
@@ -1518,7 +1532,7 @@
       "version": "4.2.11",
       "license": "ISC",
       "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/has-flag",
@@ -1707,7 +1721,7 @@
       "version": "4.3.2",
       "license": "MIT",
       "integrity": "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/json-buffer",
@@ -1742,7 +1756,7 @@
       "version": "6.2.1",
       "license": "MIT",
       "integrity": "sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/jstoxml",
@@ -1763,7 +1777,7 @@
       "version": "1.0.5",
       "license": "MIT",
       "integrity": "sha512-0/BnGCCfyUMkBpeDgWihanIAF9JmZhHBgUhEqzvf+adhNGLoP6TaiI5oF8oyb3I45P+PcnrqihSf01M0l0G5+Q==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/locate-path",
@@ -1777,6 +1791,20 @@
       "version": "4.18.1",
       "license": "MIT",
       "integrity": "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==",
+      "dev": false
+    },
+    {
+      "path": "node_modules/lodash.escaperegexp",
+      "version": "4.1.2",
+      "license": "MIT",
+      "integrity": "sha512-TM9YBvyC84ZxE3rgfefxUWiQKLilstD6k7PTGt6wfbtXF8ixIJLOL3VYyV/z+ZiPLsVxAsKAFVwWlWeb2Y8Yyw==",
+      "dev": false
+    },
+    {
+      "path": "node_modules/lodash.isequal",
+      "version": "4.5.0",
+      "license": "MIT",
+      "integrity": "sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==",
       "dev": false
     },
     {
@@ -2064,6 +2092,20 @@
       "version": "1.1.0",
       "license": "MIT",
       "integrity": "sha512-ixCMMwnVxyHFQLQnINhmIpWqXIfS2YOXchwQrk+OFzmo6nDjQ0E4KXAyyUh0T0MZgV4bUhkRrAbVqlE4yLVq4A==",
+      "dev": false
+    },
+    {
+      "path": "node_modules/otpauth",
+      "version": "9.5.1",
+      "license": "MIT",
+      "integrity": "sha512-fJmDAHc8wImfqqqOXIlBvT1dEKrZK0Cmb2VEgScpNTolCz0PHh6ExUZGv4sLtOsWNaHCQlD+rRqaPgnoxFoZjQ==",
+      "dev": false
+    },
+    {
+      "path": "node_modules/otpauth/node_modules/@noble/hashes",
+      "version": "2.2.0",
+      "license": "MIT",
+      "integrity": "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==",
       "dev": false
     },
     {
@@ -2658,6 +2700,13 @@
       "dev": true
     },
     {
+      "path": "node_modules/tiny-typed-emitter",
+      "version": "2.1.0",
+      "license": "MIT",
+      "integrity": "sha512-qVtvMxeXbVej0cQWKqVSSAHmKZEHAvxdF8HEUBFWts8h+xEo5m/lEiPakuyZ3BnCBjOD8i24kzNOiOLLgsSxhA==",
+      "dev": false
+    },
+    {
       "path": "node_modules/tinyglobby",
       "version": "0.2.17",
       "license": "MIT",
@@ -2732,7 +2781,7 @@
       "version": "2.0.1",
       "license": "MIT",
       "integrity": "sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw==",
-      "dev": true
+      "dev": false
     },
     {
       "path": "node_modules/unzipper",

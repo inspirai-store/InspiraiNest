@@ -181,7 +181,8 @@ jobs:
           test -s desktop/dist/latest-mac.yml
           grep -F "InspiraiNest-v${version}-macOS-arm64.zip" desktop/dist/latest-mac.yml
           grep -F "InspiraiNest-v${version}-macOS-x64.zip" desktop/dist/latest-mac.yml
-          grep -F 'provider: github' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
+          grep -F 'provider: generic' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
+          grep -F 'https://library.inspirai.store/updates/macos' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
           (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)

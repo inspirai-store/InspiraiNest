@@ -86,6 +86,26 @@ export function unavailableBeforeWork(result) {
   });
 }
 
+export function describeAgentFailure(name, result) {
+  let error = '';
+  for (const line of result.tail.split('\n')) {
+    try {
+      const event = JSON.parse(line);
+      if (event.type === 'turn.failed' || event.type === 'error') {
+        let value = event.error?.message || event.message || '';
+        try { const nested = JSON.parse(value); value = nested.error?.message || nested.message || value; } catch {}
+        error = String(value).slice(0, 2000);
+      }
+    } catch {}
+  }
+  const details = { agent: name, exitCode: result.code, ...(error ? { error } : {}) };
+  if (/model.+(?:not supported|requires a newer version)|unsupported model/i.test(error)) return {
+    code: 'AGENT_MODEL', message: '本机采集程序配置的模型不可用，请更换当前账号支持的模型后继续', details };
+  if (/authentication|not logged in|sign in|\b401\b|expired.{0,30}token/i.test(error)) return {
+    code: 'AGENT_LOGIN', message: '本机采集程序的登录授权异常，请重新登录后继续', details };
+  return { code: 'AGENT_EXIT', message: `${name} 执行退出（${result.code}），成果已保留；请展开执行详情检查后继续`, details };
+}
+
 export async function detectAgents(profiles = {}) {
   const results = {};
   for (const name of Object.keys(defaults)) {

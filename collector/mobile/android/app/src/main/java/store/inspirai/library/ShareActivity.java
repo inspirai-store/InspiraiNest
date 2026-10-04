@@ -57,7 +57,7 @@ public class ShareActivity extends Screen {
             Credentials credentials=new Credentials(this);
             if(credentials.isPaired()) work(()->new Api(credentials).call("/api/state","GET",null),stateJSON->{
                 JSONArray devices=stateJSON.getJSONArray("devices"); List<String> names=new ArrayList<>();names.add("自动选择在线电脑"); String selected=draft.optString("deviceId"); int selection=0;
-                for(int i=0;i<devices.length();i++){JSONObject d=devices.getJSONObject(i);if(d.optString("role").equals("worker")&&d.isNull("revokedAt")){deviceIds.add(d.getString("id"));names.add(d.getString("name")+(d.optBoolean("online")?" · 在线":" · 离线，等待上线"));if(d.getString("id").equals(selected))selection=names.size()-1;}}
+                for(int i=0;i<devices.length();i++){JSONObject d=devices.getJSONObject(i);if(DevicePresentation.dispatchable(d)){deviceIds.add(d.getString("id"));names.add(d.getString("name")+" · "+DevicePresentation.status(d));if(d.getString("id").equals(selected))selection=names.size()-1;}}
                 if(!selected.isEmpty()&&selection==0){deviceIds.add(selected);names.add("先前选择的电脑（当前不可用）");selection=names.size()-1;}
                 device.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));device.setSelection(selection);
             }); else notice("尚未配对。草稿已保存在手机，可先保存再到资料库登录。");
@@ -71,7 +71,7 @@ public class ShareActivity extends Screen {
         try {
             String raw=original.isEmpty()?draft.getString("content"):original,addition=draft.getString("extra");String full=raw+(addition.isEmpty()?"":"\n\n补充要求：\n"+addition);
             if(full.trim().isEmpty()||full.length()>10000)throw new Exception("内容须为 1–10000 字符；原文仍保存在草稿中。");
-            Credentials c=new Credentials(this); if(!c.isPaired()){notice("请先返回资料库，用手机管理端配对码登录；草稿已保存。");return;}
+            Credentials c=new Credentials(this); if(!c.isPaired()){notice("请先返回资料库，用设备配对码登录；草稿已保存。");return;}
             JSONArray tagArray=new JSONArray();for(String t:draft.getString("tags").split("[,，]"))if(!t.trim().isEmpty())tagArray.put(t.trim());
             if(tagArray.length()>20)throw new Exception("最多填写 20 个标签");for(int i=0;i<tagArray.length();i++)if(tagArray.getString(i).length()>60)throw new Exception("单个标签最多 60 字符");
             JSONObject payload=new JSONObject().put("content",full).put("submissionId",id).put("autoArchive",draft.getBoolean("autoArchive")).put("tags",tagArray);

@@ -130,6 +130,62 @@ struct Device: Codable, Identifiable, Sendable {
     let revokedAt: String?
     let online: Bool?
     let agents: [String]?
+    var displayName: String? = nil
+    var deviceInfo: DeviceInformation? = nil
+    var identity: DeviceIdentitySummary? = nil
+    var lastSeen: String? = nil
+    var category: String? = nil
+    var workerAuthorized: Bool? = nil
+    var readyForDispatch: Bool? = nil
+    var browserExpiresAt: String? = nil
+    var loggedOutAt: String? = nil
+    var capabilities: [String]? = nil
+    var authorizationCategory: String {
+        if let category { return category }
+        if role == "reader" { return "integration" }
+        if role == "worker" || ["worker", "desktop"].contains(deviceInfo?.client.type ?? "") { return "desktop" }
+        if ["android", "ios"].contains(deviceInfo?.client.type ?? "") { return "mobile" }
+        return deviceInfo?.client.type == "web" ? "browser" : "unknown"
+    }
+    var canDispatch: Bool { revokedAt == nil && authorizationCategory == "desktop" && (workerAuthorized ?? (role == "worker")) }
+    var statusLabel: String {
+        if revokedAt != nil { return "已撤销" }
+        if authorizationCategory == "browser" {
+            if loggedOutAt != nil { return "已退出" }
+            let parser = ISO8601DateFormatter(); parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let browserExpiresAt, let expires = parser.date(from: browserExpiresAt), expires <= Date() { return "已过期" }
+            return "已登录"
+        }
+        if authorizationCategory == "integration" { return "只读授权" }
+        if authorizationCategory == "mobile" { return "已登录" }
+        if authorizationCategory != "desktop" { return "待识别" }
+        if !canDispatch { return "未启用工作节点" }
+        if online != true { return "工作节点离线" }
+        if agents?.isEmpty != false { return "无可用 Agent" }
+        return capabilities?.isEmpty != false ? "未启用处理能力" : "工作节点在线"
+    }
+}
+struct DevicePolicy: Codable, Sendable { let version: Int; let namespace: String }
+struct ScopedDeviceIdentity: Codable, Sendable, Equatable { let version: Int; let namespace: String; let source: String; let digest: String }
+struct DeviceIdentitySummary: Codable, Sendable {
+    let source: String
+    let shortId: String
+    var sourceName: String {
+        switch source {
+        case "smbios", "ioplatform": return "硬件标识"
+        case "android-id": return "系统标识"
+        case "keychain": return "Keychain 标识"
+        case "browser-profile": return "浏览器档案"
+        default: return "本地标识"
+        }
+    }
+}
+struct DeviceInformation: Codable, Sendable {
+    struct OperatingSystem: Codable, Sendable { let family: String; var version: String? = nil; var build: String? = nil }
+    struct Client: Codable, Sendable { let type: String; var name: String? = nil; var version: String? = nil }
+    let os: OperatingSystem
+    let client: Client
+    var model: String? = nil
 }
 struct TaskEvent: Codable, Sendable { let at: String; let state: String; let message: String }
 struct LibraryTask: Codable, Identifiable, Sendable {

@@ -122,7 +122,7 @@ class ConfigurationTests(unittest.TestCase):
         for contract in ["text(input.key, 'pairing key', 200)", "text(input.name, 'device name', 100)", "text(input.content, 'collection content', 10000)", "input.autoArchive ?? true", "t.submissionId === submissionId", "Path=/library/; HttpOnly; Secure; SameSite=Strict", "awaiting_review"]:
             self.assertIn(contract, server)
         client = (ROOT / "Shared/CollectorAPI.swift").read_text(encoding="utf-8")
-        self.assertIn('["key": key, "name": name]', client)
+        self.assertIn('["key": key, "name": name, "clientType": "ios"]', client)
         self.assertIn("completionHandler(nil)", client)
         self.assertIn('task.submissionId == submission.submissionId', client)
 

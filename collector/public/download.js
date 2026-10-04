@@ -46,7 +46,7 @@
     const firstCLI = Object.values(reader.cli || {}).find(Boolean);
     document.querySelector('#cli-status').textContent = firstCLI ? `v${firstCLI.version} · 预览版 · 按系统和芯片选择` : 'CLI 安装包暂未提供，可先从 GitHub 安装 Skill。';
     const release = data.android;
-    if (!release) { button.querySelector('span').textContent = '安装包暂未提供'; status.textContent = '你可以先继续使用网页版。'; return; }
+    if (!release) { button.querySelector('span').textContent = '安装包暂未提供'; status.textContent = '请选择其他已发布的客户端，或稍后重试。'; return; }
     button.href = release.browserUrl; button.setAttribute('download', release.filename); button.removeAttribute('aria-disabled');
     button.querySelector('span').textContent = '下载 Android 客户端';
     const size = release.size < 1048576 ? (release.size / 1024).toFixed(0) + ' KB' : (release.size / 1048576).toFixed(1) + ' MB';
@@ -55,5 +55,5 @@
     document.querySelector('#release-file').textContent = release.filename;
     document.querySelector('#release-sha').textContent = release.sha256;
     document.querySelector('#release-details').hidden = false;
-  }).catch(() => { button.querySelector('span').textContent = '暂时无法获取安装包'; status.textContent = '请检查连接后刷新页面，或继续使用网页版。'; document.querySelector('#cli-status').textContent = '暂时无法获取下载信息，请刷新重试；Skill 可从 GitHub 安装。'; });
+  }).catch(() => { button.querySelector('span').textContent = '暂时无法获取安装包'; status.textContent = '请检查连接后刷新页面。'; document.querySelector('#cli-status').textContent = '暂时无法获取下载信息，请刷新重试；Skill 可从 GitHub 安装。'; });
 })();

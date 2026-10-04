@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>授权只读连接 · InspiraiNest</title>
+  <title>授权只读连接 · 灵藏</title>
   <link rel="icon" href="/brand-icon.png"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/brand.css">
   <link rel="stylesheet" href="/authorize.css">
   <script defer src="/vendor/lucide.js"></script>
+  <script defer src="/device-identity.js"></script><script defer src="/browser-session.js"></script>
   <script defer src="/authorize.js"></script>
 </head>
 <body class="authorize-page">
   <header class="authorize-header">
-    <a class="brand" href="/" aria-label="InspiraiNest首页"><img src="/brand-icon.png" alt=""><span>InspiraiNest</span></a>
-    <a class="back-link" href="/">返回资料库 <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+    <a class="brand" href="/" aria-label="灵藏首页"><img src="/brand-icon.png" alt=""><span>灵藏</span></a>
+    <a class="back-link" href="/">资料库 <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
   </header>
   <main class="authorize-main">
   <article class="authorize-card" aria-labelledby="page-title">
@@ -22,9 +23,12 @@
       <h1 id="page-title" tabindex="-1">授权 CLI 读取资料库</h1>
       <p id="page-description">确认连接信息，为你的工具开启资料库只读访问。</p>
     </div>
+    <div id="auth-session" class="session-actions" hidden><a href="/security">账户安全</a><button id="auth-logout" type="button" class="text-button"><i data-lucide="log-out" aria-hidden="true"></i>退出登录</button></div>
     <form id="auth-login" hidden>
-      <label for="owner-key">管理密钥或管理端配对码</label>
+      <label for="owner-key">管理密钥或设备配对码</label>
       <input id="owner-key" name="key" type="password" autocomplete="current-password" aria-describedby="login-note" required>
+      <label for="login-factor">动态码或恢复码（已绑定时填写）</label>
+      <input id="login-factor" name="factor" autocomplete="one-time-code" maxlength="80" spellcheck="false">
       <p id="login-note" class="field-note">使用资料库现有的管理登录凭据。登录后仍需核对并确认授权。</p>
       <button type="submit" class="primary wide">登录并继续</button>
     </form>

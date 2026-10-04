@@ -88,13 +88,13 @@ final class ShareModel: ObservableObject {
             }
             let box = try Outbox.shared()
             let cached = try box.cachedDevices(origin: credential.origin)
-            devices = cached.filter { $0.role == "worker" && $0.revokedAt == nil }
+            devices = cached.filter { $0.canDispatch }
             dispatchOrigin = credential.origin
             dispatchNotice = "显示缓存电脑列表；正在刷新。离线仍保留你的选择。"
             let state = try await CollectorAPI(origin: credential.server, token: credential.token, timeout: 5).state()
             guard state.me.role == "owner", state.me.id == credential.deviceID else { throw CollectorError.http(403) }
             try box.cacheDevices(state.devices, origin: credential.origin)
-            devices = state.devices.filter { $0.role == "worker" && $0.revokedAt == nil }
+            devices = state.devices.filter { $0.canDispatch }
             dispatchNotice = "电脑在线状态来自最近一次刷新。指定电脑离线时任务会等待，不会自动换机。"
         } catch { dispatchNotice = "电脑列表未能刷新，保留缓存与当前选择。自动派发仍可用。" }
     }

@@ -6,9 +6,7 @@
   const states = { awaiting_review: '待确认', queued: '待分配', assigned: '已分配', running: '处理中', uploading: '上传中', waiting_action: '待操作', failed: '失败', completed: '已完成', cancelled: '已取消' };
   const types = { auto: '自动识别', article: '文章', webpage: '网页', video: '视频', repository: '代码项目', document: '文档', audio: '音频', image: '图片', note: '笔记', other: '其他' };
   const date = value => new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
-  let token = sessionStorage.getItem('collector-token');
-  let installationId = localStorage.getItem('collector-installation-id');
-  if (!installationId) { installationId = crypto.randomUUID(); localStorage.setItem('collector-installation-id', installationId); }
+  let token = null;
   let infoSent = false;
   let requestedEntry = new URLSearchParams(location.search).get('entry');
   let snapshot;
@@ -25,15 +23,15 @@
     noticeTimer = setTimeout(() => $('#notice').hidden = true, 3500);
   }
   async function api(route, method = 'GET', data) {
-    const res = await fetch('/api' + route, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: data === undefined ? undefined : JSON.stringify(data) });
+    const res = await fetch('/api' + route, { method, headers: { 'Content-Type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) });
     const value = await res.json();
     if (!res.ok) {
-      if (res.status === 401 && route !== '/pair') logout();
-      throw new Error(value.error || '请求失败');
+      if (res.status === 401 && route !== '/pair' && !value.code) logout();
+      throw Object.assign(new Error(value.error || '请求失败'), { status: res.status });
     }
     return value;
   }
-  function logout() { fetch('/api/library-logout', { method: 'POST' }); document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; sessionStorage.removeItem('collector-token'); snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); }
+  async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); }
   const badge = state => `<span class="badge ${esc(state)}">${states[state] || esc(state)}</span>`;
   function render() {
     const { devices, tasks, archives } = snapshot;
@@ -41,14 +39,14 @@
     $('#device-count').textContent = devices.filter(d => !d.revokedAt).length;
     const unique = [...new Map([...archives].reverse().map(a => [a.entryId, a])).values()].reverse();
     $('#archive-count').textContent = unique.length;
-    $('#queue-summary').textContent = `${devices.filter(d => d.role === 'worker' && d.online).length} 台电脑在线 · ${tasks.filter(t => t.state === 'queued').length} 项待分配`;
+    $('#queue-summary').textContent = `${devices.filter(d => window.deviceView.dispatchable(d) && d.online).length} 个工作节点在线 · ${tasks.filter(t => t.state === 'queued').length} 项待分配`;
     const filter = $('#status-filter').value;
     const filtered = tasks.filter(t => filter === 'all' || (filter === 'running' ? ['running', 'assigned', 'uploading'].includes(t.state) : t.state === filter));
     $('#tasks').innerHTML = filtered.map(task => {
       const machine = devices.find(d => d.id === task.deviceId);
       return `<div class="row">${icon('link')}<div class="row-main"><button class="row-title" data-task="${task.id}">${esc((task.content ?? task.url).slice(0, 180))}</button><p>${esc(task.scenario || '通用摘要')}</p><small>${types[task.type]} · ${date(task.createdAt)} · ${machine ? esc(machine.name) + (machine.online ? '' : '（离线，等待恢复）') : task.deviceId ? '原设备已移除' : '等待电脑'}${task.agent ? ' · ' + esc(task.agent) : ''}</small></div>${badge(task.state)}</div>`;
     }).join('') || '<div class="empty">暂无采集任务</div>';
-    $('#devices').innerHTML = devices.map(device => `<div class="row">${icon(device.role === 'worker' ? 'monitor' : 'smartphone')}<div class="row-main"><strong>${esc(device.name)}</strong><p><span class="badge ${device.online ? 'online' : ''}">${device.role === 'reader' ? (Date.parse(device.expiresAt) > Date.now() ? '只读授权' : '已过期') : device.role === 'owner' ? '已授权' : device.online ? '在线' : '离线'}</span> ${device.role === 'reader' ? '只读 CLI' : device.role === 'worker' ? '采集端' : '管理端'}${device.id === snapshot.me.id ? ' · 当前设备' : ''}</p><small>${esc([device.platform, device.system, device.installationKey ? `设备标识 ${device.installationKey.slice(0, 10)}` : '旧版授权', device.role === 'reader' ? `授权 ${date(device.createdAt)} · 到期 ${date(device.expiresAt)} · 最近访问 ${date(device.lastSeen)}` : device.role === 'worker' ? (device.capabilities || []).map(t => types[t]).join('、') + ' · ' + (device.agents.join(' / ') || '无可用 Agent') : date(device.createdAt)].filter(Boolean).join(' · '))}</small></div><button class="icon danger" data-revoke="${device.id}" title="撤销设备" aria-label="撤销 ${esc(device.name)}">${icon('shield-off')}</button></div>`).join('');
+    $('#devices').innerHTML = window.deviceView.groups(devices).map(group => `<section class="device-group" data-category="${group.key}"><h2>${group.title}<span>${group.devices.length}</span></h2>${group.devices.map(device => `<div class="row">${icon(({desktop:'monitor',mobile:'smartphone',browser:'globe',integration:'terminal'})[group.key] || 'help-circle')}<div class="row-main"><strong>${esc(device.displayName || device.name)}</strong><p><span class="badge ${device.online ? 'online' : ''}">${window.deviceView.status(device)}</span>${device.id === snapshot.me.id ? ' · 当前登录' : ''}${device.name && device.name !== device.displayName ? ' · 备注：' + esc(device.name) : ''}</p><small>${esc([device.deviceInfo?.model, device.deviceInfo?.client.version ? `客户端 ${device.deviceInfo.client.version}` : null, device.identity ? `${device.identity.source} · ${device.identity.shortId}` : '旧版授权', device.browserExpiresAt ? `有效至 ${date(device.browserExpiresAt)}` : device.role === 'reader' ? `到期 ${date(device.expiresAt)}` : null, window.deviceView.dispatchable(device) ? (device.capabilities || []).map(t => types[t]).join('、') + ' · ' + ((device.agents || []).join(' / ') || '无可用 Agent') : null, device.lastSeen ? `最近活动 ${date(device.lastSeen)}` : null].filter(Boolean).join(' · '))}</small></div><button class="icon danger" data-revoke="${device.id}" title="撤销授权" aria-label="撤销 ${esc(device.name)}">${icon('shield-off')}</button></div>`).join('') || '<p class="empty">暂无授权</p>'}</section>`).join('');
     const query = $('#search').value.trim().toLowerCase();
     $('#archives').innerHTML = unique.filter(a => [a.meta.title, a.meta.summary, ...a.meta.tags].join(' ').toLowerCase().includes(query)).map(a => `<div class="row">${icon('file-text')}<div class="row-main"><button class="row-title" data-archive="${a.id}">${esc(a.meta.title)}</button><p>${esc(a.meta.summary)}</p><small>${types[a.meta.type]} · ${a.meta.collected_at ? esc(a.meta.collected_at.includes('T') ? date(a.meta.collected_at) : a.meta.collected_at) : '时间未记录'} · ${esc(a.meta.tags.join(' / '))}</small></div><span class="badge">${a.meta.status === 'archived' ? '已归档' : '待补齐'}</span></div>`).join('') || '<div class="empty">暂无匹配的归档资料</div>';
     icons();
@@ -57,14 +55,17 @@
   let refreshing = false;
   async function refresh() {
     if (!token || refreshing) return;
+    const currentToken = token;
     refreshing = true;
     try {
       if (!infoSent) {
-        infoSent = true;
-        try { await api('/devices/me/info', 'POST', { installationId, platform: navigator.userAgentData?.platform || navigator.platform || 'browser', system: '浏览器' }); }
+        try { await api('/devices/me/info', 'POST', await window.browserDevice.metadata()); if (token === currentToken) infoSent = true; }
         catch (error) { notice(`设备信息未同步：${error.message}`); }
       }
-      snapshot = await api('/state'); $('#login-view').hidden = true; $('#app').hidden = false; $('#connection').textContent = '已连接'; render();
+      if (token !== currentToken) return;
+      const next = await api('/state');
+      if (token !== currentToken) return;
+      snapshot = next; $('#login-view').hidden = true; $('#app').hidden = false; $('#connection').textContent = '已连接'; render();
       if (requestedEntry) {
         document.querySelector('[data-view=archives]').click();
         $('#library-frame').src = '/library/#entry=' + encodeURIComponent(requestedEntry);
@@ -138,10 +139,10 @@
   function download(url, name) { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); }
   $('#login-form').addEventListener('submit', async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true; $('#login-error').textContent = '';
-    try { const data = await api('/pair', 'POST', { ...Object.fromEntries(new FormData(event.target)), installationId, platform: navigator.userAgentData?.platform || navigator.platform || 'browser', system: '浏览器' }); if (data.device.role !== 'owner') throw new Error('请使用管理端配对码'); token = data.token; sessionStorage.setItem('collector-token', token); event.target.key.value = ''; await refresh(); }
-    catch (error) { $('#login-error').textContent = error.message; } finally { button.disabled = false; }
+    try { const fields = Object.fromEntries(new FormData(event.target)); const factor = fields.factor.trim(); delete fields.factor; const data = await api('/pair', 'POST', { ...fields, ...(/^\d{6}$/.test(factor) ? { otp: factor } : { recoveryCode: factor }), ...await window.browserDevice.metadata() }); if (data.device.role !== 'owner') throw new Error('配对权限不匹配，请生成新的设备配对码'); window.browserSession.adopt(); token = 'cookie'; infoSent = true; event.target.key.value = ''; event.target.elements.factor.value = ''; await refresh(); }
+    catch (error) { $('#login-error').textContent = error.status === 409 ? '设备身份冲突，请检查已有授权后重新配对。' : error.message; } finally { button.disabled = false; }
   });
-  $('#new-task').onclick = () => { $('#dispatch-device').innerHTML = '<option value="">自动</option>' + snapshot.devices.filter(d => d.role === 'worker' && !d.revokedAt).map(d => `<option value="${esc(d.id)}">${esc(d.name)}${d.online ? '' : '（离线）'}</option>`).join(''); $('#task-form').dataset.submission = crypto.randomUUID(); $('#task-dialog').showModal(); };
+  $('#new-task').onclick = () => { $('#dispatch-device').innerHTML = '<option value="">自动</option>' + snapshot.devices.filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(d.name)}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); $('#task-form').dataset.submission = crypto.randomUUID(); $('#task-dialog').showModal(); };
   $('#task-form').addEventListener('submit', async event => {
     event.preventDefault(); event.submitter.disabled = true; $('#task-error').textContent = '';
     try { await api('/tasks', 'POST', { ...Object.fromEntries(new FormData(event.target)), autoArchive: event.target.elements.autoArchive.checked, tags: [...new Set(event.target.elements.tags.value.split(/[,，\n]/).map(t => t.trim()).filter(Boolean))], submissionId: event.target.dataset.submission }); event.target.reset(); $('#task-dialog').close(); await refresh(); notice('任务已提交'); }
@@ -151,12 +152,11 @@
   function clearPairing() { clearTimeout(pairingExpiryTimer); $('#pair-result').hidden = true; $('#pair-key').value = ''; $('#pair-key').type = 'password'; $('#pair-qr').removeAttribute('src'); $('#pair-qr-wrap').hidden = true; }
   $('#pair-device').onclick = () => { clearPairing(); $('#pair-dialog').showModal(); };
   $('#pair-dialog').addEventListener('close', clearPairing);
-  $('#pair-form').elements.role.addEventListener('change', clearPairing);
   $('#pair-form').addEventListener('submit', async event => {
     event.preventDefault(); event.submitter.disabled = true;
     clearPairing();
     try {
-      const result = await api('/pairings', 'POST', Object.fromEntries(new FormData(event.target)));
+      const result = await api('/pairings', 'POST', {});
       if (!$('#pair-dialog').open) return;
       $('#pair-key').value = result.key; $('#pair-expiry').textContent = '一次性使用 · 有效至 ' + date(result.expiresAt); $('#pair-result').hidden = false;
       if (result.qrDataUrl) { $('#pair-qr').src = result.qrDataUrl; $('#pair-qr-wrap').hidden = false; }
@@ -188,5 +188,6 @@
       if (d.retry || d.cancel) { await api(`/tasks/${d.retry || d.cancel}/${d.retry ? 'retry' : 'cancel'}`, 'POST', {}); $('#detail-dialog').close(); await refresh(); }
     } catch (error) { notice(error.message); }
   });
-  icons(); refresh(); setInterval(refresh, 5000);
+  icons(); window.browserSession.ready().then(active => { token = active ? 'cookie' : null; refresh(); }); setInterval(refresh, 5000);
+  window.addEventListener('browser-session-expired', logout);
 })();

@@ -3,6 +3,9 @@
   host.textContent = '正在载入资料…';
   try {
     const token = sessionStorage.getItem('collector-token');
+    const script = document.createElement('script'); script.src = '/browser-session.js';
+    await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.append(script); });
+    await window.browserSession.ready();
     if (token) {
       const session = await fetch('/api/library-session', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       if (!session.ok) throw new Error('请先登录采集中心');
@@ -19,8 +22,8 @@
     window.LIBRARY_DATA = await response.json();
     window.LIBRARY_REMOTE = true;
     async function archiveAction(route, method = 'GET') {
-      if (!token) throw new Error('请返回采集中心登录后操作');
-      const response = await fetch('/api/' + route, { method, headers: { Authorization: `Bearer ${token}` } });
+      if (!window.browserSession.active && !token) throw new Error('请返回采集中心登录后操作');
+      const response = await fetch('/api/' + route, { method, headers: window.browserSession.active ? {} : { Authorization: `Bearer ${token}` } });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '操作失败，请重试');
       return result;
@@ -54,9 +57,9 @@
         }
       } catch (error) { list.textContent = error.message; }
     };
-    const script = document.createElement('script');
-    script.src = '/library/assets/library.js';
-    document.head.append(script);
+    const readerScript = document.createElement('script');
+    readerScript.src = '/library/assets/library.js';
+    document.head.append(readerScript);
   } catch (error) {
     host.textContent = error.message;
     const link = document.createElement('a');
