@@ -1,3 +1,4 @@
+const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -29,7 +30,7 @@ const { _electron } = require('playwright');
     await until(() => app.windows().some(p => p.url().startsWith('file:') && !p.url().includes('compact=1')));
     const page = app.windows().find(p => p.url().startsWith('file:') && !p.url().includes('compact=1'));
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
     await page.locator('#pair-worker [name=server]').fill(server);
     await page.locator('#pair-worker [name=name]').fill('隔离日志测试电脑');
     await page.locator('#pair-worker [name=key]').fill(pairing.key);

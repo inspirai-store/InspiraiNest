@@ -1,3 +1,4 @@
+const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -32,26 +33,28 @@ const { _electron } = require('playwright');
     await until(() => app.windows().some(window => window.url().startsWith('file:') && !window.url().includes('compact=1')));
     const page = app.windows().find(window => window.url().startsWith('file:') && !window.url().includes('compact=1'));
     assert.ok(page, 'Main Worker window missing');
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
     await page.locator('#pair-worker').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-action=start]').isDisabled(), true);
+    await setTheme(page,'dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
-    await page.locator('#theme-toggle').click();
+    await setTheme(page);
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
-    assert.equal(await page.locator('#theme-toggle').getAttribute('aria-label'), '切换到黑夜模式');
+    assert.equal(await page.locator('[name=themeMode][value=light]').isChecked(), true);
     assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
     assert.equal(await page.title(), '灵藏 · 桌面工作台');
     const appPath = await app.evaluate(({ app }) => app.getAppPath());
     assert.equal(fs.existsSync(path.join(appPath, 'public/device-view.js')), true, 'Missing authorization presentation helper');
+    assert.equal(fs.existsSync(path.join(appPath, 'public/pairing-dialog.css')), true, 'Missing pairing dialog stylesheet');
     assert.equal(fs.existsSync(path.join(appPath, '..', 'library', 'scripts', 'catalog.mjs')), true);
-    for (const file of ['owner-client.mjs','updater.mjs','workspace.css','workspace.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
+    for (const file of ['settings.mjs','settings-renderer.js','nodes.js','owner-client.mjs','updater.mjs','workspace.css','workspace.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
       assert.equal(fs.existsSync(path.join(appPath, 'desktop', file)), true, `Missing packaged resource: ${file}`);
     }
     assert.equal(fs.existsSync(path.join(appPath, '..', 'app-update.yml')), true, 'Missing packaged update provider configuration');
-    await page.locator('[data-view=updates]').click();
+    await showSettings(page,'updates');
     await page.waitForFunction(() => document.querySelector('#update-current').textContent.startsWith('v'));
     assert.equal(await page.locator('#update-check').isEnabled(), true);
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
     await page.locator('#pair-worker [name=server]').fill(server);
     await page.locator('#pair-worker [name=name]').fill('packaged-test-worker');
     await page.locator('#pair-worker [name=key]').fill(pairing.key);

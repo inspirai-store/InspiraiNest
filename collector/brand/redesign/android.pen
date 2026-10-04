@@ -1,0 +1,2650 @@
+{
+  "version": "2.17",
+  "children": [
+    {
+      "type": "frame",
+      "id": "AVdVL",
+      "x": 0,
+      "y": 0,
+      "name": "01 资料库列表浅色 393x852",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "$bg-light",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "aONsU",
+          "name": "状态栏 浅色",
+          "width": "fill_container",
+          "height": 44,
+          "padding": [
+            13,
+            32,
+            0,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "V5nvh",
+              "name": "状态栏时间 浅色",
+              "fill": "$ink-light",
+              "content": "9:41",
+              "fontFamily": "$font-sans",
+              "fontSize": 15,
+              "fontWeight": "800"
+            },
+            {
+              "type": "frame",
+              "id": "unf7P",
+              "name": "状态栏弹性间隔 浅色",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "plEXm",
+              "name": "状态栏图标 wifi",
+              "width": 18,
+              "height": 18,
+              "icon": "wifi",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "icon",
+              "id": "GgAK3",
+              "name": "状态栏图标 triangle",
+              "width": 15,
+              "height": 18,
+              "icon": "triangle",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "icon",
+              "id": "HSYU5",
+              "name": "状态栏图标 battery-full",
+              "width": 18,
+              "height": 18,
+              "icon": "battery-full",
+              "library": "lucide",
+              "fill": "$ink-light"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "izrQH",
+          "name": "资料库页头",
+          "width": "fill_container",
+          "height": 76,
+          "padding": [
+            8,
+            32,
+            10,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "IwETN",
+              "name": "资料库标题",
+              "fill": "$ink-light",
+              "content": "资料库",
+              "fontFamily": "$font-sans",
+              "fontSize": 36,
+              "fontWeight": "900"
+            },
+            {
+              "type": "frame",
+              "id": "bI4Rc",
+              "name": "页头间隔",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "JWypm",
+              "name": "页头图标 刷新",
+              "width": 27,
+              "height": 48,
+              "icon": "refresh-cw",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "icon",
+              "id": "jpgw5",
+              "name": "页头图标 新建",
+              "width": 27,
+              "height": 48,
+              "icon": "plus",
+              "library": "lucide",
+              "fill": "$accent-light"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wC8Ck",
+          "name": "搜索框",
+          "width": 329,
+          "height": 62,
+          "fill": "$surface-light",
+          "cornerRadius": 10,
+          "stroke": "$line-light",
+          "strokeWidth": 1,
+          "gap": 12,
+          "padding": [
+            0,
+            18
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "J8Ob7",
+              "name": "搜索图标",
+              "width": 23,
+              "height": 23,
+              "icon": "search",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "text",
+              "id": "b7Yosm",
+              "name": "搜索占位",
+              "fill": "$ink-light",
+              "content": "搜索标题、标签或正文",
+              "fontFamily": "$font-sans",
+              "fontSize": 17,
+              "fontWeight": "800"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "i30aX",
+          "name": "分段与筛选",
+          "width": "fill_container",
+          "height": 64,
+          "stroke": "$line-light",
+          "strokeWidth": {
+            "bottom": 1
+          },
+          "gap": 34,
+          "padding": [
+            0,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "aNYKb",
+              "name": "标签 全部",
+              "height": 48,
+              "layout": "vertical",
+              "gap": 7,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "d2ugFq",
+                  "name": "标签文字 全部",
+                  "fill": "$accent-light",
+                  "content": "全部",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 18,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "SBuMg",
+                  "name": "标签下划线 全部",
+                  "fill": "$accent-light",
+                  "width": 42,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jacxB",
+              "name": "标签 收藏",
+              "height": 48,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "Peehb",
+                  "name": "标签图标 收藏",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "star",
+                  "library": "lucide",
+                  "fill": "$ink-light"
+                },
+                {
+                  "type": "text",
+                  "id": "S8oFN7",
+                  "name": "标签文字 收藏",
+                  "fill": "$ink-light",
+                  "content": "收藏",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 16,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "lXnRQ",
+                  "name": "标签下划线 收藏",
+                  "fill": "#00000000",
+                  "width": 42,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "L2EcrY",
+              "name": "标签 筛选",
+              "height": 48,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OzpGh",
+                  "name": "标签文字 筛选",
+                  "fill": "$ink-light",
+                  "content": "筛选",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 16,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "grXm2",
+                  "name": "标签下划线 筛选",
+                  "fill": "#00000000",
+                  "width": 42,
+                  "height": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "vD3fS",
+          "name": "资料库列表",
+          "width": "fill_container",
+          "height": 524,
+          "layout": "vertical",
+          "padding": [
+            14,
+            32,
+            0,
+            32
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "TFaLr",
+              "name": "列表数量说明",
+              "fill": "$ink-light",
+              "content": "46 条资料 · 最近收集",
+              "fontFamily": "$font-sans",
+              "fontSize": 16,
+              "fontWeight": "800"
+            },
+            {
+              "type": "frame",
+              "id": "fzCqn",
+              "name": "资料行 1",
+              "width": "fill_container",
+              "height": 136,
+              "stroke": "$line-light",
+              "strokeWidth": {
+                "bottom": 1
+              },
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "qKLm1",
+                  "name": "资料文字 1",
+                  "width": 220,
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Y0BJsN",
+                      "name": "资料来源 1",
+                      "fill": "$ink-secondary-light",
+                      "content": "视频 · bilibili",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kraTb",
+                      "name": "资料标题 1",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+                      "lineHeight": 1.12,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 16,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YuNw7",
+                      "name": "资料摘要 1",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "介绍 KVMem 将历史 KV 保存在主机内存，按当前问题检索有限 GPU 工作集...",
+                      "lineHeight": 1.08,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "PZEoJ",
+                      "name": "资料标签 1",
+                      "fill": "$ink-light",
+                      "content": "#本地AI   #大模型部署",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "y1QWhF",
+                  "name": "资料缩略图 1",
+                  "width": 82,
+                  "height": 68,
+                  "fill": "#172124",
+                  "cornerRadius": 7,
+                  "stroke": "$line-light",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "OwC7I",
+                      "name": "缩略图图标 1",
+                      "width": 24,
+                      "height": 24,
+                      "icon": "server",
+                      "library": "lucide",
+                      "fill": "#FFFDF8"
+                    },
+                    {
+                      "type": "text",
+                      "id": "WMrtv",
+                      "name": "缩略图时间 1",
+                      "fill": "#FFFDF8",
+                      "content": "11:22",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 14,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UiLPg",
+              "name": "资料行 2",
+              "width": "fill_container",
+              "height": 136,
+              "stroke": "$line-light",
+              "strokeWidth": {
+                "bottom": 1
+              },
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Js8JI",
+                  "name": "资料文字 2",
+                  "width": 220,
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "AQWjW",
+                      "name": "资料来源 2",
+                      "fill": "$ink-secondary-light",
+                      "content": "视频 · 已归档",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "wWmTL",
+                      "name": "资料标题 2",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "前端狂喜！超过7000个UI组件直接免费开源！",
+                      "lineHeight": 1.12,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 16,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FdHlf",
+                      "name": "资料摘要 2",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "约40秒视频介绍 Uiverse / Galaxy 的组件搜索、交互预览、复制代码及社区投稿...",
+                      "lineHeight": 1.08,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CzJpC",
+                      "name": "资料标签 2",
+                      "fill": "$ink-light",
+                      "content": "前端开发 / UI组件",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "K3bLxP",
+                  "name": "资料缩略图 2",
+                  "width": 82,
+                  "height": 68,
+                  "fill": "#222822",
+                  "cornerRadius": 7,
+                  "stroke": "$line-light",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "VbdK5",
+                      "name": "缩略图图标 2",
+                      "width": 24,
+                      "height": 24,
+                      "icon": "panels-top-left",
+                      "library": "lucide",
+                      "fill": "#FFFDF8"
+                    },
+                    {
+                      "type": "text",
+                      "id": "QQ41b",
+                      "name": "缩略图时间 2",
+                      "fill": "#FFFDF8",
+                      "content": "09-24",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 14,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "E86eiy",
+              "name": "资料行 3",
+              "width": "fill_container",
+              "height": 136,
+              "stroke": "$line-light",
+              "strokeWidth": {
+                "bottom": 1
+              },
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ANo07",
+                  "name": "资料文字 3",
+                  "width": 220,
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "E9GDMQ",
+                      "name": "资料来源 3",
+                      "fill": "$ink-secondary-light",
+                      "content": "视频 · bilibili.com",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "gHANn",
+                      "name": "资料标题 3",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "CardForge：角色卡、小说世界书与变量制作工具",
+                      "lineHeight": 1.12,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 16,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "text",
+                      "id": "A9hSl",
+                      "name": "资料摘要 3",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "拆解 V2 角色卡、世界书、MVU、状态栏和小说五类抽取...",
+                      "lineHeight": 1.08,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "xVkux",
+                      "name": "资料标签 3",
+                      "fill": "$ink-light",
+                      "content": "前端开发 / UI组件",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "jeXbQ",
+                  "name": "资料缩略图 3",
+                  "width": 82,
+                  "height": 68,
+                  "fill": "#FFFDF8",
+                  "cornerRadius": 7,
+                  "stroke": "$line-light",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "JdCGF",
+                      "name": "缩略图图标 3",
+                      "width": 24,
+                      "height": 24,
+                      "icon": "book-open",
+                      "library": "lucide",
+                      "fill": "$accent-light"
+                    },
+                    {
+                      "type": "text",
+                      "id": "A2BK7N",
+                      "name": "缩略图时间 3",
+                      "fill": "$ink-light",
+                      "content": "09-24",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 14,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "FCqrc",
+          "name": "底部导航 资料库选中",
+          "width": "fill_container",
+          "height": 82,
+          "fill": "$surface-light",
+          "stroke": "$line-light",
+          "strokeWidth": {
+            "top": 1
+          },
+          "justifyContent": "space_around",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "VsOuc",
+              "name": "底部 资料库",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "giFPu",
+                  "name": "底部图标 资料库",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-library.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "UgFPZ",
+                  "name": "底部文字 资料库",
+                  "fill": "$accent-light",
+                  "content": "资料库",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "OD2zZ",
+                  "name": "底部选中线 资料库",
+                  "fill": "$accent-light",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "F5awM",
+              "name": "底部 采集",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IZwKg",
+                  "name": "底部图标 采集",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-collect.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "juUf6",
+                  "name": "底部文字 采集",
+                  "fill": "$ink-light",
+                  "content": "采集",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "e5PIuZ",
+                  "name": "底部选中线 采集",
+                  "fill": "#00000000",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "DEApq",
+              "name": "底部 我的",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dZAES",
+                  "name": "底部图标 我的",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-mine.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "Yj6fT",
+                  "name": "底部文字 我的",
+                  "fill": "$ink-light",
+                  "content": "我的",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "HlVzE",
+                  "name": "底部选中线 我的",
+                  "fill": "#00000000",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "x9ovZY",
+      "x": 473,
+      "y": 0,
+      "name": "02 视频阅读页深色 393x852",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "$bg-dark",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "a2HtPI",
+          "name": "状态栏 深色",
+          "width": "fill_container",
+          "height": 44,
+          "padding": [
+            13,
+            32,
+            0,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "hkR1j",
+              "name": "状态栏时间 深色",
+              "fill": "$ink-dark",
+              "content": "9:41",
+              "fontFamily": "$font-sans",
+              "fontSize": 15,
+              "fontWeight": "800"
+            },
+            {
+              "type": "frame",
+              "id": "iSLdj",
+              "name": "状态栏间隔 深色",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "gPRJO",
+              "name": "深色状态图标 wifi",
+              "width": 18,
+              "height": 18,
+              "icon": "wifi",
+              "library": "lucide",
+              "fill": "$ink-dark"
+            },
+            {
+              "type": "icon",
+              "id": "J3edN",
+              "name": "深色状态图标 triangle",
+              "width": 15,
+              "height": 18,
+              "icon": "triangle",
+              "library": "lucide",
+              "fill": "$ink-dark"
+            },
+            {
+              "type": "icon",
+              "id": "KArc9",
+              "name": "深色状态图标 battery-full",
+              "width": 18,
+              "height": 18,
+              "icon": "battery-full",
+              "library": "lucide",
+              "fill": "$ink-dark"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "aQJIF",
+          "name": "阅读顶栏",
+          "width": "fill_container",
+          "height": 74,
+          "gap": 18,
+          "padding": [
+            10,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "WHAKd",
+              "name": "返回",
+              "width": 27,
+              "height": 48,
+              "icon": "arrow-left",
+              "library": "lucide",
+              "fill": "$ink-dark"
+            },
+            {
+              "type": "text",
+              "id": "vxO56",
+              "name": "阅读类型标题",
+              "fill": "$ink-dark",
+              "content": "视频",
+              "fontFamily": "$font-sans",
+              "fontSize": 24,
+              "fontWeight": "900"
+            },
+            {
+              "type": "frame",
+              "id": "x5Kbfj",
+              "name": "阅读顶栏间隔",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "bkM9j",
+              "name": "阅读收藏",
+              "width": 27,
+              "height": 48,
+              "icon": "star",
+              "library": "lucide",
+              "fill": "$highlight-dark"
+            },
+            {
+              "type": "icon",
+              "id": "GCY2z",
+              "name": "阅读更多",
+              "width": 27,
+              "height": 48,
+              "icon": "ellipsis",
+              "library": "lucide",
+              "fill": "$ink-dark"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "cCjgg",
+          "name": "阅读内容区",
+          "width": "fill_container",
+          "height": 652,
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            20,
+            32,
+            0,
+            32
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "lOI6o",
+              "name": "阅读标题",
+              "fill": "$ink-dark",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+              "lineHeight": 1.32,
+              "fontFamily": "$font-sans",
+              "fontSize": 29,
+              "fontWeight": "900"
+            },
+            {
+              "type": "text",
+              "id": "KjGV1",
+              "name": "阅读来源",
+              "fill": "$ink-dark",
+              "content": "FirePKU · 收集于 09-24",
+              "fontFamily": "$font-sans",
+              "fontSize": 21,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "GjXCx",
+              "name": "阅读标签页",
+              "width": "fill_container",
+              "height": 66,
+              "stroke": "$line-dark",
+              "strokeWidth": {
+                "bottom": 1
+              },
+              "gap": 58,
+              "alignItems": "end",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "nHrCU",
+                  "name": "阅读标签 摘要",
+                  "width": 65,
+                  "height": 58,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "oVWsn",
+                      "name": "阅读标签文字 摘要",
+                      "fill": "$ink-dark",
+                      "content": "摘要",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 22,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 2,
+                      "id": "a5Dda",
+                      "name": "阅读标签下划线 摘要",
+                      "fill": "$accent-dark",
+                      "width": "fill_container",
+                      "height": 3
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "EYPlz",
+                  "name": "阅读标签 英文",
+                  "width": 65,
+                  "height": 58,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "qJ5q6",
+                      "name": "阅读标签文字 原文",
+                      "fill": "$ink-dark",
+                      "content": "原文",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 22,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 2,
+                      "id": "QXyDA",
+                      "name": "阅读标签下划线 英文",
+                      "fill": "#00000000",
+                      "width": "fill_container",
+                      "height": 3
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G5SsMs",
+                  "name": "阅读标签 转录",
+                  "width": 65,
+                  "height": 58,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "qVus0",
+                      "name": "阅读标签文字 转录",
+                      "fill": "$ink-dark",
+                      "content": "转录",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 22,
+                      "fontWeight": "900"
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 2,
+                      "id": "U1EgxB",
+                      "name": "阅读标签下划线 转录",
+                      "fill": "#00000000",
+                      "width": "fill_container",
+                      "height": 3
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "v8Kuv",
+              "name": "阅读正文",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 18,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "D86cE",
+                  "name": "一句话总结标题",
+                  "fill": "$ink-dark",
+                  "content": "一句话总结",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 23,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "text",
+                  "id": "b37T7",
+                  "name": "一句话总结正文",
+                  "fill": "$ink-dark",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "KVMem 用主机内存保存长历史 KV，再按当前问题检索一部分送回 GPU...",
+                  "lineHeight": 1.55,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "text",
+                  "id": "dgXqG",
+                  "name": "重点摘要正文",
+                  "fill": "$ink-secondary-dark",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "它把显存压力从完整上下文转移到可检索的历史缓存，适合在单张 16G 显卡上运行更长上下文的大模型实验。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "q3sYP",
+          "name": "阅读底部操作栏",
+          "width": "fill_container",
+          "height": 82,
+          "fill": "$bg-dark",
+          "stroke": "$line-dark",
+          "strokeWidth": {
+            "top": 1
+          },
+          "justifyContent": "space_around",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "hrjvl",
+              "name": "底部操作 字号",
+              "width": 72,
+              "height": 64,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "lU18q",
+                  "name": "操作文字 字号",
+                  "fill": "$ink-dark",
+                  "content": "Aa",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 30,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jRBgm",
+              "name": "底部操作 收藏",
+              "width": 72,
+              "height": 64,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "aaooW",
+                  "name": "操作图标 收藏",
+                  "width": 31,
+                  "height": 31,
+                  "icon": "star",
+                  "library": "lucide",
+                  "fill": "$ink-dark"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "mh6xH",
+              "name": "底部操作 目录",
+              "width": 72,
+              "height": 64,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "aH8dN",
+                  "name": "操作图标 目录",
+                  "width": 31,
+                  "height": 31,
+                  "icon": "list",
+                  "library": "lucide",
+                  "fill": "$ink-dark"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "E0aUl4",
+              "name": "底部操作 分享",
+              "width": 72,
+              "height": 64,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "qAKEH",
+                  "name": "操作图标 分享",
+                  "width": 31,
+                  "height": 31,
+                  "icon": "share",
+                  "library": "lucide",
+                  "fill": "$ink-dark"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "DszZz",
+      "x": 946,
+      "y": 0,
+      "name": "03 筛选底部抽屉浅色 393x852",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "$bg-light",
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "leFQL",
+          "x": 0,
+          "y": 0,
+          "name": "抽屉背景资料库",
+          "width": 393,
+          "height": 852,
+          "fill": "$bg-light",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "TDz2N",
+              "name": "抽屉状态栏",
+              "width": "fill_container",
+              "height": 44,
+              "padding": [
+                13,
+                32,
+                0,
+                32
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pzGPl",
+                  "name": "抽屉状态时间",
+                  "fill": "$ink-light",
+                  "content": "9:41",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 15,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "frame",
+                  "id": "tDHuz",
+                  "name": "抽屉状态间隔",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "icon",
+                  "id": "Z6GWyq",
+                  "name": "抽屉状态图标 wifi",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "wifi",
+                  "library": "lucide",
+                  "fill": "$ink-light"
+                },
+                {
+                  "type": "icon",
+                  "id": "oBif8",
+                  "name": "抽屉状态图标 triangle",
+                  "width": 15,
+                  "height": 18,
+                  "icon": "triangle",
+                  "library": "lucide",
+                  "fill": "$ink-light"
+                },
+                {
+                  "type": "icon",
+                  "id": "g2PPOU",
+                  "name": "抽屉状态图标 battery-full",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "battery-full",
+                  "library": "lucide",
+                  "fill": "$ink-light"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "ZuQO6",
+              "name": "抽屉背景标题",
+              "fill": "$ink-light",
+              "content": "资料库",
+              "fontFamily": "$font-sans",
+              "fontSize": 36,
+              "fontWeight": "900"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "n6N6fR",
+          "x": 0,
+          "y": 0,
+          "name": "抽屉遮罩",
+          "fill": "#1F262266",
+          "width": 393,
+          "height": 852
+        },
+        {
+          "type": "frame",
+          "id": "xbJfV",
+          "x": 0,
+          "y": 340,
+          "name": "筛选底部抽屉",
+          "width": 393,
+          "height": 512,
+          "fill": "$surface-light",
+          "cornerRadius": [
+            18,
+            18,
+            0,
+            0
+          ],
+          "stroke": "$line-light",
+          "strokeWidth": {
+            "top": 1
+          },
+          "layout": "vertical",
+          "gap": 20,
+          "padding": [
+            14,
+            24,
+            20,
+            24
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "nWWsl",
+              "name": "抽屉拖拽区",
+              "width": "fill_container",
+              "height": 22,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "f7ycsb",
+                  "name": "抽屉拖拽柄",
+                  "fill": "$line-light",
+                  "width": 42,
+                  "height": 4
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "R3xtPU",
+              "name": "抽屉标题行",
+              "width": "fill_container",
+              "height": 48,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n8evK",
+                  "name": "抽屉标题",
+                  "fill": "$ink-light",
+                  "content": "筛选",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 24,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "wHwEF",
+                  "name": "抽屉标题间隔",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "icon",
+                  "id": "dJhdu",
+                  "name": "关闭筛选",
+                  "width": 48,
+                  "height": 48,
+                  "icon": "x",
+                  "library": "lucide",
+                  "fill": "$ink-light"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "K2WtIB",
+              "name": "筛选分组 类型",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "PLPUy",
+                  "name": "筛选分组标题 类型",
+                  "fill": "$ink-secondary-light",
+                  "content": "类型",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 15,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "hlq5h",
+                  "name": "筛选选项行 类型",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oV9UR",
+                      "name": "筛选选项 全部",
+                      "height": 48,
+                      "fill": "$accent-soft-light",
+                      "cornerRadius": 8,
+                      "stroke": "$accent-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "wHSFF",
+                          "name": "筛选选项文字 全部",
+                          "fill": "$accent-light",
+                          "content": "全部",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jUpVp",
+                      "name": "筛选选项 视频",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "lu9vT",
+                          "name": "筛选选项文字 视频",
+                          "fill": "$ink-light",
+                          "content": "视频",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "z2KL4",
+                      "name": "筛选选项 文章",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "BTmIP",
+                          "name": "筛选选项文字 文章",
+                          "fill": "$ink-light",
+                          "content": "文章",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Lu2gF",
+                      "name": "筛选选项 网页",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QCqiV",
+                          "name": "筛选选项文字 网页",
+                          "fill": "$ink-light",
+                          "content": "网页",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "y9H86I",
+              "name": "筛选分组 状态",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qGn7U",
+                  "name": "筛选分组标题 状态",
+                  "fill": "$ink-secondary-light",
+                  "content": "状态",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 15,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "RJObu",
+                  "name": "筛选选项行 状态",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KtYJZ",
+                      "name": "筛选选项 全部",
+                      "height": 48,
+                      "fill": "$accent-soft-light",
+                      "cornerRadius": 8,
+                      "stroke": "$accent-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "twj7V",
+                          "name": "筛选选项文字 全部",
+                          "fill": "$accent-light",
+                          "content": "全部",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "L0q8Q5",
+                      "name": "筛选选项 已归档",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Pntn3",
+                          "name": "筛选选项文字 已归档",
+                          "fill": "$ink-light",
+                          "content": "已归档",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "W6msv",
+                      "name": "筛选选项 待补齐",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JmK8N",
+                          "name": "筛选选项文字 待补齐",
+                          "fill": "$ink-light",
+                          "content": "待补齐",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "TPYKt",
+              "name": "筛选分组 排序",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ZFQ6O",
+                  "name": "筛选分组标题 排序",
+                  "fill": "$ink-secondary-light",
+                  "content": "排序",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 15,
+                  "fontWeight": "900"
+                },
+                {
+                  "type": "frame",
+                  "id": "pgPEO",
+                  "name": "筛选选项行 排序",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "A8YtX",
+                      "name": "筛选选项 最近收集",
+                      "height": 48,
+                      "fill": "$accent-soft-light",
+                      "cornerRadius": 8,
+                      "stroke": "$accent-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ikNdU",
+                          "name": "筛选选项文字 最近收集",
+                          "fill": "$accent-light",
+                          "content": "最近收集",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "blUVA",
+                      "name": "筛选选项 最近阅读",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "y8SbY",
+                          "name": "筛选选项文字 最近阅读",
+                          "fill": "$ink-light",
+                          "content": "最近阅读",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "l1mgcB",
+                      "name": "筛选选项 标题 A-Z",
+                      "height": 48,
+                      "fill": "#00000000",
+                      "cornerRadius": 8,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "SQwH6",
+                          "name": "筛选选项文字 标题 A-Z",
+                          "fill": "$ink-light",
+                          "content": "标题 A-Z",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zC4yx",
+              "name": "抽屉弹性空白",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "type": "frame",
+              "id": "ZGM6D",
+              "name": "抽屉操作区",
+              "width": "fill_container",
+              "height": 58,
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MuWlA",
+                  "name": "重置按钮",
+                  "width": 114,
+                  "height": 54,
+                  "fill": "#00000000",
+                  "cornerRadius": 8,
+                  "stroke": "$line-light",
+                  "strokeWidth": 1,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "axVuP",
+                      "name": "重置按钮文字",
+                      "fill": "$ink-light",
+                      "content": "重置",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 16,
+                      "fontWeight": "900"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "U2r7bs",
+                  "name": "应用筛选按钮",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "$accent-light",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "yFO0H",
+                      "name": "应用筛选按钮文字",
+                      "fill": "#FFFDF8",
+                      "content": "应用筛选",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 16,
+                      "fontWeight": "900"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "GqZrt",
+      "x": 1419,
+      "y": 0,
+      "name": "04 采集页浅色 393x852",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "$bg-light",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "kltEJ",
+          "name": "采集状态栏",
+          "width": "fill_container",
+          "height": 44,
+          "padding": [
+            13,
+            32,
+            0,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "zd0jb",
+              "name": "采集状态时间",
+              "fill": "$ink-light",
+              "content": "9:41",
+              "fontFamily": "$font-sans",
+              "fontSize": 15,
+              "fontWeight": "800"
+            },
+            {
+              "type": "frame",
+              "id": "bm3DF",
+              "name": "采集状态间隔",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "NovFB",
+              "name": "采集状态图标 wifi",
+              "width": 18,
+              "height": 18,
+              "icon": "wifi",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "icon",
+              "id": "X7Z3eb",
+              "name": "采集状态图标 triangle",
+              "width": 15,
+              "height": 18,
+              "icon": "triangle",
+              "library": "lucide",
+              "fill": "$ink-light"
+            },
+            {
+              "type": "icon",
+              "id": "cQlSR",
+              "name": "采集状态图标 battery-full",
+              "width": 18,
+              "height": 18,
+              "icon": "battery-full",
+              "library": "lucide",
+              "fill": "$ink-light"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "NrAMj",
+          "name": "采集页头",
+          "width": "fill_container",
+          "height": 88,
+          "padding": [
+            10,
+            32,
+            14,
+            32
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "Z7gYLu",
+              "name": "采集标题",
+              "fill": "$ink-light",
+              "content": "采集",
+              "fontFamily": "$font-sans",
+              "fontSize": 36,
+              "fontWeight": "900"
+            },
+            {
+              "type": "frame",
+              "id": "Pbwjb",
+              "name": "采集页头间隔",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "icon",
+              "id": "kojQW",
+              "name": "采集设置",
+              "width": 48,
+              "height": 48,
+              "icon": "settings-2",
+              "library": "lucide",
+              "fill": "$ink-light"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bzhB0",
+          "name": "采集内容区",
+          "width": "fill_container",
+          "height": 638,
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            0,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "DtdBf",
+              "name": "新建采集按钮",
+              "width": "fill_container",
+              "height": 58,
+              "fill": "$accent-light",
+              "cornerRadius": 9,
+              "gap": 10,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "LV5Di",
+                  "name": "新建采集图标",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "#FFFDF8"
+                },
+                {
+                  "type": "text",
+                  "id": "l3U2Qa",
+                  "name": "新建采集文字",
+                  "fill": "#FFFDF8",
+                  "content": "新建采集",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dHas1",
+              "name": "任务待提交分段",
+              "width": "fill_container",
+              "height": 44,
+              "fill": "$surface-light",
+              "cornerRadius": 8,
+              "stroke": "$line-light",
+              "strokeWidth": 1,
+              "gap": 4,
+              "padding": 4,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "HmzHi",
+                  "name": "分段 任务",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$accent-light",
+                  "cornerRadius": 6,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "O4QDC",
+                      "name": "分段文字 任务",
+                      "fill": "#FFFDF8",
+                      "content": "任务",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "sBUg1",
+                  "name": "分段 待提交",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "#00000000",
+                  "cornerRadius": 6,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cNdTc",
+                      "name": "分段文字 待提交",
+                      "fill": "$ink-secondary-light",
+                      "content": "待提交",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wJiU2",
+              "name": "状态筛选",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "hMsae",
+                  "name": "状态筛选标题",
+                  "fill": "$ink-light",
+                  "content": "状态筛选",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "lkxUq",
+                  "name": "状态筛选行",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "XWIni",
+                      "name": "状态筛选 全部状态",
+                      "height": 34,
+                      "fill": "$accent-soft-light",
+                      "cornerRadius": 7,
+                      "stroke": "$accent-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "bsc1d",
+                          "name": "状态筛选文字 全部状态",
+                          "fill": "$accent-light",
+                          "content": "全部状态",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "w5zoD",
+                      "name": "状态筛选 处理中",
+                      "height": 34,
+                      "fill": "#FFFDF8",
+                      "cornerRadius": 7,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "GCOcX",
+                          "name": "状态筛选文字 处理中",
+                          "fill": "$ink-secondary-light",
+                          "content": "处理中",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "OT0fF",
+                      "name": "状态筛选 待审核",
+                      "height": 34,
+                      "fill": "#FFFDF8",
+                      "cornerRadius": 7,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "j1PKY",
+                          "name": "状态筛选文字 待审核",
+                          "fill": "$ink-secondary-light",
+                          "content": "待审核",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "X2vcl",
+                  "name": "状态筛选行",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "L9apC",
+                      "name": "状态筛选 需处理",
+                      "height": 34,
+                      "fill": "#FFFDF8",
+                      "cornerRadius": 7,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XxWvn",
+                          "name": "状态筛选文字 需处理",
+                          "fill": "$ink-secondary-light",
+                          "content": "需处理",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "E1Y3E",
+                      "name": "状态筛选 已完成",
+                      "height": 34,
+                      "fill": "#FFFDF8",
+                      "cornerRadius": 7,
+                      "stroke": "$line-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XwQFH",
+                          "name": "状态筛选文字 已完成",
+                          "fill": "$ink-secondary-light",
+                          "content": "已完成",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wWqFx",
+              "name": "采集任务标题行",
+              "width": "fill_container",
+              "height": 34,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cNdxW",
+                  "name": "任务列表标题",
+                  "fill": "$ink-light",
+                  "content": "任务",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "frame",
+                  "id": "e022E8",
+                  "name": "任务标题间隔",
+                  "width": "fill_container",
+                  "height": 1
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "CnBeK",
+              "name": "任务卡片 采集中",
+              "width": "fill_container",
+              "fill": "$surface-light",
+              "cornerRadius": 8,
+              "stroke": "$line-light",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "CJdcL",
+                  "name": "任务卡片头部",
+                  "width": "fill_container",
+                  "height": 30,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "E5ST7",
+                      "name": "状态标签 采集中",
+                      "height": 28,
+                      "fill": "$accent-soft-light",
+                      "cornerRadius": 7,
+                      "stroke": "$accent-light",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        10
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "p45IVB",
+                          "name": "状态标签文字 采集中",
+                          "fill": "$accent-light",
+                          "content": "采集中",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "V4bRb",
+                      "name": "任务卡片头部间隔",
+                      "width": "fill_container",
+                      "height": 1
+                    },
+                    {
+                      "type": "icon",
+                      "id": "pR0SW",
+                      "name": "任务卡片状态图标",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "loader",
+                      "library": "lucide",
+                      "fill": "$accent-light"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "HLvi8",
+                  "name": "任务内容三行区域",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": 70,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "eG1Vn",
+                      "x": 0,
+                      "y": 0,
+                      "name": "任务内容",
+                      "fill": "$ink-light",
+                      "textGrowth": "fixed-width",
+                      "width": 297,
+                      "content": "【前端狂喜！超过7000个UI组件直接免费开源！-哔哩哔哩】 https://b23.tv/Xrtm87o 分析一下这个视频的内容",
+                      "lineHeight": 1.45,
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ikn7A",
+                  "name": "最近事件",
+                  "width": "fill_container",
+                  "height": 34,
+                  "fill": "#F6F2E8",
+                  "cornerRadius": 7,
+                  "gap": 8,
+                  "padding": [
+                    0,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "S4Hsn",
+                      "name": "最近事件图标",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "sparkles",
+                      "library": "lucide",
+                      "fill": "$accent-light"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FLfXW",
+                      "name": "最近事件文字",
+                      "fill": "$ink-secondary-light",
+                      "content": "Agent 正在整理字幕",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Oi1Ik",
+          "name": "底部导航 采集选中",
+          "width": "fill_container",
+          "height": 82,
+          "fill": "$surface-light",
+          "stroke": "$line-light",
+          "strokeWidth": {
+            "top": 1
+          },
+          "justifyContent": "space_around",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "EC5aE",
+              "name": "采集底部 资料库",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "jDAUj",
+                  "name": "采集底部图标 资料库",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-library.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "dqoSC",
+                  "name": "采集底部文字 资料库",
+                  "fill": "$ink-light",
+                  "content": "资料库",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "rOvs9",
+                  "name": "采集底部选中线 资料库",
+                  "fill": "#00000000",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "XrZ7m",
+              "name": "采集底部 采集",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lfPIL",
+                  "name": "采集底部图标 采集",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-collect.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "lNNMz",
+                  "name": "采集底部文字 采集",
+                  "fill": "$accent-light",
+                  "content": "采集",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "ND0JS",
+                  "name": "采集底部选中线 采集",
+                  "fill": "$accent-light",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "k3s6D",
+              "name": "采集底部 我的",
+              "width": 88,
+              "height": 64,
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cmCEl",
+                  "name": "采集底部图标 我的",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/nav-mine.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "kQ7GW",
+                  "name": "采集底部文字 我的",
+                  "fill": "$ink-light",
+                  "content": "我的",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "d5Ivw",
+                  "name": "采集底部选中线 我的",
+                  "fill": "#00000000",
+                  "width": 38,
+                  "height": 3
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "bg-light": {
+      "type": "color",
+      "value": "#F7F4EC"
+    },
+    "surface-light": {
+      "type": "color",
+      "value": "#FFFDF8"
+    },
+    "ink-light": {
+      "type": "color",
+      "value": "#1F2622"
+    },
+    "ink-secondary-light": {
+      "type": "color",
+      "value": "#5C665F"
+    },
+    "line-light": {
+      "type": "color",
+      "value": "#E3DED2"
+    },
+    "accent-light": {
+      "type": "color",
+      "value": "#1F5C4B"
+    },
+    "accent-soft-light": {
+      "type": "color",
+      "value": "#E6EFE8"
+    },
+    "highlight-fill": {
+      "type": "color",
+      "value": "#F2C230"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#A14E0B"
+    },
+    "bg-dark": {
+      "type": "color",
+      "value": "#161B18"
+    },
+    "surface-dark": {
+      "type": "color",
+      "value": "#1D2320"
+    },
+    "ink-dark": {
+      "type": "color",
+      "value": "#DCE1DB"
+    },
+    "ink-secondary-dark": {
+      "type": "color",
+      "value": "#9AA39D"
+    },
+    "line-dark": {
+      "type": "color",
+      "value": "#313934"
+    },
+    "accent-dark": {
+      "type": "color",
+      "value": "#8CC3AC"
+    },
+    "accent-soft-dark": {
+      "type": "color",
+      "value": "#213A30"
+    },
+    "highlight-dark": {
+      "type": "color",
+      "value": "#E5C15A"
+    },
+    "font-sans": {
+      "type": "string",
+      "value": "Inter"
+    }
+  },
+  "fileToken": "7de0228b-c357-4ff2-92ac-c05e0a5fa04c"
+}

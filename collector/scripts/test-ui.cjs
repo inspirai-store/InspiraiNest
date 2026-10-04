@@ -31,10 +31,12 @@ async function main() {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(server);
-    await page.locator('#login-form input[name=name]').fill('浏览器测试');
     await page.locator('#login-form input[name=key]').fill(key);
     await page.locator('#login-form button').click();
     await page.locator('#app').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#archives-view').isVisible(), true);
+    assert.equal(await page.locator('#tasks-dialog').isVisible(), false);
+    await page.locator('#tasks-toggle').click();
     await page.locator('#new-task').click();
     await page.locator('#task-form textarea[name=content]').fill('【前端狂喜！超过7000个UI组件直接免费开源！-哔哩哔哩】 https://b23.tv/Xrtm87o\n分析一下这个视频的内容');
     await page.locator('#task-form input[name=tags]').fill('前端，组件');
@@ -57,6 +59,11 @@ async function main() {
     await page.locator(`[data-task="${task.id}"]`).click();
     await page.locator('[data-approve]').click();
     await page.locator('#detail-dialog').waitFor({ state: 'hidden' });
+    await page.locator(`[data-task="${task.id}"]`).click();
+    await page.locator('#detail-dialog [data-archive]').click();
+    await page.locator('#tasks-dialog').waitFor({ state: 'hidden' });
+    await page.frameLocator('#library-frame').locator('#reader').waitFor({ state: 'visible' });
+    await page.frameLocator('#library-frame').locator('#close-reader').click();
     await page.locator('[data-view=devices]').click();
     await page.locator('#pair-device').click();
     assert.equal(await page.locator('#pair-form select').count(), 0);
@@ -99,6 +106,7 @@ async function main() {
       await page.locator('#new-task').click();
       assert.ok(await page.locator('#task-dialog').evaluate(el => el.scrollWidth <= el.clientWidth));
       await page.locator('#task-dialog [data-close]').first().click();
+      await page.locator('#tasks-dialog [data-close]').click();
       await page.locator('[data-view=archives]').click();
       await library.locator('[data-open]').first().click();
       await library.locator('#reader').waitFor({ state: 'visible' });

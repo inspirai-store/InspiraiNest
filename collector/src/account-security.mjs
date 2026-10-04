@@ -82,7 +82,7 @@ export function accountSecurity({ store, masterKey, serialized, encryptionKey = 
       state.totp.recoveryHashes.splice(index, 1);
       return;
     }
-    if (!input.otp) rejected(state, '请输入认证器动态码或恢复码；旧客户端请使用一次性配对码', 'mfa_required');
+    if (!input.otp) throw Object.assign(new Error('请输入认证器动态码或恢复码；旧客户端请使用一次性配对码'), { status: 401, code: 'mfa_required' });
     const token = String(input.otp).trim();
     const delta = /^\d{6}$/.test(token) ? totp(unseal(state.totp.secret)).validate({ token, timestamp: clock(), window: 1 }) : null;
     const counter = Math.floor(clock() / 30000) + delta;
@@ -101,12 +101,13 @@ export function accountSecurity({ store, masterKey, serialized, encryptionKey = 
   }
   return {
     status: () => change(state => publicState(state)),
-    login: input => change(async state => {
+    transaction: work => change(work),
+    login: (input, context = {}) => change(async (state, tx) => {
       throttle(state);
       if (!await matches(input.key, state.password)) { state.failures.count++; return false; }
-      factor(state, input);
+      if (!await context.trusted?.(state, tx)) factor(state, input);
       state.failures.count = 0;
-      return true;
+      return context.complete ? context.complete(state, tx) : true;
     }),
     async operation(action, input, device) {
       requireValue(device.role === 'owner', 'Owner permission required', 403);
@@ -121,6 +122,7 @@ export function accountSecurity({ store, masterKey, serialized, encryptionKey = 
           state.failures.count = 0;
           state.password = await passwordRecord(input.newKey);
           state.credentialChangedAt = at();
+          state.trustEpoch = (state.trustEpoch || 0) + 1;
           state.pending = null;
           return publicState(state);
         }
@@ -141,6 +143,7 @@ export function accountSecurity({ store, masterKey, serialized, encryptionKey = 
           state.totp = { secret: state.pending.secret, lastCounter: Math.floor(clock() / 30000) + delta, enabledAt: at(), recoveryHashes: [] };
           state.pending = null;
           const recoveryCodes = recovery(state);
+          state.trustEpoch = (state.trustEpoch || 0) + 1;
           return { ...publicState(state), recoveryCodes };
         }
         if (action === 'totp/cancel') {
@@ -151,7 +154,7 @@ export function accountSecurity({ store, masterKey, serialized, encryptionKey = 
         requireValue(['totp/disable', 'recovery-codes'].includes(action), 'Not found', 404);
         requireValue(state.totp, '二次认证尚未启用', 409);
         await proof(state, input);
-        if (action === 'totp/disable') { state.totp = null; state.pending = null; return publicState(state); }
+        if (action === 'totp/disable') { state.totp = null; state.pending = null; state.trustEpoch = (state.trustEpoch || 0) + 1; return publicState(state); }
         const recoveryCodes = recovery(state);
         return { ...publicState(state), recoveryCodes };
       });

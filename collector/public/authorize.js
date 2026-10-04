@@ -72,7 +72,8 @@
     if (token) codeInput.select();
   }
   function failure(error, { login = false } = {}) {
-    if (login && error.code) { show('login'); message(error.message); $('#login-factor').focus(); return; }
+    if (error.name === 'AbortError') return;
+    if (login && error.code) { show('login'); message(error.message); $('#owner-key').focus(); return; }
     if (error.status === 401) {
       token = null;
       sessionStorage.removeItem('collector-token');
@@ -177,8 +178,7 @@
     button.textContent = '正在登录…';
     message('');
     try {
-      const factor = event.target.elements.factor.value.trim();
-      const response = await api('/api/pair', 'POST', { key: event.target.elements.key.value, ...(/^\d{6}$/.test(factor) ? { otp: factor } : { recoveryCode: factor }), name: '浏览器只读授权确认', ...await window.browserDevice.metadata() });
+      const response = await window.webLogin.login(event.target);
       if (current !== generation) return;
       if (response.device.role !== 'owner') throw Object.assign(new Error('Owner required'), { status: 403 });
       window.browserSession.adopt(); token = 'cookie';

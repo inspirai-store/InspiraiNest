@@ -14,8 +14,48 @@
   let selectedTask;
   let objectURLs = [];
   let noticeTimer;
+  let connected = false;
+  let currentView = 'archives';
+  let taskScrollTop = 0;
+  const taskDialog = $('#tasks-dialog');
+  function closeTasks() {
+    if (!taskDialog.open) return;
+    taskScrollTop = $('#tasks-view').scrollTop; taskDialog.close();
+    $('#tasks-toggle').setAttribute('aria-expanded', 'false'); updateTitle();
+  }
+  function updateTitle() {
+    document.title = `${taskDialog.open ? '采集任务' : currentView === 'devices' ? '授权设备' : '资料库'} · 灵藏`;
+  }
+  function ensureLibraryFrame() {
+    if ($('#library-frame')) return;
+    const frame = document.createElement('iframe'); frame.id = 'library-frame'; frame.title = '资料库'; frame.src = '/library/';
+    $('#archives-view').append(frame);
+  }
+  function showView(view) {
+    if (view === 'tasks') {
+      if (!taskDialog.open) {
+        taskDialog.showModal(); $('#tasks-view').scrollTop = taskScrollTop;
+        $('#tasks-toggle').setAttribute('aria-expanded', 'true'); updateTitle();
+      }
+      return;
+    }
+    if (!['archives', 'devices'].includes(view)) return;
+    closeTasks(); currentView = view;
+    for (const item of ['archives', 'devices']) $(`#${item}-view`).hidden = item !== view;
+    document.querySelectorAll('nav [data-view]').forEach(button => button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false'));
+    if (view === 'archives' && token) ensureLibraryFrame();
+    updateTitle();
+  }
+  taskDialog.addEventListener('close', () => {
+    $('#tasks-toggle').setAttribute('aria-expanded', String(taskDialog.open)); updateTitle();
+  });
+  taskDialog.addEventListener('cancel', () => { taskScrollTop = $('#tasks-view').scrollTop; });
+  taskDialog.addEventListener('click', event => {
+    const rect = taskDialog.getBoundingClientRect();
+    if (event.target === taskDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeTasks();
+  });
   function notice(message) {
-    const host = document.querySelector('dialog[open]') || document.body;
+    const host = [...document.querySelectorAll('dialog[open]')].at(-1) || document.body;
     host.append($('#notice'));
     $('#notice').textContent = message;
     $('#notice').hidden = false;
@@ -27,18 +67,55 @@
     const value = await res.json();
     if (!res.ok) {
       if (res.status === 401 && route !== '/pair' && !value.code) logout();
-      throw Object.assign(new Error(value.error || '请求失败'), { status: res.status });
+      throw Object.assign(new Error(value.error || '请求失败'), { status: res.status, code: value.code });
     }
     return value;
   }
-  async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); }
+  async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
   const badge = state => `<span class="badge ${esc(state)}">${states[state] || esc(state)}</span>`;
+  function renderWorkerNodes() {
+    const nodes = (snapshot?.devices || []).filter(window.deviceView.dispatchable);
+    const online = nodes.filter(device => device.online).length;
+    const count = `${connected ? online : '—'}/${nodes.length}`;
+    const toggle = $('#worker-nodes-toggle');
+    $('#worker-node-count').textContent = count;
+    toggle.dataset.status = !connected ? 'unknown' : online ? 'online' : 'offline';
+    toggle.title = connected ? `工作节点：${online} 个在线 / ${nodes.length} 个已授权` : `连接中断 · ${nodes.length} 个已授权工作节点，在线状态待更新`;
+    toggle.setAttribute('aria-label', toggle.title);
+    $('#node-connection-state').textContent = connected ? '已连接' : '连接中断 · 状态待更新';
+    $('#node-connection-summary').textContent = `在线 ${connected ? online : '—'} · 已授权 ${nodes.length}`;
+    const sorted = [...nodes].sort((a, b) => Number(b.online) - Number(a.online));
+    $('#worker-nodes').innerHTML = sorted.map(device => {
+      const info = device.deviceInfo || {};
+      const state = !connected ? 'unknown' : device.online ? 'online' : 'offline';
+      const agents = (device.agents || []).map(agent => ({ codex: 'Codex', codebuddy: 'CodeBuddy' })[agent] || agent).join(' / ');
+      const taskCount = (snapshot.tasks || []).filter(task => task.deviceId === device.id && ['assigned', 'running', 'uploading'].includes(task.state)).length;
+      const fields = [['型号', info.model || '未上报'], ['客户端', info.client?.version || '未上报'],
+        ['可用 Agent', agents || '无可用 Agent'], ['处理能力', (device.capabilities || []).map(type => types[type] || type).join('、') || '未启用'],
+        ['最近心跳', device.lastHeartbeatAt ? date(device.lastHeartbeatAt) : '尚无心跳'],
+        ['短标识', device.identity?.shortId || device.id.slice(0, 12)]];
+      return `<article class="node-card" data-node-id="${esc(device.id)}" data-status="${state}"><div class="node-card-heading"><span class="node-device-icon">${icon(info.os?.family === 'macOS' ? 'laptop' : 'monitor')}</span><strong>${esc(device.displayName || device.name)}</strong></div><p class="node-state"><span class="node-dot" aria-hidden="true"></span>${connected ? window.deviceView.status(device) : '状态待更新'}${taskCount ? ` · ${taskCount} 项处理中` : ''}</p>${device.name && device.name !== device.displayName ? `<p class="node-remark">备注：${esc(device.name)}</p>` : ''}<dl>${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></article>`;
+    }).join('') || '<div class="nodes-empty">暂无已授权工作节点</div>';
+  }
+  const nodeDialog = $('#worker-nodes-dialog');
+  $('#worker-nodes-toggle').onclick = () => { if (!nodeDialog.open) { nodeDialog.showModal(); $('#worker-nodes-toggle').setAttribute('aria-expanded', 'true'); } };
+  nodeDialog.addEventListener('close', () => $('#worker-nodes-toggle').setAttribute('aria-expanded', String(nodeDialog.open)));
+  nodeDialog.addEventListener('click', event => {
+    const rect = nodeDialog.getBoundingClientRect();
+    if (event.target === nodeDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) nodeDialog.close();
+  });
+  $('#manage-worker-nodes').onclick = () => { nodeDialog.close(); showView('devices'); };
   function render() {
     const { devices, tasks, archives } = snapshot;
-    $('#task-count').textContent = tasks.filter(t => !['completed', 'cancelled'].includes(t.state)).length;
+    const taskCount = tasks.filter(t => !['completed', 'cancelled'].includes(t.state)).length;
+    $('#task-count').textContent = taskCount > 99 ? '99+' : taskCount;
+    $('#task-count').classList.toggle('is-empty', taskCount === 0);
+    $('#tasks-toggle').title = `采集任务 · ${taskCount} 项未结束`;
+    $('#tasks-toggle').setAttribute('aria-label', $('#tasks-toggle').title);
     $('#device-count').textContent = devices.filter(d => !d.revokedAt).length;
     const unique = [...new Map([...archives].reverse().map(a => [a.entryId, a])).values()].reverse();
     $('#archive-count').textContent = unique.length;
+    renderWorkerNodes();
     $('#queue-summary').textContent = `${devices.filter(d => window.deviceView.dispatchable(d) && d.online).length} 个工作节点在线 · ${tasks.filter(t => t.state === 'queued').length} 项待分配`;
     const filter = $('#status-filter').value;
     const filtered = tasks.filter(t => filter === 'all' || (filter === 'running' ? ['running', 'assigned', 'uploading'].includes(t.state) : t.state === filter));
@@ -65,14 +142,15 @@
       if (token !== currentToken) return;
       const next = await api('/state');
       if (token !== currentToken) return;
-      snapshot = next; $('#login-view').hidden = true; $('#app').hidden = false; $('#connection').textContent = '已连接'; render();
+      snapshot = next; connected = true; $('#login-view').hidden = true; $('#app').hidden = false; $('#connection').textContent = '已连接'; render();
+      ensureLibraryFrame();
       if (requestedEntry) {
         document.querySelector('[data-view=archives]').click();
         $('#library-frame').src = '/library/#entry=' + encodeURIComponent(requestedEntry);
         requestedEntry = null;
       }
     }
-    catch (error) { $('#connection').textContent = '连接中断'; notice(error.message); }
+    catch (error) { connected = false; $('#connection').textContent = '连接中断'; renderWorkerNodes(); icons(); notice(error.message); }
     finally { refreshing = false; }
   }
   function showTask(id, open = true) {
@@ -139,8 +217,8 @@
   function download(url, name) { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); }
   $('#login-form').addEventListener('submit', async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true; $('#login-error').textContent = '';
-    try { const fields = Object.fromEntries(new FormData(event.target)); const factor = fields.factor.trim(); delete fields.factor; const data = await api('/pair', 'POST', { ...fields, ...(/^\d{6}$/.test(factor) ? { otp: factor } : { recoveryCode: factor }), ...await window.browserDevice.metadata() }); if (data.device.role !== 'owner') throw new Error('配对权限不匹配，请生成新的设备配对码'); window.browserSession.adopt(); token = 'cookie'; infoSent = true; event.target.key.value = ''; event.target.elements.factor.value = ''; await refresh(); }
-    catch (error) { $('#login-error').textContent = error.status === 409 ? '设备身份冲突，请检查已有授权后重新配对。' : error.message; } finally { button.disabled = false; }
+    try { const data = await window.webLogin.login(event.target); if (data.device.role !== 'owner') throw new Error('配对权限不匹配，请生成新的设备配对码'); window.browserSession.adopt(); token = 'cookie'; infoSent = true; await refresh(); }
+    catch (error) { if (error.name !== 'AbortError') $('#login-error').textContent = error.status === 409 ? '设备身份冲突，请检查已有授权后重新配对。' : error.message; } finally { button.disabled = false; }
   });
   $('#new-task').onclick = () => { $('#dispatch-device').innerHTML = '<option value="">自动</option>' + snapshot.devices.filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(d.name)}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); $('#task-form').dataset.submission = crypto.randomUUID(); $('#task-dialog').showModal(); };
   $('#task-form').addEventListener('submit', async event => {
@@ -173,12 +251,8 @@
     const button = event.target.closest('button'); if (!button) return;
     const d = button.dataset;
     try {
-      if (d.close !== undefined) button.closest('dialog').close();
-      if (d.view) { for (const view of ['tasks', 'archives', 'devices']) $(`#${view}-view`).hidden = view !== d.view; document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', b === button ? 'page' : 'false')); }
-      if (d.view === 'archives' && !$('#library-frame')) {
-        const frame = document.createElement('iframe'); frame.id = 'library-frame'; frame.title = '资料库'; frame.src = '/library/';
-        $('#archives-view').append(frame);
-      }
+      if (d.close !== undefined) { const dialog = button.closest('dialog'); if (dialog === taskDialog) closeTasks(); else dialog.close(); }
+      if (d.view) showView(d.view);
       if (d.task) showTask(d.task);
       if (d.archive) await openArchive(d.archive);
       if (d.preview) showBundle(await api(`/tasks/${d.preview}/draft`));

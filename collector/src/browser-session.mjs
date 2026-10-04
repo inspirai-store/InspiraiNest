@@ -3,6 +3,10 @@ import { hash, requireValue } from './common.mjs';
 
 export const browserLifetime = 7 * 86400;
 export const browserCookie = 'collector_browser_session';
+export function appendCookie(res, value) {
+  const previous = res.getHeader('Set-Cookie');
+  res.setHeader('Set-Cookie', [...(previous ? Array.isArray(previous) ? previous : [previous] : []), value]);
+}
 export const browserValid = (device, at = Date.now()) => deviceCategory(device) !== 'browser'
   || !device.loggedOutAt && Date.parse(device.browserExpiresAt) > at;
 
@@ -19,11 +23,11 @@ export function browserSessions({ store, serialized, clock = Date.now }) {
     }));
   }
   function cookie(res, token) {
-    res.setHeader('Set-Cookie', `${browserCookie}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${browserLifetime}`);
+    appendCookie(res, `${browserCookie}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${browserLifetime}`);
   }
   function clear(res) {
-    res.setHeader('Set-Cookie', [`${browserCookie}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`,
-      'library_session=; Path=/library/; HttpOnly; Secure; SameSite=Strict; Max-Age=0']);
+    appendCookie(res, `${browserCookie}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
+    appendCookie(res, 'library_session=; Path=/library/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
   }
   async function activity(device, token, res) {
     requireValue(deviceCategory(device) === 'browser' && device.role === 'owner', 'Browser session required', 403);

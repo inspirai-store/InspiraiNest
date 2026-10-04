@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>账户安全 · 灵藏</title>
   <link rel="icon" href="/brand-icon.png"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/brand.css"><link rel="stylesheet" href="/security.css">
-  <script defer src="/vendor/lucide.js"></script><script defer src="/browser-session.js"></script><script defer src="/security.js"></script>
+  <script defer src="/vendor/lucide.js"></script><script defer src="/device-identity.js"></script><script defer src="/browser-session.js"></script><script defer src="/security.js"></script>
 </head>
 <body class="security-page">
   <header><a class="brand" href="/"><img src="/brand-icon.png" alt=""><span>灵藏</span></a><a href="/">返回资料库</a><a href="/authorize">CLI 授权</a></header>
@@ -13,6 +13,10 @@
     <p id="security-message" role="status" aria-live="polite">正在载入安全设置</p>
     <p id="login-required" hidden>请先<a href="/login">登录资料库</a>。</p>
     <div id="security-settings" hidden>
+      <section class="security-row">
+        <div class="security-row-title"><i data-lucide="monitor-check" aria-hidden="true"></i><div><h2>当前浏览器</h2><p id="browser-trust-status"></p></div></div>
+        <button id="forget-browser" type="button"><i data-lucide="eraser"></i>忘记此浏览器</button>
+      </section>
       <section class="security-row">
         <div class="security-row-title"><i data-lucide="key-round" aria-hidden="true"></i><div><h2>登录凭据</h2><p id="credential-status"></p></div></div>
         <button id="edit-credential" type="button"><i data-lucide="pencil"></i>修改凭据</button>

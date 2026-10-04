@@ -1,3 +1,4 @@
+const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -45,7 +46,7 @@ const { _electron } = require('playwright');
   try {
     await wait(() => app.windows().some(page => page.url().startsWith('file:') && !page.url().includes('compact=1')));
     const page = app.windows().find(page => page.url().startsWith('file:') && !page.url().includes('compact=1'));
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
     await page.waitForFunction(() => document.querySelector('#headline').textContent === '工作节点已停止');
     if (macOS) {
       const buttons = await page.locator('[data-action=drain], [data-action=quit-after]').evaluateAll(elements => elements.map(button => ({ action: button.dataset.action, width: button.clientWidth, contentWidth: button.scrollWidth })));
@@ -110,15 +111,16 @@ const { _electron } = require('playwright');
       await app.evaluate(() => { const desktop = globalThis.workerDesktop(); desktop.setSnapshot(null); desktop.main.setSize(1020, 760); });
       await page.waitForFunction(() => !document.querySelector('[data-action=start]').disabled);
     }
+    await setTheme(page,'dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
-    await page.locator('#theme-toggle').click();
+    await setTheme(page);
     await wait(async () => await compactPage.locator('html').getAttribute('data-theme') === 'light');
-    assert.equal(await page.locator('#theme-toggle').getAttribute('aria-label'), '切换到黑夜模式');
+    assert.equal(await page.locator('[name=themeMode][value=light]').isChecked(), true);
     await page.reload();
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
     await page.waitForFunction(() => document.querySelector('#headline').textContent === '工作节点已停止');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
-    await compactPage.locator('#theme-toggle').click();
+    await setTheme(page);
     await wait(async () => await page.locator('html').getAttribute('data-theme') === 'dark');
     if (macOS) await nativeAction('worker-start'); else await page.locator('[data-action=start]').click();
     await wait(() => manager.snapshot().online);

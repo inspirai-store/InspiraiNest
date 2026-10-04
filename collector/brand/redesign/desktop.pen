@@ -1,0 +1,3987 @@
+{
+  "version": "2.17",
+  "children": [
+    {
+      "type": "frame",
+      "id": "SkSZ5",
+      "x": 0,
+      "y": 0,
+      "name": "主窗口 / 运行中 / 浅色",
+      "clip": true,
+      "width": 1020,
+      "height": 760,
+      "fill": "$light-bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "HlhVh",
+          "name": "标题栏",
+          "width": "fill_container",
+          "height": 42,
+          "fill": "$light-surface",
+          "stroke": "$light-line",
+          "strokeWidth": {
+            "bottom": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Ak5N1",
+              "name": "标题与状态",
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "xRiG3",
+                  "name": "InspiraiNest 图标",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/inspirainest-icon.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "YVaiI",
+                  "name": "应用标题",
+                  "fill": "$light-ink",
+                  "content": "InspiraiNest 采集 Worker",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "J552qY",
+                  "name": "状态标签 运行中",
+                  "height": 24,
+                  "fill": "$light-accent-soft",
+                  "cornerRadius": 4,
+                  "stroke": "$light-accent",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    9
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "hcpQU",
+                      "name": "运行点",
+                      "fill": "$light-success",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "nHD2Z",
+                      "name": "运行中文案",
+                      "fill": "$light-accent",
+                      "content": "运行中",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "pLLKm",
+              "name": "窗口操作与版本",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "u1VdYn",
+                  "name": "版本号",
+                  "fill": "$light-ink-secondary",
+                  "content": "v0.8.9 · 本机在线",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "hfwqp",
+                  "name": "窗口按钮 —",
+                  "fill": "$light-ink-secondary",
+                  "content": "—",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "x2EvcA",
+                  "name": "窗口按钮 □",
+                  "fill": "$light-ink-secondary",
+                  "content": "□",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "x2PkDL",
+                  "name": "窗口按钮 ×",
+                  "fill": "$light-ink-secondary",
+                  "content": "×",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "zqcap",
+          "name": "窗口内容",
+          "width": "fill_container",
+          "height": 688,
+          "gap": 12,
+          "padding": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "Ej35m",
+              "name": "左栏",
+              "width": 264,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "x2PfK",
+                  "name": "运行状态卡",
+                  "width": "fill_container",
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "F1Zdk",
+                      "name": "运行状态标题",
+                      "fill": "$light-ink",
+                      "content": "运行状态",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TI76o",
+                      "name": "运行状态数值",
+                      "fill": "$light-accent",
+                      "content": "采集中 · 队列 08",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 22,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cytw3",
+                      "name": "状态行 工作进程",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "YwlNC",
+                          "name": "工作进程 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "工作进程",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TqQ4A",
+                          "name": "工作进程 值",
+                          "fill": "$light-ink",
+                          "content": "Worker 正在运行",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "S8L73",
+                      "name": "状态行 阶段",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "OLmsL",
+                          "name": "阶段 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "阶段",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "uQug9",
+                          "name": "阶段 值",
+                          "fill": "$light-ink",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AUUlg",
+                      "name": "状态行 领取模式",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ye01X",
+                          "name": "领取模式 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "领取模式",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Pewka",
+                          "name": "领取模式 值",
+                          "fill": "$light-ink",
+                          "content": "自动领取",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Bpqjq",
+                      "name": "状态行 最近心跳",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "t2NQE7",
+                          "name": "最近心跳 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "最近心跳",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "oWB0D",
+                          "name": "最近心跳 值",
+                          "fill": "$light-ink",
+                          "content": "1s 前",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "osbto",
+                      "name": "状态行 运行时长",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "yuAv6",
+                          "name": "运行时长 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "运行时长",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "JxEMO",
+                          "name": "运行时长 值",
+                          "fill": "$light-ink",
+                          "content": "00:36:12",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CdhWx",
+                      "name": "状态行 默认 Agent",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "z3qGQ",
+                          "name": "默认 Agent 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "默认 Agent",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "UGhWU",
+                          "name": "默认 Agent 值",
+                          "fill": "$light-ink",
+                          "content": "Qwen Collector",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AkLVU",
+                      "name": "状态行 服务地址",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "N4NyX",
+                          "name": "服务地址 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "服务地址",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qOwK6",
+                          "name": "服务地址 值",
+                          "fill": "$light-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "127.0.0.1:17321",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PwiMA",
+                      "name": "状态行 数据目录",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "l8KD1",
+                          "name": "数据目录 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "数据目录",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "D8Mna",
+                          "name": "数据目录 值",
+                          "fill": "$light-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "D:/InspiraiNest/inbox",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gengE",
+                  "name": "控制按钮组",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "gj8GP",
+                      "name": "主控按钮 启动 Worker",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "GbEfx",
+                          "name": "按钮文字 启动 Worker",
+                          "fill": "$light-surface",
+                          "content": "启动 Worker",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Fi9Us",
+                      "name": "主控按钮 暂停领取",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-surface",
+                      "cornerRadius": 4,
+                      "stroke": "$light-line",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "k4bV5",
+                          "name": "按钮文字 暂停领取",
+                          "fill": "$light-ink",
+                          "content": "暂停领取",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bbSNr",
+                      "name": "主控按钮 继续领取",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-surface",
+                      "cornerRadius": 4,
+                      "stroke": "$light-line",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xhok7",
+                          "name": "按钮文字 继续领取",
+                          "fill": "$light-danger",
+                          "content": "继续领取",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YS5ld",
+                      "name": "主控按钮 完成后停止",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "olYyo",
+                          "name": "按钮文字 完成后停止",
+                          "fill": "$light-surface",
+                          "content": "完成后停止",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CSILJ",
+                      "name": "辅助按钮 数据目录",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "V3g9EW",
+                          "name": "按钮文字 数据目录",
+                          "fill": "$light-surface",
+                          "content": "数据目录",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ZcETU",
+                      "name": "辅助按钮 Worker 日志",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XTjBJ",
+                          "name": "按钮文字 Worker 日志",
+                          "fill": "$light-surface",
+                          "content": "Worker 日志",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "U0AneU",
+                      "name": "辅助按钮 远端任务",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xwjPi",
+                          "name": "按钮文字 远端任务",
+                          "fill": "$light-surface",
+                          "content": "远端任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "XMSqv",
+                      "name": "辅助按钮 仅退出管理器",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QuI3F",
+                          "name": "按钮文字 仅退出管理器",
+                          "fill": "$light-surface",
+                          "content": "仅退出管理器",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "L9yDKk",
+                      "name": "辅助按钮 完成后停止并退出",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$light-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$light-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "oYN91",
+                          "name": "按钮文字 完成后停止并退出",
+                          "fill": "$light-surface",
+                          "content": "完成后停止并退出",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "HmsZZ",
+              "name": "右栏",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Z0SR1",
+                  "name": "右栏顶部",
+                  "width": "fill_container",
+                  "height": 158,
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "LlB69",
+                      "name": "当前任务卡片",
+                      "width": 430,
+                      "height": "fill_container",
+                      "fill": "$light-surface",
+                      "cornerRadius": 6,
+                      "stroke": "$light-line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 9,
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "uxEjh",
+                          "name": "当前任务标题",
+                          "fill": "$light-ink",
+                          "content": "当前任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "HAkXq",
+                          "name": "任务名称",
+                          "fill": "$light-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "zKqbf",
+                          "name": "任务进度数字",
+                          "fill": "$light-ink-secondary",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D5eQpk",
+                          "name": "进度槽",
+                          "width": "fill_container",
+                          "height": 8,
+                          "fill": "$light-sunken",
+                          "cornerRadius": 4,
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 4,
+                              "id": "e0qvEA",
+                              "x": 0,
+                              "y": 0,
+                              "name": "进度条",
+                              "fill": "$light-accent",
+                              "width": 276,
+                              "height": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "ra2Qh",
+                          "name": "任务提示",
+                          "fill": "$light-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "备注：正在采集部署方案与关键参数。",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "awge6",
+                      "name": "客户端更新卡",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$light-surface",
+                      "cornerRadius": 6,
+                      "stroke": "$light-line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "rEq7T",
+                          "name": "更新标题",
+                          "fill": "$light-ink",
+                          "content": "客户端更新",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "l8v5i",
+                          "name": "更新状态",
+                          "fill": "$light-warning",
+                          "content": "发现新版本 v0.9.0",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "tgjpb",
+                          "name": "更新说明",
+                          "fill": "$light-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "包含队列恢复、托盘状态和 Worker 心跳修复。",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "gbRi1",
+                          "name": "更新按钮",
+                          "height": 28,
+                          "fill": "$light-accent",
+                          "cornerRadius": 4,
+                          "padding": [
+                            0,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "bOmCV",
+                              "name": "更新按钮文字",
+                              "fill": "$light-surface",
+                              "content": "下载并重启",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "g3L3x3",
+                  "name": "本次运行任务表",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "eHCJi",
+                      "name": "任务表标题行",
+                      "width": "fill_container",
+                      "height": 34,
+                      "fill": "$light-sunken",
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Z1OdjS",
+                          "name": "任务表标题",
+                          "fill": "$light-ink",
+                          "content": "本次运行任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "dGyGJ",
+                      "name": "任务表列头",
+                      "width": "fill_container",
+                      "height": 34,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "AEYAq",
+                          "name": "列头 ID",
+                          "fill": "$light-ink-secondary",
+                          "content": "ID",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "CMqJy",
+                          "name": "列头 状态",
+                          "fill": "$light-ink-secondary",
+                          "content": "状态",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GHyrV",
+                          "name": "列头 Agent",
+                          "fill": "$light-ink-secondary",
+                          "content": "Agent",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "fecpN",
+                          "name": "列头 备注",
+                          "fill": "$light-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "备注",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aTKIj",
+                      "name": "任务行 KVMem",
+                      "width": "fill_container",
+                      "height": 34,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Q5h1KI",
+                          "name": "任务单元 ID",
+                          "fill": "$light-ink",
+                          "content": "KVMem",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "dJXnq",
+                          "name": "任务单元 状态",
+                          "fill": "$light-success",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "UKkWm",
+                          "name": "任务单元 Agent",
+                          "fill": "$light-ink-secondary",
+                          "content": "Qwen Collector",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "z0aLY4",
+                          "name": "任务单元 备注",
+                          "fill": "$light-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "最实用的16G显卡 Qwen 27b 模型部署方案",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Ksql5",
+                  "name": "日志面板",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$light-sunken",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "W32w8h",
+                      "name": "日志标题行",
+                      "width": "fill_container",
+                      "height": 32,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "NcHrg",
+                          "name": "日志标题",
+                          "fill": "$light-ink",
+                          "content": "日志",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "QWhPK",
+                          "name": "日志筛选",
+                          "fill": "$light-ink-secondary",
+                          "content": "INFO · WARN · ERROR",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "C0aohq",
+                      "name": "日志行 09:42:18",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:42:18 INFO  heart-beat ok, latency 24ms",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "WUtvn",
+                      "name": "日志行 09:42:14",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:42:14 INFO  captured 32 items from xhs.search",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kG3h7",
+                      "name": "日志行 09:41:55",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:41:55 WARN  3 items need manual review",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Q7LO0",
+                      "name": "日志行 09:41:12",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:41:12 INFO  archive flushed to local library",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Zg0W5",
+          "name": "底部状态栏",
+          "width": "fill_container",
+          "height": 30,
+          "fill": "$light-surface",
+          "stroke": "$light-line",
+          "strokeWidth": {
+            "top": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "y1sqT",
+              "name": "底部状态",
+              "fill": "$light-ink-secondary",
+              "content": "状态 1s 前更新 · 关闭窗口后继续托盘运行",
+              "fontFamily": "$font-ui",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "e5RV6",
+      "x": 1100,
+      "y": 0,
+      "name": "主窗口 / 运行中 / 深色",
+      "clip": true,
+      "width": 1020,
+      "height": 760,
+      "fill": "$dark-bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "ZrKE8",
+          "name": "标题栏",
+          "width": "fill_container",
+          "height": 42,
+          "fill": "$dark-surface",
+          "stroke": "$dark-line",
+          "strokeWidth": {
+            "bottom": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "n3E9tw",
+              "name": "标题与状态",
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Q4ZI4R",
+                  "name": "InspiraiNest 图标",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/inspirainest-icon.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "bbQd1",
+                  "name": "应用标题",
+                  "fill": "$dark-ink",
+                  "content": "InspiraiNest 采集 Worker",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "lJoGi",
+                  "name": "状态标签 运行中",
+                  "height": 24,
+                  "fill": "$dark-sunken",
+                  "cornerRadius": 4,
+                  "stroke": "$dark-accent",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    9
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "aN8ce",
+                      "name": "运行点",
+                      "fill": "$dark-success",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "JSazu",
+                      "name": "运行中文案",
+                      "fill": "$dark-accent",
+                      "content": "运行中",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "v9MJgn",
+              "name": "窗口操作与版本",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "g7SguO",
+                  "name": "版本号",
+                  "fill": "$dark-ink-secondary",
+                  "content": "v0.8.9 · 本机在线",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "KW3EP",
+                  "name": "窗口按钮 —",
+                  "fill": "$dark-ink-secondary",
+                  "content": "—",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "qShNO",
+                  "name": "窗口按钮 □",
+                  "fill": "$dark-ink-secondary",
+                  "content": "□",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "zcPDG",
+                  "name": "窗口按钮 ×",
+                  "fill": "$dark-ink-secondary",
+                  "content": "×",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "IqEhf",
+          "name": "窗口内容",
+          "width": "fill_container",
+          "height": 688,
+          "gap": 12,
+          "padding": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "ciSYO",
+              "name": "左栏",
+              "width": 264,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "zz1ZC",
+                  "name": "运行状态卡",
+                  "width": "fill_container",
+                  "fill": "$dark-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$dark-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hyibC",
+                      "name": "运行状态标题",
+                      "fill": "$dark-ink",
+                      "content": "运行状态",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YjSUV",
+                      "name": "运行状态数值",
+                      "fill": "$dark-accent",
+                      "content": "采集中 · 队列 08",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 22,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "hwd5D",
+                      "name": "状态行 工作进程",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Aek2t",
+                          "name": "工作进程 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "工作进程",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "SYt42",
+                          "name": "工作进程 值",
+                          "fill": "$dark-ink",
+                          "content": "Worker 正在运行",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "J9I1nj",
+                      "name": "状态行 阶段",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "gWZu0",
+                          "name": "阶段 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "阶段",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "IpNyQ",
+                          "name": "阶段 值",
+                          "fill": "$dark-ink",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "X0erT",
+                      "name": "状态行 领取模式",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "s1u05U",
+                          "name": "领取模式 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "领取模式",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "IFUTy",
+                          "name": "领取模式 值",
+                          "fill": "$dark-ink",
+                          "content": "自动领取",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BIvxg",
+                      "name": "状态行 最近心跳",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "MXAXh",
+                          "name": "最近心跳 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "最近心跳",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "lvrg2",
+                          "name": "最近心跳 值",
+                          "fill": "$dark-ink",
+                          "content": "1s 前",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ycSFz",
+                      "name": "状态行 运行时长",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TJbS6",
+                          "name": "运行时长 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "运行时长",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "vkThn",
+                          "name": "运行时长 值",
+                          "fill": "$dark-ink",
+                          "content": "00:36:12",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "SCRg4",
+                      "name": "状态行 默认 Agent",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "G55DH",
+                          "name": "默认 Agent 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "默认 Agent",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "h4dd9",
+                          "name": "默认 Agent 值",
+                          "fill": "$dark-ink",
+                          "content": "Qwen Collector",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "XOaP4",
+                      "name": "状态行 服务地址",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Tlmpa",
+                          "name": "服务地址 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "服务地址",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "V77pR",
+                          "name": "服务地址 值",
+                          "fill": "$dark-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "127.0.0.1:17321",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JiJyW",
+                      "name": "状态行 数据目录",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Wp37r",
+                          "name": "数据目录 标签",
+                          "fill": "$dark-ink-secondary",
+                          "content": "数据目录",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "fd3Ue",
+                          "name": "数据目录 值",
+                          "fill": "$dark-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "D:/InspiraiNest/inbox",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Q7WmdQ",
+                  "name": "控制按钮组",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "LoW6y",
+                      "name": "主控按钮 启动 Worker",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "t1stk3",
+                          "name": "按钮文字 启动 Worker",
+                          "fill": "$dark-surface",
+                          "content": "启动 Worker",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "epf03",
+                      "name": "主控按钮 暂停领取",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-surface",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-line",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "V694M",
+                          "name": "按钮文字 暂停领取",
+                          "fill": "$dark-ink",
+                          "content": "暂停领取",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t2bS0q",
+                      "name": "主控按钮 继续领取",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-surface",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-line",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "KNvy1",
+                          "name": "按钮文字 继续领取",
+                          "fill": "$dark-danger",
+                          "content": "继续领取",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YAJug",
+                      "name": "主控按钮 完成后停止",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ApbBa",
+                          "name": "按钮文字 完成后停止",
+                          "fill": "$dark-surface",
+                          "content": "完成后停止",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tKd4d",
+                      "name": "辅助按钮 数据目录",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jiQLU",
+                          "name": "按钮文字 数据目录",
+                          "fill": "$dark-surface",
+                          "content": "数据目录",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jyP0E",
+                      "name": "辅助按钮 Worker 日志",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xBUSv",
+                          "name": "按钮文字 Worker 日志",
+                          "fill": "$dark-surface",
+                          "content": "Worker 日志",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BAEZ3",
+                      "name": "辅助按钮 远端任务",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kRdbj",
+                          "name": "按钮文字 远端任务",
+                          "fill": "$dark-surface",
+                          "content": "远端任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "SWyW6",
+                      "name": "辅助按钮 仅退出管理器",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jeBBT",
+                          "name": "按钮文字 仅退出管理器",
+                          "fill": "$dark-surface",
+                          "content": "仅退出管理器",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "OEjWo",
+                      "name": "辅助按钮 完成后停止并退出",
+                      "width": "fill_container",
+                      "height": 28,
+                      "fill": "$dark-accent",
+                      "cornerRadius": 4,
+                      "stroke": "$dark-accent",
+                      "strokeWidth": 1,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ozQqa",
+                          "name": "按钮文字 完成后停止并退出",
+                          "fill": "$dark-surface",
+                          "content": "完成后停止并退出",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "WZo3L",
+              "name": "右栏",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "aXgti",
+                  "name": "右栏顶部",
+                  "width": "fill_container",
+                  "height": 158,
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AdCzc",
+                      "name": "当前任务卡片",
+                      "width": 430,
+                      "height": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 6,
+                      "stroke": "$dark-line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 9,
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jMguB",
+                          "name": "当前任务标题",
+                          "fill": "$dark-ink",
+                          "content": "当前任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "uYeDM",
+                          "name": "任务名称",
+                          "fill": "$dark-ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "sVYBp",
+                          "name": "任务进度数字",
+                          "fill": "$dark-ink-secondary",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "B4qVju",
+                          "name": "进度槽",
+                          "width": "fill_container",
+                          "height": 8,
+                          "fill": "$dark-sunken",
+                          "cornerRadius": 4,
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 4,
+                              "id": "MJ3wM",
+                              "x": 0,
+                              "y": 0,
+                              "name": "进度条",
+                              "fill": "$dark-accent",
+                              "width": 276,
+                              "height": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "wKmKO",
+                          "name": "任务提示",
+                          "fill": "$dark-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "备注：正在采集部署方案与关键参数。",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EOBrD",
+                      "name": "客户端更新卡",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 6,
+                      "stroke": "$dark-line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "padding": 12,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "deNUV",
+                          "name": "更新标题",
+                          "fill": "$dark-ink",
+                          "content": "客户端更新",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "rCsxI",
+                          "name": "更新状态",
+                          "fill": "$dark-warning",
+                          "content": "发现新版本 v0.9.0",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KfGiI",
+                          "name": "更新说明",
+                          "fill": "$dark-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "包含队列恢复、托盘状态和 Worker 心跳修复。",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Vd9ZU",
+                          "name": "更新按钮",
+                          "height": 28,
+                          "fill": "$dark-accent",
+                          "cornerRadius": 4,
+                          "padding": [
+                            0,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "EZMby",
+                              "name": "更新按钮文字",
+                              "fill": "$dark-surface",
+                              "content": "下载并重启",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "YjZGv",
+                  "name": "本次运行任务表",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$dark-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$dark-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "s9cdQ",
+                      "name": "任务表标题行",
+                      "width": "fill_container",
+                      "height": 34,
+                      "fill": "$dark-sunken",
+                      "stroke": "$dark-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "L2YMhY",
+                          "name": "任务表标题",
+                          "fill": "$dark-ink",
+                          "content": "本次运行任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aA7tY",
+                      "name": "任务表列头",
+                      "width": "fill_container",
+                      "height": 34,
+                      "stroke": "$dark-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "HXnv8",
+                          "name": "列头 ID",
+                          "fill": "$dark-ink-secondary",
+                          "content": "ID",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "e6CuSp",
+                          "name": "列头 状态",
+                          "fill": "$dark-ink-secondary",
+                          "content": "状态",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "mEzY9",
+                          "name": "列头 Agent",
+                          "fill": "$dark-ink-secondary",
+                          "content": "Agent",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "pWKqL",
+                          "name": "列头 备注",
+                          "fill": "$dark-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "备注",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aul7L",
+                      "name": "任务行 KVMem",
+                      "width": "fill_container",
+                      "height": 34,
+                      "stroke": "$dark-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "V8TD7",
+                          "name": "任务单元 ID",
+                          "fill": "$dark-ink",
+                          "content": "KVMem",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "CYrnA",
+                          "name": "任务单元 状态",
+                          "fill": "$dark-success",
+                          "content": "Agent 采集中",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "F0UEa",
+                          "name": "任务单元 Agent",
+                          "fill": "$dark-ink-secondary",
+                          "content": "Qwen Collector",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "wzyxE",
+                          "name": "任务单元 备注",
+                          "fill": "$dark-ink-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "最实用的16G显卡 Qwen 27b 模型部署方案",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "zsxBn",
+                  "name": "日志面板",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$dark-sunken",
+                  "cornerRadius": 6,
+                  "stroke": "$dark-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "wiUYr",
+                      "name": "日志标题行",
+                      "width": "fill_container",
+                      "height": 32,
+                      "stroke": "$dark-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "faLHH",
+                          "name": "日志标题",
+                          "fill": "$dark-ink",
+                          "content": "日志",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "A7g5D",
+                          "name": "日志筛选",
+                          "fill": "$dark-ink-secondary",
+                          "content": "INFO · WARN · ERROR",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "xd7Mn",
+                      "name": "日志行 09:42:18",
+                      "fill": "$dark-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:42:18 INFO  heart-beat ok, latency 24ms",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "U0Viwr",
+                      "name": "日志行 09:42:14",
+                      "fill": "$dark-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:42:14 INFO  captured 32 items from xhs.search",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "yxsKs",
+                      "name": "日志行 09:41:55",
+                      "fill": "$dark-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:41:55 WARN  3 items need manual review",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "aVqLv",
+                      "name": "日志行 09:41:12",
+                      "fill": "$dark-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:41:12 INFO  archive flushed to local library",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "s8fFfs",
+          "name": "底部状态栏",
+          "width": "fill_container",
+          "height": 30,
+          "fill": "$dark-surface",
+          "stroke": "$dark-line",
+          "strokeWidth": {
+            "top": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "VlaWr",
+              "name": "底部状态",
+              "fill": "$dark-ink-secondary",
+              "content": "状态 1s 前更新 · 关闭窗口后继续托盘运行",
+              "fontFamily": "$font-ui",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "R5dob",
+      "x": 0,
+      "y": 840,
+      "name": "托盘气泡 / 浅色",
+      "clip": true,
+      "width": 390,
+      "height": 250,
+      "fill": "$light-bg",
+      "cornerRadius": 8,
+      "stroke": "$light-line",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 10,
+      "children": [
+        {
+          "type": "frame",
+          "id": "FFnmm",
+          "name": "托盘气泡 / 浅色 标题区",
+          "width": "fill_container",
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "DOALg",
+              "name": "托盘气泡 / 浅色 标题与状态",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "W2wsUg",
+                  "name": "托盘气泡 / 浅色 标题",
+                  "fill": "$light-ink",
+                  "content": "InspiraiNest Worker",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "QFwHN",
+                  "name": "托盘气泡 / 浅色 运行中标签",
+                  "height": 22,
+                  "fill": "$light-accent-soft",
+                  "cornerRadius": 4,
+                  "stroke": "$light-accent",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "rpKay",
+                      "name": "托盘气泡 / 浅色 状态点",
+                      "fill": "$light-success",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "rZTnK",
+                      "name": "状态行",
+                      "fill": "$light-accent",
+                      "content": "运行中 · 1s 前更新",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "CNJ6O",
+              "x": 326,
+              "y": 3,
+              "name": "托盘气泡 / 浅色 版本",
+              "enabled": false,
+              "fill": "$light-ink-secondary",
+              "content": "v0.8.9",
+              "fontFamily": "$font-mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "M4mPu",
+          "name": "托盘气泡 / 浅色 当前任务",
+          "width": "fill_container",
+          "fill": "$light-surface",
+          "cornerRadius": 6,
+          "stroke": "$light-line",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "fr5hf",
+              "name": "当前任务标题",
+              "fill": "$light-ink-secondary",
+              "content": "当前任务",
+              "fontFamily": "$font-ui",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "h47kqt",
+              "name": "当前任务 第一行",
+              "fill": "$light-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+              "fontFamily": "$font-ui",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "eQ5gD",
+              "name": "托盘气泡 / 浅色 当前任务元信息",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "EYXPS",
+                  "name": "当前任务 第二行",
+                  "fill": "$light-ink-secondary",
+                  "content": "Agent 采集中",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "NPKgL",
+                  "x": 287,
+                  "y": 0,
+                  "name": "托盘气泡 / 浅色 剩余时间",
+                  "enabled": false,
+                  "fill": "$light-ink-secondary",
+                  "content": "剩余 11 分钟",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "yTB6D",
+          "name": "托盘气泡 / 浅色 指标行",
+          "width": "fill_container",
+          "height": 60,
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "k3Dyp1",
+              "name": "领取模式",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$light-surface",
+              "cornerRadius": 6,
+              "stroke": "$light-line",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 5,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "bJolh",
+                  "name": "托盘气泡 / 浅色 指标标签 队列",
+                  "fill": "$light-ink-secondary",
+                  "content": "领取模式",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "QauYt",
+                  "name": "托盘气泡 / 浅色 指标值 队列",
+                  "fill": "$light-ink",
+                  "content": "自动领取",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "EYcCX",
+              "name": "最近心跳",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$light-surface",
+              "cornerRadius": 6,
+              "stroke": "$light-line",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 5,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qqes3",
+                  "name": "托盘气泡 / 浅色 指标标签 成功",
+                  "fill": "$light-ink-secondary",
+                  "content": "最近心跳",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "k0nlxB",
+                  "name": "托盘气泡 / 浅色 指标值 成功",
+                  "fill": "$light-ink",
+                  "content": "1s 前",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Z4WFJ",
+          "name": "托盘气泡 / 浅色 操作区",
+          "width": "fill_container",
+          "height": 28,
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "S4kl16",
+              "name": "适用按钮 暂停领取",
+              "width": 118,
+              "height": 28,
+              "fill": "$light-accent",
+              "cornerRadius": 4,
+              "stroke": "$light-accent",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pIz3n",
+                  "name": "按钮文字 暂停领取",
+                  "fill": "$light-surface",
+                  "content": "暂停领取",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "z9MnMD",
+              "name": "适用按钮 完成后停止",
+              "width": 118,
+              "height": 28,
+              "fill": "$light-surface",
+              "cornerRadius": 4,
+              "stroke": "$light-line",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "AIV4B",
+                  "name": "按钮文字 完成后停止",
+                  "fill": "$light-ink",
+                  "content": "完成后停止",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "nfcTb",
+              "name": "底部 打开管理窗口",
+              "width": 114,
+              "height": 28,
+              "fill": "$light-surface",
+              "cornerRadius": 4,
+              "stroke": "$light-line",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Jc2Dl",
+                  "name": "按钮文字 打开管理窗口",
+                  "fill": "$light-danger",
+                  "content": "打开管理窗口",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "v6JGH",
+      "x": 430,
+      "y": 840,
+      "name": "托盘气泡 / 深色",
+      "clip": true,
+      "width": 390,
+      "height": 250,
+      "fill": "$dark-bg",
+      "cornerRadius": 8,
+      "stroke": "$dark-line",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 10,
+      "children": [
+        {
+          "type": "frame",
+          "id": "xJwXX",
+          "name": "托盘气泡 / 深色 标题区",
+          "width": "fill_container",
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ugV4Z",
+              "name": "托盘气泡 / 深色 标题与状态",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "rZFup",
+                  "name": "托盘气泡 / 深色 标题",
+                  "fill": "$dark-ink",
+                  "content": "InspiraiNest Worker",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "ZKeSZ",
+                  "name": "托盘气泡 / 深色 运行中标签",
+                  "height": 22,
+                  "fill": "$dark-sunken",
+                  "cornerRadius": 4,
+                  "stroke": "$dark-accent",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    8
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "t7w2YE",
+                      "name": "托盘气泡 / 深色 状态点",
+                      "fill": "$dark-success",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "mfDnV",
+                      "name": "状态行",
+                      "fill": "$dark-accent",
+                      "content": "运行中 · 1s 前更新",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "eGDCW",
+              "x": 326,
+              "y": 3,
+              "name": "托盘气泡 / 深色 版本",
+              "enabled": false,
+              "fill": "$dark-ink-secondary",
+              "content": "v0.8.9",
+              "fontFamily": "$font-mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "iy0ig",
+          "name": "托盘气泡 / 深色 当前任务",
+          "width": "fill_container",
+          "fill": "$dark-surface",
+          "cornerRadius": 6,
+          "stroke": "$dark-line",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "VI2S4",
+              "name": "当前任务标题",
+              "fill": "$dark-ink-secondary",
+              "content": "当前任务",
+              "fontFamily": "$font-ui",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "T8CbJ",
+              "name": "当前任务 第一行",
+              "fill": "$dark-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "KVMem：最实用的16G显卡 Qwen 27b 模型部署方案",
+              "fontFamily": "$font-ui",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "M6FUzk",
+              "name": "托盘气泡 / 深色 当前任务元信息",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "YeePy",
+                  "name": "当前任务 第二行",
+                  "fill": "$dark-ink-secondary",
+                  "content": "Agent 采集中",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "jx5Om",
+                  "x": 287,
+                  "y": 0,
+                  "name": "托盘气泡 / 深色 剩余时间",
+                  "enabled": false,
+                  "fill": "$dark-ink-secondary",
+                  "content": "剩余 11 分钟",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wrrj7",
+          "name": "托盘气泡 / 深色 指标行",
+          "width": "fill_container",
+          "height": 60,
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "S0RWi",
+              "name": "领取模式",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$dark-surface",
+              "cornerRadius": 6,
+              "stroke": "$dark-line",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 5,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pqXPd",
+                  "name": "托盘气泡 / 深色 指标标签 队列",
+                  "fill": "$dark-ink-secondary",
+                  "content": "领取模式",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "Y3SIM",
+                  "name": "托盘气泡 / 深色 指标值 队列",
+                  "fill": "$dark-ink",
+                  "content": "自动领取",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Wh5Jw",
+              "name": "最近心跳",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$dark-surface",
+              "cornerRadius": 6,
+              "stroke": "$dark-line",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 5,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "k72Wc",
+                  "name": "托盘气泡 / 深色 指标标签 成功",
+                  "fill": "$dark-ink-secondary",
+                  "content": "最近心跳",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "TMdBl",
+                  "name": "托盘气泡 / 深色 指标值 成功",
+                  "fill": "$dark-ink",
+                  "content": "1s 前",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "FGY5v",
+          "name": "托盘气泡 / 深色 操作区",
+          "width": "fill_container",
+          "height": 28,
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "JNM3d",
+              "name": "适用按钮 暂停领取",
+              "width": 118,
+              "height": 28,
+              "fill": "$dark-accent",
+              "cornerRadius": 4,
+              "stroke": "$dark-accent",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "N4Aq2",
+                  "name": "按钮文字 暂停领取",
+                  "fill": "$dark-surface",
+                  "content": "暂停领取",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "w0Qj7",
+              "name": "适用按钮 完成后停止",
+              "width": 118,
+              "height": 28,
+              "fill": "$dark-surface",
+              "cornerRadius": 4,
+              "stroke": "$dark-line",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "i8W7n8",
+                  "name": "按钮文字 完成后停止",
+                  "fill": "$dark-ink",
+                  "content": "完成后停止",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zryOJ",
+              "name": "底部 打开管理窗口",
+              "width": 114,
+              "height": 28,
+              "fill": "$dark-surface",
+              "cornerRadius": 4,
+              "stroke": "$dark-line",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "vb0v5",
+                  "name": "按钮文字 打开管理窗口",
+                  "fill": "$dark-danger",
+                  "content": "打开管理窗口",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "Fnclw",
+      "x": 1100,
+      "y": 840,
+      "name": "主窗口 / 未配对 / 连接这台电脑",
+      "clip": true,
+      "width": 1020,
+      "height": 760,
+      "fill": "$light-bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "RtpqY",
+          "name": "未配对标题栏",
+          "width": "fill_container",
+          "height": 42,
+          "fill": "$light-surface",
+          "stroke": "$light-line",
+          "strokeWidth": {
+            "bottom": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "v6PVE",
+              "name": "未配对标题与状态",
+              "gap": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Id4Zf",
+                  "name": "InspiraiNest 图标",
+                  "width": 24,
+                  "height": 24,
+                  "fill": {
+                    "type": "image",
+                    "enabled": true,
+                    "url": "refs/inspirainest-icon.png",
+                    "mode": "fit"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "rPhGm",
+                  "name": "未配对应用标题",
+                  "fill": "$light-ink",
+                  "content": "InspiraiNest 采集 Worker",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "Gdq2T",
+                  "name": "状态标签 未配对",
+                  "height": 24,
+                  "fill": "$light-sunken",
+                  "cornerRadius": 4,
+                  "stroke": "$light-warning",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    0,
+                    9
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "nAV7I",
+                      "name": "未配对状态点",
+                      "fill": "$light-warning",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "yju7H",
+                      "name": "未配对状态文字",
+                      "fill": "$light-warning",
+                      "content": "未配对",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "TBHiq",
+              "name": "未配对窗口操作与版本",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "zhNXC",
+                  "name": "未配对版本号",
+                  "fill": "$light-ink-secondary",
+                  "content": "v0.8.9 · 等待连接",
+                  "fontFamily": "$font-mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "QVN1N",
+                  "name": "未配对窗口按钮 —",
+                  "fill": "$light-ink-secondary",
+                  "content": "—",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "EOv0D",
+                  "name": "未配对窗口按钮 □",
+                  "fill": "$light-ink-secondary",
+                  "content": "□",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "X8miAj",
+                  "name": "未配对窗口按钮 ×",
+                  "fill": "$light-ink-secondary",
+                  "content": "×",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "iNo8Q",
+          "name": "未配对内容",
+          "width": "fill_container",
+          "height": 688,
+          "gap": 12,
+          "padding": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "FRqKn",
+              "name": "未配对左栏",
+              "width": 264,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "m3ksa",
+                  "name": "本机准备状态",
+                  "width": "fill_container",
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "javtJ",
+                      "name": "本机准备标题",
+                      "fill": "$light-ink",
+                      "content": "本机准备状态",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "WzbNT",
+                      "name": "本机准备主状态",
+                      "fill": "$light-warning",
+                      "content": "等待连接",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 22,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "T9S8v",
+                      "name": "未配对状态行 本机名称",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Ov2Ds",
+                          "name": "本机名称 未配对标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "本机名称",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "N0PTe",
+                          "name": "本机名称 未配对值",
+                          "fill": "$light-ink",
+                          "content": "DESKTOP-CN-SHA-023",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "w7pGQg",
+                      "name": "未配对状态行 Agent",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "RQ593",
+                          "name": "Agent 未配对标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "Agent",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "XasCB",
+                          "name": "Agent 未配对值",
+                          "fill": "$light-ink",
+                          "content": "已启动",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "FHbaW",
+                      "name": "未配对状态行 端口",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "tS6wM",
+                          "name": "端口 未配对标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "端口",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "e2xCDb",
+                          "name": "端口 未配对值",
+                          "fill": "$light-ink",
+                          "content": "127.0.0.1:17321",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "wFDUT",
+                      "name": "未配对状态行 浏览器授权",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JxWTc",
+                          "name": "浏览器授权 未配对标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "浏览器授权",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "C4WuRR",
+                          "name": "浏览器授权 未配对值",
+                          "fill": "$light-warning",
+                          "content": "未绑定",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dTMAe",
+                  "name": "连接说明卡",
+                  "width": "fill_container",
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "FPQaF",
+                      "name": "连接说明标题",
+                      "fill": "$light-ink",
+                      "content": "连接说明",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "bLOky",
+                      "name": "连接说明 1",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "1. 在 Web 控制台打开 Worker 管理。",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "wA0kl",
+                      "name": "连接说明 2",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "2. 选择“连接这台电脑”。",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "swc6Y",
+                      "name": "连接说明 3",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "3. 填写电脑采集端配对码并提交。",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "IXF1T",
+                      "name": "连接说明 4",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "4. 配对成功后开始接收任务。",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KsVGH",
+              "name": "未配对右栏",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Fe5Bb",
+                  "name": "连接这台电脑表单",
+                  "width": "fill_container",
+                  "height": 360,
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 14,
+                  "padding": 18,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Y5wjcQ",
+                      "name": "表单标题",
+                      "fill": "$light-ink",
+                      "content": "连接这台电脑",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 22,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "text",
+                      "id": "LYYJB",
+                      "name": "表单副标题",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "输入服务地址、电脑名称和电脑采集端配对码，将这台电脑连接到 InspiraiNest Worker 管理。",
+                      "lineHeight": 1.45,
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bO2nt",
+                      "name": "字段 服务地址",
+                      "width": "fill_container",
+                      "height": 70,
+                      "fill": "$light-sunken",
+                      "cornerRadius": 6,
+                      "stroke": "$light-line",
+                      "strokeWidth": 1,
+                      "gap": 8,
+                      "padding": 14,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "DsCl3",
+                          "name": "服务地址 标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "服务地址",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "PBSwD",
+                          "name": "服务地址 输入值",
+                          "fill": "$light-accent",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "https://inspirainest.local",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "i9w8j",
+                      "name": "连接字段组",
+                      "width": "fill_container",
+                      "height": 86,
+                      "gap": 12,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "zE82i",
+                          "name": "字段 电脑名称",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "fXZay",
+                              "name": "电脑名称 标签",
+                              "fill": "$light-ink-secondary",
+                              "content": "电脑名称",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "OvoYj",
+                              "name": "电脑名称 输入框",
+                              "width": "fill_container",
+                              "height": 32,
+                              "fill": "$light-bg",
+                              "cornerRadius": 4,
+                              "stroke": "$light-line",
+                              "strokeWidth": 1,
+                              "padding": [
+                                0,
+                                10
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "d0jbsn",
+                                  "name": "电脑名称 输入值",
+                                  "fill": "$light-ink",
+                                  "content": "DESKTOP-CN-SHA-023",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VH91a",
+                          "name": "字段 归档目录",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "PxObi",
+                              "name": "电脑采集端配对码 标签",
+                              "fill": "$light-ink-secondary",
+                              "content": "电脑采集端配对码",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "z1ABMY",
+                              "name": "归档目录 输入框",
+                              "width": "fill_container",
+                              "height": 32,
+                              "fill": "$light-bg",
+                              "cornerRadius": 4,
+                              "stroke": "$light-line",
+                              "strokeWidth": 1,
+                              "padding": [
+                                0,
+                                10
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "JoBGu",
+                                  "name": "电脑采集端配对码 输入值",
+                                  "fill": "$light-ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "输入 Web 控制台提供的配对码",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tGHG4",
+                      "name": "表单操作",
+                      "width": "fill_container",
+                      "height": 30,
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "td1at",
+                          "name": "表单按钮 配对 Worker",
+                          "width": 160,
+                          "height": 28,
+                          "fill": "$light-accent",
+                          "cornerRadius": 4,
+                          "stroke": "$light-accent",
+                          "strokeWidth": 1,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "w0Z3JP",
+                              "name": "表单按钮文字 配对 Worker",
+                              "fill": "$light-surface",
+                              "content": "配对 Worker",
+                              "fontFamily": "$font-ui",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "a9Z06",
+                  "name": "未配对任务占位",
+                  "width": "fill_container",
+                  "height": 180,
+                  "fill": "$light-surface",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "TPx1w",
+                      "name": "未配对任务标题",
+                      "fill": "$light-ink",
+                      "content": "任务队列",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "T9Hg2i",
+                      "name": "未配对任务空状态",
+                      "fill": "$light-ink-secondary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "连接完成后，这里会显示本次运行任务、进度与失败重试队列。",
+                      "fontFamily": "$font-ui",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "krsMi",
+                      "name": "未配对队列行 当前任务",
+                      "width": "fill_container",
+                      "height": 28,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "sQjNI",
+                          "name": "当前任务 队列标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "当前任务",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "xD8KY",
+                          "name": "当前任务 队列值",
+                          "fill": "$light-ink",
+                          "content": "--",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e0RhFQ",
+                      "name": "未配对队列行 待执行",
+                      "width": "fill_container",
+                      "height": 28,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "C08Jq4",
+                          "name": "待执行 队列标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "待执行",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "O0dF6",
+                          "name": "待执行 队列值",
+                          "fill": "$light-ink",
+                          "content": "--",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cZAyU",
+                      "name": "未配对队列行 上次同步",
+                      "width": "fill_container",
+                      "height": 28,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "sxOrx",
+                          "name": "上次同步 队列标签",
+                          "fill": "$light-ink-secondary",
+                          "content": "上次同步",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qTKQa",
+                          "name": "上次同步 队列值",
+                          "fill": "$light-ink",
+                          "content": "尚未连接",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cwwqs",
+                  "name": "未配对日志面板",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$light-sunken",
+                  "cornerRadius": 6,
+                  "stroke": "$light-line",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "zQnYk",
+                      "name": "未配对日志标题行",
+                      "width": "fill_container",
+                      "height": 32,
+                      "stroke": "$light-line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "VNK7N",
+                          "name": "未配对日志标题",
+                          "fill": "$light-ink",
+                          "content": "日志",
+                          "fontFamily": "$font-ui",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "cc1Jv",
+                          "name": "未配对日志筛选",
+                          "fill": "$light-ink-secondary",
+                          "content": "PAIRING · AGENT",
+                          "fontFamily": "$font-mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "NeAkQ",
+                      "name": "未配对日志行 09:44:08",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:44:08 PAIRING waiting for worker pairing form",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "mRjE7",
+                      "name": "未配对日志行 09:44:03",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:44:03 AGENT   local service started on 127.0.0.1:17321",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "WEmOv",
+                      "name": "未配对日志行 09:43:58",
+                      "fill": "$light-ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "09:43:58 AGENT   waiting for browser authorization",
+                      "fontFamily": "$font-mono",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "myJTq",
+          "name": "未配对底部状态栏",
+          "width": "fill_container",
+          "height": 30,
+          "fill": "$light-surface",
+          "stroke": "$light-line",
+          "strokeWidth": {
+            "top": 1
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "yi4AR",
+              "name": "未配对底部状态",
+              "fill": "$light-ink-secondary",
+              "content": "状态 1s 前更新 · 关闭窗口后继续托盘运行",
+              "fontFamily": "$font-ui",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "font-ui": {
+      "type": "string",
+      "value": "Noto Sans SC"
+    },
+    "font-mono": {
+      "type": "string",
+      "value": "JetBrains Mono"
+    },
+    "light-bg": {
+      "type": "color",
+      "value": "#F7F4EC"
+    },
+    "light-surface": {
+      "type": "color",
+      "value": "#FFFDF8"
+    },
+    "light-sunken": {
+      "type": "color",
+      "value": "#EFEBE0"
+    },
+    "light-ink": {
+      "type": "color",
+      "value": "#1F2622"
+    },
+    "light-ink-secondary": {
+      "type": "color",
+      "value": "#5C665F"
+    },
+    "light-line": {
+      "type": "color",
+      "value": "#E3DED2"
+    },
+    "light-accent": {
+      "type": "color",
+      "value": "#1F5C4B"
+    },
+    "light-accent-soft": {
+      "type": "color",
+      "value": "#E6EFE8"
+    },
+    "light-success": {
+      "type": "color",
+      "value": "#2F6F3E"
+    },
+    "light-warning": {
+      "type": "color",
+      "value": "#A14E0B"
+    },
+    "light-danger": {
+      "type": "color",
+      "value": "#B0392F"
+    },
+    "dark-bg": {
+      "type": "color",
+      "value": "#161B18"
+    },
+    "dark-surface": {
+      "type": "color",
+      "value": "#1D2320"
+    },
+    "dark-sunken": {
+      "type": "color",
+      "value": "#111512"
+    },
+    "dark-ink": {
+      "type": "color",
+      "value": "#DCE1DB"
+    },
+    "dark-ink-secondary": {
+      "type": "color",
+      "value": "#9AA39D"
+    },
+    "dark-line": {
+      "type": "color",
+      "value": "#313934"
+    },
+    "dark-accent": {
+      "type": "color",
+      "value": "#8CC3AC"
+    },
+    "dark-success": {
+      "type": "color",
+      "value": "#86C79A"
+    },
+    "dark-warning": {
+      "type": "color",
+      "value": "#EE9A45"
+    },
+    "dark-danger": {
+      "type": "color",
+      "value": "#F28B82"
+    }
+  },
+  "fileToken": "0df38de2-32f7-4004-aa3a-16f903f38f48"
+}

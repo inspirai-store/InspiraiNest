@@ -10,6 +10,11 @@ files:
   - desktop/manager.mjs
   - desktop/owner-client.mjs
   - desktop/updater.mjs
+  - desktop/settings.mjs
+  - desktop/login-item.mjs
+  - desktop/worker-session.mjs
+  - desktop/settings-renderer.js
+  - desktop/nodes.js
   - desktop/macos-policy.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
@@ -25,6 +30,7 @@ files:
   - desktop/trayTemplate@2x.png
   - desktop/vendor/**
   - public/device-view.js
+  - public/pairing-dialog.css
   - src/**
   - worker.production.example.json
   - node_modules/**

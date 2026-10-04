@@ -12,6 +12,11 @@
   let activeView = 'overview', entriesSeq = 0, currentEntry = null, currentFile = null, currentText = '', nextCursor = null;
   let refreshBusy = false, toastTimer, searchTimer, lastTaskSignature = '', lastDeviceSignature = '', lastRefreshError = '';
   let workspaceEpoch = 0, detailSeq = 0, documentSeq = 0, readBusy = false;
+  let pairingSeq = 0, pairingExpiryTimer;
+  let settingsTab = 'appearance', lastSuccess = null, connected = false;
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,
+    onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
+  addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();
   const favoriteKey = () => 'lingnest-desktop-favorites:' + auth.server;
   function loadFavorites() { try { favorites = new Set(JSON.parse(localStorage.getItem(favoriteKey()) || '[]')); } catch { favorites = new Set(); } }
@@ -23,17 +28,22 @@
     auth = nextAuth; state = null; entries = []; total = offset = 0;
     selectedTask = selectedEntry = currentEntry = currentFile = nextCursor = null; currentText = '';
     lastTaskSignature = lastDeviceSignature = '';
+    connected = false; lastSuccess = null;
+    nodes.updateRemote(null, { connected, paired: auth.paired, lastSuccess });
     for (const id of ['remote-tasks','remote-entries','device-list','attention','recent-entries','trash-list','pair-key']) $('#'+id).textContent = '';
     $('#task-detail').textContent = '选择一项任务查看过程和操作。'; $('#entry-detail').textContent = '选择一条资料开始阅读。';
     $('#entry-detail').removeAttribute('aria-busy');
     $('#remote-entries').removeAttribute('aria-busy'); $('#load-more').disabled = false; $('#load-more').hidden = true;
     $('#task-detail').classList.remove('open'); $('#entry-detail').classList.remove('open');
     for (const id of ['nav-task-count','nav-entry-count']) $('#'+id).textContent = '';
-    $('#pair-result').hidden = $('#trash-panel').hidden = true; $('#pair-qr').removeAttribute('src');
+    $('#pair-result').hidden = true; $('#trash-panel').close(); $('#pair-qr').removeAttribute('src');
     $('#capture-dialog').close();
+    $('#pair-dialog').close(); clearPairing();
     $('#capture-form').reset(); delete $('#capture-form').dataset.submission; delete $('#capture-form').dataset.payload;
     $('#capture-error').textContent = '';
     $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
+    $('#overview-connect-banner').hidden = auth.paired;
+    $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
     $('#owner-indicator').textContent = auth.paired ? '管理端 · 已连接' : '管理端未配对';
     loadFavorites();
   }
@@ -44,7 +54,9 @@
     ],{duration:240,easing:'cubic-bezier(.2,.7,.2,1)'});
   }
   function go(view) {
-    if (!['overview','worker','updates'].includes(view) && !auth.paired) { go('overview'); $('#owner-pair input[name=key]').focus(); return; }
+    if (['devices','updates'].includes(view)) { showSettings(view); return; }
+    if (view === 'worker') { view = 'nodes'; nodes.selectLocal(); }
+    if (!['overview','nodes','settings'].includes(view) && !auth.paired) { showSettings('devices'); $('#owner-pair input[name=key]').focus(); return; }
     activeView = view;
     document.querySelectorAll('.workspace-nav [data-view]').forEach(button => button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false'));
     document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== view + '-view'; page.classList.toggle('active', !page.hidden); });
@@ -53,8 +65,27 @@
   }
   document.querySelectorAll('.workspace-nav [data-view]').forEach(button => { button.title = button.textContent.trim(); button.addEventListener('click', () => go(button.dataset.view)); });
   document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => go(button.dataset.go)));
+  function showSettings(tab = settingsTab) {
+    settingsTab = tab; go('settings');
+    for (const id of ['appearance','devices','updates']) {
+      $('#'+id+'-view').hidden = id !== tab;
+      $('[data-settings="'+id+'"]').setAttribute('aria-selected', String(id === tab));
+      $('[data-settings="'+id+'"]').tabIndex = id === tab ? 0 : -1;
+    }
+  }
+  document.querySelectorAll('[data-settings]').forEach(button => {
+    button.tabIndex = button.dataset.settings === settingsTab ? 0 : -1;
+    button.onclick = () => showSettings(button.dataset.settings);
+    button.onkeydown = event => {
+      if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+      event.preventDefault(); const names = ['appearance','devices','updates'];
+      const index = names.indexOf(settingsTab), next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+      showSettings(names[next]); $('[data-settings="'+names[next]+'"]').focus();
+    };
+  });
+  document.querySelectorAll('[data-settings-go]').forEach(button => button.onclick = () => showSettings(button.dataset.settingsGo));
   async function workerStatus() {
-    try { const s = await window.worker.snapshot();
+    try { const s = await window.worker.snapshot(); nodes.updateLocal(s);
       $('#worker-indicator').textContent = '工作节点 · ' + (!s.paired ? '未配对' : !s.running ? '已停止' : s.online ? '在线' : '连接中断');
       $('#metric-worker').textContent = !s.paired ? '未配对' : !s.running ? '已停止' : s.online ? '在线' : '离线';
       $('#metric-worker-hint').textContent = s.lastHeartbeat ? '最近心跳 ' + date(s.lastHeartbeat) : '暂无心跳';
@@ -65,20 +96,23 @@
   async function setup() {
     try { auth = await window.library.status(); loadFavorites();
       $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
+      $('#overview-connect-banner').hidden = auth.paired;
+      $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
       $('#owner-indicator').textContent = auth.paired ? '管理端 · 已连接' : '管理端未配对';
       if (auth.paired) { await refresh(); await loadEntries(); }
       else { $('#remote-tasks').textContent = ''; $('#remote-entries').textContent = ''; }
     } catch (error) { toast(errorText(error)); }
+    nodes.updateRemote(state, { connected, paired: auth.paired, lastSuccess });
     await workerStatus(); icons();
   }
   window.library.onChanged?.(async next => { if (next.deviceId === auth.deviceId && next.paired === auth.paired) return; clearWorkspace(next); if (auth.paired) { await refresh(); await loadEntries(); } });
   $('#owner-pair').addEventListener('submit', async event => {
     event.preventDefault(); const form = event.currentTarget, button = event.submitter; button.disabled = true;
-    try { clearWorkspace(await window.library.pair(Object.fromEntries(new FormData(form)))); form.elements.key.value = ''; toast('资料库已连接，可阅读和采集'); await refresh(); await loadEntries(); }
+    try { clearWorkspace(await window.library.pair(Object.fromEntries(new FormData(form)))); form.elements.key.value = ''; toast('资料库已连接，可阅读和采集'); await refresh(); await loadEntries(); go('overview'); }
     catch (error) { toast(errorText(error)); } finally { button.disabled = false; }
   });
   $('#owner-logout').addEventListener('click', async () => {
-    try { clearWorkspace(await window.library.logout()); go('overview'); toast('已退出管理端'); await workerStatus(); }
+      try { clearWorkspace(await window.library.logout()); showSettings('devices'); toast('已退出管理端'); await workerStatus(); }
     catch (error) { toast(errorText(error)); }
   });
   function taskTitle(task) { return short(task.content || task.url || '未命名任务'); }
@@ -128,7 +162,19 @@
     if (signature === lastDeviceSignature) return;
     lastDeviceSignature = signature;
     const identityNames = { smbios:'硬件标识', ioplatform:'硬件标识', 'android-id':'系统标识', keychain:'Keychain 标识', 'browser-profile':'浏览器档案', local:'本地标识' };
-    $('#device-list').innerHTML = window.deviceView.groups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h2>${g.title} · ${g.devices.length}</h2>${g.devices.map(d => `<article class="device-card"><div><strong>${esc(d.displayName || d.name)}</strong><p>${esc(d.name)} · ${window.deviceView.status(d)}${d.id === state.me.id ? ' · 当前设备' : ''}</p><p>${esc([d.deviceInfo?.model,d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '',d.identity ? `${identityNames[d.identity.source] || '设备标识'} ${d.identity.shortId}` : '等待客户端补齐标识',d.browserExpiresAt ? '有效至 '+date(d.browserExpiresAt) : '',window.deviceView.dispatchable(d) ? 'Agent · '+(d.agents?.join(' / ') || '无可用 Agent') : '', '最近活动 '+date(d.lastSeen)].filter(Boolean).join(' · '))}</p></div><button data-revoke="${esc(d.id)}" class="danger-button" ${d.id === state.me.id ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销</button></article>`).join('') || '<p class="quiet">暂无授权</p>'}</section>`).join('');
+    const deviceIcons = { desktop:'monitor', mobile:'smartphone', browser:'globe', integration:'key-round', unknown:'monitor-smartphone' };
+    $('#device-list').innerHTML = window.deviceView.groups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h3>${g.title}<span>${g.devices.length}</span></h3>${g.devices.map(d => {
+      const current = d.id === state.me.id, status = window.deviceView.status(d);
+      const fields = [
+        ['型号', d.deviceInfo?.model],
+        ['客户端', d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '未上报'],
+        [d.identity ? identityNames[d.identity.source] || '设备标识' : '设备标识', d.identity?.shortId || '未上报'],
+        ...(window.deviceView.dispatchable(d) ? [['Agent', d.agents?.join(' / ') || '无可用 Agent']] : []),
+        ...(d.browserExpiresAt ? [['有效至', date(d.browserExpiresAt)]] : [])
+      ].filter(([,value]) => value);
+      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
+    }).join('') || '<p class="quiet">暂无授权设备</p>'}</section>`).join('');
+    icons();
     $('#device-list').querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => {
       if (!confirm('撤销该设备的访问权限？')) return;
       try { await window.library.revoke(b.dataset.revoke); toast('设备已撤销'); await refresh(); } catch (error) { toast(errorText(error)); }
@@ -137,11 +183,13 @@
   async function refresh() {
     if (!auth.paired || refreshBusy) return;
     refreshBusy = true; const epoch = workspaceEpoch;
-    try { const result = await window.library.state(); if (epoch !== workspaceEpoch) return; state = result; lastRefreshError = ''; $('#owner-indicator').textContent = result.identityWarning ? '设备标识需处理' : '管理端 · 已连接'; $('#owner-indicator').title = result.identityWarning || ''; renderOverview(); renderTasks(); renderDevices(); fillCaptureDevices(); }
+    try { const result = await window.library.state(); if (epoch !== workspaceEpoch) return; state = result; connected = true; lastSuccess = new Date().toISOString(); lastRefreshError = ''; $('#owner-indicator').textContent = result.identityWarning ? '设备标识需处理' : '管理端 · 已连接'; $('#owner-indicator').title = result.identityWarning || ''; renderOverview(); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state, {connected,paired:auth.paired,lastSuccess}); updateCaptureHint(); }
     catch (error) {
       if (epoch !== workspaceEpoch) return;
+      connected = false;
       if (errorText(error).includes('授权已失效')) { clearWorkspace(await window.library.logout()); go('overview'); }
       else $('#owner-indicator').textContent = '管理端 · 连接中断';
+      nodes.updateRemote(state, {connected,paired:auth.paired,lastSuccess}); updateCaptureHint();
       if (lastRefreshError !== errorText(error)) { lastRefreshError = errorText(error); toast(lastRefreshError); }
     }
     finally { refreshBusy = false; }
@@ -267,7 +315,22 @@
       let retry = host.querySelector('.more-content'); if (!retry) { retry = document.createElement('button'); retry.className = 'more-content'; host.append(retry); } retry.textContent = '重新加载'; retry.onclick = () => readNext(id,file);
     } finally { if (seq === documentSeq) { readBusy = false; const more = host.querySelector('.more-content'); if (more) more.disabled = false; } }
   }
-  $('#capture-top').onclick = () => { if (!auth.paired) { go('overview'); toast('请先连接管理端'); return; } fillCaptureDevices(); $('#capture-dialog').showModal(); };
+  function updateCaptureHint() {
+    const target = $('#capture-device').value, device = state?.devices.find(d=>d.id === target);
+    $('#capture-target-hint').textContent = !connected ? '管理端连接中断，恢复连接后可提交任务。'
+      : target && (!device || !window.deviceView.dispatchable(device)) ? '目标节点授权已失效，请重新选择。'
+      : target && !device.online ? '目标节点离线；任务将等待该节点上线且处理能力匹配，不会自动改派。'
+      : target ? '任务将派发至所选节点，等待该节点领取。' : '由可用工作节点自动领取任务。';
+    $('#capture-form button[type=submit]').disabled = !connected || Boolean(target && (!device || !window.deviceView.dispatchable(device))) || $('#capture-form').dataset.submitting === '1';
+  }
+  function openCapture(deviceId = '') {
+    if (!auth.paired) { showSettings('devices'); toast('请先连接管理端'); return; }
+    if (!connected) { toast('管理端连接中断，请恢复连接后再派发任务'); return; }
+    fillCaptureDevices(); if (deviceId) $('#capture-device').value = deviceId;
+    updateCaptureHint(); $('#capture-dialog').showModal();
+  }
+  $('#capture-top').onclick = () => openCapture();
+  $('#capture-device').onchange = updateCaptureHint;
   document.querySelectorAll('[data-close-dialog]').forEach(b => b.onclick = () => $('#'+b.dataset.closeDialog).close());
   $('#capture-form').addEventListener('submit', async event => {
     event.preventDefault(); const form = event.currentTarget, button = event.submitter;
@@ -276,16 +339,59 @@
     const payload = { content:values.content, tags:[...new Set(values.tags.split(/[,，\n]/).map(t => t.trim()).filter(Boolean))], deviceId:values.deviceId, agent:values.agent, autoArchive:form.elements.autoArchive.checked };
     const signature = JSON.stringify(payload);
     if (form.dataset.payload !== signature) { form.dataset.submission = crypto.randomUUID(); form.dataset.payload = signature; }
-    button.disabled = true; $('#capture-error').textContent = '';
+    button.disabled = true; form.dataset.submitting = '1'; $('#capture-error').textContent = '';
     try { await window.library.task({ ...payload, submissionId:form.dataset.submission });
       if (epoch !== workspaceEpoch) return;
       form.reset(); delete form.dataset.submission; delete form.dataset.payload; $('#capture-dialog').close(); go('tasks'); toast('任务已提交'); await refresh(); }
-    catch (error) { if (epoch === workspaceEpoch) $('#capture-error').textContent = errorText(error); } finally { button.disabled = false; }
+    catch (error) { if (epoch === workspaceEpoch) $('#capture-error').textContent = errorText(error); } finally { delete form.dataset.submitting; updateCaptureHint(); }
   });
-  async function pairing() { const epoch = workspaceEpoch; try { const result = await window.library.pairing(); if (epoch !== workspaceEpoch) return; $('#pair-result').hidden = false; $('#pair-key').textContent = result.key; $('#pair-expiry').textContent = `到期 ${date(result.expiresAt)}`; $('#pair-qr').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl; else $('#pair-qr').removeAttribute('src'); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }
-  $('#pair-device').onclick = () => pairing();
-  $('#open-trash').onclick = async () => { const epoch = workspaceEpoch, panel = $('#trash-panel'), list = $('#trash-list'); panel.hidden = false; list.textContent = '正在读取回收站…'; try { const items = await window.library.trash(); if (epoch !== workspaceEpoch) return; list.innerHTML = items.length ? items.map(item => `<div class="file-row"><span>${esc(item.title)}</span><button data-restore="${esc(item.archiveId)}">恢复</button></div>`).join('') : '回收站为空'; list.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => { try { await window.library.restore(b.dataset.restore); if (epoch !== workspaceEpoch) return; toast('已恢复资料'); await refresh(); await loadEntries(); $('#open-trash').click(); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }); } catch (error) { if (epoch === workspaceEpoch) list.textContent = errorText(error); } };
-  $('#close-trash').onclick = () => $('#trash-panel').hidden = true;
+  function clearPairing() {
+    pairingSeq++; clearTimeout(pairingExpiryTimer);
+    $('#copy-key').innerHTML = '<i data-lucide="copy"></i>'; $('#copy-key').setAttribute('aria-label', '复制配对码'); icons();
+    $('#pair-result').hidden = true; $('#pair-key').value = ''; $('#pair-key').type = 'password'; $('#pair-expiry').textContent = '';
+    $('#pair-qr-wrap').hidden = true; $('#pair-qr').removeAttribute('src');
+    $('#pair-status').hidden = $('#pair-error').hidden = true;
+    $('#pair-status').textContent = $('#pair-error').textContent = '';
+    $('#pair-generate').disabled = $('#pair-device').disabled = false;
+    $('#pair-dialog').removeAttribute('aria-busy');
+  }
+  async function pairing() {
+    clearPairing();
+    const epoch = workspaceEpoch, seq = pairingSeq, dialog = $('#pair-dialog');
+    const current = () => epoch === workspaceEpoch && seq === pairingSeq && dialog.open;
+    $('#pair-generate').disabled = $('#pair-device').disabled = true;
+    dialog.setAttribute('aria-busy', 'true');
+    $('#pair-status').textContent = '正在生成配对码…'; $('#pair-status').hidden = false;
+    try {
+      const result = await window.library.pairing(); if (!current()) return;
+      $('#pair-status').hidden = true; $('#pair-result').hidden = false;
+      $('#pair-key').value = result.key; $('#pair-expiry').textContent = '有效至 ' + new Date(result.expiresAt).toLocaleTimeString('zh-CN', { timeZone:'Asia/Shanghai', hour12:false, hour:'2-digit', minute:'2-digit' }); $('#pair-expiry').title = date(result.expiresAt);
+      $('#pair-qr-wrap').hidden = !result.qrDataUrl; if (result.qrDataUrl) $('#pair-qr').src = result.qrDataUrl;
+      $('#pair-generate').textContent = '重新生成';
+      pairingExpiryTimer = setTimeout(() => {
+        if (!current()) return;
+        clearPairing(); $('#pair-status').textContent = '配对码已过期'; $('#pair-status').hidden = false;
+      }, Math.max(0, Date.parse(result.expiresAt) - Date.now()));
+    } catch (error) {
+      if (!current()) return;
+      $('#pair-status').hidden = true; $('#pair-error').textContent = errorText(error); $('#pair-error').hidden = false;
+      $('#pair-generate').textContent = '重试';
+    } finally {
+      if (current()) {
+        $('#pair-generate').disabled = $('#pair-device').disabled = false; dialog.removeAttribute('aria-busy');
+      }
+    }
+  }
+  $('#pair-device').onclick = () => { $('#pair-dialog').showModal(); void pairing(); };
+  $('#pair-generate').onclick = () => pairing();
+  $('#pair-dialog').addEventListener('close', clearPairing);
+  $('#copy-key').onclick = async () => {
+    const field = $('#pair-key'), button = $('#copy-key'); if (!field.value) return;
+    try { await navigator.clipboard.writeText(field.value); button.innerHTML = '<i data-lucide="check"></i>'; button.setAttribute('aria-label', '配对码已复制'); icons(); }
+    catch { field.type = 'text'; field.focus(); field.select(); }
+  };
+  $('#open-trash').onclick = async () => { const epoch = workspaceEpoch, panel = $('#trash-panel'), list = $('#trash-list'); if (!panel.open) panel.showModal(); list.textContent = '正在读取回收站…'; try { const items = await window.library.trash(); if (epoch !== workspaceEpoch) return; list.innerHTML = items.length ? items.map(item => `<div class="file-row"><span>${esc(item.title)}</span><button data-restore="${esc(item.archiveId)}">恢复</button></div>`).join('') : '回收站为空'; list.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => { try { await window.library.restore(b.dataset.restore); if (epoch !== workspaceEpoch) return; toast('已恢复资料'); await refresh(); await loadEntries(); $('#open-trash').click(); } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); } }); } catch (error) { if (epoch === workspaceEpoch) list.textContent = errorText(error); } };
+  $('#close-trash').onclick = () => $('#trash-panel').close();
   function renderUpdate(s) {
     $('#update-current').textContent = `v${s.version}`;
     $('#nav-update-count').textContent = ['available','downloaded','waiting_worker'].includes(s.phase) ? '●' : '';

@@ -25,8 +25,17 @@
     }
     return active;
   }
+  async function bootstrap() {
+    if (!active || !window.browserDevice) return;
+    try {
+      const metadata = await window.browserDevice.metadata();
+      const info = await fetch('/api/devices/me/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata), signal: AbortSignal.timeout(15000) });
+      if (!info.ok) return;
+      await fetch('/api/browser-trust/bootstrap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata), signal: AbortSignal.timeout(15000) });
+    } catch {}
+  }
   window.browserSession = {
-    ready: () => pending ||= ready(),
+    ready: () => pending ||= ready().then(async value => { if (value) await bootstrap(); return value; }),
     get active() { return active; },
     adopt() { active = true; lastActivity = Date.now(); sessionStorage.removeItem('collector-token'); },
     async logout() {

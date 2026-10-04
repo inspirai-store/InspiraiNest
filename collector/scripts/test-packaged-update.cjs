@@ -1,3 +1,4 @@
+const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -51,7 +52,7 @@ const { _electron } = require('playwright');
       if (!page) await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!page) throw new Error('Main application window did not load');
-    await page.locator('[data-view=updates]').click();
+    await showSettings(page,'updates');
     await page.locator('#update-check').click();
     try { await page.waitForFunction(version => document.querySelector('#update-headline').textContent.includes(`v${version}`), next, { timeout: 30000 }); }
     catch (error) {

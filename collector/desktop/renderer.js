@@ -1,24 +1,4 @@
 const $ = selector => document.querySelector(selector);
-const themeKey = 'worker-theme';
-let theme = 'dark';
-try { if (localStorage.getItem(themeKey) === 'light') theme = 'light'; } catch {}
-function applyTheme(value) {
-  theme = value === 'light' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = theme;
-  const button = $('#theme-toggle');
-  button.textContent = theme === 'dark' ? '白天' : '黑夜';
-  button.title = `切换到${theme === 'dark' ? '白天' : '黑夜'}模式`;
-  button.setAttribute('aria-label', button.title);
-}
-applyTheme(theme);
-$('#theme-toggle').addEventListener('click', () => {
-  const next = theme === 'dark' ? 'light' : 'dark';
-  try { localStorage.setItem(themeKey, next); } catch {}
-  applyTheme(next);
-});
-addEventListener('storage', event => {
-  if (event.key === themeKey || event.key === null) applyTheme(event.newValue === 'light' ? 'light' : 'dark');
-});
 const labels = { assigned: '准备采集', running: 'Agent 采集中', validating: '本机校验', uploading: '上传轻量资料', waiting_action: '等待操作', completed: '已完成', awaiting_review: '等待归档确认', cancelled: '已取消', failed: '失败', interrupted: '已中断' };
 const phases = { starting: '启动中', idle: '空闲', claiming: '领取任务', working: '执行中', syncing: '同步资料', paused: '已暂停', stopped: '已停止' };
 const parameters = new URLSearchParams(location.search);
@@ -32,8 +12,8 @@ if (macOS) {
   $('[data-action=drain]').textContent = compact ? '完成后停止' : '停止工作节点（完成当前任务后）';
 }
 const actionTitles = new Map([...document.querySelectorAll('[data-action]')].map(button => [button, button.title]));
-if (compact) { document.body.classList.add('compact'); document.title = '灵藏 · 工作节点状态'; }
-let snapshot, busy = false, logsOpen = !compact, logsTaskId = null, logsLoading = false, refreshing = false;
+if (compact) { document.body.classList.add('compact'); $('#nodes-view').hidden = false; document.title = '灵藏 · 工作节点状态'; }
+let snapshot, busy = false, pendingAction = '', logsOpen = !compact, logsTaskId = null, logsLoading = false, refreshing = false;
 let logDomain = 'collection', logData = { events: [] }, logSignature = '', rawTaskId = null;
 const text = (selector, value) => { $(selector).textContent = value ?? '—'; };
 const selectedTask = () => snapshot?.current || snapshot?.lastTask;
@@ -111,7 +91,14 @@ function render(s) {
   text('#device', s.device || '本机');
   text('#headline', !s.running ? '工作节点已停止' : s.legacy ? '现有工作节点正在运行' : s.stale ? '状态更新中断' : s.quitAfterTask ? '完成当前任务后停止并退出应用' : s.mode === 'draining' ? '完成当前任务后停止' : s.current ? '正在处理资料' : s.mode === 'paused' ? '已暂停领取新任务' : task?.state === 'waiting_action' ? '需要你处理一下' : '准备接收采集任务');
   text('#description', !s.running ? '启动后会连接服务，并领取分配给这台电脑的任务。' : s.legacy ? '已避免重复启动；当前采集继续运行。' : s.quitAfterTask ? '当前任务与上传完成后，工作节点和应用一同退出；等待期间菜单栏保留。' : s.mode === 'draining' ? '当前 Agent 与上传完成后停止工作节点，不再领取后续任务。' : s.mode === 'paused' ? '当前任务继续执行；恢复领取后再接收后续任务。' : '原文与媒体保留本机，校验后上传轻量资料。');
-  badge('#connection', !s.running ? '已停止' : s.legacy || s.stale ? '连接未知' : s.online ? '在线' : '离线 · 正在重连', !s.running ? '' : s.online && !s.stale ? 'ok' : 'warning');
+  const starting = Boolean(s.starting || pendingAction === 'start');
+  badge('#connection', starting ? '启动中…' : !s.running ? '已停止' : s.legacy || s.stale ? '连接未知' : s.online ? '在线' : '离线 · 正在重连', starting ? 'active' : !s.running ? '' : s.online && !s.stale ? 'ok' : 'warning');
+  const connection = $('#connection');
+  const startReason = busy ? '操作处理中，请稍候。' : starting ? '工作节点正在启动，请稍候。' : s.running ? '工作节点正在运行。' : !s.paired ? '请先连接这台电脑，再启动工作节点。' : s.quitAfterTask ? '正在等待工作节点停止并退出。' : macOS && s.actions?.start?.enabled === false ? s.actions.start.reason || '当前无法启动工作节点。' : '';
+  connection.disabled = Boolean(startReason);
+  connection.title = startReason || '点击启动工作节点';
+  connection.setAttribute('aria-label', startReason ? `${connection.textContent}，${startReason}` : '已停止，点击启动工作节点');
+  connection.setAttribute('aria-busy', String(starting));
   badge('#mode-badge', mode, !s.running ? '' : s.mode === 'running' ? 'active' : 'warning');
   text('#process', s.running ? '运行中 · PID ' + (s.pid || '—') : '未运行');
   text('#phase', !s.running ? '已停止' : s.legacy ? '未知' : phases[s.phase] || s.phase || '—');
@@ -165,7 +152,7 @@ function render(s) {
   $('#task-folder').disabled = !task?.id;
   $('#task-logs').disabled = !task?.id;
   const age = s.updatedAt ? elapsed(s.updatedAt) : '未知';
-  text('#freshness', '状态 ' + age + '更新 · 关闭窗口后继续' + (macOS ? '菜单栏' : '托盘') + '运行');
+  text('#freshness', '状态 ' + age + '更新 · ' + (document.documentElement.dataset.closeBehavior === 'quit' ? '关闭时退出工作台，工作节点继续' : '关闭时收起到' + (macOS ? '菜单栏' : '托盘')));
   $('#freshness').classList.toggle('stale', Boolean(s.stale));
 }
 async function refreshLogs() {
@@ -248,16 +235,16 @@ async function loadRawLogs(taskId = logsTaskId) {
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
-  try { render(await window.worker.snapshot()); await refreshLogs(); }
+  try { const state = await window.worker.snapshot(); render(state); dispatchEvent(new CustomEvent('worker:snapshot', { detail: state })); await refreshLogs(); }
   catch (error) { actionResult(error.message); }
   finally { refreshing = false; }
 }
-async function act(fn, success = '') {
+async function act(fn, success = '', action = '') {
   if (busy) return;
-  busy = true; if (snapshot) render(snapshot);
+  busy = true; pendingAction = action; if (snapshot) render(snapshot);
   try { await fn(); actionResult(success); }
   catch (error) { actionResult(error.message.replace(/^Error invoking remote method '[^']+': Error: /, '')); }
-  finally { busy = false; await refresh(); }
+  finally { busy = false; pendingAction = ''; await refresh(); }
 }
 async function showLogs(taskId = null) {
   logsOpen = true; logsTaskId = taskId;
@@ -268,7 +255,11 @@ async function showLogs(taskId = null) {
   await refreshLogs();
   $('#logs-panel').scrollIntoView({ block: 'nearest' });
 }
-for (const button of document.querySelectorAll('[data-action]')) button.addEventListener('click', () => act(() => window.worker.action(button.dataset.action), ['pause', 'resume', 'drain'].includes(button.dataset.action) ? '工作节点已确认操作。' : ''));
+for (const button of document.querySelectorAll('[data-action]')) button.addEventListener('click', () => act(() => window.worker.action(button.dataset.action), button.dataset.action === 'start' ? '工作节点已启动。' : ['pause', 'resume', 'drain'].includes(button.dataset.action) ? '工作节点已确认操作。' : '', button.dataset.action));
+$('#connection').addEventListener('click', () => {
+  if ($('#connection').disabled) return;
+  act(() => window.worker.action('start'), '工作节点已启动。', 'start');
+});
 $('#task-folder').onclick = () => act(() => window.worker.taskFolder(selectedTask()?.id));
 $('#task-logs').onclick = () => act(() => showLogs(selectedTask()?.id));
 $('#worker-logs').onclick = () => act(() => showLogs());

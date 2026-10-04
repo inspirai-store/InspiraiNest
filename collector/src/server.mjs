@@ -13,6 +13,7 @@ import { createReadApi } from './read-api.mjs';
 import { deviceMetadata, publicDeviceMetadata, deviceCategory, workerAuthorized, workerOnline } from './device-metadata.mjs';
 import { browserSessions, browserCookie, browserValid } from './browser-session.mjs';
 import { accountSecurity } from './account-security.mjs';
+import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
 import QRCode from 'qrcode';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
@@ -47,6 +48,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const sessions = browserSessions({ store, serialized, clock });
   const publicDevice = device => publicDeviceMetadata(device, clock());
   const security = accountSecurity({ store, masterKey, serialized, clock });
+  const trust = browserTrust({ clock });
   const download = clientDownload({ releaseDir, publicUrl });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
@@ -135,31 +137,33 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     requireValue(task && task.deviceId === device.id, 'Task not assigned to this device', 403);
     return task;
   }
-  async function enroll(name, role, input = {}) {
+  async function enroll(name, role, input = {}, transaction, prepared) {
     const token = secret();
     // Keep management credentials outside the Agent Worker configuration.
     const ownerToken = input.clientType === 'desktop' ? secret() : null;
     const key = installationKey(input, role);
     const platform = input.platform ? text(input.platform, 'platform', 40) : null;
     const system = input.system ? text(input.system, 'system', 100) : null;
-    const data = await metadata(input);
+    const data = prepared || await metadata(input);
     const inferred = deviceCategory({ role, ...input });
     const category = inferred === 'unknown' && input.clientType === 'web' ? 'browser' : inferred;
-    return serialized(`installation:${key || token}`, async () => store.transaction(async tx => {
+    const write = async tx => {
       if (data.identity) await tx.getForUpdate('setting', 'device-identity-v2');
       let previousBrowser;
       if (key) for (const old of await tx.list('device')) {
         if (old.installationKey !== key) continue;
+        if (deviceCategory(old) === 'browser' && category === 'browser') { previousBrowser = old; continue; }
         const busy = (await tx.list('task')).some(task => task.deviceId === old.id && [...active, 'waiting_action'].includes(task.state));
         requireValue(!busy, 'This computer has an unfinished task; resume or cancel it before pairing again', 409);
-        if (deviceCategory(old) === 'browser' && category === 'browser') { previousBrowser = old; continue; }
         await tx.delete('device', old.id);
       }
       await identityConflict(tx, data, previousBrowser?.id, input.clientType);
-      const record = { id: previousBrowser?.id || id(), name: text(name, 'device name', 100), role, clientType: input.clientType || (role === 'worker' ? 'worker' : 'web'), tokenHash: hash(token), ...(ownerToken ? { ownerTokenHash: hash(ownerToken) } : {}), installationKey: key, platform, system, ...data, createdAt: previousBrowser?.createdAt || now(), lastSeen: now(), lastHeartbeatAt: null, revokedAt: null, capabilities: [], agents: [] };
+      const record = { id: previousBrowser?.id || id(), name: previousBrowser?.name || text(name, 'device name', 100), role, clientType: input.clientType || (role === 'worker' ? 'worker' : 'web'), tokenHash: hash(token), ...(ownerToken ? { ownerTokenHash: hash(ownerToken) } : {}), installationKey: key, platform, system, ...data, createdAt: previousBrowser?.createdAt || now(), lastSeen: now(), lastHeartbeatAt: null, revokedAt: null, capabilities: [], agents: [],
+        ...(category === 'browser' ? { browserTrustMigrated: previousBrowser ? previousBrowser.browserTrustMigrated === true : true } : {}) };
       const device = await tx.put('device', { ...record, ...sessions.fields({ ...record, category }) });
       return { device: publicDevice(device), token, ...(ownerToken ? { ownerToken } : {}) };
-    }));
+    };
+    return transaction ? write(transaction) : serialized(`installation:${key || token}`, () => store.transaction(write));
   }
   function send(res, status, value) {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -316,6 +320,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/authorize.js': ['public/authorize.js', 'text/javascript; charset=utf-8'],
           '/device-identity.js': ['public/device-identity.js', 'text/javascript; charset=utf-8'],
           '/browser-session.js': ['public/browser-session.js', 'text/javascript; charset=utf-8'],
+          '/web-login.js': ['public/web-login.js', 'text/javascript; charset=utf-8'],
           '/device-view.js': ['public/device-view.js', 'text/javascript; charset=utf-8'],
           '/authorize.css': ['public/authorize.css', 'text/css; charset=utf-8'],
           '/security': ['public/security.html', 'text/html; charset=utf-8'],
@@ -334,7 +339,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const ip = req.socket.remoteAddress;
         if (attempts.size > 10000) attempts.clear();
         const attempt = attempts.get(ip);
-        const record = attempt && Date.now() - attempt.at < 60000 ? attempt : { at: Date.now(), count: 0 };
+        const record = attempt && clock() - attempt.at < 60000 ? attempt : { at: clock(), count: 0 };
         attempts.set(ip, record);
         requireValue(++record.count <= 10, 'Too many pairing attempts; retry in a minute', 429);
         const input = await body(req);
@@ -345,8 +350,27 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return await serialized(`pair:${hash(input.key)}`, async () => {
           const pairing = await store.get('pairing', hash(input.key));
           if (!pairing) {
-            requireValue(await security.login(input), 'Invalid or expired pairing key', 401);
-            const result = await enroll(input.name, input.clientType ? clientRole : 'owner', { ...input, clientType });
+            const prepared = await metadata(input);
+            const browserLogin = clientType === 'web' && clientRole === 'owner' && req.headers.origin && req.headers.authorization === undefined
+              && (!prepared.deviceInfo || prepared.deviceInfo.client.type === 'web')
+              && (!prepared.identity || prepared.identity.source === 'browser-profile')
+              && !['desktop', 'mobile'].includes(deviceCategory({ role: 'owner', ...input, clientType }));
+            const profile = installationKey(input, clientRole);
+            const result = await serialized(`installation:${profile || secret()}`, () => security.login(input, {
+              trusted: async (state, tx) => {
+                // Metadata updates lock the policy before the device; use the same order.
+                if (prepared.identity) await tx.getForUpdate('setting', 'device-identity-v2');
+                return browserLogin && trust.find(tx, state, cookieValue(req, trustCookie), profile);
+              },
+              complete: async (state, tx) => {
+                const enrolled = await enroll(input.name, input.clientType ? clientRole : 'owner', { ...input, clientType }, tx, prepared);
+                if (state.totp && browserLogin && profile && enrolled.device.category === 'browser') {
+                  await trust.issue(tx, state, await tx.get('device', enrolled.device.id), res);
+                }
+                return enrolled;
+              },
+            }));
+            requireValue(result, 'Invalid or expired pairing key', 401);
             if (result.device.category === 'browser') sessions.cookie(res, result.token);
             return send(res, 201, result);
           }
@@ -368,11 +392,33 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         sessions.clear(res); return send(res, 200, { loggedOut: true });
       }
       const device = await authenticate(req);
+      if (route.startsWith('/api/browser-trust')) {
+        owner(device);
+        requireValue(deviceCategory(device) === 'browser' && req.headers.authorization === undefined && cookieValue(req, browserCookie), 'Browser cookie session required', 403);
+        if (route === '/api/browser-trust' && req.method === 'GET') return send(res, 200,
+          await security.transaction(async (state, tx) => trust.status(await trust.find(tx, state, cookieValue(req, trustCookie), device.installationKey, device.id))));
+        sameOrigin(req);
+        if (route === '/api/browser-trust/bootstrap' && req.method === 'POST') {
+          const input = await body(req);
+          installationKey(input, 'owner'); await metadata(input);
+          return send(res, 200, await security.transaction((state, tx) => trust.bootstrap(tx, state, device, input, cookieValue(req, trustCookie), res)));
+        }
+        if (route === '/api/browser-trust/forget' && req.method === 'POST') return send(res, 200,
+          await security.transaction((state, tx) => trust.forget(tx, device, res)));
+        fail('Not found', 404);
+      }
       if (route.startsWith('/api/browser-session')) {
         owner(device);
         requireValue(deviceCategory(device) === 'browser', 'Browser session required', 403);
         if (route === '/api/browser-session' && req.method === 'GET') return send(res, 200, publicDevice(device));
-        if (route === '/api/browser-session/activity' && req.method === 'POST') return send(res, 200, publicDevice(await sessions.activity(device, req.authToken, res)));
+        if (route === '/api/browser-session/activity' && req.method === 'POST') {
+          const current = await sessions.activity(device, req.authToken, res);
+          if (req.headers.authorization === undefined && cookieValue(req, browserCookie)) await security.transaction(async (state, tx) => {
+            const live = await tx.getForUpdate('device', current.id);
+            if (live && live.tokenHash === current.tokenHash && browserValid(live, clock())) await trust.renew(tx, state, live, cookieValue(req, trustCookie), res);
+          });
+          return send(res, 200, publicDevice(current));
+        }
         fail('Not found', 404);
       }
       if (route.startsWith('/api/read/v1/')) {
@@ -386,7 +432,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         owner(device);
         if (route === '/api/security' && req.method === 'GET') return send(res, 200, await security.status());
         requireValue(req.method === 'POST' && route.startsWith('/api/security/'), 'Not found', 404);
-        return send(res, 200, await security.operation(route.slice('/api/security/'.length), await body(req), device));
+        const action = route.slice('/api/security/'.length);
+        const result = await security.operation(action, await body(req), device);
+        if (['credential', 'totp/confirm', 'totp/disable'].includes(action)) trust.clear(res);
+        return send(res, 200, result);
       }
       if (route === '/api/devices/me/info' && req.method === 'POST') {
         const input = await body(req);
@@ -435,7 +484,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         owner(device);
         const target = await store.get('device', revoke[1]);
         requireValue(target, 'Device not found', 404);
-        await store.transaction(tx => tx.delete('device', target.id));
+        await security.transaction(async (state, tx) => {
+          await tx.delete('device', target.id);
+          for (const proof of await tx.list('browser-trust')) if (proof.deviceId === target.id) await tx.delete('browser-trust', proof.id);
+        });
         return send(res, 200, { revoked: true });
       }
       if (route === '/api/heartbeat' && req.method === 'POST') {

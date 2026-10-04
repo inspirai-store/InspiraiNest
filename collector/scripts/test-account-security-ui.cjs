@@ -69,13 +69,13 @@ const path = require('node:path');
     }
     const fresh = await page(); await fresh.goto(base + '/login');
     await fillForm(fresh, '#login-form', { key }); await fresh.locator('#login-form button').click(); await fresh.locator('#login-error').filter({ hasText: 'Invalid' }).waitFor();
-    await fillForm(fresh, '#login-form', { key: next }); await fresh.locator('#login-form button').click(); await fresh.locator('#login-error').filter({ hasText: '动态码' }).waitFor();
-    await fillForm(fresh, '#login-form', { factor: codes[1] }); await fresh.locator('#login-form button').click(); await fresh.locator('#app').waitFor({ state: 'visible' });
+    await fillForm(fresh, '#login-form', { key: next }); await fresh.locator('#login-form button').click(); await fresh.locator('#login-mfa-dialog').waitFor({ state: 'visible' });
+    await fillForm(fresh, '#login-mfa-dialog', { factor: codes[1] }); await fresh.locator('#login-mfa-dialog button[type=submit]').click(); await fresh.locator('#app').waitFor({ state: 'visible' });
     for (const width of [320, 375, 1440]) { await fresh.setViewportSize({ width, height: 900 }); assert.ok(await fresh.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `app overflow ${width}`); }
     const grant = await (await fetch(base + '/oauth/device_authorization', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: 'lingnest-cli', scope: 'library:read' }) })).json();
     const authorize = await page(); await authorize.goto(base + '/authorize#code=' + grant.user_code); await authorize.locator('#auth-login').waitFor({ state: 'visible' });
-    await fillForm(authorize, '#auth-login', { key: next }); await authorize.locator('#auth-login button').click(); await authorize.locator('#auth-message').filter({ hasText: '动态码' }).waitFor();
-    await fillForm(authorize, '#auth-login', { factor: codes[2] }); await authorize.locator('#auth-login button').click(); await authorize.locator('#consent').waitFor({ state: 'visible' });
+    await fillForm(authorize, '#auth-login', { key: next }); await authorize.locator('#auth-login button').click(); await authorize.locator('#login-mfa-dialog').waitFor({ state: 'visible' });
+    await fillForm(authorize, '#login-mfa-dialog', { factor: codes[2] }); await authorize.locator('#login-mfa-dialog button[type=submit]').click(); await authorize.locator('#consent').waitFor({ state: 'visible' });
     assert.equal((await service.store.list('reader_grant'))[0].state, 'pending');
     await authorize.locator('#allow').click(); await authorize.locator('#result-title').filter({ hasText: '已允许只读访问' }).waitFor();
     assert.equal((await service.store.list('reader_grant'))[0].state, 'approved');

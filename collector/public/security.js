@@ -62,9 +62,23 @@
   }
   async function perform(work) {
     if (busy) return; busy = true; document.querySelectorAll('button').forEach(button => button.disabled = true); message('正在处理');
-    try { await work(); } catch (error) { message(error.message, true); }
+    try { await work(); await refreshTrust(); } catch (error) { message(error.message, true); }
     finally { busy = false; document.querySelectorAll('button').forEach(button => button.disabled = false); }
   }
+  async function trustRequest(method = 'GET', route = '') {
+    const response = await fetch('/api/browser-trust' + route, { method, signal: AbortSignal.timeout(15000) });
+    const value = await response.json();
+    if (!response.ok) throw new Error(value.error || '浏览器确认状态暂不可用');
+    return value;
+  }
+  async function refreshTrust() {
+    const state = await trustRequest();
+    $('#browser-trust-status').textContent = state.confirmed ? `已确认 · 有效至 ${date(state.expiresAt)}（北京时间）` : '尚未确认 · 下次登录需二次认证（已绑定时）';
+    $('#forget-browser').hidden = !state.confirmed;
+  }
+  $('#forget-browser').onclick = () => perform(async () => {
+    await trustRequest('POST', '/forget'); message('已忘记此浏览器。当前登录仍然有效。');
+  });
   $('#edit-credential').onclick = () => openDialog('#credential-dialog');
   $('#credential-form').onsubmit = event => {
     event.preventDefault(); const input = fields(event.target);

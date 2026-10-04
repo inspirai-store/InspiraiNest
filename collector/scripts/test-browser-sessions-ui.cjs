@@ -22,7 +22,7 @@ const path = require('node:path');
     }
     context = await browser.newContext(); let page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.locator('#login-form [name=key]').fill(key); await page.locator('#login-form button').click(); await page.locator('#app').waitFor({ state: 'visible' });
-    assert.equal(await page.title(), '灵藏 · 采集中心');
+    assert.equal(await page.title(), '资料库 · 灵藏');
     assert.equal(await page.evaluate(() => sessionStorage.getItem('collector-token') || localStorage.getItem('collector-token')), null);
     const cookie = (await context.cookies()).find(c => c.name === 'collector_browser_session');
     assert.ok(cookie.httpOnly && cookie.secure && cookie.sameSite === 'Strict');
@@ -35,6 +35,7 @@ const path = require('node:path');
     assert.ok((await page.locator('[data-category=desktop]').innerText()).includes('工作节点离线'));
     await page.locator('[data-view=tasks]').click(); await page.locator('#new-task').click();
     assert.equal(await page.locator('#dispatch-device option').count(), 2); await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
     // A background state fetch does not renew the browser authorization.
     await page.evaluate(() => fetch('/api/state')); assert.equal((await service.store.get('device', profile.id)).browserExpiresAt, expiry);
     await page.locator('[data-view=devices]').click();
@@ -65,7 +66,7 @@ const path = require('node:path');
     const legacyToken = secret();
     await service.store.put('device', { id: 'legacy-browser-fixture', name: 'Preserved legacy note', role: 'owner', clientType: 'web', tokenHash: hash(legacyToken), revokedAt: null });
     await context.close(); context = await browser.newContext();
-    await context.addInitScript(token => sessionStorage.setItem('collector-token', token), legacyToken);
+    await context.addInitScript(token => { if (window === window.top) sessionStorage.setItem('collector-token', token); }, legacyToken);
     page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.locator('#app').waitFor({ state: 'visible' });
     const migrated = await service.store.get('device', 'legacy-browser-fixture');

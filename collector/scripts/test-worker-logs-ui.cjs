@@ -1,3 +1,4 @@
+const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -36,7 +37,8 @@ const { _electron } = require('playwright');
     for (let n = 0; n < 100 && !page; n++) { page = app.windows().find(p => p.url().startsWith('file:') && !p.url().includes('compact=1')); if (!page) await new Promise(r => setTimeout(r, 100)); }
     assert.ok(page);
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.locator('[data-view=worker]').click();
+    await page.locator('[data-view=nodes]').click();
+    await setTheme(page,'dark');
     await page.locator('#logs .log-event').first().waitFor();
     assert.equal(await page.locator('#logs .log-event').count(), 3);
     assert.match(await page.locator('#logs .log-event').first().innerText(), /已归档/);
@@ -57,9 +59,10 @@ const { _electron } = require('playwright');
     await page.screenshot({ path: path.join(output, 'system-dark.png') });
     await page.locator('#logs-collection').click();
     await page.screenshot({ path: path.join(output, 'collection-dark.png') });
-    await page.locator('#theme-toggle').click();
+    await setTheme(page);
     await page.screenshot({ path: path.join(output, 'collection-light.png') });
     await app.evaluate(() => globalThis.workerDesktop().main.setSize(740,580));
+    await page.locator('[data-node=local]').click();
     await page.screenshot({ path: path.join(output, 'collection-minimum-light.png') });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -73,5 +76,10 @@ const { _electron } = require('playwright');
     assert.ok(!(await page.locator('#log-raw-output').innerText()).includes('private-fixture-token'));
     assert.deepEqual(errors, []);
     console.log('Worker log UI: newest-first, Chinese stages, system separation, dedup/recovery, expandable diagnostics, redaction, themes, minimum size and keyboard: passed');
-  } finally { await app.evaluate(({app}) => app.quit()).catch(() => {}); await app.close(); }
+  } finally {
+    // The lock belongs to this synthetic fixture, not a real Worker. Remove it
+    // before macOS safe quit tries to send a control command to the test runner.
+    try { fs.unlinkSync(path.join(root, 'worker.lock')); } catch {}
+    await app.evaluate(({app}) => app.quit()).catch(() => {}); await app.close();
+  }
 })().catch(e => { console.error(e); process.exitCode = 1; });
