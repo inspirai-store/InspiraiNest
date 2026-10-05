@@ -10,8 +10,9 @@ for (const file of fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name
   if (file === 'collector-release.yml') {
     if (Object.keys(workflow.on).join() !== 'workflow_dispatch') throw new Error('Release must be manual only');
     for (const job of Object.values(workflow.jobs)) {
-      if (job.environment !== 'signed-release' || !job.if?.includes("github.ref == 'refs/heads/master'") || !job.if?.includes("vars.ENABLE_SIGNED_RELEASE == 'true'")) throw new Error('Release job lacks explicit enablement, branch or environment guard');
+      if (job.environment !== 'signed-release' || !job.if?.includes("github.ref == 'refs/heads/main'") || !job.if?.includes("vars.ENABLE_SIGNED_RELEASE == 'true'")) throw new Error('Release job lacks explicit enablement, branch or environment guard');
     }
+    if (workflow.permissions?.contents !== 'read' || /pull_request_target|workflow_run|contents:\s*write|id-token:\s*write/i.test(source)) throw new Error('Release permissions must remain read-only');
     continue;
   }
   if (/secrets\s*(?:\.|\[)|contents:\s*write|id-token:\s*write|pull_request_target|workflow_run|self-hosted/i.test(source)) throw new Error(`Privileged capability in public CI: ${file}`);
@@ -25,4 +26,4 @@ for (const file of fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name
     }
   }
 }
-console.log('CI boundaries checked: public workflows have no signing/release capabilities.');
+console.log('CI boundaries checked: regular workflows are unprivileged; signed releases require manual main-branch enablement.');

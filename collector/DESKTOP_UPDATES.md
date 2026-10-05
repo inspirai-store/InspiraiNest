@@ -1,15 +1,11 @@
 # Desktop client updates
 
-The desktop client checks the public `inspirai-store/InspiraiNest` GitHub Releases feed at startup, every six hours, and on request from the main window or tray menu. It downloads an update only after the user chooses **下载更新**, then installs it after the user chooses **安装并重启**. If the detached Worker is active, the client requests a drain and waits for that process to exit before replacing application files.
+macOS clients use the generic update feed at `https://library.inspirai.store/updates/macos`. Windows clients retain their configured update channel. Updates download only after the user chooses 下载更新 and install after 安装并重启; an active Worker drains before the app is replaced.
 
-Windows updates use an NSIS installer. Existing portable builds are not self-updating; users must install an NSIS build once to enter this update channel. macOS updates require a Developer ID signed app and a ZIP for each architecture; ad-hoc CI builds are development artifacts and must not be published as update releases.
+Regular public CI builds test artifacts without signing or publication credentials. Formal macOS releases use `.github/workflows/collector-release.yml`, manually dispatched from the reviewed `main` commit. The `signed-release` environment, the `ENABLE_SIGNED_RELEASE=true` repository variable and the dedicated `inspirainest-macos` self-hosted runner are required. Pull requests cannot use this release job.
 
-Build both platforms from the same version and commit. `npm run build:worker:win` produces `InspiraiNest-v<version>-Windows-x64.exe` and `latest.yml`; `npm run build:worker:mac:release` produces signed ZIPs/DMGs and `latest-mac.yml`. Publish the installer, both Mac ZIPs, the optional DMGs, both metadata files and the generated blockmaps as assets of the same **non-draft** GitHub Release tagged `v<version>`. Keep the generated metadata paired with its exact binaries; the SHA-512 values are verified during download. Check that the signed macOS apps retain the same Apple Team ID across releases and pass notarization/Gatekeeper validation. The public CI deliberately has no signing or publishing credentials.
+Repository Secrets retain the existing names: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `OSS_RELEASE_REGION`, `OSS_RELEASE_BUCKET`, `OSS_RELEASE_ACCESS_KEY_ID`, and `OSS_RELEASE_ACCESS_KEY_SECRET`. Never export plaintext values into logs or repository files.
 
-Before publishing, run `npm test` and the packaged Windows update test:
+`npm run build:worker:mac:release` builds Developer ID signed and notarized arm64/x64 ZIPs and DMGs, both architectures in `latest-mac.yml`, and blockmaps. The release job checks signatures, notarization, Gatekeeper, architectures, ZIP/DMG integrity and SHA-512 update metadata, then runs packaged update and lifecycle checks. It uploads the verified files to private OSS under an immutable version/run prefix and reads every object back. No GitHub Release or build artifact storage is used by this formal release job.
 
-```powershell
-node scripts/test-packaged-update.cjs desktop/dist/win-unpacked/InspiraiNest.exe desktop/dist/InspiraiNest-v<version>-Windows-x64.exe
-```
-
-The packaged test serves a temporary local update manifest and checks that the client recognizes and downloads the real package. CI runs it on both Windows and macOS, and checks that `app-update.yml` points at this repository and macOS metadata lists both architectures. After publishing, verify `latest.yml`, `latest-mac.yml`, the file checksums and an update from an older installed version on Windows and on signed macOS builds. Do not use the unsigned/ad-hoc CI artifacts as proof of a production installation update.
+After the OSS completion receipt exists, stage the matching packages and metadata into the production download service. Preserve other platforms, update `worker-release.json`, and keep `latest-mac.yml` paired with its exact ZIPs. Verify public download hashes and the Mac update feed before announcing publication. A development or ad-hoc package is not a formal update release.

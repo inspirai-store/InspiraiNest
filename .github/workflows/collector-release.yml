@@ -1,0 +1,118 @@
+name: InspiraiNest signed macOS OSS release
+
+# Manual releases use the reviewed main commit and retain verified packages in OSS.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-macos:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true'
+    environment: signed-release
+    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    timeout-minutes: 150
+    concurrency:
+      group: inspirainest-macos-release
+      cancel-in-progress: false
+    steps:
+      - name: Check out the reviewed public source commit
+        uses: actions/checkout@v4
+        with:
+          repository: inspirai-store/InspiraiNest
+          ref: ${{ github.sha }}
+          path: public-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify the source pin before any secrets are available
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C public-source rev-parse HEAD)" = ${{ github.sha }}
+          node -e 'if(!/^\d+\.\d+\.\d+$/.test(require("./public-source/collector/package.json").version))throw Error("Invalid release version")'
+          test -f public-source/collector/desktop/updater.mjs
+          test -f public-source/collector/desktop/macos-policy.mjs
+          test -f public-source/collector/electron-builder.yml
+      - run: npm ci --ignore-scripts
+        working-directory: public-source/collector
+      - run: npm test
+        working-directory: public-source/collector
+      - name: Build Developer ID signed and notarized macOS packages
+        working-directory: public-source/collector
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            test -n "${!name}" || { echo "Missing $name" >&2; exit 1; }
+          done
+          npm run build:worker:mac:release
+      - name: Verify signatures, both architectures and update metadata
+        working-directory: public-source/collector
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          test -s desktop/dist/latest-mac.yml
+          for arch in arm64 x64; do
+            zip="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
+            dmg="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.dmg"
+            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/InspiraiNest.app"
+            test -s "$zip"
+            test -s "$dmg"
+            unzip -tq "$zip" >/dev/null
+            hdiutil verify "$dmg" >/dev/null
+            codesign --verify --deep --strict "$app"
+            test "$(lipo -archs "$app/Contents/MacOS/InspiraiNest")" = "$([[ "$arch" == arm64 ]] && echo arm64 || echo x86_64)"
+            signature=$(codesign -dv --verbose=4 "$app" 2>&1)
+            [[ "$signature" == *'Authority=Developer ID Application:'* ]]
+            [[ "$signature" == *"TeamIdentifier=$APPLE_TEAM_ID"* ]]
+            xcrun stapler validate "$app"
+            spctl --assess --type execute "$app"
+            grep -F "InspiraiNest-v${version}-macOS-${arch}.zip" desktop/dist/latest-mac.yml
+          done
+          grep -F 'provider: generic' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
+          grep -F 'https://library.inspirai.store/updates/macos' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
+          node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("desktop/dist/latest-mac.yml","utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`desktop/dist/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
+          (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
+            "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
+            "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
+      - name: Test signed Apple Silicon update download
+        working-directory: public-source/collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          node scripts/test-packaged-update.cjs \
+            desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest \
+            "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+      - name: Test packaged macOS menu bar and safe Worker lifecycle
+        working-directory: public-source/collector
+        shell: bash
+        env:
+          COLLECTOR_DESKTOP_EXECUTABLE: ${{ github.workspace }}/public-source/collector/desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest
+        run: node scripts/test-desktop.cjs
+      - name: Upload verified packages and update files to private OSS
+        working-directory: public-source/collector
+        shell: bash
+        env:
+          OSS_RELEASE_REGION: ${{ secrets.OSS_RELEASE_REGION }}
+          OSS_RELEASE_BUCKET: ${{ secrets.OSS_RELEASE_BUCKET }}
+          OSS_RELEASE_ACCESS_KEY_ID: ${{ secrets.OSS_RELEASE_ACCESS_KEY_ID }}
+          OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
+          OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          OSS_RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/upload-macos-oss.mjs desktop/dist InspiraiNest
