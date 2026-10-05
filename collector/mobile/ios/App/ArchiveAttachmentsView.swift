@@ -25,10 +25,6 @@ struct ArchiveListView: View {
     }
     var body: some View {
         List {
-            Section {
-                Text("在原生阅读器查看已归档的 PDF、图片、报告、原文与字幕。仅读取当前服务器返回的轻量附件，不下载外部链接。")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
             ForEach(latest) { archive in
                 NavigationLink { ArchiveAttachmentsView(archive: archive).id(model.sessionID) } label: {
                     VStack(alignment: .leading) {

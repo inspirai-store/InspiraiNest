@@ -33,11 +33,11 @@ struct RootView: View {
                 }.padding().background(.thinMaterial)
             }
             TabView(selection: $selectedTab) {
-                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("任务", systemImage: "list.bullet.rectangle") }.tag(0)
-                NavigationStack { OutboxView() }.tabItem { Label("发件箱", systemImage: "tray.and.arrow.up") }.tag(1)
-                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(2)
-                NavigationStack { SettingsView() }.tabItem { Label("设备", systemImage: "iphone") }.tag(3)
+                NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(0)
+                NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("采集", systemImage: "plus.circle") }.tag(1)
+                NavigationStack { SettingsView() }.tabItem { Label("我的", systemImage: "person.crop.circle") }.tag(2)
             }
+            .tint(.primary)
         }
     }
 }
@@ -52,8 +52,6 @@ struct PairingForm: View {
     @State private var showingManual = false
     var body: some View {
         Section("配对管理端") {
-            Text("在网页「授权设备」生成手机管理端二维码，然后用这台 iPhone 扫描。")
-                .font(.footnote).foregroundStyle(.secondary)
             Button { showingScanner = true } label: { Label("扫码连接资料库", systemImage: "qrcode.viewfinder") }
                 .disabled(model.busy)
             if let scanned {
@@ -90,7 +88,7 @@ struct TasksView: View {
     var body: some View {
         List {
             if !model.paired { PairingForm() }
-            if let last = model.lastRefresh { Text("最近更新 \(last.formatted(date: .omitted, time: .standard))").font(.caption).foregroundStyle(.secondary) }
+            NavigationLink { OutboxView() } label: { Label("待提交", systemImage: "tray.and.arrow.up") }
             ForEach(model.snapshot?.tasks ?? []) { task in
                 NavigationLink { TaskDetailView(taskID: task.id).id(model.sessionID) } label: {
                     VStack(alignment: .leading, spacing: 6) {
@@ -100,8 +98,8 @@ struct TasksView: View {
                     }
                 }
             }
-            if model.paired && model.snapshot?.tasks.isEmpty == true { Text("暂无任务。通过其他应用的分享菜单收集资料。") }
-        }.navigationTitle("采集任务").refreshable { await model.refresh() }
+            if model.paired && model.snapshot?.tasks.isEmpty == true { Text("暂无任务") }
+        }.navigationTitle("采集").refreshable { await model.refresh() }
     }
 }
 
@@ -139,8 +137,6 @@ struct OutboxView: View {
     var body: some View {
         List {
             Section {
-                Text("“已保存”表示原文在本机；只有收到服务器确认后才显示“已提交”。重试始终沿用原提交 ID。")
-                    .font(.footnote).foregroundStyle(.secondary)
                 Button("重试当前服务器的待发送记录") { Task { await model.retryQueued() } }
                     .disabled(model.busy || !model.paired)
             }
@@ -195,13 +191,13 @@ struct OutboxDetailView: View {
                         if item.origin != model.serverName { Text("记录属于另一台服务器。请配对到原服务器后再重试。") }
                     }
                 }
-                Text("为避免超时后重复创建任务，已保存内容不可就地改写。超过服务端限制的内容完整保留在此，可选择复制。")
-                    .font(.footnote).foregroundStyle(.secondary)
-                .confirmationDialog("将完整分享内容发送到 \(model.serverName)？绑定后不会自动迁移到其他服务器。", isPresented: $binding, titleVisibility: .visible) {
+            }
+        }.navigationTitle("已保存的分享")
+            .confirmationDialog("将完整分享内容发送到 \(model.serverName)？绑定后不会自动迁移到其他服务器。", isPresented: $binding, titleVisibility: .visible) {
+                if let item = model.items.first(where: { $0.id == itemID }) {
                     Button("绑定并提交") { Task { await model.send(item, bindUnassigned: true) } }
                 }
             }
-        }.navigationTitle("已保存的分享")
     }
 }
 
@@ -238,15 +234,11 @@ struct SettingsView: View {
                     }
                 }
             } else { PairingForm() }
-            Section {
-                Text("分享扩展仅做短时间发送尝试。离线或系统终止时，请回到发件箱重试；无需重新分享。电脑上的采集 Agent 负责分析与归档。")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
             Section("帮助与隐私") {
                 Link("使用帮助与联系支持", destination: URL(string: "https://library.inspirai.store/support")!)
                 Link("隐私政策", destination: URL(string: "https://library.inspirai.store/privacy")!)
             }
-        }.navigationTitle("设备与配对").refreshable { await model.refresh() }
+        }.navigationTitle("我的").refreshable { await model.refresh() }
         .confirmationDialog("撤销 \(revoking?.name ?? "") 的服务器访问？", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }), titleVisibility: .visible) {
             if let device = revoking { Button("撤销设备", role: .destructive) { Task { await model.revoke(device) }; revoking = nil } }
         }

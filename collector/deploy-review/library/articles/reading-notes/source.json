@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "review-demo:article",
+  "title": "读完长文后，怎样留下可回溯的笔记",
+  "type": "article",
+  "platform": "原创内容",
+  "source_url": null,
+  "canonical_url": null,
+  "aliases": [],
+  "creator": "灵感小窝编辑团队",
+  "published_at": null,
+  "collected_at": "2026-10-03T18:24:54+08:00",
+  "organized_at": "2026-10-03",
+  "mode": "general",
+  "scenario": null,
+  "tags": ["阅读", "笔记", "信息整理"],
+  "summary": "从观点、证据和待验证问题三个层次整理长文，并保留原文位置，方便日后重新判断。",
+  "status": "archived",
+  "verification_status": "source_only",
+  "verified_at": null,
+  "coverage_note": "团队原创全文，原文和摘要均已保存；没有外部来源。",
+  "files": [
+    { "path": "original.md", "role": "original" },
+    { "path": "summary.md", "role": "summary" }
+  ],
+  "related": []
+}

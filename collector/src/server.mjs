@@ -247,6 +247,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           return res.end(html);
         }
+        const mobileAsset = route.match(/^\/library\/mobile-next\/(index\.html|mobile\.(?:css|js)|brand\.png|vendor\/(?:marked|purify)\.js)$/);
+        if (mobileAsset) {
+          const file = mobileAsset[1];
+          res.setHeader('Content-Type', file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : 'text/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          return res.end(fs.readFileSync(path.join(project, 'mobile/android/app/src/main/assets/mobile-next', file)));
+        }
         const assets = { '/library/bootstrap.js': 'collector/public/library-bootstrap.js', ...Object.fromEntries(['library.js', 'library.css', 'library-time.js', 'client-prompt.js', 'client-prompt.css', 'brand-icon.png', 'brand.css', 'vendor/lucide.js', 'vendor/marked.js', 'vendor/purify.js'].map(f => ['/library/assets/' + f, 'assets/' + f])) };
         if (assets[route]) {
           res.setHeader('Content-Type', route.endsWith('.css') ? 'text/css' : route.endsWith('.png') ? 'image/png' : 'text/javascript');
@@ -495,7 +502,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         worker(device);
         const input = await body(req);
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
-        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
+        requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy', 'basic'].includes(x)), 'Invalid agents');
         await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)] });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })) });
       }
@@ -517,7 +524,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           const target = await store.get('device', preferredDeviceId);
           requireValue(target && workerAuthorized(target), 'Invalid dispatch device');
         }
-        requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
+        requireValue(!input.agent || ['codex', 'codebuddy', 'basic'].includes(input.agent), 'Unknown agent');
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {

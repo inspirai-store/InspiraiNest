@@ -41,11 +41,13 @@ final class APITests: XCTestCase {
         }
         let policy = try await api().devicePolicy()
         XCTAssertEqual(policy?.version, 2)
-        let first = try DeviceIdentity.scoped(policy)
-        XCTAssertEqual(first, try DeviceIdentity.scoped(policy))
-        XCTAssertEqual(first?.source, "keychain")
-        XCTAssertEqual(first?.digest.count, 64)
-        XCTAssertNotEqual(first?.digest, try DeviceIdentity.scoped(DevicePolicy(version: 2, namespace: "22222222-2222-4222-8222-222222222222"))?.digest)
+        guard let policy else { XCTFail("missing device policy"); return }
+        let installationID = "33333333-3333-4333-8333-333333333333"
+        let first = try DeviceIdentity.scoped(policy, installationID: installationID)
+        XCTAssertEqual(first, try DeviceIdentity.scoped(policy, installationID: installationID))
+        XCTAssertEqual(first.source, "keychain")
+        XCTAssertEqual(first.digest.count, 64)
+        XCTAssertNotEqual(first.digest, try DeviceIdentity.scoped(DevicePolicy(version: 2, namespace: "22222222-2222-4222-8222-222222222222"), installationID: installationID).digest)
         StubProtocol.handler = { _ in (404, Data("{\"error\":\"Not found\"}".utf8)) }
         let missing = try await api().devicePolicy()
         XCTAssertNil(missing)

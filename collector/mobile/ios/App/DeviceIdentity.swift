@@ -35,8 +35,12 @@ enum DeviceIdentity {
     }
     static func scoped(_ policy: DevicePolicy?) throws -> ScopedDeviceIdentity? {
         guard let policy else { return nil }
+        return try scoped(policy, installationID: id())
+    }
+
+    static func scoped(_ policy: DevicePolicy, installationID: String) throws -> ScopedDeviceIdentity {
         guard policy.version == 2, UUID(uuidString: policy.namespace) != nil else { throw CollectorError.message("设备身份策略无效。") }
-        let input = "\(policy.namespace)\nkeychain\n\(try id())"
+        let input = "\(policy.namespace)\nkeychain\n\(installationID)"
         let digest = SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
         return ScopedDeviceIdentity(version: 2, namespace: policy.namespace, source: "keychain", digest: digest)
     }

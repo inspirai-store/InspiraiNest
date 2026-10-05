@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "review-demo:document",
+  "title": "周末徒步出发清单",
+  "type": "document",
+  "platform": "原创内容",
+  "source_url": null,
+  "canonical_url": null,
+  "aliases": [],
+  "creator": "灵感小窝编辑团队",
+  "published_at": null,
+  "collected_at": "2026-10-03T18:24:54+08:00",
+  "organized_at": "2026-10-03",
+  "mode": "general",
+  "scenario": null,
+  "tags": ["徒步", "清单", "出行"],
+  "summary": "一份短途徒步出发前的核对清单，覆盖路线、天气、饮水、随身物品和返程安排。",
+  "status": "archived",
+  "verification_status": "source_only",
+  "verified_at": null,
+  "coverage_note": "团队原创清单，原文和摘要均已保存；没有外部来源。",
+  "files": [
+    { "path": "original.md", "role": "original" },
+    { "path": "summary.md", "role": "summary" }
+  ],
+  "related": []
+}

@@ -32,6 +32,7 @@ files:
   - public/device-view.js
   - public/pairing-dialog.css
   - src/**
+  - mobile/android/app/src/main/assets/mobile-next/**
   - worker.production.example.json
   - node_modules/**
 extraResources:
