@@ -1,5 +1,11 @@
 # 桌面工作台下载记录
 
+## macOS 0.1.11 与 Web 更新（2026-10-05）
+
+Apple Silicon 和 Intel 的签名、公证 DMG/ZIP 已由公开仓库 CI 构建并保存到 OSS。官网下载页和 macOS 自动更新地址均已切换到 0.1.11，Windows 0.1.11、Android 1.3.4、只读 CLI 0.1.1 的文件与清单保持一致。
+
+本次同时发布当前 Web 源码，包含配对弹窗及登录、浏览器会话相关更新。构建来源、文件校验值、部署记录和验收范围见 [本次发布记录](releases/2026-10-05-macos-011-web.md)。
+
 ## Windows 0.1.11
 
 - 安装包：`InspiraiNest-v0.1.11-Windows-x64.exe`，沿用 NSIS。

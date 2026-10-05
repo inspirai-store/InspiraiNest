@@ -48,7 +48,11 @@ const {showSettings,setTheme} = require('./desktop-test-helpers.cjs');
         return { key: 'fixture-pairing-' + call, expiresAt: new Date(Date.now() + lifetime).toISOString(), qrDataUrl };
       });
     }, await QRCode.toDataURL('fixture-only-no-authority'));
-    const page = app.windows().find(p => p.url().startsWith('file:') && !p.url().includes('compact=1'));
+    let page;
+    for (let i = 0; i < 100 && !page; i++) {
+      page = app.windows().find(p => p.url().startsWith('file:') && !p.url().includes('compact=1'));
+      if (!page) await new Promise(resolve => setTimeout(resolve, 100));
+    }
     assert.ok(page);
     await page.reload();
     await page.locator('#overview-data').waitFor({ state: 'visible' });
