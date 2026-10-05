@@ -30,6 +30,7 @@ const { _electron } = require('playwright');
   const args = process.env.COLLECTOR_DESKTOP_APP ? [path.resolve(process.env.COLLECTOR_DESKTOP_APP)] : process.env.COLLECTOR_DESKTOP_EXECUTABLE ? [] : [path.resolve(__dirname, '../desktop')];
   const app = await _electron.launch({ executablePath: electron, args, env });
   const macOS = process.platform === 'darwin';
+  const skipNativeMinimize = macOS && process.env.COLLECTOR_DESKTOP_SKIP_NATIVE_MINIMIZE === '1';
   const desktopProcess = app.process();
   const manager = new WorkerManager(file, process.execPath);
   const bounded = async (promise, milliseconds) => {
@@ -72,6 +73,8 @@ const { _electron } = require('playwright');
         { name: 'safe-quit pending', patch: { running: true, managed: true, mode: 'draining', quitAfterTask: true }, expected: { start: [false, '退出应用'], pause: [false, '退出应用'], resume: [false, '退出应用'], drain: [false, '退出应用'], 'quit-after': [false, '退出应用'] } },
       ];
       await app.evaluate(() => globalThis.workerDesktop().main.setSize(740, 580));
+      // The narrow node layout opens its detail pane only after selecting a node.
+      await page.locator('[data-node=local]').click();
       for (const state of states) {
         const snapshot = { ...base, ...state.patch };
         await app.evaluate((_, value) => globalThis.workerDesktop().setSnapshot(value), snapshot);
@@ -143,9 +146,11 @@ const { _electron } = require('playwright');
     await page.screenshot({ path: path.join(output, 'completed.png') });
     if (macOS) {
       assert.equal(await app.evaluate(({ app }) => app.dock.isVisible()), true);
-      await app.evaluate(() => globalThis.workerDesktop().main.minimize());
-      await wait(() => app.evaluate(() => globalThis.workerDesktop().main.isMinimized()));
-      assert.equal(await app.evaluate(({ app }) => app.dock.isVisible()), true, 'native minimization keeps Dock');
+      if (!skipNativeMinimize) {
+        await app.evaluate(() => globalThis.workerDesktop().main.minimize());
+        await wait(() => app.evaluate(() => globalThis.workerDesktop().main.isMinimized()));
+        assert.equal(await app.evaluate(({ app }) => app.dock.isVisible()), true, 'native minimization keeps Dock');
+      }
       await app.evaluate(({ app }) => app.emit('activate'));
       await wait(() => app.evaluate(() => { const { main } = globalThis.workerDesktop(); return main.isVisible() && !main.isMinimized(); }));
       await app.evaluate(() => globalThis.workerDesktop().main.close());
@@ -247,8 +252,8 @@ const { _electron } = require('playwright');
       assert.equal(manager.snapshot().running, true);
     }
     assert.deepEqual(errors, []);
-    const platformChecks = macOS ? ['disabled action reasons match native menu and both panels across nine states', 'disabled reasons fit minimum manager and compact controls', 'native MenuItem handlers start pause resume and drain synthetic Worker', 'full manager stop and quit labels fit their buttons', 'single click toggles immediately', 'Escape and blur hide panel', 'template tray icon', 'stable Worker-scoped menu-bar GUID', 'red close hides Dock and retains manager', 'native minimize and Dock activation restore', 'explicit manager restores Dock', 'standard Quit and application menu drain before exit', 'current task completed and next task left queued'] : ['single-click handler shows status', 'double-click handler restores manager', 'double click cancels pending single click', 'quit keeps worker'];
-    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, platform: process.platform, checks: ['isolated renderer', 'theme persistence and cross-window sync', 'start', 'pause', 'resume', 'drain preserves task', 'logs', 'hide', 'native tray exists', ...platformChecks], limitation: 'Tray events, MenuItem handlers and Dock activation are invoked by the harness, not physical OS mouse clicks. This does not verify real menu-bar click delivery or the icon appearance in both system themes.', errors }, null, 2));
+    const platformChecks = macOS ? ['disabled action reasons match native menu and both panels across nine states', 'disabled reasons fit minimum manager and compact controls', 'native MenuItem handlers start pause resume and drain synthetic Worker', 'full manager stop and quit labels fit their buttons', 'single click toggles immediately', 'Escape and blur hide panel', 'template tray icon', 'stable Worker-scoped menu-bar GUID', 'red close hides Dock and retains manager', ...(skipNativeMinimize ? [] : ['native minimization keeps Dock']), 'Dock activation restores manager', 'explicit manager restores Dock', 'standard Quit and application menu drain before exit', 'current task completed and next task left queued'] : ['single-click handler shows status', 'double-click handler restores manager', 'double click cancels pending single click', 'quit keeps worker'];
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, platform: process.platform, checks: ['isolated renderer', 'theme persistence and cross-window sync', 'start', 'pause', 'resume', 'drain preserves task', 'logs', 'hide', 'native tray exists', ...platformChecks], skipped: skipNativeMinimize ? ['native minimization: unavailable on this self-hosted macOS session; manual acceptance required'] : [], limitation: 'Tray events, MenuItem handlers and Dock activation are invoked by the harness, not physical OS mouse clicks. This does not verify real menu-bar click delivery or the icon appearance in both system themes.', errors }, null, 2));
     console.log('Desktop fixture passed. Screenshots: collector/test-output/desktop');
   } catch (error) {
     console.error('Desktop fixture failed:', error.message);

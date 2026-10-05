@@ -102,6 +102,9 @@ jobs:
         shell: bash
         env:
           COLLECTOR_DESKTOP_EXECUTABLE: ${{ github.workspace }}/public-source/collector/desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest
+          # This runner session cannot minimize even a bare Electron window.
+          # Keep that OS interaction in manual acceptance and record it as skipped.
+          COLLECTOR_DESKTOP_SKIP_NATIVE_MINIMIZE: '1'
         run: node scripts/test-desktop.cjs
       - name: Upload verified packages and update files to private OSS
         working-directory: public-source/collector
