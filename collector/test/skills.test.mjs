@@ -11,7 +11,24 @@ import {scanSkillInventory,globalSkillRoots,dependencyStatus,fixedSkillProfiles}
 import {createSkillRuntime,taskSkillSnapshots} from '../src/skill-runtime.mjs';
 import {mysqlFixture} from './mysql-fixture.mjs';
 
-const temporary=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;};
+const resources=new WeakMap();
+function resource(t) {
+ let state=resources.get(t);
+ if(!state){
+  state={roots:[],close:[]};resources.set(t,state);
+  t.after(async()=>{
+   const errors=[];
+   // Windows cannot remove an open SQLite database or watched directory.
+   // Always close every resource before removing any fixture directory.
+   for(const close of state.close.toReversed())try{await close();}catch(error){errors.push(error);}
+   for(const root of state.roots.toReversed())try{fs.rmSync(root,{recursive:true,force:true});}catch(error){errors.push(error);}
+   if(errors.length)throw new AggregateError(errors,'Skill fixture cleanup failed');
+  });
+ }
+ return state;
+}
+const temporary=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-'));resource(t).roots.push(root);return root;};
+const cleanup=(t,close)=>resource(t).close.push(close);
 function skill(directory,content='original'){
  fs.mkdirSync(path.join(directory,'scripts'),{recursive:true});
  fs.writeFileSync(path.join(directory,'SKILL.md'),'---\nname: article-extract\ndescription: Public article extractor\nmetadata:\n  version: "1"\n---\nRead [extractor](scripts/extract.mjs).\n');
@@ -22,7 +39,7 @@ const versionProbe=async()=>({code:0,tail:'fixture 1.0'});
 const scanner=(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,CODEX_HOME:path.join(options.home,'.codex'),HOME:options.home,USERPROFILE:options.home},versionProbe,nativeCodex:async()=>null});
 async function setup(t,store){
  const dataDir=temporary(t),key=secret(),app=createService({dataDir,masterKey:key,...(store?{store}:{})});
- await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));t.after(()=>app.close());
+ await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));cleanup(t,()=>app.close());
  const server='http://127.0.0.1:'+app.server.address().port;
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'Owner'})};
  async function node(name){const pairing=await api(owner,'/api/pairings','POST',{role:'worker'});const config={server,...await api({server},'/api/pair','POST',{key:pairing.key,name,platform:process.platform})};config.deviceId=config.device.id;await heartbeat(config);return config;}
@@ -59,7 +76,7 @@ async function lifecycle(t,store){
  source.dataDir=path.join(home,'data');target.dataDir=path.join(targetHome,'data');
  const runtime=createSkillRuntime(source,{home,cwd:home,scan:scanner,api:(...args)=>api(source,...args)});
  const destination=createSkillRuntime(target,{home:targetHome,cwd:targetHome,scan:scanner,api:(...args)=>api(target,...args),verify:async op=>({state:'passed',bodyHash:hash(op.sample),characters:1200,agent:op.agent})});
- t.after(()=>{runtime.close();destination.close();});await runtime.report();await destination.report();
+ cleanup(t,()=>{runtime.close();destination.close();});await runtime.report();await destination.report();
  async function execute(device,worker,op){await worker.tick({idle:true,operationIds:[op.id]});return api(service.owner,'/api/skills/operations/'+op.id);}
  const item=runtime.inventory.items.find(s=>s.agent==='codex');const preview=await execute(source,runtime,await service.create(source,'prepare-publish',{skillId:item.id,expectedHash:item.hash}));assert.equal(preview.state,'succeeded');assert.equal(preview.result.preview.files.length,2);
  const requestId=crypto.randomUUID(),publication={deviceId:source.deviceId,requestId,action:'publish',skillId:item.id,expectedHash:item.hash,previewId:preview.id,policy:{capabilities:['wechat.article.extract'],agents:['codex']}};
@@ -87,7 +104,7 @@ async function lifecycle(t,store){
  fs.writeFileSync(path.join(targetDir,'scripts/extract.mjs'),Buffer.from(bundle.files.find(f=>f.path==='scripts/extract.mjs').body,'base64'));
  const rolled=await execute(target,destination,await service.create(target,'rollback',{syncId:installed.id}));assert.equal(rolled.state,'succeeded');assert.equal(fs.existsSync(targetDir),false);
  const other=await setup(t);await assert.rejects(()=>api({...target,server:other.owner.server},'/api/skills/versions/'+versionId+'/package'),e=>e.status===401);
- const switched=createSkillRuntime({...target,server:other.owner.server},{home:targetHome,cwd:targetHome,scan:scanner,api:()=>{throw new Error('offline');}});t.after(()=>switched.close());assert.equal(switched.inventory,null);
+ const switched=createSkillRuntime({...target,server:other.owner.server},{home:targetHome,cwd:targetHome,scan:scanner,api:()=>{throw new Error('offline');}});cleanup(t,()=>switched.close());assert.equal(switched.inventory,null);
  await api(service.owner,'/api/devices/'+target.deviceId+'/revoke','POST',{});await assert.rejects(()=>api(target,'/api/skills/operations'),e=>e.status===401);
 }
 test('SQLite private publication → compare → sync → verification → dispatch; conflicts, rollback and deployment isolation',t=>lifecycle(t));
@@ -112,7 +129,7 @@ test('interrupted sync restores backups and preserves edits made before recovery
  const root=temporary(t),home=path.join(root,'home');fs.mkdirSync(home);const config={server:'https://one.example',deviceId:'fixture',token:'fixture-token',dataDir:path.join(root,'data')};
  const envRoot=path.join(config.dataDir,'environments',hash(config.server+':'+config.deviceId+':'+hash(config.token))),real=path.join(globalSkillRoots(home).codex,'article-extract'),backup=path.join(path.dirname(real),'.lingnest-backup-fixture'),stage=path.join(path.dirname(real),'.lingnest-stage-fixture');
  const old=skill(real,'old');fs.renameSync(real,backup);const incoming=skill(real,'new');fs.appendFileSync(path.join(real,'scripts/extract.mjs'),'// user edit after interrupted commit\n');fs.mkdirSync(envRoot,{recursive:true});fs.writeFileSync(path.join(envRoot,'transaction.json'),JSON.stringify({id:'fixture',committed:false,installHash:incoming.hash,targets:[{real,backup,stage,originalHash:old.hash}]}));
- const runtime=createSkillRuntime(config,{home,cwd:home,scan:scanner,api:()=>{throw new Error('offline');}});t.after(()=>runtime.close());assert.equal(packageSkill(real).hash,old.hash);
+ const runtime=createSkillRuntime(config,{home,cwd:home,scan:scanner,api:()=>{throw new Error('offline');}});cleanup(t,()=>runtime.close());assert.equal(packageSkill(real).hash,old.hash);
  const preserved=fs.readdirSync(path.dirname(real)).find(f=>f.startsWith('.lingnest-preserved-fixture'));assert.ok(preserved);assert.match(fs.readFileSync(path.join(path.dirname(real),preserved,'scripts/extract.mjs'),'utf8'),/user edit/);assert.equal(fs.existsSync(path.join(envRoot,'transaction.json')),false);
 });
 test('fixed Codex task skills retain unrelated visibility settings and disable changed global versions',async t=>{
@@ -142,7 +159,7 @@ test('inventory pages commit atomically and readers cannot combine snapshots',as
 
 test('shared global directories require the whole Agent group and roll back as one target',async t=>{
  const home=temporary(t),roots=globalSkillRoots(home),directory=path.join(roots.codex,'article-extract'),before=skill(directory,'old');fs.mkdirSync(roots.codebuddy,{recursive:true});fs.symlinkSync(directory,path.join(roots.codebuddy,'article-extract'),process.platform==='win32'?'junction':'dir');
- const bundle=skill(path.join(home,'incoming'),'new'),config={server:'https://one.example',deviceId:'fixture',token:'fixture',dataDir:path.join(home,'data')},runtime=createSkillRuntime(config,{home,cwd:home,scan:scanner,api:async()=>bundle});t.after(()=>runtime.close());
+ const bundle=skill(path.join(home,'incoming'),'new'),config={server:'https://one.example',deviceId:'fixture',token:'fixture',dataDir:path.join(home,'data')},runtime=createSkillRuntime(config,{home,cwd:home,scan:scanner,api:async()=>bundle});cleanup(t,()=>runtime.close());
  const base={schemaVersion:1,versionId:hash('version'),versionHash:bundle.hash,name:bundle.name,policy:{agents:['codex','codebuddy'],systems:['darwin','win32','linux'],requirements:{}}};
  const incomplete=await runtime.operation({...base,id:hash('incomplete'),action:'compare',agents:['codex']});assert.equal(incomplete.result.comparison.compatible,false);
  const comparison=await runtime.operation({...base,id:hash('comparison'),action:'compare',agents:['codex','codebuddy']});assert.equal(comparison.result.comparison.compatible,true);assert.equal(comparison.result.comparison.targets[0].sharedAgents.length,2);

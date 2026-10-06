@@ -125,7 +125,7 @@ jobs:
       - run: npm ci --ignore-scripts
         working-directory: collector
       - name: Test Windows skill package and directory contracts
-        run: node --test test/skills.test.mjs
+        run: node --test --test-reporter=tap test/skills.test.mjs
         working-directory: collector
       - run: npm run build:worker:win
         working-directory: collector
