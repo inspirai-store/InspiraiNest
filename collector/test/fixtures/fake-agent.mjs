@@ -5,6 +5,15 @@ if (process.argv.includes('--version')) { console.log('fixture-agent 1.0'); proc
 let prompt = '';
 for await (const chunk of process.stdin) prompt += chunk;
 fs.writeFileSync('received-prompt.txt', prompt);
+if (process.argv.includes('--wait-once')) {
+  const marker = 'retained-source.txt';
+  if (!fs.existsSync(marker)) {
+    fs.writeFileSync(marker, 'source retained for explicit retry');
+    fs.writeFileSync('collector-result.json', JSON.stringify({ status: 'waiting_action', category: 'source', message: '合成来源需要用户操作' }));
+    process.exit();
+  }
+  if (fs.readFileSync(marker, 'utf8') !== 'source retained for explicit retry') throw new Error('Previous task workspace was not retained');
+}
 const meta = {
   schema_version: 1, id: 'article:fixture', title: '自动化闭环测试资料', type: 'article', platform: 'fixture',
   source_url: 'https://example.com/fixture', canonical_url: null, aliases: [], creator: null,

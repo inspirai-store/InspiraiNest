@@ -208,6 +208,7 @@ const { _electron } = require('playwright');
       await wait(() => app.evaluate(({ app }) => { const { main, popover } = globalThis.workerDesktop(); return main.isVisible() && !popover.isVisible() && app.dock.isVisible(); }));
       assert.equal(await page.locator('[data-action=quit]').isVisible(), false, 'macOS has no invisible-worker exit');
       assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('safe-quit').accelerator), 'Command+Q');
+      assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items[0].label), '灵藏');
     } else {
       await app.evaluate(() => { const { tray } = globalThis.workerDesktop(); tray.emit('click'); tray.emit('double-click'); });
       await new Promise(resolve => setTimeout(resolve, 600));
@@ -223,7 +224,7 @@ const { _electron } = require('playwright');
     if (macOS) {
       await page.locator('[data-action=drain]').click();
       await wait(() => !manager.snapshot().running);
-      // Resolve only this synthetic waiting task; it otherwise blocks new claims.
+      // Remove the fixture after verifying its reason; the next check covers drain.
       await api(owner, `/api/tasks/${waitingTask.id}/cancel`, 'POST', {});
       const quitAgent = path.join(root, 'quit-agent.mjs');
       const fakeAgent = require('node:url').pathToFileURL(path.resolve(__dirname, '../test/fixtures/fake-agent.mjs')).href;

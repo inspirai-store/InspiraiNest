@@ -129,7 +129,7 @@ test('log view is bounded, credential-redacted and rejects traversal', () => {
   assert.equal(redact('Bearer abc123'), 'Bearer [已隐藏]');
 });
 
-test('waiting-action reason is visible and survives restart without consuming the next task', async t => {
+test('waiting-action reason survives paused restart; explicit drain leaves the next task queued', async t => {
   const { config, owner, submit } = await fixture(t);
   const script = fileURLToPath(new URL('./fixtures/waiting-agent.mjs', import.meta.url));
   config.agents.codex.args = [script];

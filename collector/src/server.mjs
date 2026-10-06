@@ -153,7 +153,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (key) for (const old of await tx.list('device')) {
         if (old.installationKey !== key) continue;
         if (deviceCategory(old) === 'browser' && category === 'browser') { previousBrowser = old; continue; }
-        const busy = (await tx.list('task')).some(task => task.deviceId === old.id && [...active, 'waiting_action'].includes(task.state));
+        const busy = (await tx.list('task')).some(task => task.deviceId === old.id && [...active, 'waiting_action', 'queued'].includes(task.state));
         requireValue(!busy, 'This computer has an unfinished task; resume or cancel it before pairing again', 409);
         await tx.delete('device', old.id);
       }
@@ -536,8 +536,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
           let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state));
-          if (!task && device.agents.length && !tasks.some(t => t.deviceId === device.id && t.state === 'waiting_action')) {
-            task = tasks.filter(t => !t.deviceId && t.state === 'queued' && (t.type === 'auto' ? device.capabilities.length > 0 : device.capabilities.includes(t.type)) && (!t.preferredDeviceId || t.preferredDeviceId === device.id) && (!t.preferredAgent || device.agents.includes(t.preferredAgent))).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+          if (!task && device.agents.length) {
+            // A task waiting for user action keeps its workspace on this computer,
+            // but does not occupy the execution slot. Explicit retries join the
+            // queue and must wait for any current task to finish.
+            task = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && (t.type === 'auto' ? device.capabilities.length > 0 : device.capabilities.includes(t.type)) && (!t.preferredDeviceId || t.preferredDeviceId === device.id) && (!t.preferredAgent || device.agents.includes(t.preferredAgent)))).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
             if (task) task = await saveTask({ ...task, deviceId: device.id }, 'assigned', `已分配给 ${device.name}`);
           }
           return send(res, 200, { task: task || null });
@@ -578,10 +581,12 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         }
         if (action === 'retry' || action === 'cancel') {
           owner(device);
-          const task = await store.get('task', taskId);
-          requireValue(task, 'Task not found', 404);
-          requireValue(action === 'cancel' ? task.state !== 'completed' : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
-          return send(res, 200, await saveTask(task, action === 'cancel' ? 'cancelled' : task.deviceId ? 'assigned' : 'queued', action === 'cancel' ? '用户取消' : '等待原电脑继续'));
+          return await serialized('claim', async () => {
+            const task = await store.get('task', taskId);
+            requireValue(task, 'Task not found', 404);
+            requireValue(action === 'cancel' ? task.state !== 'completed' : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            return send(res, 200, await saveTask(task, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑'));
+          });
         }
         const task = await assigned(device, taskId);
         if (action === 'result') return send(res, 200, await publish(input, device, req, taskId));

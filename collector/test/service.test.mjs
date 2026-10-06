@@ -5,11 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createService } from '../src/server.mjs';
-import { api, processTask, syncLibrary } from '../src/worker.mjs';
+import { api, processTask, runWorker, syncLibrary } from '../src/worker.mjs';
 import { packageEntry, unpackArchive, validateArchive, permitted } from '../src/archive.mjs';
 import { agentOrder, detectAgents, unavailableBeforeWork, execute } from '../src/agents.mjs';
 import { secret, hash, safePath } from '../src/common.mjs';
 import { loadWorkerConfig, initializeWorkerConfig } from '../src/config.mjs';
+import { mysqlFixture } from './mysql-fixture.mjs';
 
 const fixture = fileURLToPath(new URL('./fixtures/fake-agent.mjs', import.meta.url));
 const profiles = { codex: { command: process.execPath, args: [fixture], versionArgs: [fixture, '--version'] }, codebuddy: { enabled: false } };
@@ -238,17 +239,57 @@ test('capabilities, idempotent submissions, single claimant and offline ownershi
   await assert.rejects(api(loser, `/api/tasks/${task.id}/progress`, 'POST', { state: 'running', message: 'wrong worker' }), { status: 403 });
 });
 
-test('waiting for user action is explicit; resume remains on original computer', async t => {
-  const { owner, pairWorker, submit } = await setup(t);
-  const worker = await pairWorker(); const task = await submit();
+async function assertWaitingQueue(t, overrides = {}) {
+  const { owner, pairWorker, submit } = await setup(t, overrides);
+  const worker = await pairWorker(); const other = await pairWorker('other'); const task = await submit();
   await api(worker, '/api/claim', 'POST', {});
   await api(worker, `/api/tasks/${task.id}/progress`, 'POST', { state: 'waiting_action', message: '请在本机登录' });
-  await submit();
-  assert.equal((await api(worker, '/api/claim', 'POST', {})).task, null);
-  await api(owner, `/api/tasks/${task.id}/retry`, 'POST', {});
+  const next = await submit();
+  assert.equal((await api(worker, '/api/claim', 'POST', {})).task.id, next.id);
+  await api(worker, `/api/tasks/${next.id}/progress`, 'POST', { state: 'running', message: '继续下一项' });
+  const retried = await api(owner, `/api/tasks/${task.id}/retry`, 'POST', {});
+  assert.equal(retried.state, 'queued');
+  assert.equal(retried.deviceId, worker.device.id);
+  assert.equal((await api(other, '/api/claim', 'POST', {})).task, null, 'other computers cannot take the retained workspace');
+  assert.equal((await api(worker, '/api/claim', 'POST', {})).task.id, next.id, 'current work takes precedence over retry');
+  await api(owner, `/api/tasks/${next.id}/cancel`, 'POST', {});
   assert.equal((await api(worker, '/api/claim', 'POST', {})).task.id, task.id);
   await api(owner, `/api/tasks/${task.id}/cancel`, 'POST', {});
   await assert.rejects(api(worker, `/api/tasks/${task.id}/progress`, 'POST', { state: 'running', message: 'late result' }), { status: 409 });
+}
+test('waiting tasks release the slot; retry queues behind current work on the original computer', assertWaitingQueue);
+test('MySQL waiting tasks release the slot and retries retain original-computer ownership', { skip: !process.env.MYSQL_URL }, async t => {
+  await assertWaitingQueue(t, { store: await mysqlFixture() });
+});
+
+test('Worker continues after a source obstacle and explicit retry reuses the retained workspace', async t => {
+  const { owner, root, pairWorker, submit } = await setup(t);
+  const worker = await pairWorker();
+  const blocked = await submit({ agent: 'codex' });
+  const next = await submit({ agent: 'codebuddy' });
+  const dataDir = path.join(root, 'worker');
+  const agents = { codex: { ...profiles.codex, args: [fixture, '--wait-once'] }, codebuddy: { ...profiles.codex, enabled: true } };
+  const controller = new AbortController();
+  const running = runWorker({ ...worker, dataDir, agents, capabilities: ['article'], pollMs: 1 }, { signal: controller.signal });
+  try {
+    const deadline = Date.now() + 15000;
+    let state;
+    do {
+      state = await api(owner, '/api/state');
+      if (state.tasks.find(task => task.id === next.id)?.state === 'completed') break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } while (Date.now() < deadline);
+    assert.equal(state.tasks.find(task => task.id === blocked.id).state, 'waiting_action');
+    assert.equal(state.tasks.find(task => task.id === next.id).state, 'completed');
+    assert.equal(state.tasks.find(task => task.id === blocked.id).deviceId, worker.device.id);
+  } finally { controller.abort(); await running; }
+  const workspace = path.join(dataDir, 'tasks', blocked.id, 'library');
+  assert.equal(fs.readFileSync(path.join(workspace, 'retained-source.txt'), 'utf8'), 'source retained for explicit retry');
+  await api(owner, `/api/tasks/${blocked.id}/retry`, 'POST', {});
+  await runWorker({ ...worker, dataDir, agents, capabilities: ['article'] }, { once: true });
+  assert.equal((await api(owner, '/api/state')).tasks.find(task => task.id === blocked.id).state, 'completed');
+  assert.equal(fs.readFileSync(path.join(workspace, 'retained-source.txt'), 'utf8'), 'source retained for explicit retry');
+  assert.ok(fs.readdirSync(workspace).some(name => /^collector-result\..+\.json$/.test(name)), 'the previous waiting checkpoint is retained');
 });
 
 test('noninteractive permission denial stops the agent without bypassing permissions', async () => {

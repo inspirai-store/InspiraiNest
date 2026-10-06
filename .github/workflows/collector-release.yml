@@ -77,13 +77,14 @@ jobs:
           for arch in arm64 x64; do
             zip="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
             dmg="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.dmg"
-            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/InspiraiNest.app"
+            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
             test -s "$zip"
             test -s "$dmg"
             unzip -tq "$zip" >/dev/null
             hdiutil verify "$dmg" >/dev/null
             codesign --verify --deep --strict "$app"
-            test "$(lipo -archs "$app/Contents/MacOS/InspiraiNest")" = "$([[ "$arch" == arm64 ]] && echo arm64 || echo x86_64)"
+            node scripts/check-macos-name.mjs "$app"
+            test "$(lipo -archs "$app/Contents/MacOS/灵藏")" = "$([[ "$arch" == arm64 ]] && echo arm64 || echo x86_64)"
             signature=$(codesign -dv --verbose=4 "$app" 2>&1)
             [[ "$signature" == *'Authority=Developer ID Application:'* ]]
             [[ "$signature" == *"TeamIdentifier=$APPLE_TEAM_ID"* ]]
@@ -91,8 +92,8 @@ jobs:
             spctl --assess --type execute "$app"
             grep -F "InspiraiNest-v${version}-macOS-${arch}.zip" desktop/dist/latest-mac.yml
           done
-          grep -F 'provider: generic' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
-          grep -F 'https://library.inspirai.store/updates/macos' desktop/dist/mac/InspiraiNest.app/Contents/Resources/app-update.yml
+          grep -F 'provider: generic' desktop/dist/mac/灵藏.app/Contents/Resources/app-update.yml
+          grep -F 'https://library.inspirai.store/updates/macos' desktop/dist/mac/灵藏.app/Contents/Resources/app-update.yml
           node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("desktop/dist/latest-mac.yml","utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`desktop/dist/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
           (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
@@ -102,7 +103,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          executable=desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest
+          executable=desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
           node scripts/test-desktop-login.cjs "$executable"
           node scripts/test-desktop-login-switch.cjs "$executable"
           node scripts/test-desktop-settings-nodes.cjs "$executable"
@@ -114,13 +115,13 @@ jobs:
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
           node scripts/test-packaged-update.cjs \
-            desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest \
+            desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
             "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
       - name: Test packaged macOS menu bar and safe Worker lifecycle
         working-directory: public-source/collector
         shell: bash
         env:
-          COLLECTOR_DESKTOP_EXECUTABLE: ${{ github.workspace }}/public-source/collector/desktop/dist/mac-arm64/InspiraiNest.app/Contents/MacOS/InspiraiNest
+          COLLECTOR_DESKTOP_EXECUTABLE: ${{ github.workspace }}/public-source/collector/desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
           # This runner session cannot minimize even a bare Electron window.
           # Keep that OS interaction in manual acceptance and record it as skipped.
           COLLECTOR_DESKTOP_SKIP_NATIVE_MINIMIZE: '1'

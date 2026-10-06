@@ -29,6 +29,8 @@ if (app.isPackaged) {
 const manager = new WorkerManager();
 const scope = createHash('sha256').update(path.resolve(manager.configuration().loginDataRoot || manager.dataDir).toLowerCase()).digest('hex').slice(0, 16);
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
+// Keep the existing safeStorage Keychain namespace across display-name updates.
+// macOS shows the packaged bundle name and the application menu below as 灵藏.
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
 // Isolated GUI fixtures opt in explicitly; normal launches always use OS encryption.
@@ -246,10 +248,10 @@ function refreshTray() {
 function applicationMenu() {
   if (!isMac) return;
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: app.name, submenu: [
-      { role: 'about' }, { type: 'separator' },
+    { label: '灵藏', submenu: [
+      { role: 'about', label: '关于灵藏' }, { type: 'separator' },
       { label: '打开管理窗口', click: () => openManager() },
-      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
+      { role: 'hide', label: '隐藏灵藏' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
       { id: 'safe-quit', label: '完成当前任务后停止并退出灵藏', accelerator: 'Command+Q', click: () => menuAction('quit-after') },
     ] },
     { role: 'editMenu' }, { role: 'windowMenu' },
