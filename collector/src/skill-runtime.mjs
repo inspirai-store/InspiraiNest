@@ -21,6 +21,13 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   const ledgerFile = path.join(root,'managed.json'), receiptsFile = path.join(root,'receipts.json'), transactionFile = path.join(root,'transaction.json');
   let ledger = read(ledgerFile,{installations:{},backups:{}}), receipts = read(receiptsFile,{}), state = { inventory:read(path.join(root,'inventory.json'),null),local:new Map() }, lastScan = 0, pending, dirty = true;
   const watchers = new Map();let closed=false;
+  async function pauseWatches() {
+    const closing=[...watchers.values()].map(watcher=>new Promise(resolve=>{
+      if(watcher.once)watcher.once('close',resolve);
+      watcher.close();if(!watcher.once)resolve();
+    }));
+    watchers.clear();await Promise.all(closing);
+  }
   function recover() {
     const transaction=read(transactionFile,null);if(!transaction)return;
     if(!transaction.committed) for(const target of [...transaction.targets].reverse()) {
@@ -175,6 +182,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
         const comparison=await compare(op,bundle);requireValue(comparison.compatible,comparison.problems.join('；'));
         requireValue(canonicalJson(comparison.targets)===canonicalJson(op.expectedTargets),'目标 Skill 已变化，请重新比较');
         requireValue(!comparison.targets.some(t=>t.sharedAgents.length>1) || op.confirmShared,'请确认全部共享 Agent');
+        await pauseWatches();
         result=install(op,bundle,comparison.targets);
       }
       if(op.action==='verify'){
@@ -185,7 +193,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
         result={verification:{...verification,versionId:op.versionId,hash:bundle.hash,profileHash:state.inventory.agents.find(a=>a.name===op.agent)?.profileHash,at:now(),sample:op.sample}};
         ledger.installations[op.agent+':'+real].verification=result.verification;atomicJson(ledgerFile,ledger);
       }
-    }else if(op.action==='rollback')result=rollback(op);
+    }else if(op.action==='rollback'){await pauseWatches();result=rollback(op);}
     else throw new Error('不支持的技能操作');
     dirty=true;
     return {state:'succeeded',result};

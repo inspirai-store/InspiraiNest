@@ -102,7 +102,7 @@ async function lifecycle(t,store){
  const frozen=await taskSkillSnapshots(claimed,workspace,()=>{throw new Error('Must reuse frozen snapshot');});assert.equal(frozen[0].hash,bundle.hash);
  const rollbackConflict=await execute(target,destination,await service.create(target,'rollback',{syncId:installed.id}));assert.equal(rollbackConflict.state,'failed');
  fs.writeFileSync(path.join(targetDir,'scripts/extract.mjs'),Buffer.from(bundle.files.find(f=>f.path==='scripts/extract.mjs').body,'base64'));
- const rolled=await execute(target,destination,await service.create(target,'rollback',{syncId:installed.id}));assert.equal(rolled.state,'succeeded');assert.equal(fs.existsSync(targetDir),false);
+ const rolled=await execute(target,destination,await service.create(target,'rollback',{syncId:installed.id}));assert.equal(rolled.state,'succeeded',rolled.result?.error);assert.equal(fs.existsSync(targetDir),false);
  const other=await setup(t);await assert.rejects(()=>api({...target,server:other.owner.server},'/api/skills/versions/'+versionId+'/package'),e=>e.status===401);
  const switched=createSkillRuntime({...target,server:other.owner.server},{home:targetHome,cwd:targetHome,scan:scanner,api:()=>{throw new Error('offline');}});cleanup(t,()=>switched.close());assert.equal(switched.inventory,null);
  await api(service.owner,'/api/devices/'+target.deviceId+'/revoke','POST',{});await assert.rejects(()=>api(target,'/api/skills/operations'),e=>e.status===401);
