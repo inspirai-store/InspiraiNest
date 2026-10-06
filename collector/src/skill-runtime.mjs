@@ -217,7 +217,7 @@ export async function taskSkillSnapshots(task,workspace,api) {
       fs.mkdirSync(path.dirname(destination),{recursive:true});
       if(!fs.existsSync(destination))writeSkillPackage(bundle,destination);
       requireValue(actualHash(destination)===bundle.hash,'任务技能快照已修改');
-      snapshots.push({...skill,path:path.relative(workspace,destination)});
+      snapshots.push({...skill,path:path.relative(workspace,destination).split(path.sep).join('/')});
     }
     atomicJson(manifest,snapshots);
   }

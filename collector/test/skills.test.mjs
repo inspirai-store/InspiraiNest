@@ -94,7 +94,7 @@ async function lifecycle(t,store){
  assert.equal(task.content,raw);assert.deepEqual(task.requiredCapabilities,['wechat.article.extract']);
  assert.equal((await api(source,'/api/claim','POST',{})).task,null);
  const claimed=(await api(target,'/api/claim','POST',{})).task;assert.equal(claimed.id,task.id);assert.equal(claimed.selectedSkills[0].versionId,versionId);
- const workspace=path.join(targetHome,'workspace');fs.mkdirSync(workspace);const snapshots=await taskSkillSnapshots(claimed,workspace,(...args)=>api(target,...args));assert.equal(snapshots[0].hash,bundle.hash);
+ const workspace=path.join(targetHome,'workspace');fs.mkdirSync(workspace);const snapshots=await taskSkillSnapshots(claimed,workspace,(...args)=>api(target,...args));assert.equal(snapshots[0].hash,bundle.hash);assert.equal(snapshots[0].path,'.agents/skills/article-extract');
  await api(target,'/api/tasks/'+claimed.id+'/progress','POST',{state:'waiting_action',message:'Fixture source requires user action',agent:'codex'});
  const generic=await api(service.owner,'/api/tasks','POST',{content:'https://example.com/no-specialist',submissionId:crypto.randomUUID()});assert.equal((await api(source,'/api/claim','POST',{})).task.id,generic.id);
  const before=await execute(target,destination,await service.create(target,'compare',{versionId,agents:['codex']}));fs.appendFileSync(path.join(targetDir,'scripts/extract.mjs'),'// local edit\n');
