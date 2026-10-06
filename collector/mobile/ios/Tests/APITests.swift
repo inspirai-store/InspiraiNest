@@ -17,6 +17,24 @@ private final class StubProtocol: URLProtocol {
 }
 
 final class APITests: XCTestCase {
+    func testNodeSkillsPageUsesAuthenticatedOriginAndKeepsUnknownLoadingDistinct() async throws {
+        let deviceID = "00000000-0000-4000-8000-000000000001"
+        let snapshot = String(repeating: "a", count: 64)
+        StubProtocol.handler = { request in
+            XCTAssertEqual(request.url?.path, "/api/skills/devices/\(deviceID)/environment")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-owner")
+            XCTAssertTrue(request.url!.query!.contains("offset=40"))
+            XCTAssertTrue(request.url!.query!.contains("snapshotId=\(snapshot)"))
+            return (200, Data("""
+            {"schemaVersion":1,"agents":[],"items":[{"id":"fixture","agent":"codex","name":"wechat-fixture","loadState":"unknown","dependencies":{"state":"missing","missing":["Python 模块：requests"],"unknown":[]},"capabilities":[],"verification":null}],"total":41,"nextOffset":null,"snapshotId":"\(snapshot)","scannedAt":"2026-10-07T00:00:00Z"}
+            """.utf8))
+        }
+        let page = try await api(token: "fixture-owner").skillEnvironment(deviceID: deviceID, offset: 40, snapshotID: snapshot)
+        XCTAssertEqual(page.total, 41); XCTAssertNil(page.nextOffset)
+        XCTAssertEqual(page.items.first?.loadLabel, "加载未确认")
+        XCTAssertNil(page.items.first?.verification)
+        XCTAssertEqual(page.items.first?.dependencies.missing, ["Python 模块：requests"])
+    }
     override func tearDown() { StubProtocol.handler = nil }
     private func api(token: String? = nil) throws -> CollectorAPI {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [StubProtocol.self]

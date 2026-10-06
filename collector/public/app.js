@@ -72,6 +72,14 @@
     return value;
   }
   async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
+  const skillManager = window.createSkillManager({identity:()=>String(token || ''),request:input=>{
+    if(input.kind==='environment'){const query=new URLSearchParams({offset:String(input.offset || 0)});if(input.snapshotId)query.set('snapshotId',input.snapshotId);return api('/skills/devices/'+encodeURIComponent(input.deviceId)+'/environment?'+query);}
+    if(input.kind==='versions')return api('/skills/versions');
+    if(input.kind==='history')return api('/skills/operations?deviceId='+encodeURIComponent(input.deviceId));
+    if(input.kind==='operation')return api('/skills/operations/'+encodeURIComponent(input.operationId));
+    if(input.kind==='create')return api('/skills/operations','POST',input.operation);
+    throw new Error('技能请求无效');
+  }});
   const badge = state => `<span class="badge ${esc(state)}">${states[state] || esc(state)}</span>`;
   function renderWorkerNodes() {
     const nodes = (snapshot?.devices || []).filter(window.deviceView.dispatchable);
@@ -96,6 +104,7 @@
         ['短标识', device.identity?.shortId || device.id.slice(0, 12)]];
       return `<article class="node-card" data-node-id="${esc(device.id)}" data-status="${state}"><div class="node-card-heading"><span class="node-device-icon">${icon(info.os?.family === 'macOS' ? 'laptop' : 'monitor')}</span><strong>${esc(device.displayName || device.name)}</strong></div><p class="node-state"><span class="node-dot" aria-hidden="true"></span>${connected ? window.deviceView.status(device) : '状态待更新'}${taskCount ? ` · ${taskCount} 项处理中` : ''}</p>${device.name && device.name !== device.displayName ? `<p class="node-remark">备注：${esc(device.name)}</p>` : ''}<dl>${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></article>`;
     }).join('') || '<div class="nodes-empty">暂无已授权工作节点</div>';
+    $('#worker-nodes').querySelectorAll('[data-node-id]').forEach(card=>{const button=document.createElement('button');button.type='button';button.textContent='节点技能';button.disabled=!connected;button.onclick=()=>skillManager.open(nodes.find(d=>d.id===card.dataset.nodeId));card.append(button);});
   }
   const nodeDialog = $('#worker-nodes-dialog');
   $('#worker-nodes-toggle').onclick = () => { if (!nodeDialog.open) { nodeDialog.showModal(); $('#worker-nodes-toggle').setAttribute('aria-expanded', 'true'); } };

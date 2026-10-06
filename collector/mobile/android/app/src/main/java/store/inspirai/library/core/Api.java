@@ -67,6 +67,10 @@ public final class Api {
     JSONObject callBound(String expectedServer, String path, String method, JSONObject body) throws Exception {
         return authenticated(expectedServer, path, method, body).body;
     }
+    public JSONObject skillEnvironment(String expectedServer,String deviceId,int offset,String snapshotId) throws Exception {
+        if(deviceId==null || !deviceId.matches("[a-fA-F0-9-]{36}") || offset<0 || snapshotId!=null&&!snapshotId.matches("[a-f0-9]{64}"))throw new Failure(400,"清单请求无效。");
+        return callBound(expectedServer,"/api/skills/devices/"+deviceId+"/environment?offset="+offset+(snapshotId==null?"":"&snapshotId="+snapshotId),"GET",null);
+    }
 
     private Reply authenticated(String expectedServer, String path, String method, JSONObject body) throws Exception {
         requireBackground();

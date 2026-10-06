@@ -3,9 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const defaults = {
-  codex: { command: 'codex', args: ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'approval_policy="never"', '-'] },
+  codex: { command: 'codex', args: ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"', '-'] },
   codebuddy: { enabled: false, command: 'codebuddy', args: ['-p', '--output-format', 'stream-json', '--verbose'] },
 };
+
+export function agentProfile(name, profiles = {}) {
+  const profile = { ...(defaults[name] || { command: name }), ...profiles[name] };
+  // Upgrade only the old built-in profile. Explicitly customized network policies stay authoritative.
+  const previous = ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'approval_policy="never"', '-'];
+  if (name === 'codex' && JSON.stringify(profile.args) === JSON.stringify(previous)) profile.args = [...defaults.codex.args];
+  return profile;
+}
 
 export function terminate(child) {
   if (!child.pid || child.exitCode !== null) return;
@@ -109,7 +117,7 @@ export function describeAgentFailure(name, result) {
 export async function detectAgents(profiles = {}) {
   const results = {};
   for (const name of Object.keys(defaults)) {
-    const profile = { ...defaults[name], ...profiles[name] };
+    const profile = agentProfile(name, profiles);
     if (profile.enabled === false) continue;
     const result = await execute(profile.command, profile.versionArgs || ['--version'], { timeoutMs: 15000 });
     results[name] = { available: result.code === 0, version: result.code === 0 ? result.tail.trim().slice(0, 200) : null, error: result.spawnError || (result.timedOut ? 'timeout' : result.code === 0 ? null : `exit ${result.code}`) };
@@ -118,11 +126,13 @@ export async function detectAgents(profiles = {}) {
 }
 
 export function agentOrder(config, task, available) {
-  const preferred = task.preferredAgent ? [task.preferredAgent] : config.byType?.[task.type] || [];
+  if (task.agent) return available[task.agent]?.available ? [task.agent] : [];
+  if (task.preferredAgent) return available[task.preferredAgent]?.available ? [task.preferredAgent] : [];
+  const preferred = task.selectedSkills?.length ? task.selectedSkills.map(s => s.agent) : config.byType?.[task.type] || [];
   return [...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || ['codebuddy'])])].filter(name => available[name]?.available);
 }
 
 export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs }) {
-  const profile = { ...defaults[name], ...profiles[name] };
+  const profile = agentProfile(name, profiles);
   return execute(profile.command, profile.args, { cwd, input: prompt, signal, timeoutMs, logFile: path.join(cwd, '..', `${name}.log`) });
 }

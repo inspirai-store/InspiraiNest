@@ -14,7 +14,11 @@
   let workspaceEpoch = 0, detailSeq = 0, documentSeq = 0, readBusy = false;
   let pairingSeq = 0, pairingExpiryTimer;
   let settingsTab = 'appearance', lastSuccess = null, connected = false;
-  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,
+  const skillManager = window.createSkillManager({request:input=>window.library.skills(input),identity:()=>auth.server+':'+workspaceEpoch,openConfig:async(device,agent)=>{
+    if(device.id!==(await window.worker.snapshot()).deviceId)return null;
+    return window.worker.skillConfig(agent);
+  }});
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device),
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();
@@ -24,6 +28,7 @@
   function toast(message) { const el = $('#workspace-toast'); el.textContent = message; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 3800); }
   function errorText(error) { return String(error?.message || error || '操作失败').replace(/^Error invoking remote method '[^']+': Error: /, ''); }
   function clearWorkspace(nextAuth) {
+    skillManager.close();
     workspaceEpoch++; entriesSeq++; detailSeq++; documentSeq++; readBusy = false;
     auth = nextAuth; state = null; entries = []; total = offset = 0;
     selectedTask = selectedEntry = currentEntry = currentFile = nextCursor = null; currentText = '';

@@ -26,10 +26,38 @@ public class DevicesActivity extends Screen {
     else if(!d.optString("role").equals("reader"))c.addView(label("等待客户端补齐标识",13,false));
     c.addView(label("最近活动："+d.optString("lastSeen"),13,false));
     if(selected==null){c.setFocusable(true);c.setContentDescription("查看设备："+title);c.setOnClickListener(v->startActivity(new Intent(this,DevicesActivity.class).putExtra("deviceId",d.optString("id"))));}
-    else{c.addView(label("授权时间："+d.optString("createdAt"),13,false));if(d.isNull("revokedAt"))button(body,"撤销此设备",()->confirm("撤销后，此设备不能再访问资料和任务。",()->work(()->new Api(new Credentials(this)).call("/api/devices/"+d.optString("id")+"/revoke","POST",new JSONObject()),v->finish())));}
+    else{c.addView(label("授权时间："+d.optString("createdAt"),13,false));if(DevicePresentation.dispatchable(d))button(body,"节点技能",()->loadSkills(d.optString("id")));if(d.isNull("revokedAt"))button(body,"撤销此设备",()->confirm("撤销后，此设备不能再访问资料和任务。",()->work(()->new Api(new Credentials(this)).call("/api/devices/"+d.optString("id")+"/revoke","POST",new JSONObject()),v->finish())));}
    }}
    if(visible==0)body.addView(label("没有可显示的授权设备",16,false));
   });
  }
+ private void loadSkills(String deviceId){
+  String origin=new Credentials(this).server();page("节点技能","");notice("载入中");
+  work(()->{
+   Api api=new Api(new Credentials(this));JSONArray all=new JSONArray();int offset=0;String snapshot=null;JSONObject result;
+   do{
+    result=api.skillEnvironment(origin,deviceId,offset,snapshot);
+    JSONArray items=result.getJSONArray("items");for(int i=0;i<items.length();i++)all.put(items.getJSONObject(i));
+    snapshot=result.optString("snapshotId",null);offset=result.isNull("nextOffset")?-1:result.getInt("nextOffset");
+   }while(offset>=0);
+   result.put("items",all);return result;
+  },result->{
+   if(!origin.equals(new Credentials(this).server()))return;notice("");
+   body.addView(label(result.optString("scannedAt","未上报"),16,false));
+   JSONArray agents=result.optJSONArray("agents");if(agents!=null)for(int i=0;i<agents.length();i++){JSONObject agent=agents.getJSONObject(i);body.addView(label(agent.optString("name")+" · "+agent.optString("version","未安装"),16,false));}
+   JSONArray items=result.getJSONArray("items");if(items.length()==0)body.addView(label("未上报",16,false));
+   for(int i=0;i<items.length();i++){
+    JSONObject skill=items.getJSONObject(i);LinearLayout card=card(body);card.addView(label(skill.optString("name"),20,true));
+    card.addView(label(skill.optString("agent")+" · "+skill.optString("source")+" · "+skill.optString("context"),16,false));
+    String version=skill.optString("declaredVersion");if(version.isEmpty())version=skill.optString("hash","未记录");card.addView(label(version.substring(0,Math.min(version.length(),16)),16,false));
+    card.addView(label(skillLoadState(skill.optString("loadState")),16,false));JSONObject verification=skill.optJSONObject("verification");card.addView(label(verification!=null&&verification.optString("state").equals("passed")?"提取验证通过":"提取未验证",16,false));
+    JSONArray capabilities=skill.optJSONArray("capabilities");if(capabilities!=null&&capabilities.length()>0)card.addView(label(capabilities.join("、").replace("\"",""),16,false));
+    JSONObject dependencies=skill.optJSONObject("dependencies");if(dependencies!=null)for(String key:new String[]{"missing","unknown"}){JSONArray gaps=dependencies.optJSONArray(key);if(gaps!=null)for(int n=0;n<gaps.length();n++)card.addView(label(gaps.getString(n),16,false));}
+    if(!skill.isNull("issue"))card.addView(label(skill.optString("issue"),16,false));
+   }
+   button(body,"刷新",()->loadSkills(deviceId));
+  });
+ }
+ static String skillLoadState(String value){return switch(value){case "loaded"->"可加载";case "configured"->"已配置";case "disabled"->"已禁用";case "not_loaded"->"未加载";case "shadowed"->"被覆盖";case "agent_unavailable"->"Agent 未安装";default->"加载未确认";};}
  private static String identitySource(String source){return switch(source){case "smbios","ioplatform"->"硬件标识";case "android-id"->"系统标识";case "keychain"->"Keychain 标识";case "browser-profile"->"浏览器档案";default->"本地标识";};}
 }

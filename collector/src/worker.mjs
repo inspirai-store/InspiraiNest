@@ -11,6 +11,9 @@ import { createWorkerControl } from './worker-control.mjs';
 import { createWorkerEvents, errorDetails } from './worker-events.mjs';
 import { watchCollectionSteps } from './collection-steps.mjs';
 import { computerMetadata } from './device-identity.mjs';
+import { createSkillRuntime, taskSkillSnapshots } from './skill-runtime.mjs';
+import { fixedSkillProfiles } from './skill-inventory.mjs';
+import { verifySkillExtraction } from './skill-verification.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || path.join(project, '..'));
@@ -76,10 +79,11 @@ export function taskPrompt(task, localInstructions = '') {
 export async function processTask(config, task, available, signal, onProgress = () => {}) {
   const dataDir = path.resolve(config.dataDir || path.join(project, 'worker-data'));
   const workspace = prepareWorkspace(task, dataDir);
+  const skillSnapshots = await taskSkillSnapshots(task, workspace, (...args) => api(config, ...args));
   const checkpoint = path.join(workspace, 'collector-result.json');
   const progress = (state, message, agent, diagnostic) => {
     onProgress({ state, message, agent, ...(diagnostic ? { diagnostic } : {}) });
-    return api(config, `/api/tasks/${task.id}/progress`, 'POST', { state, message, agent });
+    return api(config, `/api/tasks/${task.id}/progress`, 'POST', { state, message, agent, executionSkills: skillSnapshots.filter(s => s.agent === agent).map(({path,...s}) => s) });
   };
   if (fs.existsSync(checkpoint) && readJson(checkpoint).status !== 'ready') {
     fs.renameSync(checkpoint, path.join(workspace, `collector-result.${id()}.json`));
@@ -89,11 +93,11 @@ export async function processTask(config, task, available, signal, onProgress = 
     for (const name of agentOrder(config, task, available)) {
       chosen = name;
       await progress('running', `使用 ${name} 采集；本机保留中间成果`, name);
-      const instructions = [config.instructions, config.agents?.[name]?.instructions].filter(Boolean).join('\n');
+      const instructions = [config.instructions, config.agents?.[name]?.instructions, ...skillSnapshots.filter(s => s.agent === name).map(s => `本任务必须使用固定技能 ${s.path}/SKILL.md，版本 ${s.versionId}，包哈希 ${s.hash}；先读取该文件，不使用其他目录中的同名版本。`)].filter(Boolean).join('\n');
       const stopSteps = watchCollectionSteps(workspace, step => onProgress({ state: 'running', agent: name, ...step }), error => onProgress({ state: 'running', agent: name,
         message: '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: 'STEP_LOG_READ', details: errorDetails(error) } }));
       let result;
-      try { result = await runAgent(name, config.agents || {}, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
+      try { const profiles=await fixedSkillProfiles(config.agents || {},skillSnapshots.filter(s=>s.agent===name),workspace); result = await runAgent(name, profiles, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
       finally { stopSteps(); }
       if (result.aborted) return;
       if (result.permissionBlocked) { await progress('waiting_action', `${name} 的非交互权限不足，已停止执行。请在本机客户端配置权限后继续。`, name, { code: 'AGENT_PERMISSION', details: { agent: name } }); return; }
@@ -186,13 +190,34 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let heartbeatPending = false;
   let lastHeartbeatAttempt = 0;
   let deviceMetadata;
+  let skillOperations = [];
+  let skillRuntime;
+  try {
+  const skillCwd = prepareWorkspace({id:'_environment'},dataDir);
+  skillRuntime = createSkillRuntime({...config,dataDir},{api:(...args)=>api(config,...args),cwd:skillCwd,
+    verify:(op,bundle,workspace)=>verifySkillExtraction(config,op,bundle,workspace,{signal,prepare:directory=>{
+      const template=prepareWorkspace({id:'_environment'},dataDir);
+      for (const file of ['AGENTS.md','README.md','scripts/catalog.mjs','scripts/browser-data.mjs','assets/library-time.js','templates/source.template.json','templates/summary.md','templates/scenario.md','package.json']) {
+        fs.mkdirSync(path.dirname(path.join(directory,file)),{recursive:true}); fs.copyFileSync(path.join(template,file),path.join(directory,file));
+      }
+    },prompt:taskPrompt})});
+  } catch(error) { control.close();journal.flush();fs.unlinkSync(lock);throw error; }
+  let skillTick;
+  const updateSkills = (idle=false) => {
+    if(skillTick)return skillTick;
+    skillTick=skillRuntime.tick({idle,operationIds:skillOperations}).catch(error=>{
+      if([401,403].includes(error.status)){forbidden=true;current?.controller.abort();}
+      fault('skills',error,'技能环境更新失败，最后清单已保留');
+    }).finally(()=>{skillTick=null;});return skillTick;
+  };
   const heartbeat = async () => {
     if (heartbeatPending || Date.now() - lastHeartbeatAttempt < 9000) return;
     heartbeatPending = true;
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available) });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick}, environmentDigest:skillRuntime.inventory?.digest || null });
+      skillOperations = Array.isArray(result.skillOperations) ? result.skillOperations : [];
       if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (!result.tasks.every(task => task && typeof task.id === 'string')) throw Object.assign(new Error('心跳任务列表结构异常'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (current && result.tasks.some(task => task.id === current.id && task.state === 'cancelled')) current.controller.abort();
@@ -202,6 +227,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
       control.update({ connection: 'online', lastHeartbeat: new Date().toISOString(), tasks: result.tasks, error: null,
         ...(terminal && !current ? { lastTask: { ...lastTask, state: remoteTask.state } } : {}) });
       journal.recover('heartbeat', '服务连接已恢复，心跳正常');
+      if (current) void updateSkills(false);
     } catch (error) {
       if ([401, 403].includes(error.status) || error.status === 409 || error.code === 'IDENTITY_CHANGED') { forbidden = true; current?.controller.abort(); }
       control.update({ connection: 'offline', error: error.status === 409 || error.code === 'IDENTITY_CHANGED' ? '设备身份冲突或硬件变化，请确认授权并重新配对；原任务已保留' : [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : `无法连接服务（${error.status || error.name}），本机成果已保留` });
@@ -220,6 +246,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (Date.now() - lastProbe > 60000) { available = await detectAgents(config.agents); lastProbe = Date.now(); control.update({ agents: available }); }
         await heartbeat();
+        if(skillOperations.length)await updateSkills(true);
+        else void updateSkills(false);
         if (forbidden || signal?.aborted) break;
         control.readCommand();
         if (control.state.mode === 'draining') break;
@@ -287,6 +315,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
     } while (!once && !forbidden && !signal?.aborted && control.state.mode !== 'draining');
   } finally {
     clearInterval(timer);
+    if (skillTick) await skillTick;
+    skillRuntime.close();
     signal?.removeEventListener('abort', abort);
     control.close();
     journal.event({ domain: 'system', code: 'WORKER_STOP', message: forbidden ? '设备授权失效，采集服务已停止' : '采集服务已停止，本机成果保留' });

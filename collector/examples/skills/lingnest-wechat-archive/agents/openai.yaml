@@ -1,0 +1,7 @@
+interface:
+  display_name: "WeChat Article To MD"
+  short_description: "Archive WeChat articles as clean Markdown."
+  default_prompt: "Use $wechat-article-to-md-skill to save this WeChat article as a local Markdown archive."
+
+policy:
+  allow_implicit_invocation: true

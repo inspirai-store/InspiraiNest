@@ -19,6 +19,8 @@
         "--sandbox",
         "workspace-write",
         "-c",
+        "sandbox_workspace_write.network_access=true",
+        "-c",
         "approval_policy=\"never\"",
         "-"
       ]

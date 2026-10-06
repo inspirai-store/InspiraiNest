@@ -14,6 +14,7 @@ import { deviceMetadata, publicDeviceMetadata, deviceCategory, workerAuthorized,
 import { browserSessions, browserCookie, browserValid } from './browser-session.mjs';
 import { accountSecurity } from './account-security.mjs';
 import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
+import { createSkillService, taskCapabilities } from './skill-service.mjs';
 import QRCode from 'qrcode';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
@@ -52,6 +53,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const download = clientDownload({ releaseDir, publicUrl });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
+  const skills = createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock });
   const deleted = async archive => Boolean((await store.get('trash', archive.entryId))?.deletedAt);
   async function identityPolicy() {
     return serialized('device-policy', () => store.transaction(async tx => {
@@ -314,6 +316,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/client-prompt.js': ['../assets/client-prompt.js', 'text/javascript; charset=utf-8'],
           '/client-prompt.css': ['../assets/client-prompt.css', 'text/css; charset=utf-8'],
           '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
+          '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
+          '/skill-manager.css': ['public/skill-manager.css', 'text/css; charset=utf-8'],
           '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
           '/pairing-dialog.css': ['public/pairing-dialog.css', 'text/css; charset=utf-8'],
           '/library-frame.css': ['public/library-frame.css', 'text/css; charset=utf-8'],
@@ -393,6 +397,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         sessions.clear(res); return send(res, 200, { loggedOut: true });
       }
       const device = await authenticate(req);
+      if (await skills.handle(req, res, route, device)) return;
       if (route.startsWith('/api/browser-trust')) {
         owner(device);
         requireValue(deviceCategory(device) === 'browser' && req.headers.authorization === undefined && cookieValue(req, browserCookie), 'Browser cookie session required', 403);
@@ -496,8 +501,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const input = await body(req);
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
-        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)] });
-        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })) });
+        const runtime = input.skillRuntime;
+        requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
+        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null });
+        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })), skillOperations:runtime?await skills.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
@@ -527,6 +534,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             return send(res, 200, existing);
           }
           const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now() };
+          task.requiredCapabilities = taskCapabilities(task);
           return send(res, 201, await saveTask(task, 'queued', '等待可用电脑'));
         });
       }
@@ -540,8 +548,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            task = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && (t.type === 'auto' ? device.capabilities.length > 0 : device.capabilities.includes(t.type)) && (!t.preferredDeviceId || t.preferredDeviceId === device.id) && (!t.preferredAgent || device.agents.includes(t.preferredAgent)))).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
-            if (task) task = await saveTask({ ...task, deviceId: device.id }, 'assigned', `已分配给 ${device.name}`);
+            const candidates = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && (t.type === 'auto' ? device.capabilities.length > 0 : device.capabilities.includes(t.type)) && (!t.preferredDeviceId || t.preferredDeviceId === device.id) && (!t.preferredAgent || device.agents.includes(t.preferredAgent)))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            for (const candidate of candidates) {
+              const selected = await skills.selection(candidate,device,tasks);
+              if (!selected.eligible) continue;
+              task = await saveTask({ ...candidate, deviceId: device.id, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || candidate.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`);
+              break;
+            }
           }
           return send(res, 200, { task: task || null });
         });
@@ -592,7 +605,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         if (action === 'result') return send(res, 200, await publish(input, device, req, taskId));
         requireValue(active.includes(task.state), 'Task is not running', 409);
         requireValue(['running', 'uploading', 'waiting_action', 'failed'].includes(input.state), 'Invalid task state');
-        return send(res, 200, await saveTask({ ...task, agent: input.agent || task.agent || null }, input.state, text(input.message, 'progress message', 1000)));
+        const executionSkills = (task.selectedSkills || []).filter(s=>s.agent === (input.agent || task.agent));
+        return send(res, 200, await saveTask({ ...task, agent: input.agent || task.agent || null, executionSkills }, input.state, text(input.message, 'progress message', 1000)));
       }
       if (route === '/api/archives' && req.method === 'POST') {
         requireValue(['owner', 'worker'].includes(device.role), 'Archive publisher permission required', 403);

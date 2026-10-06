@@ -92,6 +92,19 @@ export class OwnerClient {
     if (!this.identity) throw new Error('请先配对管理端');
     return this.call(this.identity.server, this.identity.token, route, method, data, binary);
   }
+  skills(input) {
+    if (!input || typeof input !== 'object') throw new Error('技能请求无效');
+    if (input.kind === 'environment') {
+      const query = new URLSearchParams({offset:String(Number(input.offset)||0)});
+      if(input.snapshotId)query.set('snapshotId',archiveId(input.snapshotId));
+      return this.api(`/api/skills/devices/${taskId(input.deviceId)}/environment?${query}`);
+    }
+    if (input.kind === 'versions') return this.api('/api/skills/versions');
+    if (input.kind === 'operation') return this.api('/api/skills/operations/'+archiveId(input.operationId));
+    if (input.kind === 'history') return this.api('/api/skills/operations?deviceId='+taskId(input.deviceId));
+    if (input.kind === 'create' && ['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.operation?.action)) return this.api('/api/skills/operations','POST',input.operation);
+    throw new Error('不支持的技能请求');
+  }
   async state() {
     const identity = this.identity;
     if (identity && Date.now() - this.identityAttemptAt > 60000) {

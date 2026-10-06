@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { WorkerManager } from './manager.mjs';
@@ -180,12 +181,18 @@ function registerIPC() {
     logs: task => manager.logs(task), activity: task => manager.activity(task),
     pair: input => pairDesktop(input),
     'task-folder': async task => { const error = await shell.openPath(manager.taskDirectory(task)); if (error) throw new Error(error); },
-  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (name === 'pair') trustedMain(event); else trusted(event); return fn(argument); });
+    'skill-config': async agent => {
+      if(!['codex','codebuddy','claude'].includes(agent))throw new Error('Agent 无效');
+      const directory=path.join(os.homedir(),agent==='codex'?'.codex':'.'+agent);
+      fs.mkdirSync(directory,{recursive:true});const error=await shell.openPath(directory);if(error)throw new Error(error);
+    },
+  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
   const library = {
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
+    skills: input => owner.skills(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id),

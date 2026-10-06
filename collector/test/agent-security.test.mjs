@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentEnvironment, execute } from '../src/agents.mjs';
+import { agentEnvironment, execute, agentProfile } from '../src/agents.mjs';
 
 test('spawned agents cannot inherit deployment and pairing credentials', async () => {
   const env = agentEnvironment({ ...process.env, COLLECTOR_MASTER_KEY: 'fixture-admin',
@@ -14,4 +14,10 @@ test('spawned agents cannot inherit deployment and pairing credentials', async (
   }))`], { env });
   assert.equal(result.code, 0);
   assert.deepEqual(JSON.parse(result.tail), { safe: 'visible', leaked: [] });
+});
+
+test('collection network migration updates only the previous built-in Codex profile',()=>{
+ const old=['exec','--skip-git-repo-check','--json','--sandbox','workspace-write','-c','approval_policy="never"','-'];
+ assert.ok(agentProfile('codex',{codex:{args:old}}).args.includes('sandbox_workspace_write.network_access=true'));
+ const explicit=[...old.slice(0,-1),'-c','sandbox_workspace_write.network_access=false','-'];assert.deepEqual(agentProfile('codex',{codex:{args:explicit}}).args,explicit);
 });

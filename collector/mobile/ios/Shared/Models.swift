@@ -148,6 +148,7 @@ struct Device: Codable, Identifiable, Sendable {
     var browserExpiresAt: String? = nil
     var loggedOutAt: String? = nil
     var capabilities: [String]? = nil
+    var environment: SkillEnvironmentSummary? = nil
     var authorizationCategory: String {
         if let category { return category }
         if role == "reader" { return "integration" }
@@ -172,6 +173,23 @@ struct Device: Codable, Identifiable, Sendable {
         if agents?.isEmpty != false { return "无可用 Agent" }
         return capabilities?.isEmpty != false ? "未启用处理能力" : "工作节点在线"
     }
+}
+
+struct SkillAgent: Codable, Sendable { let name: String; let installed: Bool; let version: String? }
+struct SkillEnvironmentSummary: Codable, Sendable { let schemaVersion: Int; let scannedAt: String; let count: Int; let agents: [SkillAgent]; let verifiedCount: Int }
+struct SkillDependencies: Codable, Sendable { let state: String; let missing: [String]; let unknown: [String] }
+struct SkillVerification: Codable, Sendable { let state: String; let at: String? }
+struct NodeSkill: Codable, Identifiable, Sendable {
+    let id: String; let agent: String; let name: String; let description: String?
+    let declaredVersion: String?; let hash: String?; let source: String?; let context: String?
+    let enabled: Bool?; let loadState: String; let dependencies: SkillDependencies
+    let capabilities: [String]; let verification: SkillVerification?; let issue: String?
+    var agentLabel: String { ["codex":"Codex","codebuddy":"CodeBuddy","claude":"Claude Code"][agent] ?? agent }
+    var loadLabel: String { ["loaded":"可加载","configured":"已配置","unknown":"加载未确认","disabled":"已禁用","not_loaded":"未加载","shadowed":"被覆盖","agent_unavailable":"Agent 未安装"][loadState] ?? loadState }
+}
+struct SkillEnvironmentPage: Codable, Sendable {
+    let schemaVersion: Int; let items: [NodeSkill]; let agents: [SkillAgent]; let total: Int
+    let nextOffset: Int?; let snapshotId: String?; let scannedAt: String?
 }
 struct DevicePolicy: Codable, Sendable { let version: Int; let namespace: String }
 struct ScopedDeviceIdentity: Codable, Sendable, Equatable { let version: Int; let namespace: String; let source: String; let digest: String }

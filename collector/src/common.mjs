@@ -30,6 +30,10 @@ export function atomicJson(file, value) {
   fs.renameSync(temp, file);
 }
 export const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+export function canonicalJson(value) {
+  const sort = input => Array.isArray(input) ? input.map(sort) : input && typeof input === 'object' ? Object.fromEntries(Object.keys(input).sort().filter(key=>input[key]!==undefined).map(key=>[key,sort(input[key])])) : input;
+  return JSON.stringify(sort(value));
+}
 export function sourceURL(value) {
   let url;
   try { url = new URL(value); } catch { fail('Invalid source URL'); }

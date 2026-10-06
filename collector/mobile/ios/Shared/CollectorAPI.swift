@@ -60,6 +60,15 @@ final class CollectorAPI: @unchecked Sendable {
         do { return try await decoded(DevicePolicy.self, path: "/api/device-policy") }
         catch CollectorError.http(404) { return nil }
     }
+    func skillEnvironment(deviceID: String, offset: Int = 0, snapshotID: String? = nil) async throws -> SkillEnvironmentPage {
+        guard UUID(uuidString: deviceID) != nil, offset >= 0 else { throw CollectorError.message("节点编号无效。") }
+        var path = "/api/skills/devices/\(deviceID)/environment?offset=\(offset)"
+        if let snapshotID {
+            guard snapshotID.count == 64, snapshotID.allSatisfy({ $0.isHexDigit }) else { throw CollectorError.message("清单编号无效。") }
+            path += "&snapshotId=\(snapshotID)"
+        }
+        return try await decoded(SkillEnvironmentPage.self, path: path)
+    }
     func pair(key: String, name: String, installationId: String? = nil, platform: String? = nil, system: String? = nil,
               identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil,
               otp: String? = nil, recoveryCode: String? = nil) async throws -> DeviceCredential {

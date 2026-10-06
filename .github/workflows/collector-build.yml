@@ -49,6 +49,12 @@ jobs:
         working-directory: collector
       - run: npm test
         working-directory: collector
+      - name: Test isolated MySQL authorization and skills
+        run: node scripts/test-auth-mysql.cjs
+        working-directory: collector
+      - name: Test Web skill management
+        run: node scripts/test-skills-web.cjs
+        working-directory: collector
       - run: npm audit --omit=dev --audit-level=high
         working-directory: collector
     timeout-minutes: 30
@@ -69,6 +75,9 @@ jobs:
         working-directory: collector
       - name: Test shared Linux desktop login
         run: xvfb-run -a node scripts/test-desktop-login.cjs
+        working-directory: collector
+      - name: Test shared Linux skill management
+        run: xvfb-run -a node scripts/test-desktop-skills.cjs
         working-directory: collector
     timeout-minutes: 20
   android:
@@ -115,6 +124,9 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - run: npm ci --ignore-scripts
         working-directory: collector
+      - name: Test Windows skill package and directory contracts
+        run: node --test test/skills.test.mjs
+        working-directory: collector
       - run: npm run build:worker:win
         working-directory: collector
       - name: Test download page
@@ -137,6 +149,9 @@ jobs:
         run: |
           node collector/scripts/test-desktop-login.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
           node collector/scripts/test-desktop-login-switch.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows skill management
+        shell: pwsh
+        run: node collector/scripts/test-desktop-skills.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows pairing layout
         shell: pwsh
         run: node collector/scripts/test-desktop-pairing.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -240,6 +255,7 @@ jobs:
             app=desktop/dist/mac/灵藏.app
           fi
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login-switch.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-pairing.cjs "$app/Contents/MacOS/灵藏"

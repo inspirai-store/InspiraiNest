@@ -32,6 +32,8 @@ files:
   - desktop/vendor/**
   - public/device-view.js
   - public/pairing-dialog.css
+  - public/skill-manager.js
+  - public/skill-manager.css
   - src/**
   - worker.production.example.json
   - node_modules/**

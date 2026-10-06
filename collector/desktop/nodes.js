@@ -5,7 +5,7 @@
   const stages = { queued:'等待领取',assigned:'已分配',running:'处理中',uploading:'上传中',waiting_action:'待操作',awaiting_review:'待确认' };
   const types = {article:'文章',webpage:'网页',video:'视频',document:'文档',repository:'代码项目',audio:'音频',image:'图片',note:'笔记',other:'其他'};
   const agents = names => (names || []).map(name => ({codex:'Codex',codebuddy:'CodeBuddy'})[name] || name).join(' / ') || '未上报';
-  window.createNodeView = ({ onDispatch, onTask, animate }) => {
+  window.createNodeView = ({ onDispatch, onTask, onSkills, animate }) => {
     let local = null, state = null, connected = false, paired = false, lastSuccess = null, selected = 'local';
     let listSignature = '', detailSignature = '';
     const remotes = () => (state?.devices || []).filter(d => window.deviceView.dispatchable(d) && d.id !== local?.deviceId);
@@ -44,6 +44,10 @@
       $('#node-overview').innerHTML = `<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow">${isLocal ? 'THIS COMPUTER / 本机控制' : 'AUTHORIZED NODE / 已授权工作节点'}</span><h1 class="detail-title">${esc(title)}</h1><p class="detail-summary">${isLocal ? '本机状态与控制独立可用；关闭工作台不会停止后台采集。' : connected ? esc(window.deviceView.status(device)) : '连接中断 · 以下为最近一次成功读取的信息'}</p>${paired && device ? '<div class="detail-actions"><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button></div>' : ''}`;
       $('#node-overview [data-node-back]').onclick = () => { $('#node-detail').classList.remove('open'); $('#node-list').querySelector(`[data-node="${CSS.escape(selected)}"]`)?.focus(); };
       const dispatch = $('#node-dispatch'); if (dispatch) { dispatch.disabled = !connected; dispatch.title = connected ? '' : '恢复管理端连接后可派发任务'; dispatch.onclick = () => onDispatch(device.id); }
+      if (paired && device && onSkills) {
+        const button = document.createElement('button');button.type='button';button.textContent='节点技能';button.dataset.nodeSkills=device.id;button.disabled=!connected;button.onclick=()=>onSkills(device);
+        $('#node-overview .detail-actions').append(button);
+      }
       if (!isLocal && device) {
         const info = device.deviceInfo || {}, os = info.os;
         const fields = [['操作系统',os?.family && os.family !== 'Unknown' ? [os.family,os.version,os.build ? '构建 '+os.build : ''].filter(Boolean).join(' · ') : device.system || '未上报'],
