@@ -22,6 +22,7 @@ files:
   - desktop/style.css
   - desktop/workspace.css
   - desktop/workspace.js
+  - desktop/client-login.js
   - desktop/pair.css
   - desktop/brand.css
   - desktop/icon.png

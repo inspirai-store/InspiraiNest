@@ -48,7 +48,7 @@ async function fixture(t, { totp = true } = {}) {
 
 test('unfamiliar browsers validate key before MFA; missing factor is not a failure; proofs stay private', async t => {
   const f = await fixture(t);
-  assert.equal((await f.login({ key: 'wrong' })).value.code, undefined);
+  assert.equal((await f.login({ key: 'wrong' })).value.code, 'credential_invalid');
   const challenge = await f.login(); assert.equal(challenge.value.code, 'mfa_required');
   assert.equal((await f.store.get('setting', 'account-security-v1')).failures.count, 1);
   const invalid = await f.login({ otp: 'invalid' }); assert.equal(invalid.value.code, 'mfa_invalid');

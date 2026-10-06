@@ -14,14 +14,18 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
   fs.writeFileSync(file,JSON.stringify(config));
   const manager=new WorkerManager(file,process.execPath),output=path.resolve(__dirname,'../test-output/settings-nodes');fs.mkdirSync(output,{recursive:true});
   const executable=process.argv[2] || (()=>{try{return require('../desktop/node_modules/electron');}catch{return require('electron');}})();
-  const env={...process.env,COLLECTOR_CONFIG:file,COLLECTOR_NODE:process.execPath,COLLECTOR_DESKTOP_TEST:'1'};delete env.ELECTRON_RUN_AS_NODE;
+  const env={...process.env,COLLECTOR_CONFIG:file,COLLECTOR_NODE:process.execPath,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;
   let app,page,compact;const errors=[];
   const wait=async(fn,label='condition')=>{for(let n=0;n<180;n++){if(await fn())return;await new Promise(r=>setTimeout(r,100));}throw new Error('Timed out: '+label);};
   async function launch({startup=false}={}){
+    console.log('Settings fixture: launch');
     app=await _electron.launch({executablePath:executable,args:[...(process.argv[2]?[]:[path.resolve(__dirname,'../desktop')]),...(startup?['--startup']:[])],env});
     await wait(()=>{page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('compact=1'));compact=app.windows().find(p=>p.url().includes('compact=1'));return page&&compact;},'both windows');
+    page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(30000);
     page.on('pageerror',e=>errors.push(e.message));compact.on('pageerror',e=>errors.push(e.message));
     await page.waitForFunction(()=>document.querySelector('html').dataset.closeBehavior);
+
+    console.log('Settings fixture: window ready');
   }
   async function remote(name,online){
     const pairing=await api(owner,'/api/pairings','POST',{}),device={server,...await api({server},'/api/pair','POST',{key:pairing.key,name,clientType:'worker'})};
@@ -29,7 +33,7 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     return device;
   }
   try{
-    await launch();assert.equal(await page.locator('#theme-toggle').count(),0);
+    await launch();console.log('Settings fixture: appearance');assert.equal(await page.locator('#theme-toggle').count(),0);
     assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['overview','tasks','library','nodes','settings']);
     await showSettings(page,'appearance');
     if(await app.evaluate(({app})=>app.isPackaged)){
@@ -59,13 +63,19 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     }
     await assert.rejects(page.evaluate(()=>window.desktopSettings.update({url:'https://example.com'})),/设置内容无效/);
     await assert.rejects(compact.evaluate(()=>window.desktopSettings.update({themeMode:'dark'})),/主窗口/);
+    console.log('Settings fixture: close to tray');
     await app.evaluate(()=>globalThis.workerDesktop().main.close());
     assert.equal(await app.evaluate(()=>globalThis.workerDesktop().main.isVisible()),false);
     await page.evaluate(()=>window.worker.action('show'));
     await showSettings(page,'devices');assert.equal(await page.locator('#owner-pair').isVisible(),true);
+    console.log('Settings fixture: native login');
     const pairing=await api(owner,'/api/pairings','POST',{});
-    await page.locator('#owner-pair [name=server]').fill(server);await page.locator('#owner-pair [name=name]').fill(config.name);await page.locator('#owner-pair [name=key]').fill(pairing.key);await page.locator('#owner-pair button[type=submit]').click();
-    await page.locator('#overview-data').waitFor({state:'visible'});
+    await page.locator('#owner-pair [name=server]').fill(server);
+    await page.locator('#owner-pair [name=key]').fill(pairing.key);
+    await page.locator('#owner-pair button[type=submit]').click();
+    console.log('Settings fixture: login submitted');
+    await wait(async()=>{const message=await page.locator('#owner-pair [data-login-error]').textContent();if(message)throw new Error('Login fixture: '+message);return page.locator('#overview-data').isVisible();},'native login');
+    console.log('Settings fixture: logged in');
     const online=await remote('MacBook <script>坏标题</script>',true),offline=await remote('离线 Mac mini — 很长的设备名称用于验证文本截断',false);
     await page.locator('[data-view=nodes]').click();await wait(async()=>await page.locator(`[data-node="${online.device.id}"]`).count()===1,'remote discovery');
     assert.equal(await page.locator(`[data-node="${manager.configuration().deviceId}"]`).count(),0,'local ID deduplicated');
@@ -113,7 +123,7 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     const desktopProcess=app.process();await app.evaluate(()=>globalThis.workerDesktop().main.close()).catch(()=>{});await wait(()=>desktopProcess.exitCode!==null,'manager exit after close');app=null;
     fs.writeFileSync(path.join(output,'close-state.json'),JSON.stringify({pid,snapshot:manager.snapshot()},null,2));
     assert.equal(manager.snapshot().pid,pid);assert.equal(manager.snapshot().running,true,'window quit preserves independent Worker');
-    await launch();assert.equal(await page.evaluate(async()=>(await window.desktopSettings.get()).closeBehavior),'quit');assert.equal(manager.snapshot().pid,pid,'reopen attaches same Worker');
+    await launch();console.log('Settings fixture: appearance');assert.equal(await page.evaluate(async()=>(await window.desktopSettings.get()).closeBehavior),'quit');assert.equal(manager.snapshot().pid,pid,'reopen attaches same Worker');
     // End the isolated Worker while its manager is closed to simulate process
     // loss. Last user intent remains paused, not the test's external drain.
     const reopened=app.process();await app.evaluate(()=>globalThis.workerDesktop().main.close()).catch(()=>{});await wait(()=>reopened.exitCode!==null);app=null;
@@ -129,8 +139,8 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     await app.close();app=null;await launch();assert.equal(manager.snapshot().running,false,'explicit stop persists after reopen');
     await api(owner,`/api/devices/${offline.device.id}/revoke`,'POST',{});await page.waitForFunction(()=>document.querySelectorAll('#node-list [data-node]').length===1);
     await showSettings(page,'devices');await page.locator('#owner-logout').click();await page.locator('[data-view=nodes]').click();await page.locator('#nodes-auth-hint').waitFor({state:'visible'});
-    assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,synthetic:true,checks:['theme modes and legacy migration','settings persistence','system event synchronization','IPC allowlist','unpaired settings','node reports and escaping','local deduplication','offline dispatch and idempotent retry','task drilldown','disconnect and recovery','revocation','dark/light standard/minimum/tray','keyboard and reduced motion','close to tray','close manager keeps Worker','reattach same process','paused/running recovery after process loss','login launch stays in tray','explicit stop persists','packaged login preference toggle and persistence'],errors},null,2));
+    assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,synthetic:true,checks:['theme modes and legacy migration','settings persistence','system event synchronization','IPC allowlist','unpaired settings','node reports and escaping','local deduplication','offline dispatch and idempotent retry','task drilldown','disconnect and recovery','revocation','dark/light standard/minimum/tray','keyboard and reduced motion','close to tray','close manager keeps Worker','reattach same process','paused/running recovery after process loss','login launch stays in tray','explicit stop persists','packaged login preference toggle and persistence'],errors,credentialStorage:'Isolated fixture replacement; native Keychain approval is separate acceptance.'},null,2));
     console.log('Desktop settings and nodes: passed');
-  }catch(error){if(page&&!page.isClosed())await page.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});throw error;}
+  }catch(error){console.error('Settings fixture failed:',error.message);if(page&&!page.isClosed())await page.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});throw error;}
   finally{if(manager.snapshot().managed){await manager.control('drain');await wait(()=>!manager.snapshot().running,'cleanup drain');}if(app)await app.close();await service.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

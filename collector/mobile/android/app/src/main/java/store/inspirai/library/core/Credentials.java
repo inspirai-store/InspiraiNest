@@ -28,11 +28,15 @@ public final class Credentials {
     private static final Object LOCK = new Object();
     private final AtomicFile file;
     private final String alias;
+    private final android.content.SharedPreferences loginPreferences;
 
     public Credentials(Context context) {
         file = new AtomicFile(new File(context.getNoBackupFilesDir(), "library-credentials.json"));
         alias = context.getPackageName() + ".library.credentials.v1";
+        loginPreferences = context.getSharedPreferences("client-login", Context.MODE_PRIVATE);
     }
+    public String lastOrigin() { return loginPreferences.getString("lastSuccessfulOrigin", ""); }
+    private void lastOrigin(String origin) { loginPreferences.edit().putString("lastSuccessfulOrigin", origin).apply(); }
 
     public boolean isPaired() {
         synchronized (LOCK) {
@@ -79,6 +83,8 @@ public final class Credentials {
                         .put("iv", Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
                         .put("ciphertext", Base64.encodeToString(encrypted, Base64.NO_WRAP));
                 write(record);
+                // Non-secret preference only; survives logout without retaining the password.
+                lastOrigin(origin);
             } catch (Exception ignored) {
                 throw new Exception("无法安全保存设备凭据。");
             }
@@ -102,7 +108,7 @@ public final class Credentials {
     public static String normalizeServer(String server) throws Exception {
         try {
             if (server == null || server.isEmpty()) throw new IllegalArgumentException();
-            URI uri = new URI(server);
+            URI uri = new URI(server.trim());
             String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
             String path = uri.getRawPath();

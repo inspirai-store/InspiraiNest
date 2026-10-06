@@ -371,7 +371,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 return enrolled;
               },
             }));
-            requireValue(result, 'Invalid or expired pairing key', 401);
+            if (!result) throw Object.assign(new Error('Invalid or expired pairing key'), { status: 401, code: 'credential_invalid' });
             if (result.device.category === 'browser') sessions.cookie(res, result.token);
             return send(res, 201, result);
           }

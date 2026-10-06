@@ -22,7 +22,7 @@ const { _electron } = require('playwright');
   const file = path.join(root, 'worker.json'); atomicJson(file, config);
   const output = path.resolve(__dirname, '../test-output/desktop'); fs.mkdirSync(output, { recursive: true });
   const electron = (() => { try { return require('../desktop/node_modules/electron'); } catch { return require('electron'); } })();
-  const env = { ...process.env, COLLECTOR_CONFIG: file, COLLECTOR_NODE: process.execPath, COLLECTOR_DESKTOP_TEST: '1', COLLECTOR_DESKTOP_TRACE: path.join(output, 'events.jsonl') };
+  const env = { ...process.env, COLLECTOR_CONFIG: file, COLLECTOR_NODE: process.execPath, COLLECTOR_DESKTOP_TEST: '1', COLLECTOR_DESKTOP_STORAGE_FIXTURE: '1', COLLECTOR_DESKTOP_TRACE: path.join(output, 'events.jsonl') };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await _electron.launch({ executablePath: electron, args: [process.env.COLLECTOR_DESKTOP_SOURCE_DIR || path.resolve(__dirname, '../desktop')], env });
   const desktopProcess = app.process();
@@ -30,6 +30,7 @@ const { _electron } = require('playwright');
   const wait = async fn => { for (let i = 0; i < 200; i++) { if (await fn()) return; await new Promise(r => setTimeout(r, 100)); } throw new Error('desktop fixture timeout'); };
   try {
     await wait(() => app.windows().some(page => page.url().startsWith('file:') && !page.url().includes('compact=1')));
+
     const page = app.windows().find(page => page.url().startsWith('file:') && !page.url().includes('compact=1'));
     await page.waitForFunction(() => document.querySelector('#headline').textContent === '工作节点已停止');
     const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -57,7 +58,6 @@ const { _electron } = require('playwright');
     await page.locator('[data-view=overview]').click();
     await showSettings(page,'devices');
     await page.locator('#owner-pair input[name=server]').fill(server);
-    await page.locator('#owner-pair input[name=name]').fill(config.name);
     await page.locator('#owner-pair input[name=key]').fill(pairing.key);
     await page.locator('#owner-pair button[type=submit]').click();
     await page.locator('#overview-data').waitFor({ state: 'visible' });

@@ -44,44 +44,81 @@ struct RootView: View {
 
 struct PairingForm: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var server = ""
     @State private var key = ""
-    @State private var name = "我的 iPhone"
-    @State private var scanned: PairingQRCode?
     @State private var showingScanner = false
-    @State private var showingManual = false
+    @State private var scanned: PairingQRCode?
+    @State private var usingCode = false
+    @State private var mfa = false
+    @State private var recovery = false
+    @State private var factor = ""
+    @State private var pendingKey = ""
+    @State private var error = ""
+    @State private var attempt = 0
+    @State private var loginTask: Task<Void, Never>?
+    @Environment(\.dismiss) private var dismiss
+
+    private func cancel() {
+        attempt += 1; loginTask?.cancel(); loginTask = nil; model.cancelLogin()
+        key = ""; pendingKey = ""; factor = ""; mfa = false; scanned = nil
+    }
+    private func login(_ secret: String, address: String? = nil, otp: String? = nil, recoveryCode: String? = nil) {
+        guard !model.busy else { return }
+        attempt += 1; let current = attempt; let address = address ?? server
+        key = ""; factor = ""; error = ""
+        loginTask = Task {
+            do {
+                try await model.login(server: address, key: secret, name: UIDevice.current.name, otp: otp, recoveryCode: recoveryCode)
+                guard attempt == current, !Task.isCancelled else { return }
+                pendingKey = ""; mfa = false; scanned = nil; dismiss()
+            } catch {
+                guard attempt == current, !Task.isCancelled else { return }
+                if case CollectorError.login(let code, _) = error, ["mfa_required", "mfa_invalid"].contains(code) {
+                    pendingKey = secret; mfa = true
+                    self.error = code == "mfa_invalid" ? safeMessage(error) : ""
+                } else { pendingKey = ""; mfa = false; self.error = safeMessage(error) }
+            }
+        }
+    }
     var body: some View {
-        Section("配对管理端") {
-            Text("在网页「授权设备」生成手机管理端二维码，然后用这台 iPhone 扫描。")
-                .font(.footnote).foregroundStyle(.secondary)
-            Button { showingScanner = true } label: { Label("扫码连接资料库", systemImage: "qrcode.viewfinder") }
-                .disabled(model.busy)
+        Section("登录资料库") {
+            TextField("资料库地址 · https://", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                .onChange(of: server) { _ in cancel() }
+            SecureField(usingCode ? "配对码" : "登录密码", text: $key).textContentType(usingCode ? nil : .password)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+            Button(model.busy ? "正在登录…" : "登录") { login(key) }
+                .disabled(model.busy || key.isEmpty || server.isEmpty)
+            if !error.isEmpty && !mfa { Text(error).foregroundStyle(.red).accessibilityAddTraits(.updatesFrequently) }
+            Button(usingCode ? "使用密码登录" : "使用配对码连接") { cancel(); usingCode.toggle() }
+            Button { cancel(); showingScanner = true } label: { Label("扫码连接", systemImage: "qrcode.viewfinder") }
             if let scanned {
-                Text("已识别服务器：\(scanned.server)").font(.footnote).textSelection(.enabled)
-                TextField("设备名称", text: $name)
-                Button(model.busy ? "正在配对…" : "确认服务器并配对") {
-                    self.scanned = nil
-                    Task { await model.pair(server: scanned.server, key: scanned.key, name: name) }
-                }.disabled(model.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("取消本次扫码") { self.scanned = nil }
+                Text(scanned.server).textSelection(.enabled)
+                Button("确认地址并连接") { login(scanned.key, address: scanned.server) }
+                    .disabled(model.busy)
             }
-            DisclosureGroup("使用地址与配对码连接", isExpanded: $showingManual) {
-                TextField("https://你的服务器", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                TextField("设备名称", text: $name)
-                SecureField("手机设备配对码或个人密钥", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Button(model.busy ? "正在配对…" : "配对并登录") {
-                    let pairingKey = key; key = ""
-                    Task { await model.pair(server: server, key: pairingKey, name: name) }
-                }.disabled(model.busy || key.isEmpty || server.isEmpty || name.isEmpty)
-            }
+            Button("取消") { cancel(); dismiss() }
         }
-        .sheet(isPresented: $showingScanner) {
-            PairingScannerView { result in
-                scanned = result
-                showingScanner = false
-            }
+        .onAppear { if server.isEmpty { server = model.lastServer } }
+        .onDisappear { cancel() }
+        .onChange(of: scenePhase) { phase in if phase != .active { cancel() } }
+        .sheet(isPresented: $showingScanner) { PairingScannerView { result in scanned = result; showingScanner = false } }
+        .sheet(isPresented: $mfa, onDismiss: { if !pendingKey.isEmpty { cancel() } }) {
+            NavigationStack {
+                Form {
+                    SecureField(recovery ? "恢复码" : "动态码", text: $factor)
+                        .keyboardType(recovery ? .asciiCapable : .numberPad).textContentType(.oneTimeCode)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    if !error.isEmpty { Text(error).foregroundStyle(.red) }
+                    Button("验证并登录") {
+                        let value = factor.trimmingCharacters(in: .whitespacesAndNewlines)
+                        login(pendingKey, otp: recovery ? nil : value, recoveryCode: recovery ? value : nil)
+                    }.disabled(model.busy || factor.isEmpty)
+                    Button(recovery ? "使用动态码" : "使用恢复码") { recovery.toggle(); factor = "" }
+                }.navigationTitle("验证登录")
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { cancel() } } }
+            }.interactiveDismissDisabled(model.busy)
         }
-        .onDisappear { key = ""; scanned = nil }
     }
 }
 
@@ -208,10 +245,12 @@ struct OutboxDetailView: View {
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @State private var revoking: Device?
+    @State private var changingLibrary = false
     @State private var forget = false
     var body: some View {
         List {
             if model.paired {
+                Section { Button("更换资料库") { changingLibrary = true } }
                 Section("当前设备") {
                     Text(model.deviceName); Text(model.serverName).font(.footnote)
                     Button("移除本机登录", role: .destructive) { forget = true }.disabled(model.busy)
@@ -247,6 +286,7 @@ struct SettingsView: View {
                 Link("隐私政策", destination: URL(string: "https://library.inspirai.store/privacy")!)
             }
         }.navigationTitle("设备与配对").refreshable { await model.refresh() }
+        .sheet(isPresented: $changingLibrary) { NavigationStack { Form { PairingForm() }.navigationTitle("更换资料库") } }
         .confirmationDialog("撤销 \(revoking?.name ?? "") 的服务器访问？", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }), titleVisibility: .visible) {
             if let device = revoking { Button("撤销设备", role: .destructive) { Task { await model.revoke(device) }; revoking = nil } }
         }

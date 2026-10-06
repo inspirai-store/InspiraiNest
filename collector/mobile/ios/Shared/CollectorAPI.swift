@@ -41,7 +41,14 @@ final class CollectorAPI: @unchecked Sendable {
         guard let http = response as? HTTPURLResponse, let url = http.url, origin.contains(url) else {
             throw CollectorError.message("服务端响应地址无效。")
         }
-        guard (200..<300).contains(http.statusCode) else { throw CollectorError.http(http.statusCode) }
+        guard (200..<300).contains(http.statusCode) else {
+            if path == "/api/pair", token == nil {
+                let body = data.count <= 4096 ? (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] : nil
+                let code = body?["code"] as? String ?? ""
+                throw CollectorError.login(["mfa_required", "mfa_invalid", "credential_invalid"].contains(code) ? code : "", http.statusCode)
+            }
+            throw CollectorError.http(http.statusCode)
+        }
         return (data, http)
     }
     private func decoded<T: Decodable>(_ type: T.Type, path: String, method: String = "GET", body: Data? = nil) async throws -> T {
@@ -54,12 +61,15 @@ final class CollectorAPI: @unchecked Sendable {
         catch CollectorError.http(404) { return nil }
     }
     func pair(key: String, name: String, installationId: String? = nil, platform: String? = nil, system: String? = nil,
-              identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil) async throws -> DeviceCredential {
+              identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil,
+              otp: String? = nil, recoveryCode: String? = nil) async throws -> DeviceCredential {
         guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, key.utf16.count <= 200,
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.utf16.count <= 100 else {
             throw CollectorError.message("请输入设备配对码或个人密钥，以及设备名称。")
         }
         var fields: [String: Any] = ["key": key, "name": name, "clientType": "ios"]
+        if let otp { fields["otp"] = otp }
+        if let recoveryCode { fields["recoveryCode"] = recoveryCode }
         if let installationId { fields["installationId"] = installationId }
         if let platform { fields["platform"] = platform }
         if let system { fields["system"] = system }

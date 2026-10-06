@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import spawn from 'cross-spawn';
 import { loadWorkerConfig } from '../src/config.mjs';
@@ -9,6 +9,7 @@ import { workerSnapshot, sendControl, readOptional, redact } from '../src/worker
 import { atomicJson, contained, remoteURL } from '../src/common.mjs';
 import { readWorkerEvents } from '../src/worker-events.mjs';
 import { computerMetadata } from '../src/device-identity.mjs';
+import { clientOrigin, loginFailure } from '../src/client-login.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export class WorkerManager {
@@ -19,28 +20,39 @@ export class WorkerManager {
     this.error = null;
   }
   configuration() { return loadWorkerConfig(this.file).config; }
-  async pair({ server, key, name }, { clientType = 'worker', onPaired } = {}) {
-    if (workerSnapshot(this.dataDir).running) throw new Error('请先停止正在运行的工作节点');
-    const origin = remoteURL(server);
-    if (typeof key !== 'string' || !key.trim() || key.length > 200) throw new Error('请输入有效的配对码');
+  async pair({ server, key, name, otp, recoveryCode }, { clientType = 'worker', onPaired, signal, current = () => true } = {}) {
+    if (this.pairing || this.starting || workerSnapshot(this.dataDir).running) throw new Error('请先让工作节点完成任务并停止');
+    const origin = clientType === 'desktop' ? clientOrigin(server) : remoteURL(server);
+    if (typeof key !== 'string' || !key || key.length > 200) throw new Error('请输入登录密码或配对码');
     const deviceName = String(name || os.hostname()).trim().slice(0, 100);
     if (!deviceName) throw new Error('请输入电脑名称');
     const identityFile = path.join(this.dataDir, 'installation-id');
     const installationId = this.configuration().installationId || (fs.existsSync(identityFile) ? fs.readFileSync(identityFile, 'utf8').trim() : randomUUID());
-    const device = await computerMetadata({ server: origin, dataDir: this.dataDir, installationId, clientType, allowChange: true });
-    const response = await fetch(origin + '/api/pair', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: key.trim(), name: deviceName, ...device }),
-      signal: AbortSignal.timeout(15000), redirect: 'error',
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '配对失败');
-    if (result.device?.role !== 'worker' || !result.token) throw new Error('配对权限不匹配，请生成新的设备配对码');
-    if (clientType === 'desktop' && !result.ownerToken) throw new Error('服务端尚未支持桌面统一配对，请先升级服务端');
-    if (onPaired) await onPaired({ server: origin, installationId, result });
-    atomicJson(this.file, { ...this.configuration(), server: origin, name: deviceName,
-      installationId, clientType, deviceId: result.device.id, token: result.token });
-    return this.snapshot();
+    this.pairing = true;
+    try {
+      const device = await computerMetadata({ server: origin, dataDir: this.dataDir, installationId, clientType, allowChange: true });
+      const response = await fetch(origin + '/api/pair', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: clientType === 'desktop' ? key : key.trim(), name: deviceName, ...device,
+          ...(otp ? { otp } : {}), ...(recoveryCode ? { recoveryCode } : {}) }),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000), redirect: 'error',
+      });
+      let result;
+      try { result = await response.json(); } catch { throw new Error('登录响应格式无效，请检查资料库地址'); }
+      if (!response.ok) throw clientType === 'desktop' ? loginFailure(response.status, result) : new Error(result.error || '配对失败');
+      if (result.device?.role !== 'worker' || !result.token) throw new Error('配对权限不匹配，请生成新的设备配对码');
+      if (clientType === 'desktop' && !result.ownerToken) throw new Error('服务端尚未支持桌面统一配对，请先升级服务端');
+      if (!current() || signal?.aborted) throw new Error('登录已取消');
+      const previous = this.configuration();
+      const switching = previous.server && remoteURL(previous.server) !== origin;
+      const loginDataRoot = previous.loginDataRoot || this.dataDir;
+      const dataDir = switching ? path.join(loginDataRoot, 'server-profiles', createHash('sha256').update(origin).digest('hex').slice(0, 24)) : this.dataDir;
+      atomicJson(this.file, { ...previous, server: origin, name: deviceName, ...(clientType === 'desktop' ? { loginDataRoot, dataDir } : {}),
+        installationId, clientType, deviceId: result.device.id, token: result.token });
+      try { if (onPaired) await onPaired({ server: origin, installationId, result }); }
+      catch (error) { atomicJson(this.file, previous); throw error; }
+      return this.snapshot();
+    } finally { this.pairing = false; }
   }
   get dataDir() { return path.resolve(this.configuration().dataDir || path.join(project, 'worker-data')); }
   snapshot() {
@@ -54,7 +66,7 @@ export class WorkerManager {
       dataDir: this.dataDir, launchError: this.error }), config.token));
   }
   async start({ paused = false } = {}) {
-    if (this.starting || workerSnapshot(this.dataDir).running) throw new Error('工作节点已在运行，未重复启动');
+    if (this.pairing || this.starting || workerSnapshot(this.dataDir).running) throw new Error('工作节点已在运行或登录中，未重复启动');
     const config = this.configuration();
     if (!config.server || !config.token) throw new Error('请先按 README 完成本机配对');
     this.starting = true;

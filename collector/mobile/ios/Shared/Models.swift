@@ -3,9 +3,17 @@ import Foundation
 enum CollectorError: Error, LocalizedError, Sendable {
     case message(String)
     case http(Int)
+    case login(String, Int)
     var errorDescription: String? {
         switch self {
         case .message(let text): return text
+        case .login("mfa_required", _): return "请输入认证器动态码或恢复码。"
+        case .login("mfa_invalid", _): return "动态码或恢复码无效，请重试。"
+        case .login("credential_invalid", _), .login(_, 401): return "登录密码或配对码不正确。"
+        case .login(_, 429): return "验证过于频繁，请稍后重试。"
+        case .login(_, 410): return "此资料库已停止提供服务。"
+        case .login(_, 409): return "设备身份冲突，请检查已有授权。"
+        case .login: return "无法登录此资料库，请检查地址和服务状态。"
         case .http(401): return "设备授权已失效，请重新配对；本地原文仍已保存。"
         case .http(403): return "需要 owner 管理端权限。"
         case .http(409): return "服务端状态冲突。请刷新任务；不要更换提交 ID 重发。"

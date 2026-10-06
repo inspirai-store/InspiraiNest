@@ -89,12 +89,12 @@
       $('#worker-indicator').textContent = '工作节点 · ' + (!s.paired ? '未配对' : !s.running ? '已停止' : s.online ? '在线' : '连接中断');
       $('#metric-worker').textContent = !s.paired ? '未配对' : !s.running ? '已停止' : s.online ? '在线' : '离线';
       $('#metric-worker-hint').textContent = s.lastHeartbeat ? '最近心跳 ' + date(s.lastHeartbeat) : '暂无心跳';
-      if (s.server && !auth.paired) $('#owner-pair input[name=server]').value = s.server;
+      if (s.paired && s.server && !auth.paired) $('#owner-pair input[name=server]').value = s.server;
       if (auth.paired) $('#pair-worker input[name=server]').value = auth.server;
     } catch { $('#worker-indicator').textContent = '工作节点 状态不可用'; }
   }
   async function setup() {
-    try { auth = await window.library.status(); loadFavorites();
+    try { auth = await window.library.status(); loadFavorites(); $('#owner-pair input[name=server]').value = auth.server || ''; if (!auth.paired) showSettings('devices');
       $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
       $('#overview-connect-banner').hidden = auth.paired;
       $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
@@ -105,12 +105,8 @@
     nodes.updateRemote(state, { connected, paired: auth.paired, lastSuccess });
     await workerStatus(); icons();
   }
-  window.library.onChanged?.(async next => { if (next.deviceId === auth.deviceId && next.paired === auth.paired) return; clearWorkspace(next); if (auth.paired) { await refresh(); await loadEntries(); } });
-  $('#owner-pair').addEventListener('submit', async event => {
-    event.preventDefault(); const form = event.currentTarget, button = event.submitter; button.disabled = true;
-    try { clearWorkspace(await window.library.pair(Object.fromEntries(new FormData(form)))); form.elements.key.value = ''; toast('资料库已连接，可阅读和采集'); await refresh(); await loadEntries(); go('overview'); }
-    catch (error) { toast(errorText(error)); } finally { button.disabled = false; }
-  });
+  window.library.onChanged?.(async next => { if (next.deviceId === auth.deviceId && next.paired === auth.paired && next.server === auth.server) return; clearWorkspace(next); if (auth.paired) { await refresh(); await loadEntries(); } });
+  window.addEventListener('desktop-login', async event => { clearWorkspace(event.detail); await refresh(); await loadEntries(); go('overview'); });
   $('#owner-logout').addEventListener('click', async () => {
       try { clearWorkspace(await window.library.logout()); showSettings('devices'); toast('已退出管理端'); await workerStatus(); }
     catch (error) { toast(errorText(error)); }

@@ -14,8 +14,13 @@ final class AppModel: ObservableObject {
     private var refreshing = false
     private var reportedDeviceID: String?
     private let credentials = CredentialStore()
+    private let makeAPI: (ServerOrigin, String?) -> CollectorAPI
+    private var loginGeneration = 0
+    private var loginActive = false
+    var lastServer: String { UserDefaults.standard.string(forKey: "lastSuccessfulOrigin") ?? serverName }
+    func cancelLogin() { loginGeneration += 1; if loginActive { loginActive = false; busy = false } }
 
-    init() { reloadLocal() }
+    init(makeAPI: @escaping (ServerOrigin, String?) -> CollectorAPI = { CollectorAPI(origin: $0, token: $1) }) { self.makeAPI = makeAPI; reloadLocal() }
     func reloadLocal() {
         do {
             let credential = try credentials.load()
@@ -26,21 +31,27 @@ final class AppModel: ObservableObject {
     }
     func client() throws -> CollectorAPI {
         guard let credential = try credentials.load() else { throw CollectorError.message("请先使用 owner 配对码配对。") }
-        return CollectorAPI(origin: try credential.server, token: credential.token)
+        return makeAPI(try credential.server, credential.token)
     }
     func pair(server: String, key: String, name: String) async {
-        guard !busy else { return }; busy = true; notice = nil
-        defer { busy = false }
-        do {
-            let api = CollectorAPI(origin: try ServerOrigin(server))
-            let scoped = try DeviceIdentity.scoped(await api.devicePolicy())
-            let credential = try await api.pair(key: key, name: name, installationId: try DeviceIdentity.id(), platform: "ios", system: DeviceIdentity.system,
-                identity: scoped, deviceInfo: DeviceIdentity.information)
-            try credentials.save(credential)
-            sessionID = UUID(); snapshot = nil; lastRefresh = nil
-            reloadLocal()
-            await refresh()
-        } catch { notice = safeMessage(error) }
+        do { try await login(server: server, key: key, name: name) }
+        catch { notice = safeMessage(error) }
+    }
+    func login(server: String, key: String, name: String, otp: String? = nil, recoveryCode: String? = nil) async throws {
+        guard !busy else { throw CollectorError.message("登录正在进行。") }
+        busy = true; loginActive = true; notice = nil; loginGeneration += 1; let attempt = loginGeneration
+        defer { if loginGeneration == attempt { busy = false; loginActive = false } }
+        let api = makeAPI(try ServerOrigin(server), nil)
+        let scoped = try DeviceIdentity.scoped(await api.devicePolicy())
+        guard attempt == loginGeneration, !Task.isCancelled else { throw CancellationError() }
+        let credential = try await api.pair(key: key, name: name, installationId: try DeviceIdentity.id(), platform: "ios", system: DeviceIdentity.system,
+            identity: scoped, deviceInfo: DeviceIdentity.information, otp: otp, recoveryCode: recoveryCode)
+        guard attempt == loginGeneration, !Task.isCancelled else { throw CancellationError() }
+        try credentials.save(credential)
+        UserDefaults.standard.set(credential.origin, forKey: "lastSuccessfulOrigin")
+        sessionID = UUID(); snapshot = nil; lastRefresh = nil
+        reloadLocal()
+        await refresh()
     }
     func refresh() async {
         reloadLocal()

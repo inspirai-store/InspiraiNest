@@ -275,10 +275,4 @@ for (const domain of ['collection', 'system']) {
   };
 }
 $('#log-raw').addEventListener('toggle', () => { if ($('#log-raw').open) loadRawLogs(rawTaskId); });
-$('#pair-worker').addEventListener('submit', event => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const input = Object.fromEntries(new FormData(form));
-  act(async () => { await window.worker.pair(input); form.elements.key.value = ''; }, '电脑已配对，可以启动工作节点。');
-});
 refresh(); setInterval(refresh, 1500);

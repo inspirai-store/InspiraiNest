@@ -61,6 +61,30 @@ final class APITests: XCTestCase {
         do { _ = try await api().pair(key: "fixture-once", name: "Test phone"); XCTFail("worker accepted") }
         catch { XCTAssertTrue(safeMessage(error).contains("worker")) }
     }
+    func testPasswordIsPreservedAndFactorFieldsUseExistingPairAPI() async throws {
+        StubProtocol.handler = { request in
+            let body = try JSONSerialization.jsonObject(with: self.requestBody(request)) as! [String: String]
+            XCTAssertEqual(body["key"], "  fixture password  ")
+            XCTAssertEqual(body["otp"], "123456")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+            return (201, Data("{\"device\":{\"id\":\"00000000-0000-0000-0000-000000000001\",\"name\":\"Phone\",\"role\":\"owner\"},\"token\":\"independent-token\"}".utf8))
+        }
+        let credential = try await api().pair(key: "  fixture password  ", name: "Phone", otp: "123456")
+        XCTAssertEqual(credential.token, "independent-token")
+        XCTAssertEqual(credential.origin, "https://fixture.invalid")
+    }
+    func testLoginCodesAreDistinctFromExpiredAuthorizationAndNeverReflectBodies() async throws {
+        for code in ["mfa_required", "mfa_invalid", "credential_invalid", "untrusted-secret"] {
+            StubProtocol.handler = { _ in (401, Data("{\"code\":\"\(code)\",\"error\":\"must-not-be-reflected\"}".utf8)) }
+            do { _ = try await api().pair(key: "fixture password", name: "Phone"); XCTFail("login accepted") }
+            catch CollectorError.login(let actual, let status) {
+                XCTAssertEqual(status, 401)
+                XCTAssertEqual(actual, code == "untrusted-secret" ? "" : code)
+                XCTAssertFalse(safeMessage(CollectorError.login(actual, status)).contains("授权已失效"))
+                XCTAssertFalse(safeMessage(CollectorError.login(actual, status)).contains("must-not"))
+            }
+        }
+    }
     func testRetryKeepsIdenticalSubmissionBodyAndBearerIsOnlyAHeader() async throws {
         let parts = [SharedPart(item: 0, attachment: nil, kind: "text", representation: nil, value: "  title\ntext https://example.com/?a=1&a=2")]
         let input = Submission(id: UUID(), parts: parts, requirements: "additional")

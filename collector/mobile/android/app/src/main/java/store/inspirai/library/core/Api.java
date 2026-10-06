@@ -35,8 +35,13 @@ public final class Api {
                 new JSONObject().put("key", key).put("name", name).put("clientType", "android")).body;
     }
     public static JSONObject pair(Context context, String server, String key, String name) throws Exception {
+        return pair(context, server, key, name, null, null);
+    }
+    public static JSONObject pair(Context context, String server, String key, String name, String otp, String recoveryCode) throws Exception {
         requireBackground();
         JSONObject payload = devicePayload(context, server, true).put("key", key).put("name", name);
+        if (otp != null) payload.put("otp", otp);
+        if (recoveryCode != null) payload.put("recoveryCode", recoveryCode);
         return request(Credentials.normalizeServer(server), null, "/api/pair", "POST", payload).body;
     }
     public static JSONObject devicePayload(Context context, String server, boolean allowChange) throws Exception {
@@ -134,7 +139,26 @@ public final class Api {
                 try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
             }
             int status = connection.getResponseCode();
-            if (status < 200 || status >= 300) throw new Failure(status, statusMessage(status));
+            if (status < 200 || status >= 300) {
+                if ("/api/pair".equals(relative.getRawPath()) && token == null) {
+                    String code = "";
+                    try {
+                        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+                        try (InputStream input = connection.getErrorStream()) {
+                            if (input != null) {
+                                byte[] chunk = new byte[512]; int count;
+                                while (errors.size() <= 4096 && (count = input.read(chunk, 0, Math.min(chunk.length, 4097 - errors.size()))) >= 0) {
+                                    checkInterrupted(); errors.write(chunk, 0, count);
+                                }
+                            }
+                        }
+                        byte[] errorBytes = errors.toByteArray();
+                        if (errorBytes.length <= 4096) code = new JSONObject(new String(errorBytes, java.nio.charset.StandardCharsets.UTF_8)).optString("code");
+                    } catch (Exception ignored) {}
+                    throw loginFailure(status, code);
+                }
+                throw new Failure(status, statusMessage(status));
+            }
             String cookie = sessionCookie(connection);
             String route = relative.getRawPath();
             int maxBytes = "GET".equals(method) && (route.matches("/api/archives/[a-f0-9]{64}")
@@ -203,7 +227,22 @@ public final class Api {
 
     public static final class Failure extends Exception {
         public final int status;
-        private Failure(int status, String message) { super(message); this.status = status; }
+        public final String code;
+        private Failure(int status, String message) { this(status, message, ""); }
+        private Failure(int status, String message, String code) { super(message); this.status = status; this.code = code; }
+    }
+    public static Failure loginFailure(int status, String code) {
+        String message;
+        switch (code) {
+            case "mfa_required": message = "请输入认证器动态码或恢复码。"; break;
+            case "mfa_invalid": message = "动态码或恢复码无效，请重试。"; break;
+            case "credential_invalid": message = "登录密码或配对码不正确。"; break;
+            default:
+                code = "";
+                message = status == 401 ? "登录密码或配对码不正确。" : status == 429 ? "验证过于频繁，请稍后重试。"
+                        : status == 409 ? "设备身份冲突，请检查已有授权。" : status == 410 ? "此资料库已停止提供服务。" : "无法登录此资料库，请检查地址和服务状态。";
+        }
+        return new Failure(status, message, code);
     }
 
     /** Avoid copying a complete archive byte array again before JSON decoding. */

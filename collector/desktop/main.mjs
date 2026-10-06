@@ -10,6 +10,7 @@ import { DesktopUpdater } from './updater.mjs';
 import { DesktopSettings } from './settings.mjs';
 import { DesktopLoginItem } from './login-item.mjs';
 import { WorkerSession } from './worker-session.mjs';
+import { clientOrigin } from '../src/client-login.mjs';
 import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from './macos-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -26,15 +27,19 @@ if (app.isPackaged) {
   }
 }
 const manager = new WorkerManager();
-const scope = createHash('sha256').update(manager.dataDir.toLowerCase()).digest('hex').slice(0, 16);
+const scope = createHash('sha256').update(path.resolve(manager.configuration().loginDataRoot || manager.dataDir).toLowerCase()).digest('hex').slice(0, 16);
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 app.setName('InspiraiNest');
 const ownsLock = app.requestSingleInstanceLock();
-let owner, updates, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer;
+// Isolated GUI fixtures opt in explicitly; normal launches always use OS encryption.
+const credentialEncryption = process.env.COLLECTOR_DESKTOP_TEST === '1' && process.env.COLLECTOR_DESKTOP_STORAGE_FIXTURE === '1'
+  ? { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('fixture:' + value), decryptString: value => value.toString().slice(8) }
+  : safeStorage;
+let owner, updates, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
-if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates,
+if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates, owner,
   loginItem,
   checkNativeLoginItem: () => {
     const item = new DesktopLoginItem({ app, name: 'InspiraiNest-Test-' + process.pid });
@@ -150,12 +155,20 @@ function trustedMain(event) {
   if (event.sender !== main?.webContents) throw new Error('此功能只允许在主窗口使用');
 }
 async function pairDesktop(input) {
-  owner.serverForPair(input);
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
-  const result = await manager.pair(input, { clientType: 'desktop', onPaired: ({ server, installationId, result }) =>
-    owner.saveCredential({ server, installationId, deviceId: result.device.id, token: result.ownerToken }) });
-  main.webContents.send('library:changed', owner.status());
-  return result;
+  clientOrigin(input.server);
+  if (loginController) throw new Error('登录正在进行');
+  if (!owner.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
+  const controller = new AbortController(); loginController = controller;
+  try {
+    const result = await manager.pair(input, { clientType: 'desktop', signal: controller.signal,
+      current: () => loginController === controller && !controller.signal.aborted,
+      onPaired: ({ server, installationId, result }) => owner.saveCredential({ server, installationId, deviceId: result.device.id, token: result.ownerToken }, { allowServerChange: true }) });
+    main.webContents.send('library:changed', owner.status());
+    return result;
+  } catch (error) {
+    return { loginError: { code: error.code || '', status: error.status || 0,
+      message: controller.signal.aborted ? '登录已取消' : error.message } };
+  } finally { if (loginController === controller) loginController = null; }
 }
 function registerIPC() {
   ipcMain.handle('desktop-settings:get', event => { trusted(event); return settings.snapshot(); });
@@ -167,7 +180,9 @@ function registerIPC() {
     'task-folder': async task => { const error = await shell.openPath(manager.taskDirectory(task)); if (error) throw new Error(error); },
   })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (name === 'pair') trustedMain(event); else trusted(event); return fn(argument); });
   const library = {
-    status: () => owner.status(), pair: async input => { await pairDesktop(input); return owner.status(); }, logout: () => owner.logout(),
+    status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
+    'cancel-login': () => { loginController?.abort(); return true; },
+    logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
@@ -258,7 +273,7 @@ else {
     settings = new DesktopSettings({ file: path.join(app.getPath('userData'), 'desktop-settings.json'), nativeTheme, loginItem });
     workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
-      workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: safeStorage, identityDir: manager.dataDir });
+      workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: credentialEncryption, identityDir: manager.dataDir });
     updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater });
     main = makeWindow(); popover = makeWindow(true);
     settings.on('changed', value => {
@@ -269,6 +284,7 @@ else {
     });
     updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });
     main.on('close', event => {
+      loginController?.abort();
       if (quitting || endingSession) return;
       workerSession.observe();
       event.preventDefault();
@@ -278,6 +294,8 @@ else {
         quitting = true; trace('close-manager-worker-kept'); setImmediate(() => app.quit());
       } else { hideManager(); trace('close-to-tray'); }
     });
+    main.on('blur', () => loginController?.abort());
+    main.on('hide', () => loginController?.abort());
     const sessionEnding = () => { endingSession = true; workerSession.observe(); };
     main.on('query-session-end', sessionEnding); main.on('session-end', sessionEnding);
     powerMonitor.on('shutdown', sessionEnding);

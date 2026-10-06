@@ -1,3 +1,4 @@
+process.env.COLLECTOR_DESKTOP_TEST = '1';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

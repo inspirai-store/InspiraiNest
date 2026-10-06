@@ -4,6 +4,7 @@ import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { atomicJson, remoteURL, safePath } from '../src/common.mjs';
 import { computerMetadata } from '../src/device-identity.mjs';
+import { clientOrigin, loginFailure } from '../src/client-login.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const entryId = value => {
@@ -35,10 +36,14 @@ export class OwnerClient {
       this.identity = { server: remoteURL(stored.server), deviceId: stored.deviceId, installationId: stored.installationId, token };
     } catch { this.identity = null; }
   }
-  status() { return { paired: Boolean(this.identity), server: this.identity?.server || this.workerServer() || '', deviceId: this.identity?.deviceId || null }; }
+  status() {
+    let lastServer = '';
+    try { lastServer = clientOrigin(JSON.parse(fs.readFileSync(this.file + '.origin', 'utf8')).server); } catch {}
+    return { paired: Boolean(this.identity), server: this.identity?.server || this.workerServer() || lastServer, deviceId: this.identity?.deviceId || null };
+  }
   serverForPair(input) {
     const worker = this.workerServer();
-    const server = remoteURL(input.server || worker);
+    const server = clientOrigin(input.server || worker);
     if (worker && server !== worker) throw new Error('管理端必须连接本机工作节点使用的同一服务地址');
     if (this.identity && server !== this.identity.server) throw new Error('请先退出当前管理端授权，再连接其他服务');
     return server;
@@ -49,21 +54,24 @@ export class OwnerClient {
   async pair(input) {
     if (!this.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存管理端授权');
     const server = this.serverForPair(input);
-    const key = String(input.key || '').trim();
+    const key = String(input.key || '');
     const name = String(input.name || os.hostname()).trim().slice(0, 100);
     if (!key || key.length > 200 || !name) throw new Error('请输入设备名称和配对码');
     const installationId = this.identity?.installationId || randomUUID();
-    const result = await this.call(server, null, '/api/pair', 'POST', { key, name, installationId, clientType: 'web', platform: process.platform, system: `${os.type()} ${os.release()} · ${os.arch()}` });
+    const result = await this.call(server, null, '/api/pair', 'POST', { key, name, installationId, clientType: 'web', platform: process.platform, system: `${os.type()} ${os.release()} · ${os.arch()}`, ...(input.otp ? { otp: input.otp } : {}), ...(input.recoveryCode ? { recoveryCode: input.recoveryCode } : {}) });
     if (result.device?.role !== 'owner' || typeof result.token !== 'string') throw new Error('配对权限不匹配，请生成新的设备配对码');
     return this.saveCredential({ server, installationId, deviceId: result.device.id, token: result.token });
   }
-  saveCredential({ server, installationId, deviceId, token }) {
+  saveCredential({ server, installationId, deviceId, token }, { allowServerChange = false } = {}) {
     if (!this.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
     if (typeof token !== 'string' || !token || !deviceId) throw new Error('设备授权无效');
-    server = this.serverForPair({ server });
+    server = allowServerChange ? clientOrigin(server) : this.serverForPair({ server });
+    if (allowServerChange && this.workerServer() && clientOrigin(this.workerServer()) !== server) throw new Error('管理端与工作节点地址不一致');
     const stored = { server, deviceId, installationId, encryptedToken: this.encryption.encryptString(token).toString('base64') };
     atomicJson(this.file, stored);
     this.identity = { server, deviceId, installationId, token };
+    this.identityAttemptAt = 0; this.identityError = null;
+    try { atomicJson(this.file + '.origin', { server }); } catch {}
     return this.status();
   }
   logout() { this.identity = null; try { fs.unlinkSync(this.file); } catch (error) { if (error.code !== 'ENOENT') throw error; } return this.status(); }
@@ -71,8 +79,9 @@ export class OwnerClient {
     const response = await this.fetcher(server + route, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(data === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(binary ? 120000 : 20000), redirect: 'error' });
     if (!response.ok) {
-      let message;
-      try { message = (await response.json()).error; } catch {}
+      let message, body;
+      try { body = await response.json(); message = body.error; } catch {}
+      if (route === '/api/pair' && !token) throw loginFailure(response.status, body);
       if (response.status === 401 && token) throw new Error('管理端授权已失效，请重新配对');
       if (response.status === 404 && route.startsWith('/api/read/v1/')) throw new Error('服务端尚未提供新版资料阅读接口，请先升级服务端');
       throw new Error(message || `服务请求失败（${response.status}）`);
