@@ -19,6 +19,8 @@ async function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-control-'));
   const masterKey = secret();
   const service = createService({ dataDir: path.join(root, 'server'), masterKey });
+  // The control fixture can wait over the default 5s idle socket lifetime.
+  service.server.keepAliveTimeout = 30000;
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   t.after(() => service.close());
   const server = `http://127.0.0.1:${service.server.address().port}`;

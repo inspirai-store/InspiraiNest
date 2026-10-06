@@ -266,14 +266,23 @@ test('Worker continues after a source obstacle and explicit retry reuses the ret
   const { owner, root, pairWorker, submit } = await setup(t);
   const worker = await pairWorker();
   const blocked = await submit({ agent: 'codex' });
-  const next = await submit({ agent: 'codebuddy' });
   const dataDir = path.join(root, 'worker');
   const agents = { codex: { ...profiles.codex, args: [fixture, '--wait-once'] }, codebuddy: { ...profiles.codex, enabled: true } };
   const controller = new AbortController();
   const running = runWorker({ ...worker, dataDir, agents, capabilities: ['article'], pollMs: 1 }, { signal: controller.signal });
   try {
-    const deadline = Date.now() + 15000;
     let state;
+    const blockedDeadline = Date.now() + 15000;
+    do {
+      state = await api(owner, '/api/state');
+      if (state.tasks.find(task => task.id === blocked.id)?.state === 'waiting_action') break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } while (Date.now() < blockedDeadline);
+    assert.equal(state.tasks.find(task => task.id === blocked.id).state, 'waiting_action');
+    // Establish the obstacle before enqueueing the next task; equal millisecond
+    // timestamps do not imply a stable FIFO order across database engines.
+    const next = await submit({ agent: 'codebuddy' });
+    const deadline = Date.now() + 15000;
     do {
       state = await api(owner, '/api/state');
       if (state.tasks.find(task => task.id === next.id)?.state === 'completed') break;
