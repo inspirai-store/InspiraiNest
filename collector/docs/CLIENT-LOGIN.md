@@ -37,3 +37,7 @@ macOS、Windows、Linux 共用 Electron 登录实现；iOS、Android 使用同�
 - CI 对 Windows/macOS 包运行新登录回归；Linux 验证共享界面，不新增安装包渠道。
 
 先部署兼容服务端，再发布客户端安装包。审核部署与个人部署使用同一客户端，凭据通过对应部署地址输入。
+
+## Android 正式 CI 配置
+
+沿用原 Windows 发布的 `android-release.p12` 和同一密码，分别配置为 `ANDROID_SIGNING_STORE`（Base64）与 `ANDROID_SIGNING_PASSWORD`。不要新建签名身份，否则既有安装不能直接升级。手动触发 `collector-release.yml` 时设置 `include_macos=false`、`include_android=true`，签名 APK、SHA-256、发布清单与回执上传私有 OSS 并回读校验。普通公共 CI 继续只构建 debug APK，不取得签名 Secrets。

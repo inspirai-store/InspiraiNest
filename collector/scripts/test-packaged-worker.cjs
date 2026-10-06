@@ -23,7 +23,7 @@ const { _electron } = require('playwright');
   const agent = path.resolve(__dirname, '../test/fixtures/fake-agent.mjs');
   fs.writeFileSync(config, JSON.stringify({ dataDir: path.join(root, 'data'), server, pollMs: 250,
     capabilities: ['article'], agents: { codex: { command: process.execPath, args: [agent], versionArgs: [agent, '--version'] } } }));
-  const env = { ...process.env, COLLECTOR_CONFIG: config, COLLECTOR_DESKTOP_TEST: '1' };
+  const env = { ...process.env, COLLECTOR_CONFIG: config, COLLECTOR_DESKTOP_TEST: '1', COLLECTOR_DESKTOP_STORAGE_FIXTURE: '1' };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await _electron.launch({ executablePath: path.resolve(executable), env });
   const manager = new WorkerManager(config, process.execPath);
@@ -47,7 +47,7 @@ const { _electron } = require('playwright');
     assert.equal(fs.existsSync(path.join(appPath, 'public/device-view.js')), true, 'Missing authorization presentation helper');
     assert.equal(fs.existsSync(path.join(appPath, 'public/pairing-dialog.css')), true, 'Missing pairing dialog stylesheet');
     assert.equal(fs.existsSync(path.join(appPath, '..', 'library', 'scripts', 'catalog.mjs')), true);
-    for (const file of ['settings.mjs','settings-renderer.js','nodes.js','owner-client.mjs','updater.mjs','workspace.css','workspace.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
+    for (const file of ['settings.mjs','settings-renderer.js','nodes.js','owner-client.mjs','updater.mjs','workspace.css','workspace.js','client-login.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
       assert.equal(fs.existsSync(path.join(appPath, 'desktop', file)), true, `Missing packaged resource: ${file}`);
     }
     assert.equal(fs.existsSync(path.join(appPath, '..', 'app-update.yml')), true, 'Missing packaged update provider configuration');
@@ -56,9 +56,8 @@ const { _electron } = require('playwright');
     assert.equal(await page.locator('#update-check').isEnabled(), true);
     await page.locator('[data-view=nodes]').click();
     await page.locator('#pair-worker [name=server]').fill(server);
-    await page.locator('#pair-worker [name=name]').fill('packaged-test-worker');
     await page.locator('#pair-worker [name=key]').fill(pairing.key);
-    await page.locator('#pair-worker button').click();
+    await page.locator('#pair-worker button[type=submit]').click();
     await until(() => manager.snapshot().paired);
     await page.locator('[data-action=start]').click();
     await until(() => manager.snapshot().online);

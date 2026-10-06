@@ -1,16 +1,25 @@
-name: InspiraiNest signed macOS OSS release
+name: InspiraiNest signed client OSS release
 
 # Manual releases use the reviewed main commit and retain verified packages in OSS.
 
 on:
   workflow_dispatch:
+    inputs:
+      include_macos:
+        description: Build signed and notarized macOS packages
+        type: boolean
+        default: true
+      include_android:
+        description: Build Android using the existing release signing identity
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   signed-macos:
-    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true'
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_macos
     environment: signed-release
     runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
     timeout-minutes: 150
@@ -129,3 +138,64 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/upload-macos-oss.mjs desktop/dist InspiraiNest
+
+  signed-android:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_android
+    environment: signed-release
+    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    timeout-minutes: 45
+    concurrency:
+      group: inspirainest-android-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: inspirai-store/InspiraiNest
+          ref: ${{ github.sha }}
+          path: public-source
+          persist-credentials: false
+      - name: Check reviewed source pin
+        run: test "$(git -C public-source rev-parse HEAD)" = ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci --ignore-scripts
+        working-directory: public-source/collector
+      - name: Build and verify the existing Android signing identity
+        working-directory: public-source/collector/mobile/android
+        shell: bash
+        env:
+          ANDROID_SIGNING_STORE: ${{ secrets.ANDROID_SIGNING_STORE }}
+          LIBRARY_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+          LIBRARY_SIGNING_STORE: ${{ runner.temp }}/inspirainest-android-release.p12
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_SIGNING_STORE" || { echo 'Missing ANDROID_SIGNING_STORE' >&2; exit 1; }
+          test -n "$LIBRARY_SIGNING_PASSWORD" || { echo 'Missing ANDROID_SIGNING_PASSWORD' >&2; exit 1; }
+          node -e 'const fs=require("fs");fs.writeFileSync(process.env.LIBRARY_SIGNING_STORE,Buffer.from(process.env.ANDROID_SIGNING_STORE,"base64"),{mode:0o600})'
+          bash ./gradlew --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          node "$GITHUB_WORKSPACE/public-source/.github/scripts/stage-android-release.mjs"
+      - name: Upload verified Android package to private OSS
+        working-directory: public-source/collector
+        env:
+          OSS_RELEASE_REGION: ${{ secrets.OSS_RELEASE_REGION }}
+          OSS_RELEASE_BUCKET: ${{ secrets.OSS_RELEASE_BUCKET }}
+          OSS_RELEASE_ACCESS_KEY_ID: ${{ secrets.OSS_RELEASE_ACCESS_KEY_ID }}
+          OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
+          OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          OSS_RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: node ../.github/scripts/upload-android-oss.mjs mobile/dist
+      - name: Remove temporary Android signing file
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/inspirainest-android-release.p12"
