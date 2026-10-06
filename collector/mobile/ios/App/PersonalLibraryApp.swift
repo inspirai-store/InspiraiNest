@@ -61,7 +61,7 @@ struct PairingForm: View {
 
     private func cancel() {
         attempt += 1; loginTask?.cancel(); loginTask = nil; model.cancelLogin()
-        key = ""; pendingKey = ""; factor = ""; mfa = false; scanned = nil
+        key = ""; pendingKey = ""; factor = ""; mfa = false; recovery = false; scanned = nil
     }
     private func login(_ secret: String, address: String? = nil, otp: String? = nil, recoveryCode: String? = nil) {
         guard !model.busy else { return }

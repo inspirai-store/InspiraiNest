@@ -17,8 +17,8 @@ private final class LoginProtocol: URLProtocol {
 }
 
 final class LoginModelTests: XCTestCase {
-    @MainActor private func model() -> AppModel {
-        AppModel { origin, token in
+    @MainActor private func model(saveCredential: @escaping (DeviceCredential) throws -> Void = { try CredentialStore().save($0) }) -> AppModel {
+        AppModel(saveCredential: saveCredential) { origin, token in
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [LoginProtocol.self]
             return CollectorAPI(origin: origin, token: token, configuration: configuration)
@@ -70,5 +70,22 @@ final class LoginModelTests: XCTestCase {
         XCTAssertEqual(model.lastServer, "https://review.invalid"); XCTAssertEqual(model.serverName, "https://review.invalid")
         XCTAssertNotEqual(model.sessionID, session); XCTAssertNil(model.snapshot); XCTAssertTrue(model.paired)
         XCTAssertFalse(model.busy)
+    }
+
+    @MainActor func testCredentialSaveFailureKeepsOldConnectionAndRememberedAddress() async throws {
+        let store = CredentialStore(); let previous = try store.load()
+        let remembered = UserDefaults.standard.string(forKey: "lastSuccessfulOrigin")
+        defer {
+            LoginProtocol.handler = nil
+            if let previous { try? store.save(previous) } else { try? store.clear() }
+            UserDefaults.standard.set(remembered, forKey: "lastSuccessfulOrigin")
+        }
+        try store.save(a); UserDefaults.standard.set(a.origin, forKey: "lastSuccessfulOrigin")
+        let model = model(saveCredential: { _ in throw CollectorError.message("Fixture storage unavailable") })
+        let session = model.sessionID; LoginProtocol.handler = { try self.reply($0) }
+        do { try await model.login(server: "https://review.invalid", key: "fixture password", name: "Fixture"); XCTFail("Save failure accepted") } catch {}
+        XCTAssertEqual(try store.load()?.token, a.token); XCTAssertEqual(model.serverName, a.origin)
+        XCTAssertEqual(model.lastServer, a.origin); XCTAssertEqual(model.sessionID, session)
+        XCTAssertTrue(model.paired); XCTAssertFalse(model.busy)
     }
 }

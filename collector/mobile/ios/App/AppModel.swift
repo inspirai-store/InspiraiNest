@@ -14,13 +14,14 @@ final class AppModel: ObservableObject {
     private var refreshing = false
     private var reportedDeviceID: String?
     private let credentials = CredentialStore()
+    private let saveCredential: (DeviceCredential) throws -> Void
     private let makeAPI: (ServerOrigin, String?) -> CollectorAPI
     private var loginGeneration = 0
     private var loginActive = false
     var lastServer: String { UserDefaults.standard.string(forKey: "lastSuccessfulOrigin") ?? serverName }
     func cancelLogin() { loginGeneration += 1; if loginActive { loginActive = false; busy = false } }
 
-    init(makeAPI: @escaping (ServerOrigin, String?) -> CollectorAPI = { CollectorAPI(origin: $0, token: $1) }) { self.makeAPI = makeAPI; reloadLocal() }
+    init(saveCredential: @escaping (DeviceCredential) throws -> Void = { try CredentialStore().save($0) }, makeAPI: @escaping (ServerOrigin, String?) -> CollectorAPI = { CollectorAPI(origin: $0, token: $1) }) { self.makeAPI = makeAPI; self.saveCredential = saveCredential; reloadLocal() }
     func reloadLocal() {
         do {
             let credential = try credentials.load()
@@ -47,7 +48,7 @@ final class AppModel: ObservableObject {
         let credential = try await api.pair(key: key, name: name, installationId: try DeviceIdentity.id(), platform: "ios", system: DeviceIdentity.system,
             identity: scoped, deviceInfo: DeviceIdentity.information, otp: otp, recoveryCode: recoveryCode)
         guard attempt == loginGeneration, !Task.isCancelled else { throw CancellationError() }
-        try credentials.save(credential)
+        try saveCredential(credential)
         UserDefaults.standard.set(credential.origin, forKey: "lastSuccessfulOrigin")
         sessionID = UUID(); snapshot = nil; lastRefresh = nil
         reloadLocal()
