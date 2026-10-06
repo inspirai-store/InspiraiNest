@@ -15,8 +15,8 @@ if(!process.argv.includes('--live'))throw new Error('Use --live to run the nativ
 const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const sample=process.env.WECHAT_SAMPLE_URL || 'https://mp.weixin.qq.com/s/Y7dyRC7CJ09miHWU6LBzBA';
 const expectedText=process.env.WECHAT_SAMPLE_TEXT || '但现在想想，当时我的答案并不准确。因为其实我最近在玩的游戏，叫做 Vibe Coding';
-const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-live-')),home=os.homedir(),skillName='lingnest-wechat-archive';
-for(const agent of ['codex','claude'])assert.equal(fs.existsSync(path.join(globalSkillRoots(home)[agent],skillName)),false,'Pilot must never replace an existing local skill');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-live-')),home=os.homedir(),skillName='lingnest-wechat-archive',pilotAgents=['codex'];
+for(const agent of pilotAgents)assert.equal(fs.existsSync(path.join(globalSkillRoots(home)[agent],skillName)),false,'Pilot must never replace an existing local skill');
 // Pairing uses a fixture key from the isolated service, never an existing deployment's key.
 const key=secret(),app=createService({dataDir:path.join(root,'service-2'),masterKey:key});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
 const address='http://127.0.0.1:'+app.server.address().port;
@@ -40,15 +40,15 @@ try{
  await sourceRuntime.report();await nativeRuntime.report();
  const skill=sourceRuntime.inventory.items.find(s=>s.agent==='codex'&&s.name===skillName);assert.ok(skill?.portable);
  const preview=await operation(source,sourceRuntime,'prepare-publish',{skillId:skill.id,expectedHash:skill.hash});
- const publication=await operation(source,sourceRuntime,'publish',{skillId:skill.id,expectedHash:skill.hash,previewId:preview.id,policy:{capabilities:['wechat.article.extract'],agents:['codex','claude'],requirements:{commands:['uv']}}});
+ const publication=await operation(source,sourceRuntime,'publish',{skillId:skill.id,expectedHash:skill.hash,previewId:preview.id,policy:{capabilities:['wechat.article.extract'],agents:pilotAgents,requirements:{commands:['uv']}}});
  const versionId=publication.result.versionId;
- const comparison=await operation(target,nativeRuntime,'compare',{versionId,agents:['codex','claude']});assert.equal(comparison.result.comparison.compatible,true);
- sync=await operation(target,nativeRuntime,'sync',{versionId,agents:['codex','claude'],comparisonId:comparison.id,confirmShared:true});
+ const comparison=await operation(target,nativeRuntime,'compare',{versionId,agents:pilotAgents});assert.equal(comparison.result.comparison.compatible,true);
+ sync=await operation(target,nativeRuntime,'sync',{versionId,agents:pilotAgents,comparisonId:comparison.id,confirmShared:true});
  await nativeRuntime.refresh(true);
  const loaded=nativeRuntime.inventory.items.find(s=>s.agent==='codex'&&s.name===skillName);assert.equal(loaded.loadState,'loaded');assert.equal(loaded.hash,packageSkill(sourceDir).hash);
  console.log('Native Codex loaded the privately published package; running public article verification.');
  const verification=await operation(target,nativeRuntime,'verify',{versionId,agent:'codex',sample,expectedText});
- const result={privatePublication:true,globalSync:true,nativeCodexLoaded:true,claudeGlobalFilesInstalled:true,codebuddy:'unavailable',versionId,hash:loaded.hash,verification:verification.result.verification,evidenceDir:root};
+ const result={privatePublication:true,globalSync:true,nativeCodexLoaded:true,claude:'deferred',codebuddy:'deferred',versionId,hash:loaded.hash,verification:verification.result.verification,evidenceDir:root};
  fs.writeFileSync(path.join(root,'result.json'),JSON.stringify(result,null,2),{mode:0o600});console.log(JSON.stringify(result));
  assert.equal(result.verification.state,'passed',result.verification.reason);
 }finally{

@@ -207,7 +207,8 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
       const item = { id: skillId, agent, name, description: String(metadata.description || '').slice(0, 1024), declaredVersion: String(metadata.metadata?.version || metadata.version || origin.nativeVersion || '').slice(0, 100),
         hash: bundle?.hash || null, scope: origin.scope, source: origin.plugin || (agent==='codex' && origin.scope==='plugin'?path.relative(origin.root,directory).split(path.sep).slice(0,3).join('/'):origin.scope), context: origin.context ? path.basename(origin.context) : '采集环境', enabled, loadState,
         portable, requirements, dependencies, issue, capabilities: [], applicableAgents:[],systems:[],verification: null, sharedWith: [], taskContext: !origin.context || path.resolve(origin.context) === path.resolve(cwd) };
-      items.push(item); local.set(skillId, { directory, real, origin, globalRoot: globalRoots[agent], profile, metadata, mcp });
+      const watchDirectories=[...new Set([real,...(bundle?.files || []).map(file=>path.dirname(path.join(real,file.path)))])].filter(dir=>contained(real,dir));
+      items.push(item); local.set(skillId, { directory, real, origin, globalRoot: globalRoots[agent], profile, metadata, mcp, watchDirectories });
     }
     // Preserve a diagnostic row for bundled skills that expose no local file.
     for (const skill of nativeEntries.filter(s => !s.path)) items.push({ id: hash(agent + ':native:' + skill.name + ':' + skill.context), agent, name: skill.name, description: String(skill.description || '').slice(0,1024), scope: 'system', source: 'native', context: path.basename(skill.context), enabled: skill.enabled !== false, loadState: 'loaded', hash: null, portable: false, requirements: {}, dependencies: { state: 'unknown', missing: [], unknown: ['无本地技能包'] }, capabilities: [], verification: null, sharedWith: [] });

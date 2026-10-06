@@ -206,6 +206,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
   const updateSkills = (idle=false) => {
     if(skillTick)return skillTick;
     skillTick=skillRuntime.tick({idle,operationIds:skillOperations}).catch(error=>{
+      if(error.code==='SKILL_SCAN_STOPPED')return;
       if([401,403].includes(error.status)){forbidden=true;current?.controller.abort();}
       fault('skills',error,'技能环境更新失败，最后清单已保留');
     }).finally(()=>{skillTick=null;});return skillTick;
@@ -315,8 +316,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
     } while (!once && !forbidden && !signal?.aborted && control.state.mode !== 'draining');
   } finally {
     clearInterval(timer);
-    if (skillTick) await skillTick;
     skillRuntime.close();
+    if (skillTick) await skillTick;
     signal?.removeEventListener('abort', abort);
     control.close();
     journal.event({ domain: 'system', code: 'WORKER_STOP', message: forbidden ? '设备授权失效，采集服务已停止' : '采集服务已停止，本机成果保留' });

@@ -125,6 +125,24 @@ test('dependency gaps distinguish missing programs, Python distributions, config
  const status=await dependencyStatus({commands:['lingnest-nonexistent-program'],env:['LINGNEST_MISSING_VALUE'],pythonModules:['requests'],mcp:['configured','absent'],browser:true},{env:{PATH:''},mcp:{configured:{}},probe:async()=>({code:0,tail:'["requests"]'})});
  assert.equal(status.state,'missing');assert.deepEqual(status.missing,['程序：lingnest-nonexistent-program','环境变量：LINGNEST_MISSING_VALUE','Python 模块：requests','MCP：absent']);assert.deepEqual(status.unknown,['MCP 授权：configured','浏览器会话']);
 });
+test('file monitoring never traverses ignored environments and refreshes nested package files',async t=>{
+ const home=temporary(t),directory=path.join(globalSkillRoots(home).codex,'article-extract');skill(directory);
+ fs.mkdirSync(path.join(directory,'.venv','lib','site-packages'),{recursive:true});
+ fs.writeFileSync(path.join(directory,'.venv','lib','site-packages','cache.py'),'ignored');
+ const calls=[],original=fs.watch;
+ fs.watch=(dir,...args)=>{
+  assert.equal(args.some(arg=>arg && typeof arg==='object' && arg.recursive),false,'Inventory must not install recursive watches');
+  calls.push({dir,changed:args.at(-1)});return {close(){}};
+ };
+ const runtime=createSkillRuntime({server:'https://fixture.example',deviceId:'fixture',token:'fixture',dataDir:path.join(home,'data')},{home,cwd:home,scan:scanner,api:async()=>({})});
+ try{
+  await runtime.report();const initial=runtime.inventory.items.find(s=>s.agent==='codex').hash;
+  assert.equal(calls.some(call=>call.dir.includes('.venv')),false);
+  const scripts=calls.find(call=>call.dir===fs.realpathSync(path.join(directory,'scripts')));assert.ok(scripts);
+  fs.appendFileSync(path.join(directory,'scripts/extract.mjs'),'// changed nested file\n');scripts.changed();
+  await runtime.report();assert.notEqual(runtime.inventory.items.find(s=>s.agent==='codex').hash,initial);
+ }finally{runtime.close();fs.watch=original;}
+});
 test('interrupted sync restores backups and preserves edits made before recovery',t=>{
  const root=temporary(t),home=path.join(root,'home');fs.mkdirSync(home);const config={server:'https://one.example',deviceId:'fixture',token:'fixture-token',dataDir:path.join(root,'data')};
  const envRoot=path.join(config.dataDir,'environments',hash(config.server+':'+config.deviceId+':'+hash(config.token))),real=path.join(globalSkillRoots(home).codex,'article-extract'),backup=path.join(path.dirname(real),'.lingnest-backup-fixture'),stage=path.join(path.dirname(real),'.lingnest-stage-fixture');

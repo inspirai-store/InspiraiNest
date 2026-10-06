@@ -138,6 +138,8 @@ test('waiting-action reason survives paused restart; explicit drain leaves the n
   let running = runWorker(config, { signal: abort.signal });
   t.after(async () => { abort.abort(); await running; });
   await until(() => workerSnapshot(config.dataDir).lastTask?.state === 'waiting_action');
+  sendControl(config.dataDir, 'pause');
+  await until(() => workerSnapshot(config.dataDir).mode === 'paused');
   // Submit only after the first task is retained, avoiding same-millisecond FIFO ties.
   const second = await submit();
   assert.match(workerSnapshot(config.dataDir).lastTask.message, /补齐本机测试工具/);

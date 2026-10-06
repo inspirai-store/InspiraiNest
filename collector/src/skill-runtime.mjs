@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { hash, atomicJson, readJson, now, requireValue, safePath, contained, canonicalJson } from './common.mjs';
-import { scanSkillInventory, dependencyStatus } from './skill-inventory.mjs';
+import { dependencyStatus } from './skill-inventory.mjs';
+import { createInventoryScanner } from './skill-scan.mjs';
 import { packageSkill, validateSkillPackage, writeSkillPackage, cleanSkillPolicy } from './skill-package.mjs';
 
 const read = (file, fallback) => { try { return readJson(file); } catch { return fallback; } };
@@ -13,13 +14,13 @@ const realTarget = file => {
   const parent=path.dirname(file);requireValue(parent!==file,'目标目录无效');return path.join(realTarget(parent),path.basename(file));
 };
 
-export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory, verify, home, env } = {}) {
+export function createSkillRuntime(config, { api, cwd, scan = createInventoryScanner(), verify, home, env } = {}) {
   const namespace = hash(config.server + ':' + config.deviceId + ':' + hash(config.token || ''));
   const root = path.join(path.resolve(config.dataDir), 'environments', namespace);
   fs.mkdirSync(root,{recursive:true});
   const ledgerFile = path.join(root,'managed.json'), receiptsFile = path.join(root,'receipts.json'), transactionFile = path.join(root,'transaction.json');
   let ledger = read(ledgerFile,{installations:{},backups:{}}), receipts = read(receiptsFile,{}), state = { inventory:read(path.join(root,'inventory.json'),null),local:new Map() }, lastScan = 0, pending, dirty = true;
-  const watchers = new Map();
+  const watchers = new Map();let closed=false;
   function recover() {
     const transaction=read(transactionFile,null);if(!transaction)return;
     if(!transaction.committed) for(const target of [...transaction.targets].reverse()) {
@@ -43,6 +44,7 @@ export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory
     if(!force && !dirty && Date.now()-lastScan<60000)return state;
     pending=(async()=>{
       const next=await scan({...config,skillProjects:read(path.join(root,'projects.json'),config.skillProjects || [])},{cwd,home,env});
+      if(closed)throw Object.assign(new Error('技能盘点已停止'),{code:'SKILL_SCAN_STOPPED'});
       for(const item of next.inventory.items){
         const location=next.local.get(item.id), installed=location && ledger.installations[item.agent+':'+location.real];
         if(installed && installed.hash===item.hash){
@@ -56,9 +58,12 @@ export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory
       next.inventory.digest=hash(JSON.stringify({agents:next.inventory.agents,items:next.inventory.items,projects:next.inventory.projects}));
       state=next;lastScan=Date.now();dirty=false;
       atomicJson(path.join(root,'inventory.json'),state.inventory);
-      const roots=new Set([...Object.values(next.globalRoots),...Array.from(next.local.values()).map(x=>x.real)]);
+      // Recursive watches traverse ignored virtual environments and plugin caches.
+      // Watch only discovered package directories; polling covers additions and overflow.
+      const locations=Array.from(next.local.values());
+      const roots=new Set([...new Set([...Object.values(next.globalRoots),...locations.map(x=>x.real),...locations.flatMap(x=>x.watchDirectories || [])])].slice(0,2048));
       for(const [directory,watcher] of watchers)if(!roots.has(directory)){watcher.close();watchers.delete(directory);}
-      for(const directory of roots)if(!watchers.has(directory) && fs.existsSync(directory))try{watchers.set(directory,fs.watch(directory,{recursive:process.platform!=='linux'},()=>{dirty=true;}));}catch{}
+      for(const directory of roots)if(!watchers.has(directory) && fs.existsSync(directory))try{watchers.set(directory,fs.watch(directory,()=>{dirty=true;}));}catch{}
       return state;
     })().finally(()=>{pending=null;});
     return pending;
@@ -68,7 +73,7 @@ export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory
     const snapshotId=hash(inventory.scannedAt+inventory.digest);
     const pages=[[]];
     for(const item of inventory.items){let current=pages.at(-1);if(current.length>=40 || Buffer.byteLength(JSON.stringify([...current,item]))>85000){pages.push([]);current=pages.at(-1);}current.push(item);}
-    for(let page=0;page<pages.length;page++)await api('/api/skills/environment','POST',{...inventory,items:pages[page],snapshotId,page,final:page===pages.length-1});
+    for(let page=0;page<pages.length;page++){if(closed)return inventory;await api('/api/skills/environment','POST',{...inventory,items:pages[page],snapshotId,page,final:page===pages.length-1});}
     return inventory;
   }
   async function bundleFor(op) {
@@ -187,9 +192,10 @@ export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory
   }
   async function tick({idle=true,operationIds=[]}={}) {
     try{if(dirty || Date.now()-lastScan>=60000)await report();}catch(error){if([401,403].includes(error.status))throw error;}
-    if(!idle || !operationIds.length)return;
+    if(closed || !idle || !operationIds.length)return;
     const response=await api('/api/skills/operations');
     for(const op of response.operations || []){
+      if(closed)return;
       let receipt=receipts[op.id];
       if(!receipt){
         await api('/api/skills/operations/'+op.id+'/result','POST',{state:'running'});
@@ -199,10 +205,10 @@ export function createSkillRuntime(config, { api, cwd, scan = scanSkillInventory
       }
       await api('/api/skills/operations/'+op.id+'/result','POST',receipt);
       if(receipt.result?.bundle){receipts[op.id]={state:receipt.state,result:{published:true}};atomicJson(receiptsFile,receipts);}
-      dirty=true;await report();
+      dirty=true;if(!closed)await report();
     }
   }
-  return {refresh,report,tick,operation,get inventory(){return state.inventory;},close(){for(const watcher of watchers.values())watcher.close();}};
+  return {refresh,report,tick,operation,get inventory(){return state.inventory;},close(){closed=true;scan.close?.();for(const watcher of watchers.values())watcher.close();}};
 }
 
 export async function taskSkillSnapshots(task,workspace,api) {
