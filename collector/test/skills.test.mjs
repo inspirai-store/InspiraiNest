@@ -168,12 +168,19 @@ test('portable execute bits and Windows path restrictions survive installation',
  const reserved=structuredClone(bundle);reserved.files[1].path='scripts/CON.txt';reserved.hash=skillDigest(reserved.files);assert.throws(()=>validateSkillPackage(reserved),/Unsafe/);
  const collision=structuredClone(bundle);collision.files.push({...collision.files[0],path:'skill.md'});collision.hash=skillDigest(collision.files);assert.throws(()=>validateSkillPackage(collision),/重复/);
 });
-test('inventory pages commit atomically and readers cannot combine snapshots',async t=>{
- const service=await setup(t),device=await service.node('paged'),home=temporary(t);for(let i=0;i<45;i++)skill(path.join(globalSkillRoots(home).codex,'fixture-'+i));
+async function inventoryPages(t,store){
+ const service=await setup(t,store),device=await service.node('paged'),home=temporary(t);for(let i=0;i<45;i++)skill(path.join(globalSkillRoots(home).codex,'fixture-'+i));
  const {inventory}=await scanner({}, {home,cwd:home}),snapshotId=hash('snapshot-one');const upload=(page,final)=>api(device,'/api/skills/environment','POST',{...inventory,snapshotId,page,final,items:inventory.items.slice(page*40,page*40+40)});
  await upload(0,false);const route='/api/skills/devices/'+device.deviceId+'/environment';assert.equal((await api(service.owner,route)).total,0);await upload(1,true);const first=await api(service.owner,route);assert.equal(first.items.length,40);assert.equal(first.nextOffset,40);assert.equal((await api(service.owner,route+'?offset=40&snapshotId='+snapshotId)).items.length,5);
  await assert.rejects(()=>api(service.owner,route+'?offset=40&snapshotId='+hash('other')),e=>e.status===409);await assert.rejects(()=>api(device,route),e=>e.status===403);
-});
+ const nextSnapshot=hash('snapshot-two'),nextInventory={...inventory,scannedAt:now(),digest:hash('next-inventory'),items:inventory.items.map(item=>({...item,name:'updated-'+item.name}))};
+ for(let page=0;page<2;page++)await api(device,'/api/skills/environment','POST',{...nextInventory,snapshotId:nextSnapshot,page,final:page===1,items:nextInventory.items.slice(page*40,page*40+40)});
+ const oldPage=await api(service.owner,route+'?offset=40&snapshotId='+snapshotId);
+ assert.equal(oldPage.snapshotId,snapshotId);assert.deepEqual(oldPage.items.map(item=>item.name),inventory.items.slice(40).map(item=>item.name));
+ const latest=await api(service.owner,route);assert.equal(latest.snapshotId,nextSnapshot);assert.ok(latest.items.every(item=>item.name.startsWith('updated-')));
+}
+test('inventory pages commit atomically and stay consistent while Worker replaces the snapshot',t=>inventoryPages(t));
+test('MySQL inventory readers retain their first snapshot across refresh',{skip:!process.env.MYSQL_URL},async t=>inventoryPages(t,await mysqlFixture()));
 
 test('shared global directories require the whole Agent group and roll back as one target',async t=>{
  const home=temporary(t),roots=globalSkillRoots(home),directory=path.join(roots.codex,'article-extract'),before=skill(directory,'old');fs.mkdirSync(roots.codebuddy,{recursive:true});fs.symlinkSync(directory,path.join(roots.codebuddy,'article-extract'),process.platform==='win32'?'junction':'dir');

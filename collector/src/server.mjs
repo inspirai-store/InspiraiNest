@@ -625,7 +625,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       fail('Not found', 404);
     } catch (error) {
-      if (!res.headersSent) send(res, error.status || 500, { ...(req.url.startsWith('/api/read/v1/') ? { schema_version: 1 } : {}), ...(['mfa_required', 'mfa_invalid', 'credential_invalid'].includes(error.code) ? { code: error.code } : {}), error: error.status ? error.message : 'Internal service error' });
+      if (!res.headersSent) send(res, error.status || 500, { ...(req.url.startsWith('/api/read/v1/') ? { schema_version: 1 } : {}), ...(['mfa_required', 'mfa_invalid', 'credential_invalid', 'inventory_changed'].includes(error.code) ? { code: error.code } : {}), error: error.status ? error.message : 'Internal service error' });
       else res.end();
       if (!error.status) console.error(error.name, error.code || 'request_failed');
     }

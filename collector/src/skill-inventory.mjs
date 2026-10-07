@@ -155,7 +155,7 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
     const probe = await versionProbe(profile.command, profile.versionArgs || ['--version'], { env, timeoutMs: 5000 });
     const available = probe.code === 0;
     const version=available ? String(probe.tail || '').trim().slice(0,150) : null;
-    agents.push({ name: agent, installed: available, version, executionEnabled: agent !== 'claude' && profile.enabled !== false, profileHash:hash(canonicalJson({profile,version,platform:process.platform,home,cwd})) });
+    agents.push({ name: agent, installed: available, version, probeState: available ? 'available' : probe.timedOut ? 'timeout' : probe.spawnError === 'ENOENT' ? 'not_found' : 'failed', executionEnabled: agent !== 'claude' && profile.enabled !== false, profileHash:hash(canonicalJson({profile,version,platform:process.platform,home,cwd})) });
     const settings = settingsFor(home, agent, cwd, profile);
     const roots = [{ root: globalRoots[agent], scope: 'user', context: null }, ...contexts.flatMap(dir => projectRoots(dir, agent)).filter(origin=>path.resolve(origin.root)!==path.resolve(globalRoots[agent])), ...plugins(home, agent, settings)];
     if (agent === 'codex') roots.push({ root: path.join(env.CODEX_HOME || path.join(home, '.codex'), 'skills'), scope: 'legacy-user', context: null }, { root: '/etc/codex/skills', scope: 'admin', context: null });

@@ -10,6 +10,7 @@ import { atomicJson, contained, remoteURL } from '../src/common.mjs';
 import { readWorkerEvents } from '../src/worker-events.mjs';
 import { computerMetadata } from '../src/device-identity.mjs';
 import { clientOrigin, loginFailure } from '../src/client-login.mjs';
+import { desktopExecutionEnvironment } from './execution-environment.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export class WorkerManager {
@@ -75,8 +76,9 @@ export class WorkerManager {
     const out = fs.openSync(path.join(this.dataDir, 'worker.stdout.log'), 'a', 0o600);
     const err = fs.openSync(path.join(this.dataDir, 'worker.stderr.log'), 'a', 0o600);
     try {
+      const env = await desktopExecutionEnvironment();
       const child = spawn(this.node, [path.join(project, 'src/worker.mjs'), 'run', ...(paused ? ['--paused'] : [])], {
-        cwd: project, env: { ...process.env, COLLECTOR_CONFIG: this.file,
+        cwd: project, env: { ...env, COLLECTOR_CONFIG: this.file,
           ...(process.env.COLLECTOR_ELECTRON_NODE === '1' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }, detached: true,
         windowsHide: true, stdio: ['ignore', out, err],
       });

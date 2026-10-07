@@ -27,6 +27,15 @@ export function taskCapabilities(task) {
 }
 
 export function createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock = Date.now }) {
+  // Pin readers to the snapshot that supplied their first page. Worker refreshes
+  // can commit meanwhile without mixing inventories in one client table.
+  const reads = new Map();
+  const retain = (deviceId, data) => {
+    const key = deviceId + ':' + data.snapshotId;
+    for (const [id, value] of reads) if (clock() >= value.expiresAt) reads.delete(id);
+    if (!reads.has(key)) reads.set(key, { data, expiresAt: clock() + 120000, bytes: Buffer.byteLength(JSON.stringify(data)) });
+    while (reads.size > 16 || [...reads.values()].reduce((sum, value) => sum + value.bytes, 0) > 32 * 1024 * 1024) reads.delete(reads.keys().next().value);
+  };
   const getVersion = async versionId => { requireValue(digest(versionId), 'Invalid skill version'); const version = await store.get('skill-version', versionId); requireValue(version, 'Skill version not found', 404); return version; };
   const inbox = async deviceId => (await store.list('skill-operation')).filter(o => o.deviceId === deviceId && ['queued','running'].includes(o.state)).sort((a,b) => a.createdAt.localeCompare(b.createdAt)).slice(0,20).map(o => o.id);
   async function verifiedItems(device) {
@@ -65,7 +74,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       requireValue(input.schemaVersion === 1 && digest(input.snapshotId) && digest(input.digest) && Number.isInteger(input.page) && input.page >= 0 && input.page < 150 && Array.isArray(input.items) && input.items.length <= 40, 'Invalid environment page');
       requireValue(Number.isFinite(Date.parse(input.scannedAt)) && Math.abs(clock() - Date.parse(input.scannedAt)) < 10 * 60000, 'Invalid inventory time');
       requireValue(Array.isArray(input.agents) && input.agents.length<=3,'Invalid inventory Agents');
-      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,3).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: a.name !== 'claude' && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0 }));
+      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,3).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), probeState: a.installed === true ? 'available' : ['not_found','timeout','failed'].includes(a.probeState) ? a.probeState : 'failed', profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: a.name !== 'claude' && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0 }));
       const items = input.items.map(environmentItem);
       await serialized('skill-environment:' + device.id, () => store.transaction(async tx => {
         const currentDevice = await tx.getForUpdate('device', device.id);
@@ -91,10 +100,15 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
     const environment = route.match(/^\/api\/skills\/devices\/([\w-]+)\/environment$/);
     if (environment && req.method === 'GET') {
       owner(device);
-      const data = await store.get('skill-environment', environment[1]);
+      const latest = await store.get('skill-environment', environment[1]);
       const offset = Number(url.searchParams.get('offset') || 0);
       requireValue(Number.isSafeInteger(offset) && offset >= 0, 'Invalid inventory offset');
-      if (data && url.searchParams.get('snapshotId')) requireValue(data.snapshotId === url.searchParams.get('snapshotId'), 'Inventory changed; refresh', 409);
+      const requested = url.searchParams.get('snapshotId');
+      if (requested) requireValue(digest(requested), 'Invalid inventory snapshot');
+      const cached = requested && reads.get(environment[1] + ':' + requested);
+      const data = !requested || latest?.snapshotId === requested ? latest : cached && clock() < cached.expiresAt ? cached.data : null;
+      if (requested && !data) throw Object.assign(new Error('技能清单已更新，请刷新'), { status: 409, code: 'inventory_changed' });
+      if (data) retain(environment[1], data);
       send(res,200, data ? { ...data, items: data.items.slice(offset,offset+40), total: data.items.length, nextOffset: offset+40 < data.items.length ? offset+40 : null } : { schemaVersion:1, items:[], agents:[], total:0, nextOffset:null, scannedAt:null }); return true;
     }
     if (route === '/api/skills/versions' && req.method === 'GET') {

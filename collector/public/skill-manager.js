@@ -2,31 +2,36 @@
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const names={codex:'Codex',codebuddy:'CodeBuddy',claude:'Claude Code'};
-  const states={loaded:'可加载',configured:'已配置',unknown:'加载未确认',disabled:'已禁用',not_loaded:'未加载',shadowed:'被覆盖',agent_unavailable:'Agent 未安装',ready:'就绪',missing:'缺少依赖',passed:'验证通过',failed:'未通过',queued:'等待节点',running:'执行中',succeeded:'已完成'};
+  const states={loaded:'可加载',configured:'已配置',unknown:'加载未确认',disabled:'已禁用',not_loaded:'未加载',shadowed:'被覆盖',agent_unavailable:'Agent 不可用',ready:'就绪',missing:'缺少依赖',passed:'验证通过',failed:'未通过',queued:'等待节点',running:'执行中',succeeded:'已完成'};
   const date=x=>x?new Date(x).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'未上报';
   const short=x=>x?x.slice(0,12):'未记录';
   const split=x=>String(x||'').split(/[,，\s]+/).filter(Boolean);
   window.createSkillManager=({request,identity=()=>'',openConfig})=>{
     const dialog=document.createElement('dialog');dialog.className='skill-manager';dialog.setAttribute('aria-label','节点技能');document.body.append(dialog);
-    let epoch=0,current=null,items=[],versions=[],history=[],selected=null,preview=null,comparison=null,busy=false;
+    let epoch=0,loadRevision=0,current=null,items=[],versions=[],history=[],selected=null,preview=null,comparison=null,busy=false;
     const $=selector=>dialog.querySelector(selector);
     const valid=(generation,origin)=>dialog.open && generation===epoch && origin===identity();
     const error=message=>{$('[data-skill-status]').textContent=message;};
     dialog.addEventListener('close',()=>{epoch++;busy=false;});
     async function load(generation=epoch,origin=identity()){
+      const revision=++loadRevision,active=()=>valid(generation,origin) && revision===loadRevision;
       try {
       let offset=0,snapshotId,all=[],environment;
-      do{environment=await request({kind:'environment',deviceId:current.id,offset,snapshotId});if(!valid(generation,origin))return;all.push(...environment.items);snapshotId=environment.snapshotId;offset=environment.nextOffset;}while(offset!==null);
-      const [v,h]=await Promise.all([request({kind:'versions'}),request({kind:'history',deviceId:current.id})]);if(!valid(generation,origin))return;
+      for(let attempt=0;attempt<3;attempt++){
+        offset=0;snapshotId=undefined;all=[];
+        try{do{environment=await request({kind:'environment',deviceId:current.id,offset,snapshotId});if(!active())return;all.push(...environment.items);snapshotId=environment.snapshotId;offset=environment.nextOffset;}while(offset!==null);break;}
+        catch(e){if(!active())return;if(attempt===2 || !(e.code==='inventory_changed' || /Inventory changed; refresh|技能清单已更新/.test(e.message)))throw e;}
+      }
+      const [v,h]=await Promise.all([request({kind:'versions'}),request({kind:'history',deviceId:current.id})]);if(!active())return;
       items=all;versions=v.versions;history=h.operations;preview=null;comparison=null;
       $('[data-skill-updated]').textContent=date(environment.scannedAt);
       $('[data-projects]').value=(environment.projects || []).join('\n');
-      $('[data-agent-summary]').innerHTML=(environment.agents || []).map(a=>`<span>${esc(names[a.name])} · ${esc(a.version || '未安装')} · 内置 ${a.builtinState==='reported'?'已上报':'未确认'}${a.loadErrors?' · 加载错误 '+a.loadErrors:''}</span>`).join('');
+      $('[data-agent-summary]').innerHTML=(environment.agents || []).map(a=>`<span>${esc(names[a.name])} · ${esc(a.version || ({not_found:'未找到程序',timeout:'检测超时',failed:'检测失败'}[a.probeState] || '不可用'))} · 内置 ${a.builtinState==='reported'?'已上报':'未确认'}${a.loadErrors?' · 加载错误 '+a.loadErrors:''}</span>`).join('');
       $('[data-version]').innerHTML='<option value="">选择私有版本</option>'+versions.map(v=>`<option value="${v.id}">${esc(v.name)} · ${esc(v.declaredVersion || short(v.hash))}</option>`).join('');
       const rolled=new Set(history.filter(o=>o.action==='rollback' && o.state==='succeeded').map(o=>o.syncId));
       $('[data-rollback-version]').innerHTML='<option value="">选择同步记录</option>'+history.filter(o=>o.action==='sync' && o.state==='succeeded' && !rolled.has(o.id)).map(o=>`<option value="${o.id}">${esc(o.name)} · ${date(o.updatedAt)}</option>`).join('');
-      render();renderOperations();
-      }catch(e){if(valid(generation,origin))error(e.message);}
+      render();renderOperations();error('');
+      }catch(e){if(active())error(/Inventory changed; refresh|技能清单已更新/.test(e.message)?'技能清单更新频繁，请重试':e.message);}
     }
     function render(){
       const filter=$('[data-agent-filter]').value;
