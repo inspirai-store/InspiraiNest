@@ -12,7 +12,7 @@ import { createAgentRuntime } from '../src/agent-runtime.mjs';
 import { agentHome, resolveAgentProfile, commandEnvironment } from '../src/agent-paths.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
-const release=agent=>({package:AGENT_CATALOG.find(a=>a.id===agent).package,version:'1.2.3',tarball:'https://registry.npmjs.org/fixture/-/fixture-1.2.3.tgz',integrity:'sha512-'+Buffer.alloc(64).toString('base64')});
+const release=agent=>({package:AGENT_CATALOG.find(a=>a.id===agent).package,version:'1.2.3',tarball:'https://registry.npmjs.org/'+AGENT_CATALOG.find(a=>a.id===agent).package+'/-/'+AGENT_CATALOG.find(a=>a.id===agent).package.split('/').at(-1)+'-1.2.3.tgz',integrity:'sha512-'+Buffer.alloc(64).toString('base64')});
 const environment=()=>({schemaVersion:1,platform:process.platform,arch:process.arch,agents:AGENT_CATALOG.map(a=>({id:a.id,installed:false,version:null,source:'unknown',probeState:'not_found',fingerprint:hash(a.id),originalSupported:false}))});
 async function setup(t,store){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-agents-'));let clock=Date.now();
@@ -76,6 +76,7 @@ test('Agent inventory preserves custom executables and managed runtimes; install
  assert.deepEqual(clean,{HOME:home,PATH:'/bin'});
  assert.throws(()=>validateRelease({...release('codex'),tarball:'https://example.com/a'},'codex'),/来源/);
  assert.throws(()=>validateRelease({...release('codex'),version:'1.2.3;whoami'},'codex'),/版本/);
+ assert.throws(()=>validateRelease({...release('codex'),tarball:'https://registry.npmjs.org/other/-/other-1.2.3.tgz'},'codex'),/官方包/);
 });
 test('Worker waits until idle, retains receipts, handles failure and ignores another deployment',async t=>{
  const fixture=await setup(t),node=await fixture.node();let installs=0,fail=true;

@@ -14,6 +14,8 @@ export function validateRelease(input, agent) {
   requireValue(input?.package === definition.package && releaseVersion(input.version), 'Agent 版本无效');
   const url = new URL(input.tarball);
   requireValue(url.protocol === 'https:' && url.hostname === 'registry.npmjs.org' && !url.username && !url.password && !url.search && !url.hash, 'Agent 下载来源无效');
+  const filename=definition.package.split('/').at(-1)+'-'+input.version+'.tgz';
+  requireValue(decodeURIComponent(url.pathname)==='/'+definition.package+'/-/'+filename,'Agent 下载地址与官方包不符');
   requireValue(/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(input.integrity || ''), 'Agent 完整性信息缺失');
   return { package: definition.package, version: input.version, tarball: url.href, integrity: input.integrity };
 }
