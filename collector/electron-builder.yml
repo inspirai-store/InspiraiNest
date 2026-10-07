@@ -8,6 +8,7 @@ files:
   - LICENSE
   - desktop/main.mjs
   - desktop/manager.mjs
+  - desktop/execution-environment.mjs
   - desktop/owner-client.mjs
   - desktop/updater.mjs
   - desktop/settings.mjs
