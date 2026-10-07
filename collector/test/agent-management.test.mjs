@@ -129,3 +129,12 @@ test('Original npm updates wait for external sessions and reconcile an interrupt
  let checks=0;await assert.rejects(installer.install(op,{beforeCommit:async()=>{if(++checks===2)throw new Error('Interrupted result');}}),/Interrupted/);assert.equal(updates,1);
  assert.equal((await installer.install(op)).version,'codex-cli 1.2.3');assert.equal(updates,1);
 });
+
+test('Windows npm command shims are identified against the matching vendor package',async t=>{
+ const {originalInstallation}=await import('../src/agent-install.mjs');
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-win-shim-'));t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
+ const pkg=path.join(home,'node_modules/@openai/codex');fs.mkdirSync(path.join(pkg,'bin'),{recursive:true});atomicJson(path.join(pkg,'package.json'),{name:'@openai/codex',version:'1.2.3',bin:{codex:'bin/codex.js'}});fs.writeFileSync(path.join(pkg,'bin/codex.js'),'fixture');
+ const command=path.join(home,'codex.cmd');fs.writeFileSync(command,'@node "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*');fs.writeFileSync(path.join(home,'npm.cmd'),'fixture');
+ const installed=originalInstallation(AGENT_CATALOG[0],command,{home,platform:'win32',env:{PATH:home}});assert.equal(installed.source,'npm');assert.equal(installed.prefix,home);assert.equal(installed.real,path.join(pkg,'bin/codex.js'));
+ fs.writeFileSync(command,'@other-command %*');assert.equal(originalInstallation(AGENT_CATALOG[0],command,{home,platform:'win32',env:{PATH:home}}).source,'unknown');
+});

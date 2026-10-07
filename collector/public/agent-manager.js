@@ -15,9 +15,9 @@
     const rows=new Map();
     for(const [id,name] of Object.entries(names)){
       const row=document.createElement('tr');row.dataset.agent=id;
-      row.innerHTML=`<td>${name}</td><td data-version></td><td><span data-state></span><div role="status" data-error></div></td><td><button type="button" data-install>安装</button><button type="button" data-cancel hidden>取消</button></td>`;
-      row.querySelector('[data-install]').onclick=()=>openInstall(id);
-      row.querySelector('[data-cancel]').onclick=()=>cancel(id);
+      row.innerHTML=`<td>${name}</td><td data-agent-version></td><td><span data-agent-state></span><div role="status" data-agent-row-error></div></td><td><button type="button" data-agent-install>安装</button><button type="button" data-agent-cancel hidden>取消</button></td>`;
+      row.querySelector('[data-agent-install]').onclick=()=>openInstall(id);
+      row.querySelector('[data-agent-cancel]').onclick=()=>cancel(id);
       $('tbody').append(row);rows.set(id,row);
     }
     function render(){
@@ -30,12 +30,12 @@
       for(const [id,row] of rows){
         const agent=environment.agents.find(a=>a.id===id),release=catalog.find(a=>a.id===id)?.release;
         const op=history.find(o=>o.agent===id);
-        row.querySelector('[data-version]').textContent=agent?.version || '—';
-        row.querySelector('[data-state]').textContent=!supported?'需更新客户端':pending(op)?op.state==='queued' && op.result?.error?op.result.error:states[op.state]:agent?.installed?'已安装':({not_found:'未安装',timeout:'检测超时',failed:'检测失败'}[agent?.probeState] || '未上报');
-        row.querySelector('[data-error]').textContent=op?.state==='failed'?op.result?.error || '操作失败':'';
-        const button=row.querySelector('[data-install]');button.textContent=agent?.installed?'更新':'安装';
+        row.querySelector('[data-agent-version]').textContent=agent?.version || '—';
+        row.querySelector('[data-agent-state]').textContent=!supported?'需更新客户端':pending(op)?op.state==='queued' && op.result?.error?op.result.error:states[op.state]:agent?.installed?'已安装':({not_found:'未安装',timeout:'检测超时',failed:'检测失败'}[agent?.probeState] || '未上报');
+        row.querySelector('[data-agent-row-error]').textContent=op?.state==='failed'?op.result?.error || '操作失败':'';
+        const button=row.querySelector('[data-agent-install]');button.textContent=agent?.installed?'更新':'安装';
         button.disabled=!supported || !agent || !release || submitting || pending(op) || agent.custom;
-        row.querySelector('[data-cancel]').hidden=!pending(op);row.querySelector('[data-cancel]').disabled=submitting || op?.state==='cancel_requested';
+        row.querySelector('[data-agent-cancel]').hidden=!pending(op);row.querySelector('[data-agent-cancel]').disabled=submitting || op?.state==='cancel_requested';
       }
     }
     async function load(initial=false){

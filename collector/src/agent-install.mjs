@@ -21,6 +21,13 @@ export function originalInstallation(entry, command, { home = os.homedir(), plat
     const formulas = { codex:'codex', codebuddy:'codebuddy-code', claude:'claude-code', gemini:'gemini-cli', opencode:'opencode' };
     if (real.includes('/' + formulas[entry.id] + '/')) return { source: 'homebrew', command, real, brew, formula: formulas[entry.id] };
   }
+  if(platform==='win32' && /\.cmd$/i.test(command)){
+    const prefix=path.dirname(command), directory=path.join(prefix,'node_modules',entry.package), data=read(path.join(directory,'package.json'));
+    const bin=typeof data.bin==='string'?data.bin:data.bin?.[entry.command];
+    let shim='';try{if(fs.statSync(command).size<32768)shim=fs.readFileSync(command,'utf8').replaceAll('\\','/');}catch{}
+    const target=bin && path.resolve(directory,bin);
+    if(data.name===entry.package && target && contained(directory,target) && fs.existsSync(target) && shim.includes('node_modules/'+entry.package+'/'+bin.replace(/^\.\//,'')))return {source:'npm',command,real:target,prefix,npm:executable('npm',env,platform),version:data.version};
+  }
   let directory = path.dirname(real);
   for (let depth = 0; depth < 5; depth++, directory = path.dirname(directory)) {
     const data = read(path.join(directory, 'package.json'));
