@@ -138,3 +138,12 @@ test('Windows npm command shims are identified against the matching vendor packa
  const installed=originalInstallation(AGENT_CATALOG[0],command,{home,platform:'win32',env:{PATH:home}});assert.equal(installed.source,'npm');assert.equal(installed.prefix,home);assert.equal(installed.real,path.join(pkg,'bin/codex.js'));
  fs.writeFileSync(command,'@other-command %*');assert.equal(originalInstallation(AGENT_CATALOG[0],command,{home,platform:'win32',env:{PATH:home}}).source,'unknown');
 });
+
+test('External session detection follows npm launch aliases without exposing process arguments',{skip:process.platform==='win32'},async t=>{
+ const {externalAgentRunning}=await import('../src/agent-install.mjs'),{spawn}=await import('node:child_process');
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-session-'));t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
+ const file=path.join(home,'original.mjs'),alias=path.join(home,'launch.mjs');fs.writeFileSync(file,"process.stdout.write('ready');setInterval(()=>{},1000)");fs.symlinkSync(file,alias);
+ const child=spawn(process.execPath,[alias],{stdio:['ignore','pipe','ignore']});t.after(()=>child.kill());await new Promise(resolve=>child.stdout.once('data',resolve));
+ assert.equal(await externalAgentRunning(path.join(home,'other-executable'),{aliases:[alias],displayCommand:'lingnest-fixture-agent'}),true);
+ child.kill();await new Promise(resolve=>child.once('close',resolve));assert.equal(await externalAgentRunning(file,{aliases:[alias],displayCommand:'lingnest-fixture-agent'}),false);
+});

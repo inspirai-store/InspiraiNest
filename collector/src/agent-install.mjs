@@ -110,14 +110,14 @@ export async function ensureNode(root, { platform = process.platform, arch = pro
     const value = { node, npm, version:release.version, sha256:expected }; atomicJson(path.join(root,'runtime.json'), value); return value;
   } finally { fs.rmSync(staging, { recursive:true, force:true }); }
 }
-export async function externalAgentRunning(command, { platform = process.platform, run = execute, env = process.env } = {}) {
+export async function externalAgentRunning(command, { platform = process.platform, run = execute, env = process.env, aliases = [], displayCommand = command } = {}) {
   if (!command) return false;
   // Inspect executable identities only. Command-line arguments may contain credentials.
-  const basename=path.basename(command).replace(/\.(?:exe|cmd|bat)$/i,'');
+  const basename=path.basename(displayCommand).replace(/\.(?:exe|cmd|bat)$/i,'');
   // The inspection subprocess emits a boolean only, never another process's arguments.
-  const source=`const c=require('node:child_process'),p=require('node:path');const target=${JSON.stringify(command)},name=${JSON.stringify(basename)};const rows=c.execFileSync('ps',['-axo','pid=,comm=,args='],{encoding:'utf8',maxBuffer:8*1024*1024}).split('\\n');process.stdout.write(String(rows.some(r=>{const m=r.trim().match(/^(\\d+)\\s+(\\S+)\\s+(.*)$/);return m && ![process.pid,process.ppid].includes(Number(m[1])) && (p.basename(m[2])===name || m[3].includes(target));})));`;
+  const source=`const c=require('node:child_process'),p=require('node:path');const targets=${JSON.stringify([command,...aliases])},name=${JSON.stringify(basename)};const rows=c.execFileSync('ps',['-axo','pid=,comm=,args='],{encoding:'utf8',maxBuffer:8*1024*1024}).split('\\n');process.stdout.write(String(rows.some(r=>{const m=r.trim().match(/^(\\d+)\\s+(\\S+)\\s+(.*)$/);return m && ![process.pid,process.ppid].includes(Number(m[1])) && (p.basename(m[2])===name || targets.some(target=>m[3].includes(target)));})));`;
   const psQuote=value=>"'"+value.replaceAll("'","''")+"'";
-  const psScript='$target='+psQuote(command)+';$name='+psQuote(basename)+";$found=Get-CimInstance Win32_Process | Where-Object {$_.ProcessId -ne $PID -and ($_.Name -eq ($name+'.exe') -or ($_.CommandLine -and $_.CommandLine.Contains($target)))};[Console]::Write([bool]$found)";
+  const psScript='$targets=@('+[command,...aliases].map(psQuote).join(',')+');$name='+psQuote(basename)+";$found=Get-CimInstance Win32_Process | Where-Object {$agentProcessArguments=$_.CommandLine;$_.ProcessId -ne $PID -and ($_.Name -eq ($name+'.exe') -or ($agentProcessArguments -and ($targets | Where-Object {$agentProcessArguments.Contains($_)})))};[Console]::Write([bool]$found)";
   const result = platform === 'win32'
     ? await run('powershell.exe', ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(psScript,'utf16le').toString('base64')], { env:installerEnvironment(env), timeoutMs:10000 })
     : await run(process.execPath, ['-e',source], { env:{...installerEnvironment(env),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})}, timeoutMs:10000 });
@@ -176,7 +176,7 @@ export function createAgentInstaller(config, options = {}) {
     if (op.method === 'original') {
       requireValue(current.originalSupported, '原有安装来源不支持');
       const original = current.original;
-      if (await (options.running || externalAgentRunning)(original.real, { platform, run, env })) return { waiting:true, error:'等待 Agent 会话结束' };
+      if (await (options.running || externalAgentRunning)(original.real, { platform, run, env, aliases:[original.command],displayCommand:entry.command })) return { waiting:true, error:'等待 Agent 会话结束' };
       await beforeCommit();
       let command, args;
       if (original.source === 'npm') {
