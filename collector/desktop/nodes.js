@@ -10,9 +10,18 @@
     let listSignature = '', detailSignature = '';
     const remotes = () => (state?.devices || []).filter(d => window.deviceView.dispatchable(d) && d.id !== local?.deviceId);
     const chosen = () => selected === 'local' ? state?.devices?.find(d => d.id === local?.deviceId) : remotes().find(d => d.id === selected);
+    const overview = $('#node-overview');
+    // Keep action elements alive across heartbeats and modal focus restoration.
+    overview.innerHTML = '<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow"></span><h1 class="detail-title"></h1><p class="detail-summary"></p><div class="detail-actions" hidden><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button><button type="button" data-node-skills>节点技能</button></div>';
+    const dispatch = $('#node-dispatch'), skills = overview.querySelector('[data-node-skills]');
+    overview.querySelector('[data-node-back]').onclick = () => { $('#node-detail').classList.remove('open'); $('#node-list').querySelector(`[data-node="${CSS.escape(selected)}"]`)?.focus(); };
+    dispatch.onclick = () => { const device = chosen(); if (paired && connected && device) onDispatch(device.id); };
+    skills.onclick = () => { const device = chosen(); if (paired && connected && device && onSkills) onSkills(device); };
     function select(id, focus = false) {
       selected = id; detailSignature = ''; render(); $('#node-detail').classList.add('open');
-      if (focus) { animate($('#node-detail')); $('#node-detail').focus({preventScroll:true}); }
+      // Animating a focused scroll container can leave Chromium's native hit
+      // regions stale. Animate only the noninteractive title instead.
+      if (focus) { animate(overview.querySelector('.detail-title')); $('#node-detail').focus({preventScroll:true}); }
     }
     function render() {
       const previousSelection = selected;
@@ -35,19 +44,21 @@
       const device = chosen(), isLocal = selected === 'local'; $('#worker-view').hidden = !isLocal; $('#node-remote-content').hidden = isLocal;
       const target = isLocal ? local?.deviceId : selected;
       const tasks = target ? (state?.tasks || []).filter(t => stages[t.state] && (t.deviceId === target || t.state === 'queued' && t.preferredDeviceId === target)) : [];
+      const title = isLocal ? local?.device || '本机' : device?.name || device?.displayName || '节点信息';
+      const summary = isLocal ? '本机状态与控制独立可用；关闭工作台不会停止后台采集。' : connected ? window.deviceView.status(device) : '连接中断 · 以下为最近一次成功读取的信息';
+      for (const [selector,value] of [['.eyebrow',isLocal ? 'THIS COMPUTER / 本机控制' : 'AUTHORIZED NODE / 已授权工作节点'],['.detail-title',title],['.detail-summary',summary]]) {
+        const element = overview.querySelector(selector); if (element.textContent !== value) element.textContent = value;
+      }
+      overview.querySelector('.detail-actions').hidden = !paired || !device;
+      dispatch.disabled = skills.disabled = !connected;
+      dispatch.title = connected ? '' : '恢复管理端连接后可派发任务';
+      skills.hidden = !onSkills;
+      skills.dataset.nodeSkills = device?.id || '';
       const nextDetail = JSON.stringify([selected,device,local?.device,local?.deviceId,local?.paired,connected,paired,tasks]);
       if (nextDetail === detailSignature) return; detailSignature = nextDetail;
       const detail = $('#node-detail'), scroll = detail.scrollTop, active = document.activeElement;
       const focus = previousSelection === selected && detail.contains(active)
         ? {dispatch:active.id === 'node-dispatch',back:active.hasAttribute('data-node-back'),task:active.dataset.nodeTask} : null;
-      const title = isLocal ? local?.device || '本机' : device?.name || device?.displayName || '节点信息';
-      $('#node-overview').innerHTML = `<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow">${isLocal ? 'THIS COMPUTER / 本机控制' : 'AUTHORIZED NODE / 已授权工作节点'}</span><h1 class="detail-title">${esc(title)}</h1><p class="detail-summary">${isLocal ? '本机状态与控制独立可用；关闭工作台不会停止后台采集。' : connected ? esc(window.deviceView.status(device)) : '连接中断 · 以下为最近一次成功读取的信息'}</p>${paired && device ? '<div class="detail-actions"><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button></div>' : ''}`;
-      $('#node-overview [data-node-back]').onclick = () => { $('#node-detail').classList.remove('open'); $('#node-list').querySelector(`[data-node="${CSS.escape(selected)}"]`)?.focus(); };
-      const dispatch = $('#node-dispatch'); if (dispatch) { dispatch.disabled = !connected; dispatch.title = connected ? '' : '恢复管理端连接后可派发任务'; dispatch.onclick = () => onDispatch(device.id); }
-      if (paired && device && onSkills) {
-        const button = document.createElement('button');button.type='button';button.textContent='节点技能';button.dataset.nodeSkills=device.id;button.disabled=!connected;button.onclick=()=>onSkills(device);
-        $('#node-overview .detail-actions').append(button);
-      }
       if (!isLocal && device) {
         const info = device.deviceInfo || {}, os = info.os;
         const fields = [['操作系统',os?.family && os.family !== 'Unknown' ? [os.family,os.version,os.build ? '构建 '+os.build : ''].filter(Boolean).join(' · ') : device.system || '未上报'],

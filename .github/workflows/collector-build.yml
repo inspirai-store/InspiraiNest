@@ -79,6 +79,9 @@ jobs:
       - name: Test shared Linux skill management
         run: xvfb-run -a node scripts/test-desktop-skills.cjs
         working-directory: collector
+      - name: Test shared Linux node actions during refresh
+        run: xvfb-run -a node scripts/test-desktop-node-actions.cjs
+        working-directory: collector
       - name: Test shared Linux update window shutdown
         run: xvfb-run -a node scripts/test-desktop-update-lifecycle.cjs
         working-directory: collector
@@ -147,6 +150,9 @@ jobs:
       - name: Test packaged Windows settings and nodes
         shell: pwsh
         run: node collector/scripts/test-desktop-settings-nodes.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows node actions during refresh
+        shell: pwsh
+        run: node collector/scripts/test-desktop-node-actions.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows password login
         shell: pwsh
         run: |
@@ -260,6 +266,7 @@ jobs:
             app=desktop/dist/mac/灵藏.app
           fi
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login-switch.cjs "$app/Contents/MacOS/灵藏"
