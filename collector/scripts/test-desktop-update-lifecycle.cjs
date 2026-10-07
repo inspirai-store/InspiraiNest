@@ -33,6 +33,10 @@ const { _electron } = require('playwright');
       const { main, updates } = globalThis.workerDesktop();
       let nativeInstall = 0, closePrevented = false;
       main.on('close', event => { closePrevented = event.defaultPrevented; });
+      const closed = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Installer did not close the window')), 5000);
+        main.once('closed', () => { clearTimeout(timeout); resolve(); });
+      });
       updates.updater.quitAndInstall = () => {
         nativeInstall++;
         app.emit('activate');
@@ -41,7 +45,7 @@ const { _electron } = require('playwright');
       };
       updates.set({ phase: 'downloaded' });
       await updates.install();
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await closed;
       return { nativeInstall, closePrevented, destroyed: main.isDestroyed() };
     });
     assert.deepEqual(result, { nativeInstall: 1, closePrevented: false, destroyed: true });
