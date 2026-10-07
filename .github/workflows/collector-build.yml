@@ -150,6 +150,9 @@ jobs:
       - name: Test Windows skill package and directory contracts
         run: node --test --test-reporter=tap test/skills.test.mjs
         working-directory: collector
+      - name: Test Windows native UTF-8 collection and upload recovery
+        run: node --test --test-reporter=tap test/worker-encoding.test.mjs
+        working-directory: collector
       - run: npm run build:worker:win
         working-directory: collector
       - name: Test download page

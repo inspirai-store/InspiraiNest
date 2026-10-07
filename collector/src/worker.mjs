@@ -217,7 +217,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
   skillRuntime = createSkillRuntime({...config,dataDir},{api:(...args)=>api(config,...args),cwd:skillCwd,
     verify:(op,bundle,workspace)=>verifySkillExtraction(config,op,bundle,workspace,{signal,prepare:directory=>{
       const template=prepareWorkspace({id:'_environment'},dataDir);
-      for (const file of ['AGENTS.md','README.md','scripts/catalog.mjs','scripts/browser-data.mjs','assets/library-time.js','templates/source.template.json','templates/summary.md','templates/scenario.md','package.json']) {
+      for (const file of ['AGENTS.md','README.md','scripts/catalog.mjs','scripts/browser-data.mjs','scripts/write-collection-json.mjs','assets/library-time.js','templates/source.template.json','templates/summary.md','templates/scenario.md','package.json']) {
         fs.mkdirSync(path.dirname(path.join(directory,file)),{recursive:true}); fs.copyFileSync(path.join(template,file),path.join(directory,file));
       }
     },prompt:taskPrompt})});

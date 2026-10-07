@@ -47,6 +47,10 @@ const { _electron } = require('playwright');
     assert.equal(fs.existsSync(path.join(appPath, 'public/device-view.js')), true, 'Missing authorization presentation helper');
     assert.equal(fs.existsSync(path.join(appPath, 'public/pairing-dialog.css')), true, 'Missing pairing dialog stylesheet');
     assert.equal(fs.existsSync(path.join(appPath, '..', 'library', 'scripts', 'catalog.mjs')), true);
+    const jsonWriter = path.join(appPath, '..', 'library', 'scripts', 'write-collection-json.mjs');
+    assert.equal(fs.existsSync(jsonWriter), true, 'Missing UTF-8 collection JSON writer');
+    assert.equal(fs.readFileSync(jsonWriter, 'utf8').replace(/\r\n/g, '\n'), fs.readFileSync(path.resolve(__dirname, '../../scripts/write-collection-json.mjs'), 'utf8').replace(/\r\n/g, '\n'));
+    assert.equal(fs.existsSync(path.join(appPath, 'src', 'text-encoding.mjs')), true, 'Missing readable metadata validation');
     for (const file of ['settings.mjs','settings-renderer.js','nodes.js','owner-client.mjs','updater.mjs','workspace.css','workspace.js','client-login.js','vendor/marked.js','vendor/purify.js','vendor/lucide.js']) {
       assert.equal(fs.existsSync(path.join(appPath, 'desktop', file)), true, `Missing packaged resource: ${file}`);
     }
