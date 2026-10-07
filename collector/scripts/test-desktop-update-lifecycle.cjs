@@ -11,7 +11,8 @@ const { _electron } = require('playwright');
   const executable = process.argv[2] || require('electron');
   const env = { ...process.env, COLLECTOR_CONFIG: config, COLLECTOR_DESKTOP_TEST: '1', COLLECTOR_DESKTOP_STORAGE_FIXTURE: '1' };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await _electron.launch({ executablePath: executable, args: process.argv[2] ? [] : [path.resolve(__dirname, '../desktop')], env });
+  const app = await _electron.launch({ executablePath: executable,
+    args: [...(process.argv[2] ? [] : [path.resolve(__dirname, '../desktop')]), ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env });
   try {
     await app.firstWindow();
     for (let i = 0; i < 100; i++) {
