@@ -32,7 +32,11 @@
     }
     function closeDetail() { detailSeq++; if (dialog.open) dialog.close(); }
     dialog.querySelector('[data-close]').onclick = closeDetail;
-    dialog.addEventListener('close', () => { detailSeq++; detail.textContent = ''; });
+    dialog.addEventListener('close', () => {
+      // A queued close event must not cancel a detail reopened in the same turn.
+      if (dialog.open) return;
+      detailSeq++; detail.textContent = ''; detail.removeAttribute('aria-busy');
+    });
     dialog.addEventListener('cancel', () => { detailSeq++; });
     dialog.addEventListener('click', event => {
       const bounds = dialog.getBoundingClientRect();
