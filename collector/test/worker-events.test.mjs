@@ -116,6 +116,36 @@ test('explicit Agent progress skips previous output, handles partial lines and r
   assert.deepEqual(events.map(event => event.message), ['正在获取正文', '已取得字幕']);
 });
 
+test('task issues survive restarts, recover on completion and retain damaged progress only in details', () => {
+  const root = temporary(); let now = Date.UTC(2026, 9, 8);
+  const first = createWorkerEvents(root, { runId: 'first', now: () => now++ });
+  first.event({ taskId: 'task-encoding', stage: 'archiving', message: '???? source.json ?????' });
+  first.fault('task:task-encoding:ARCHIVE_ENCODING', { taskId: 'task-encoding', code: 'ARCHIVE_ENCODING', message: '摘要存在乱码' });
+  let result = readWorkerEvents(root, { taskId: 'task-encoding', runId: 'second' });
+  assert.equal(result.activeIssues, 1);
+  assert.match(result.events.find(e => e.domain === 'collection').message, /历史记录存在文字编码问题/);
+  assert.equal(result.events.find(e => e.domain === 'collection').details.originalMessage, '???? source.json ?????');
+  const second = createWorkerEvents(root, { runId: 'second', now: () => now++ });
+  second.fault('task:task-encoding:ARCHIVE_ENCODING', { taskId: 'task-encoding', code: 'ARCHIVE_ENCODING', message: '摘要仍存在乱码' });
+  assert.equal(readWorkerEvents(root, { runId: 'second' }).activeIssues, 1);
+  second.recover('task:task-encoding:ARCHIVE_ENCODING', '资料修复并上传成功');
+  result = readWorkerEvents(root, { taskId: 'task-encoding', runId: 'second' });
+  assert.equal(result.activeIssues, 0);
+  assert.equal(result.events.find(e => e.domain === 'system').status, 'resolved');
+  assert.equal(result.events.find(e => e.domain === 'system').count, 2);
+});
+
+test('UTF-8 BOM progress is accepted and corrupted messages produce a separate system diagnostic', () => {
+  const root = temporary(), events = [], errors = [];
+  const stop = watchCollectionSteps(root, event => events.push(event), error => errors.push(error));
+  fs.writeFileSync(path.join(root, 'collector-events.jsonl'), '\uFEFF' + JSON.stringify({ stage: 'fetching', message: '已取得来源' }) + '\n'
+    + JSON.stringify({ stage: 'archiving', message: '???? ready ??????' }) + '\n');
+  stop();
+  assert.equal(events[0].message, '已取得来源');
+  assert.match(events[1].message, /文字编码异常/);
+  assert.equal(errors[0].code, 'STEP_ENCODING');
+});
+
 test('source obstacles remain business events while local environment errors are separate system issues', async t => {
   for (const category of ['source', 'environment']) {
     const root = temporary(); const key = crypto.randomUUID();

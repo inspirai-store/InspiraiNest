@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { unreadableText, collectionStageNames } from './text-encoding.mjs';
 
 const stages = new Set(['fetching', 'transcribing', 'analyzing', 'archiving']);
 // Optional, explicit Agent progress protocol. Ordinary stdout is not a progress API.
@@ -23,8 +24,16 @@ export function watchCollectionSteps(workspace, report, diagnose = () => {}) {
       pending = lines.pop().slice(-4000);
       for (const line of lines) {
         try {
-          const entry = JSON.parse(line);
+          const entry = JSON.parse(line.replace(/^\uFEFF/, ''));
           if (!stages.has(entry.stage) || !['info', 'warn'].includes(entry.level || 'info') || typeof entry.message !== 'string') continue;
+          if (unreadableText(entry.message)) {
+            if (lastError !== 'STEP_ENCODING') {
+              lastError = 'STEP_ENCODING';
+              diagnose(Object.assign(new Error('采集程序写入的阶段记录含乱码，请使用 UTF-8 写入'), { code: 'STEP_ENCODING', stage: entry.stage }));
+            }
+            report({ logStage: entry.stage, level: 'warn', message: `${collectionStageNames[entry.stage]}阶段的说明文字编码异常，请查看系统问题；原始记录保留本机` });
+            continue;
+          }
           report({ logStage: entry.stage, level: entry.level || 'info', message: entry.message.slice(0, 500) });
         } catch { /* Incomplete / malformed progress is never treated as task failure. */ }
       }

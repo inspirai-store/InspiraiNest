@@ -30,7 +30,7 @@ export function terminate(child) {
 // Agent login files are still accessible to the OS user: this is not isolation.
 export function agentEnvironment(source = process.env) {
   const blocked = /^(?:COLLECTOR_(?:MASTER_KEY|PAIR_KEY)|OSS_.+|MYSQL_URL|DATABASE_URL|GH_TOKEN|GITHUB_TOKEN|GIT_ASKPASS|SSH_AUTH_SOCK|AWS_.+|AZURE_.+|GOOGLE_APPLICATION_CREDENTIALS|CSC_.+|APPLE_.+|LIBRARY_SIGNING_.+)$/i;
-  return Object.fromEntries(Object.entries(source).filter(([key]) => !blocked.test(key)));
+  return { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', ...Object.fromEntries(Object.entries(source).filter(([key]) => !blocked.test(key))) };
 }
 
 export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 30000, signal, env = agentEnvironment() } = {}) {

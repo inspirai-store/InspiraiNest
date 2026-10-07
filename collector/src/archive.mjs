@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { hash, readJson, safePath, contained, requireValue, text, types, sourceURL } from './common.mjs';
+import { unreadableText } from './text-encoding.mjs';
 
 const extensions = new Set(['.md', '.markdown', '.txt', '.srt', '.vtt', '.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.pdf']);
 const roles = new Set(['summary', 'analysis', 'source', 'original', 'source_excerpt', 'source_snapshot', 'transcript', 'transcript_raw', 'image', 'scenario', 'reference', 'document']);
@@ -47,15 +48,19 @@ export function validateArchive(bundle) {
 }
 
 export function requireReadableMetadata(meta) {
+  const readable = (value, field, questionRun = 3) => {
+    if (unreadableText(value, questionRun)) throw Object.assign(new Error(`Unreadable ${field}`), { status: 400, code: 'ARCHIVE_ENCODING', field });
+  };
   for (const field of ['title', 'summary', 'coverage_note']) {
-    requireValue(!/\uFFFD|\?{3,}/.test(meta[field]), `Unreadable ${field}`);
+    readable(meta[field], field);
   }
-  requireValue(meta.tags.every(tag => !/\uFFFD|\?{2,}/.test(tag)), 'Unreadable tags');
+  for (const tag of meta.tags) readable(tag, 'tags', 2);
 }
 
 export function packageEntry(entryRoot) {
   const root = fs.realpathSync(entryRoot);
   const meta = readJson(path.join(root, 'source.json'));
+  requireReadableMetadata(meta);
   const files = [];
   const seen = new Set();
   const omitted = [];

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { redact } from './worker-control.mjs';
+import { unreadableText, collectionStageNames } from './text-encoding.mjs';
 
 const filename = 'worker-events.jsonl';
 const maxRead = 512 * 1024;
@@ -14,6 +15,10 @@ export function createWorkerEvents(dataDir, { token, runId = randomUUID(), maxBy
   const issues = new Map();
   let writeFailed = false;
   fs.mkdirSync(dataDir, { recursive: true });
+  // Task failures survive a process restart; a restart alone is not recovery.
+  for (const entry of readWorkerEvents(dataDir, { token, runId }).events) {
+    if (entry.domain === 'system' && entry.taskId && entry.issueKey && entry.status === 'active') issues.set(entry.issueKey, entry);
+  }
   const write = event => {
     const line = JSON.stringify(safe({ version: 1, id: randomUUID(), at: new Date(now()).toISOString(), runId, ...event }, token)) + '\n';
     try {
@@ -35,7 +40,7 @@ export function createWorkerEvents(dataDir, { token, runId = randomUUID(), maxBy
     const time = new Date(now()).toISOString();
     const previous = issues.get(key);
     const issue = { ...previous, ...entry, id: previous?.id || randomUUID(), issueKey: key,
-      domain: 'system', level: entry.level || 'error', status: 'active', at: time,
+      runId, domain: 'system', level: entry.level || 'error', status: 'active', at: time,
       firstAt: previous?.firstAt || time, lastAt: time, count: (previous?.count || 0) + 1 };
     issues.set(key, issue);
     if (!previous || now() - (previous.writtenAt || 0) >= 30000) {
@@ -46,7 +51,7 @@ export function createWorkerEvents(dataDir, { token, runId = randomUUID(), maxBy
     const issue = issues.get(key);
     if (!issue) return;
     const at = new Date(now()).toISOString();
-    write({ ...issue, at, status: 'resolved', level: 'info', message, resolvedAt: at });
+    write({ ...issue, runId, at, status: 'resolved', level: 'info', message, resolvedAt: at });
     issues.delete(key);
   };
   const flush = () => {
@@ -90,8 +95,28 @@ export function readWorkerEvents(dataDir, { token, taskId, runId } = {}) {
       }
     } finally { fs.closeSync(fd); }
   }
-  const sorted = [...records.values()].reverse().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const latestTaskIssues = new Map();
+  const completed = new Map();
+  for (const entry of records.values()) {
+    if (entry.domain === 'system' && entry.taskId && entry.issueKey) {
+      const previous = latestTaskIssues.get(entry.issueKey);
+      if (!previous || Date.parse(entry.at) >= Date.parse(previous.at)) latestTaskIssues.set(entry.issueKey, entry);
+    }
+    if (entry.domain === 'collection' && entry.taskId && ['completed', 'awaiting_review'].includes(entry.stage)) {
+      completed.set(entry.taskId, Math.max(completed.get(entry.taskId) || 0, Date.parse(entry.at)));
+    }
+  }
+  const sorted = [...records.values()].filter(entry => !entry.taskId || !entry.issueKey || entry.domain !== 'system' || latestTaskIssues.get(entry.issueKey) === entry)
+    .map(entry => {
+      if (entry.domain === 'system' && entry.taskId && entry.status === 'active' && (completed.get(entry.taskId) || 0) >= Date.parse(entry.at)) {
+        entry = { ...entry, status: 'resolved', level: 'info', resolvedAt: new Date(completed.get(entry.taskId)).toISOString() };
+      }
+      if (entry.domain === 'collection' && unreadableText(entry.message)) entry = { ...entry,
+        message: `${collectionStageNames[entry.stage] || '采集过程'}的历史记录存在文字编码问题，请查看详情`,
+        details: { ...entry.details, originalMessage: entry.message, note: '这是采集程序写入时已损坏的历史文字；原始日志保留本机，修复后的过程以新记录为准' } };
+      return entry;
+    }).reverse().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const events = sorted.slice(0, 300).map(entry => ({ ...entry, currentRun: entry.runId === runId }));
-  return { events, activeIssues: events.filter(entry => entry.domain === 'system' && entry.status === 'active' && entry.currentRun).length,
+  return { events, activeIssues: sorted.filter(entry => entry.domain === 'system' && entry.status === 'active' && (entry.runId === runId || entry.taskId)).length,
     truncated: truncated || sorted.length > 300, legacyAvailable: ['worker.stderr.log', 'worker.stdout.log'].some(name => fs.existsSync(path.join(dataDir, name))) };
 }

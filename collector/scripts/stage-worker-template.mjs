@@ -6,7 +6,7 @@ const collector = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const library = path.resolve(collector, '..');
 const stage = path.join(collector, 'desktop', 'template');
 const files = [
-  'LICENSE', 'AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs',
+  'LICENSE', 'AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs', 'scripts/write-collection-json.mjs',
   'assets/library-time.js', 'templates/source.template.json',
   'templates/summary.md', 'templates/scenario.md',
 ];

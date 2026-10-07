@@ -48,7 +48,7 @@ export function prepareWorkspace(task, dataDir) {
   // Keep UMD .js helpers CommonJS even beneath the collector's ESM package.
   const packageFile = path.join(workspace, 'package.json');
   if (!fs.existsSync(packageFile)) atomicJson(packageFile, { private: true, type: 'commonjs' });
-  for (const file of ['AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs', 'assets/library-time.js', 'templates/source.template.json', 'templates/summary.md', 'templates/scenario.md']) {
+  for (const file of ['AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs', 'scripts/write-collection-json.mjs', 'assets/library-time.js', 'templates/source.template.json', 'templates/summary.md', 'templates/scenario.md']) {
     const target = path.join(workspace, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(path.join(library, file), target);
@@ -67,6 +67,8 @@ export function taskPrompt(task, localInstructions = '') {
     `按 AGENTS.md 创建类型目录/source.json 和中文报告，采集时间精确到秒和时区。尽量保存正文、转录、关键图片。不要把标题简介推演成全文分析。\n` +
     `files 角色：正文文本用 source 或 original，摘要用 summary，转录用 transcript，图片用 image，场景分析用 scenario；文件必须登记后才会上传。\n` +
     `媒体可留在本机，后台只上传允许的轻量附件。登录凭据绝不能写入 source.json、报告、附件或输出结果。\n` +
+    `所有中文文件必须用 UTF-8 写入。Windows PowerShell 5.1 的原生程序管道默认可能是 ASCII：不得直接把含中文的 here-string 管道送入 Python/Node。Python -X utf8 无法修复上游已变成问号的文字。每次涉及原生管道的 shell 调用都要先设置 $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)，不同调用不会保留此设置。\n` +
+    `协议 JSON 可直接使用 apply_patch 写入，或使用本工作目录提供的 node scripts/write-collection-json.mjs <相对文件路径> <UTF-8 JSON 的 Base64>；Base64 参数只有 ASCII，工具会验证中文可读性并以 UTF-8 写入，collector-events.jsonl 使用追加模式。正文和脚本同样优先直接写文件，不通过默认编码的管道传递中文。\n` +
     `在实际开始获取来源、字幕/转录、分析、归档或遇到来源障碍时，将中文过程追加到工作目录 collector-events.jsonl，每行 JSON：{"stage":"fetching|transcribing|analyzing|archiving 中的一个","level":"info 或 warn","message":"实际发生的操作及结果，最多500字"}。不要记录计划中的动作、全文内容、登录凭据或重复轮询。此文件不是成果清单。\n` +
     `不要上传资料，后台会校验上传；不要启动后台子任务，所有文件写完后再结束。不得创建定时任务。\n` +
     `单个获取途径失败不等于整个任务需要登录。原生字幕要求登录或不存在时，先尝试匿名公开下载视频或音频，再使用本机可用的 Whisper/faster-whisper 转录并结合关键画面分析。弹幕不替代字幕；将本地 ASR 与原生字幕明确区分。\n` +
@@ -96,7 +98,7 @@ export async function processTask(config, task, available, signal, onProgress = 
       await progress('running', `使用 ${name} 采集；本机保留中间成果`, name);
       const instructions = [config.instructions, config.agents?.[name]?.instructions, ...skillSnapshots.filter(s => s.agent === name).map(s => `本任务必须使用固定技能 ${s.path}/SKILL.md，版本 ${s.versionId}，包哈希 ${s.hash}；先读取该文件，不使用其他目录中的同名版本。`)].filter(Boolean).join('\n');
       const stopSteps = watchCollectionSteps(workspace, step => onProgress({ state: 'running', agent: name, ...step }), error => onProgress({ state: 'running', agent: name,
-        message: '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: 'STEP_LOG_READ', details: errorDetails(error) } }));
+        message: error.code === 'STEP_ENCODING' ? '采集程序的阶段记录存在乱码，请改用 UTF-8 写入；执行继续，上传前再次校验' : '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: error.code === 'STEP_ENCODING' ? 'STEP_ENCODING' : 'STEP_LOG_READ', details: errorDetails(error) } }));
       let result;
       try { const profiles=await fixedSkillProfiles(config.agents || {},skillSnapshots.filter(s=>s.agent===name),workspace); result = await runAgent(name, profiles, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
       finally { stopSteps(); }
@@ -120,7 +122,15 @@ export async function processTask(config, task, available, signal, onProgress = 
   onProgress({ state: 'validating', message: '正在校验本机资料与文件清单', agent: chosen });
   const check = await execute(process.execPath, ['scripts/catalog.mjs', 'check'], { cwd: workspace });
   requireValue(check.code === 0, 'Catalog validation failed; inspect local entry and rebuild its indexes');
-  const bundle = packageEntry(entryRoot);
+  let bundle;
+  try { bundle = packageEntry(entryRoot); }
+  catch (error) {
+    if (error.code !== 'ARCHIVE_ENCODING') throw error;
+    const fields = { title: '标题', summary: '摘要', coverage_note: '采集说明', tags: '标签' };
+    await progress('waiting_action', `本机资料的${fields[error.field] || '文字'}含乱码，已在上传前拦截。请修复 source.json 后继续原任务；视频和转录保留本机。`, chosen,
+      { code: 'ARCHIVE_ENCODING', details: { field: error.field, file: path.join(result.entry, 'source.json'), message: '中文已被问号或替换字符破坏，需要从原始内容恢复，单纯更改读取编码不能还原' } });
+    return;
+  }
   requireValue(typeof bundle.meta.collected_at === 'string' && bundle.meta.collected_at.includes('T'), 'New collections require second-resolution timestamps');
   await progress('uploading', '轻量资料校验通过，正在上传', chosen);
   await api(config, `/api/tasks/${task.id}/result`, 'POST', bundle);
@@ -305,7 +315,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
               journal.event({ taskId: task.id, code: 'TASK_INTERRUPTED', stage: 'interrupted', level: 'warn', message: displayTask.message });
             }
             if (['completed', 'awaiting_review'].includes(displayTask.state)) {
-              for (const code of ['AGENT_START', 'AGENT_TIMEOUT', 'AGENT_EXIT', 'AGENT_MODEL', 'AGENT_LOGIN', 'AGENT_RESULT', 'AGENT_PERMISSION', 'AGENT_ENVIRONMENT', 'STEP_LOG_READ', 'execution']) journal.recover(`task:${task.id}:${code}`, '本次采集已完成，执行问题不再阻塞');
+              for (const code of ['AGENT_START', 'AGENT_TIMEOUT', 'AGENT_EXIT', 'AGENT_MODEL', 'AGENT_LOGIN', 'AGENT_RESULT', 'AGENT_PERMISSION', 'AGENT_ENVIRONMENT', 'STEP_LOG_READ', 'STEP_ENCODING', 'ARCHIVE_ENCODING', 'execution']) journal.recover(`task:${task.id}:${code}`, '本次采集已完成，执行问题不再阻塞');
             }
             current = null; control.update({ current: null, lastTask: { ...displayTask }, phase: 'idle' });
           }

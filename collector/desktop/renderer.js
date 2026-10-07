@@ -176,7 +176,7 @@ function renderLogs() {
   text('#log-issue-count', logData.activeIssues || 0);
   const issues = logData.activeIssues || 0;
   $('#log-system-status').hidden = !issues;
-  text('#log-system-status', `${issues} 项系统问题尚未恢复，点击「系统问题」查看原因与处理建议。`);
+  text('#log-system-status', `${issues} 项系统问题尚未恢复（包含历史任务），点击「系统问题」查看原因与处理建议。`);
   for (const domain of ['collection', 'system']) { $('#logs-' + domain).setAttribute('aria-selected', String(logDomain === domain)); $('#logs-' + domain).tabIndex = logDomain === domain ? 0 : -1; }
   $('#logs').setAttribute('aria-labelledby', 'logs-' + logDomain);
   text('#log-footnote', logData.truncated ? '显示最近 300 项事件，较早记录保留在本机日志文件中。' : '仅记录实际发生的采集阶段；重复系统错误合并显示。');
@@ -199,14 +199,14 @@ function renderLogs() {
     time.append(hour, date);
     const content = document.createElement('span'); content.className = 'event-body';
     const meta = document.createElement('span'); meta.className = 'event-meta';
-    const state = event.domain === 'system' ? event.status === 'resolved' ? '已恢复' : event.status === 'active' ? event.currentRun ? '需处理' : '历史问题 · 未记录恢复' : '运行记录' : stages[event.stage] || '采集过程';
+    const state = event.domain === 'system' ? event.status === 'resolved' ? '已恢复' : event.status === 'active' ? event.currentRun ? '需处理' : event.taskId ? '待处理 · 上次运行' : '历史问题 · 未记录恢复' : '运行记录' : stages[event.stage] || '采集过程';
     meta.textContent = [state, event.taskId ? '任务 ' + event.taskId.slice(0, 8) : '', event.agent || '', event.count > 1 ? `重复 ${event.count} 次` : ''].filter(Boolean).join(' · ');
     const message = document.createElement('span'); message.className = 'event-message'; message.textContent = event.message;
     content.append(meta, message);
     const arrow = document.createElement('span'); arrow.className = 'event-expand'; arrow.textContent = '详情';
     summary.append(time, content, arrow);
     const detail = document.createElement('div'); detail.className = 'event-detail';
-    const suggestions = { NETWORK: '检查网络及服务地址，服务恢复后自动重连。', REMOTE_HTTP: '核对 HTTP 状态与接口路径；持续的 5xx 错误需要检查服务端和代理日志。', REMOTE_FORMAT: '检查所列接口、服务版本和代理配置；响应必须是有效 JSON。', AUTH: '在官网重新生成采集端配对码后配对。', EPERM: '状态文件被占用或权限受限，已自动重试；持续发生时检查文件权限和安全软件。', EACCES: '检查本机数据目录的读写权限。', AGENT_PERMISSION: '检查本机采集程序的非交互权限设置后继续。', AGENT_START: '检查采集程序版本、安装位置和已配置的候选程序。', AGENT_EXIT: '展开本任务执行输出，查看退出前的具体错误；修复后继续原任务。', AGENT_TIMEOUT: '检查执行输出和网络，保留成果后继续原任务。', AGENT_RESULT: '检查采集程序是否成功运行并生成规定的结果文件。', AGENT_ENVIRONMENT: '按采集程序上报的说明补齐工具或权限配置，再继续原任务。' };
+    const suggestions = { NETWORK: '检查网络及服务地址，服务恢复后自动重连。', REMOTE_HTTP: '核对 HTTP 状态与接口路径；持续的 5xx 错误需要检查服务端和代理日志。', REMOTE_FORMAT: '检查所列接口、服务版本和代理配置；响应必须是有效 JSON。', AUTH: '在官网重新生成采集端配对码后配对。', EPERM: '状态文件被占用或权限受限，已自动重试；持续发生时检查文件权限和安全软件。', EACCES: '检查本机数据目录的读写权限。', AGENT_PERMISSION: '检查本机采集程序的非交互权限设置后继续。', AGENT_START: '检查采集程序版本、安装位置和已配置的候选程序。', AGENT_EXIT: '展开本任务执行输出，查看退出前的具体错误；修复后继续原任务。', AGENT_TIMEOUT: '检查执行输出和网络，保留成果后继续原任务。', AGENT_RESULT: '检查采集程序是否成功运行并生成规定的结果文件。', AGENT_ENVIRONMENT: '按采集程序上报的说明补齐工具或权限配置，再继续原任务。', STEP_ENCODING: '采集说明发生编码损坏，原始输出已保留；检查每次 PowerShell 调用的 UTF-8 设置。', ARCHIVE_ENCODING: '资料元数据存在乱码；从原始记录修复对应字段、重建索引，再继续原任务，不必重新下载或转录。' };
     const fields = { '事件': event.code, '记录来源': event.reportedBy === 'agent' ? '采集程序上报，时间为本机接收时间' : '本机管线', '任务': event.taskId, '运行': event.runId, '发生时间': time.title,
       ...(event.domain === 'system' && event.status === 'active' ? { '处理建议': suggestions[event.code] || '检查下列诊断和执行输出；修复后确认系统问题已恢复。' } : {}),
       ...(event.firstAt ? { '首次发生': logTime(event.firstAt).date + ' ' + logTime(event.firstAt).time, '最近发生': logTime(event.lastAt).date + ' ' + logTime(event.lastAt).time } : {}),

@@ -20,6 +20,7 @@ name: Collector builds
       - README.md
       - scripts/catalog.mjs
       - scripts/browser-data.mjs
+      - scripts/write-collection-json.mjs
       - templates/**
       - .github/workflows/collector-build.yml
   pull_request:
@@ -27,6 +28,7 @@ name: Collector builds
       - collector/**
       - assets/**
       - index.html
+      - scripts/write-collection-json.mjs
       - .github/workflows/collector-build.yml
 permissions:
   contents: read
