@@ -18,6 +18,7 @@
     if(device.id!==(await window.worker.snapshot()).deviceId)return null;
     return window.worker.skillConfig(agent);
   }});
+  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
   const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device),
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
@@ -28,7 +29,7 @@
   function toast(message) { const el = $('#workspace-toast'); el.textContent = message; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 3800); }
   function errorText(error) { return String(error?.message || error || '操作失败').replace(/^Error invoking remote method '[^']+': Error: /, ''); }
   function clearWorkspace(nextAuth) {
-    skillManager.close();
+    skillManager.close(); skillMarket.hide();
     workspaceEpoch++; entriesSeq++; detailSeq++; documentSeq++; readBusy = false;
     auth = nextAuth; state = null; entries = []; total = offset = 0;
     selectedTask = selectedEntry = currentEntry = currentFile = nextCursor = null; currentText = '';
@@ -61,10 +62,11 @@
   function go(view) {
     if (['devices','updates'].includes(view)) { showSettings(view); return; }
     if (view === 'worker') { view = 'nodes'; nodes.selectLocal(); }
-    if (!['overview','nodes','settings'].includes(view) && !auth.paired) { showSettings('devices'); $('#owner-pair input[name=key]').focus(); return; }
+    if (!['overview','nodes','settings','skill-market'].includes(view) && !auth.paired) { showSettings('devices'); $('#owner-pair input[name=key]').focus(); return; }
     activeView = view;
     document.querySelectorAll('.workspace-nav [data-view]').forEach(button => button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false'));
     document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== view + '-view'; page.classList.toggle('active', !page.hidden); });
+    if (view === 'skill-market') skillMarket.show(); else skillMarket.hide();
     if (view === 'library' && auth.paired && !entries.length) void loadEntries();
     const page = $('#'+view+'-view'); page.tabIndex = -1; page.focus({preventScroll:true});
   }

@@ -20,3 +20,11 @@ macOS Worker: click the menu-bar icon to toggle its status panel. Closing the ma
 - 安装后仍显示未验证。填写公开公众号样例及正文末段片段，选择实际执行 Agent 验证。只有版本、执行配置和验证证据一致且依赖就绪的节点才参与专用能力优先派发；没有匹配时继续通用采集。已执行任务保留原机器、Agent 和固定技能快照。
 
 [接口、实现与验收记录](docs/agent-skills.md)。[可移植公众号示例 Skill](examples/skills/lingnest-wechat-archive/SKILL.md)。
+
+## 技能市场
+
+桌面客户端及 Web 管理端的“技能市场”接入 [腾讯 SkillHub 官方 API](https://github.com/Tencent/skillhub/blob/main/docs/api/README.md)，支持关键词、动态分类、来源、排序、分页及技能详情。桌面检索不要求连接资料库；Web 接口 `GET /api/skillhub` 需要管理端授权。搜索不执行 Skill。
+
+桌面主进程直接读取 `https://api.skillhub.cn` 的公开元数据，Web 通过服务端代理读取。可选的 `SKILLHUB_API_KEY` 只在服务端配置。资料库密码、设备令牌、Cookie、清单与本地文件不发送给 SkillHub。请求限制为官方搜索、分类及详情接口，禁止凭据重定向，设置超时、响应大小上限及有界短期缓存。
+
+运行 `node --test test/skillhub.test.mjs`、`node scripts/test-skill-market.cjs` 和 `node scripts/test-skill-market.cjs --web` 验证接口及共享界面。

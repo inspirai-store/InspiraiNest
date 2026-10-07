@@ -12,8 +12,8 @@
   <script defer src="/device-identity.js"></script>
   <script defer src="/browser-session.js"></script><script defer src="/device-view.js"></script>
   <script defer src="/web-login.js"></script>
-  <script defer src="/vendor/lucide.js"></script><script defer src="/vendor/marked.js"></script><script defer src="/vendor/purify.js"></script><script defer src="/skill-manager.js"></script><script defer src="/app.js"></script>
-<link rel="stylesheet" href="/pairing-dialog.css"><link rel="stylesheet" href="/skill-manager.css"></head>
+  <script defer src="/vendor/lucide.js"></script><script defer src="/vendor/marked.js"></script><script defer src="/vendor/purify.js"></script><script defer src="/skill-manager.js"></script><script defer src="/skill-market.js"></script><script defer src="/app.js"></script>
+<link rel="stylesheet" href="/pairing-dialog.css"><link rel="stylesheet" href="/skill-manager.css"><link rel="stylesheet" href="/skill-market.css"></head>
 <body>
   <section id="login-view">
     <form id="login-form" class="login-form">
@@ -29,10 +29,11 @@
   <div id="app" hidden>
     <header class="workspace-header"><div class="header-start"><div class="brand"><img src="/brand-icon.png" alt=""><span>灵藏</span></div><button id="tasks-toggle" data-view="tasks" class="icon task-toggle" title="采集任务" aria-label="采集任务" aria-haspopup="dialog" aria-controls="tasks-dialog" aria-expanded="false"><i data-lucide="inbox"></i><span id="task-count" class="task-count" aria-hidden="true">0</span></button></div><span id="connection" role="status">连接中</span><a class="client-header-link" href="/download" title="下载客户端" aria-label="下载客户端"><i data-lucide="download"></i><span>下载客户端</span></a><button id="refresh" class="icon" title="刷新" aria-label="刷新"><i data-lucide="refresh-cw"></i></button><button id="logout" class="icon" title="退出登录" aria-label="退出登录"><i data-lucide="log-out"></i></button></header>
     <div class="layout">
-      <nav aria-label="工作区"><button data-view="archives" aria-current="page"><i data-lucide="files"></i>资料库<span id="archive-count"></span></button><button data-view="devices"><i data-lucide="monitor-smartphone"></i>授权设备<span id="device-count"></span></button><a class="security-nav-link" href="/security"><i data-lucide="shield-check"></i>账户安全</a></nav>
+      <nav aria-label="工作区"><button data-view="archives" aria-current="page"><i data-lucide="files"></i>资料库<span id="archive-count"></span></button><button data-view="devices"><i data-lucide="monitor-smartphone"></i>授权设备<span id="device-count"></span></button><button data-view="skill-market"><i data-lucide="store"></i>技能市场</button><a class="security-nav-link" href="/security"><i data-lucide="shield-check"></i>账户安全</a></nav>
       <main>
         <section id="archives-view"><div class="heading"><h1>资料库</h1><label class="search"><i data-lucide="search"></i><input id="search" type="search" aria-label="搜索资料" placeholder="搜索标题、摘要、标签"></label></div><div id="archives" class="rows"></div></section>
         <section id="devices-view" hidden><div class="heading"><h1>授权设备</h1><button id="pair-device" class="primary"><i data-lucide="link"></i>配对设备</button></div><div id="devices" class="rows"></div></section>
+        <section id="skill-market-view" hidden></section>
       </main>
     </div>
     <footer class="workspace-footer"><button id="worker-nodes-toggle" title="查看工作节点" aria-label="查看工作节点" aria-haspopup="dialog" aria-controls="worker-nodes-dialog" aria-expanded="false"><i data-lucide="network"></i><span>工作节点</span><strong id="worker-node-count">0/0</strong><i class="node-chevron" data-lucide="chevron-up"></i></button></footer>

@@ -16,6 +16,7 @@ import { accountSecurity } from './account-security.mjs';
 import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
 import { createSkillService, taskCapabilities } from './skill-service.mjs';
 import QRCode from 'qrcode';
+import { createSkillHubClient } from './skillhub.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,7 +32,7 @@ function installationKey(input, role) {
   return value ? hash(`${role}:${value.toLowerCase()}`) : null;
 }
 
-export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now }) {
+export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now, skillHub = createSkillHubClient({ apiKey:process.env.SKILLHUB_API_KEY }) }) {
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
@@ -316,6 +317,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/client-prompt.js': ['../assets/client-prompt.js', 'text/javascript; charset=utf-8'],
           '/client-prompt.css': ['../assets/client-prompt.css', 'text/css; charset=utf-8'],
           '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
+          '/skill-market.js': ['public/skill-market.js', 'text/javascript; charset=utf-8'],
+          '/skill-market.css': ['public/skill-market.css', 'text/css; charset=utf-8'],
           '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
           '/skill-manager.css': ['public/skill-manager.css', 'text/css; charset=utf-8'],
           '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
@@ -397,6 +400,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         sessions.clear(res); return send(res, 200, { loggedOut: true });
       }
       const device = await authenticate(req);
+      if (route === '/api/skillhub') {
+        owner(device);
+        requireValue(req.method === 'GET', 'Method not allowed', 405);
+        return send(res, 200, await skillHub.request(Object.fromEntries(url.searchParams)));
+      }
       if (await skills.handle(req, res, route, device)) return;
       if (route.startsWith('/api/browser-trust')) {
         owner(device);
@@ -625,7 +633,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       fail('Not found', 404);
     } catch (error) {
-      if (!res.headersSent) send(res, error.status || 500, { ...(req.url.startsWith('/api/read/v1/') ? { schema_version: 1 } : {}), ...(['mfa_required', 'mfa_invalid', 'credential_invalid', 'inventory_changed'].includes(error.code) ? { code: error.code } : {}), error: error.status ? error.message : 'Internal service error' });
+      if (!res.headersSent) send(res, error.status || 500, { ...(req.url.startsWith('/api/read/v1/') ? { schema_version: 1 } : {}), ...(['mfa_required', 'mfa_invalid', 'credential_invalid', 'inventory_changed', 'skillhub_unavailable', 'skillhub_timeout', 'skillhub_rate_limited', 'skillhub_not_found', 'skillhub_input_invalid'].includes(error.code) ? { code: error.code } : {}), error: error.status ? error.message : 'Internal service error' });
       else res.end();
       if (!error.status) console.error(error.name, error.code || 'request_failed');
     }

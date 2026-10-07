@@ -24,7 +24,7 @@
     $('#tasks-toggle').setAttribute('aria-expanded', 'false'); updateTitle();
   }
   function updateTitle() {
-    document.title = `${taskDialog.open ? '采集任务' : currentView === 'devices' ? '授权设备' : '资料库'} · 灵藏`;
+    document.title = `${taskDialog.open ? '采集任务' : currentView === 'devices' ? '授权设备' : currentView === 'skill-market' ? '技能市场' : '资料库'} · 灵藏`;
   }
   function ensureLibraryFrame() {
     if ($('#library-frame')) return;
@@ -39,11 +39,12 @@
       }
       return;
     }
-    if (!['archives', 'devices'].includes(view)) return;
+    if (!['archives', 'devices', 'skill-market'].includes(view)) return;
     closeTasks(); currentView = view;
-    for (const item of ['archives', 'devices']) $(`#${item}-view`).hidden = item !== view;
+    for (const item of ['archives', 'devices', 'skill-market']) $(`#${item}-view`).hidden = item !== view;
     document.querySelectorAll('nav [data-view]').forEach(button => button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false'));
     if (view === 'archives' && token) ensureLibraryFrame();
+    if (view === 'skill-market') skillMarket.show(); else skillMarket.hide();
     updateTitle();
   }
   taskDialog.addEventListener('close', () => {
@@ -72,6 +73,7 @@
     return value;
   }
   async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
+  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>api('/skillhub?' + new URLSearchParams(input)) });
   const skillManager = window.createSkillManager({identity:()=>String(token || ''),request:input=>{
     if(input.kind==='environment'){const query=new URLSearchParams({offset:String(input.offset || 0)});if(input.snapshotId)query.set('snapshotId',input.snapshotId);return api('/skills/devices/'+encodeURIComponent(input.deviceId)+'/environment?'+query);}
     if(input.kind==='versions')return api('/skills/versions');

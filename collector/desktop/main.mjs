@@ -12,6 +12,7 @@ import { DesktopSettings } from './settings.mjs';
 import { DesktopLoginItem } from './login-item.mjs';
 import { WorkerSession } from './worker-session.mjs';
 import { clientOrigin } from '../src/client-login.mjs';
+import { createSkillHubClient } from '../src/skillhub.mjs';
 import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from './macos-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,7 @@ if (app.isPackaged) {
   }
 }
 const manager = new WorkerManager();
+const skillHub = createSkillHubClient();
 const scope = createHash('sha256').update(path.resolve(manager.configuration().loginDataRoot || manager.dataDir).toLowerCase()).digest('hex').slice(0, 16);
 app.setPath('userData', path.join(app.getPath('appData'), 'LibraryWorker', scope));
 // Keep the existing safeStorage Keychain namespace across display-name updates.
@@ -43,7 +45,7 @@ let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, q
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
 if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates, owner,
-  loginItem,
+  loginItem, skillHub,
   checkNativeLoginItem: () => {
     const item = new DesktopLoginItem({ app, name: 'InspiraiNest-Test-' + process.pid });
     try { item.configure(true); const on = item.snapshot(); item.configure(false, { explicit: true }); return { on, off: item.snapshot() }; }
@@ -197,7 +199,7 @@ function registerIPC() {
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
-    skills: input => owner.skills(input),
+    skills: input => owner.skills(input), market: input => skillHub.request(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id),

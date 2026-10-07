@@ -1,0 +1,42 @@
+.skill-market,.market-dialog{--market-fg:var(--fg,var(--text,#222b30));--market-panel:var(--panel,#fff);--market-line:var(--line,var(--border,#dce3e7));--market-muted:var(--muted,#667582);color:var(--market-fg)}
+.skill-market{padding:28px 30px 32px;box-sizing:border-box}
+.market-heading{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.market-heading h1{margin:0;font-size:26px;line-height:1.3;letter-spacing:-.5px}
+.market-provider{color:var(--market-muted);font-size:14px}
+.market-search{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:0 0 18px}
+.market-search label{display:grid;gap:7px;font-size:13px;color:var(--market-muted);min-width:125px}
+.market-search .market-keyword{flex:1;min-width:220px}
+.market-search input,.market-search select{font:inherit;box-sizing:border-box;height:40px;width:100%;padding:0 12px;background:var(--raised,var(--input,var(--market-panel)));color:var(--market-fg);border:1px solid var(--market-line);border-radius:8px}
+.skill-market button,.market-dialog button{font:inherit;font-size:13px;min-height:34px;padding:7px 13px;border-radius:7px;background:var(--raised,var(--input,var(--market-panel)));border:1px solid var(--market-line);color:var(--market-fg);cursor:pointer;white-space:nowrap;transform:none}
+.market-search button{height:40px;padding-inline:22px}
+.skill-market button.primary{background:var(--market-fg);color:var(--market-panel);border-color:var(--market-fg)}
+.skill-market button:disabled{opacity:.45;cursor:default}
+.skill-market button:hover:not(:disabled),.market-dialog button:hover{border-color:var(--workspace-accent,#248a71)}
+.skill-market :focus-visible,.market-dialog :focus-visible{outline:2px solid var(--workspace-accent,#248a71);outline-offset:3px}
+.market-summary{font-size:13px;color:var(--market-muted);margin-bottom:16px;min-height:20px}
+.market-error,.market-category-error{color:var(--danger,#cf4949);padding:12px 0;font-size:14px}
+.market-category-error{display:flex;align-items:center;gap:12px}
+.market-category-error[hidden],.market-error[hidden],.market-paging[hidden]{display:none}
+.market-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.market-card{min-width:0;display:flex;flex-direction:column;background:var(--market-panel);border:1px solid var(--market-line);border-radius:12px;padding:20px;gap:15px}
+.market-card-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.market-card-heading h2{font-size:16px;font-weight:650;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.market-card-heading>span{color:var(--market-muted);font-size:12px;max-width:80px;overflow-wrap:anywhere;flex-shrink:0}
+.market-description{margin:0;line-height:1.7;font-size:13px;overflow-wrap:anywhere;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.market-card-meta{display:flex;flex-wrap:wrap;gap:12px;color:var(--market-muted);font-size:12px;margin-top:auto;overflow-wrap:anywhere}
+.market-card-footer{display:flex;gap:12px;align-items:center;border-top:1px solid var(--market-line);padding-top:14px;font-size:12px;color:var(--market-muted)}
+.market-card-footer button{margin-left:auto}
+.market-empty{padding:48px 0;font-size:15px;color:var(--market-muted)}
+.market-paging{display:flex;justify-content:center;align-items:center;gap:18px;margin-top:24px;font-size:13px}
+.market-dialog{box-sizing:border-box;width:min(660px,calc(100vw - 40px));max-height:calc(100vh - 60px);margin:auto;padding:28px;border:1px solid var(--market-line);border-radius:16px;background:var(--market-panel);overflow:auto}
+.market-dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(5px)}
+.market-dialog-heading{display:flex;align-items:start;justify-content:space-between;gap:24px;margin-bottom:24px}
+.market-dialog-heading h2{font-size:22px;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.market-dialog-heading button{font-size:25px;line-height:1;min-width:36px;height:36px;padding:0;flex-shrink:0}
+.market-full-description{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;font-size:14px;margin:0 0 24px}
+.market-detail dl{display:grid;grid-template-columns:100px 1fr;gap:14px;margin:0 0 24px;font-size:14px}
+.market-detail dt{color:var(--market-muted)}
+.market-detail dd{margin:0;overflow-wrap:anywhere}
+.market-detail h3{font-size:16px}
+@media(max-width:900px){.skill-market{padding:22px 20px}.market-search .market-keyword{flex-basis:100%}.market-search label{flex:1}.market-search button{flex:0}.market-results{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}}
+@media(max-width:500px){.skill-market{padding:20px 14px}.market-search{gap:10px}.market-search label{min-width:calc(50% - 5px)}.market-search button{flex:1}.market-card{padding:16px}.market-dialog{padding:22px;width:calc(100vw - 24px)}.market-results{grid-template-columns:minmax(0,1fr)}}

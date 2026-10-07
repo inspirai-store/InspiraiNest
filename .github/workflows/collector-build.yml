@@ -52,6 +52,9 @@ jobs:
       - name: Test isolated MySQL authorization and skills
         run: node scripts/test-auth-mysql.cjs
         working-directory: collector
+      - name: Test SkillHub Web search
+        run: node scripts/test-skill-market.cjs --web
+        working-directory: collector
       - name: Test Web skill management
         run: node scripts/test-skills-web.cjs
         working-directory: collector
@@ -75,6 +78,9 @@ jobs:
         working-directory: collector
       - name: Test shared Linux desktop login
         run: xvfb-run -a node scripts/test-desktop-login.cjs
+        working-directory: collector
+      - name: Test SkillHub Linux desktop search
+        run: xvfb-run -a node scripts/test-skill-market.cjs
         working-directory: collector
       - name: Test shared Linux skill management
         run: xvfb-run -a node scripts/test-desktop-skills.cjs
@@ -158,6 +164,9 @@ jobs:
         run: |
           node collector/scripts/test-desktop-login.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
           node collector/scripts/test-desktop-login-switch.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test SkillHub packaged Windows search
+        shell: pwsh
+        run: node collector/scripts/test-skill-market.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows skill management
         shell: pwsh
         run: node collector/scripts/test-desktop-skills.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -267,6 +276,7 @@ jobs:
           fi
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-skill-market.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login-switch.cjs "$app/Contents/MacOS/灵藏"
