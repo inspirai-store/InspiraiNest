@@ -1,18 +1,19 @@
 import spawn from 'cross-spawn';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveAgentProfile, commandEnvironment, agentVersion } from './agent-paths.mjs';
 
 export const defaults = {
   codex: { command: 'codex', args: ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"', '-'] },
   codebuddy: { enabled: false, command: 'codebuddy', args: ['-p', '--output-format', 'stream-json', '--verbose'] },
 };
 
-export function agentProfile(name, profiles = {}) {
+export function agentProfile(name, profiles = {}, options) {
   const profile = { ...(defaults[name] || { command: name }), ...profiles[name] };
   // Upgrade only the old built-in profile. Explicitly customized network policies stay authoritative.
   const previous = ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'approval_policy="never"', '-'];
   if (name === 'codex' && JSON.stringify(profile.args) === JSON.stringify(previous)) profile.args = [...defaults.codex.args];
-  return profile;
+  return resolveAgentProfile(name, profile, options);
 }
 
 export function terminate(child) {
@@ -40,6 +41,7 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
     let timedOut = false;
     let aborted = signal?.aborted || false;
     let spawnError;
+    let forceTimer;
     let toolActivity = false;
     let permissionBlocked = false;
     let pendingLine = '';
@@ -69,16 +71,18 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
     child.stderr.on('data', collect);
     child.stdin.on('error', () => {});
     child.on('error', error => { spawnError = error.code || error.message; });
-    const abort = () => { aborted = true; terminate(child); };
+    const stop = () => { terminate(child); forceTimer ||= setTimeout(()=>{if(child.exitCode===null && process.platform!=='win32'){try{process.kill(-child.pid,'SIGKILL');}catch{child.kill('SIGKILL');}}},5000); };
+    const abort = () => { aborted = true; stop(); };
     signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => { timedOut = true; terminate(child); }, timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
     child.on('close', code => {
       clearTimeout(timer);
+      clearTimeout(forceTimer);
       signal?.removeEventListener('abort', abort);
       log?.end();
       resolve({ code, tail, spawnError, timedOut, aborted, toolActivity, permissionBlocked });
     });
-    if (aborted) terminate(child);
+    if (aborted) stop();
     else child.stdin.end(input);
   });
 }
@@ -119,8 +123,8 @@ export async function detectAgents(profiles = {}) {
   for (const name of Object.keys(defaults)) {
     const profile = agentProfile(name, profiles);
     if (profile.enabled === false) continue;
-    const result = await execute(profile.command, profile.versionArgs || ['--version'], { timeoutMs: 15000 });
-    results[name] = { available: result.code === 0, version: result.code === 0 ? result.tail.trim().slice(0, 200) : null, error: result.spawnError || (result.timedOut ? 'timeout' : result.code === 0 ? null : `exit ${result.code}`) };
+    const result = await execute(profile.command, profile.versionArgs || ['--version'], { timeoutMs: 15000, env: commandEnvironment(profile, agentEnvironment()) });
+    results[name] = { available: result.code === 0, version: result.code === 0 ? agentVersion(result.tail) || result.tail.trim().slice(0,200) : null, error: result.spawnError || (result.timedOut ? 'timeout' : result.code === 0 ? null : `exit ${result.code}`) };
   }
   return results;
 }
@@ -134,5 +138,5 @@ export function agentOrder(config, task, available) {
 
 export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs }) {
   const profile = agentProfile(name, profiles);
-  return execute(profile.command, profile.args, { cwd, input: prompt, signal, timeoutMs, logFile: path.join(cwd, '..', `${name}.log`) });
+  return execute(profile.command, profile.args, { cwd, input: prompt, signal, timeoutMs, env: commandEnvironment(profile, agentEnvironment()), logFile: path.join(cwd, '..', `${name}.log`) });
 }

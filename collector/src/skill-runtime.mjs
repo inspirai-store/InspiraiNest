@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { hash, atomicJson, readJson, now, requireValue, safePath, contained, canonicalJson } from './common.mjs';
 import { dependencyStatus } from './skill-inventory.mjs';
+import { acquireEnvironmentLock } from './agent-lock.mjs';
+import { agentHome } from './agent-paths.mjs';
 import { createInventoryScanner } from './skill-scan.mjs';
 import { packageSkill, validateSkillPackage, writeSkillPackage, cleanSkillPolicy } from './skill-package.mjs';
 
@@ -204,6 +206,8 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
     const response=await api('/api/skills/operations');
     for(const op of response.operations || []){
       if(closed)return;
+      const unlock=acquireEnvironmentLock(agentHome(home));if(!unlock)return;
+      try{
       let receipt=receipts[op.id];
       if(!receipt){
         await api('/api/skills/operations/'+op.id+'/result','POST',{state:'running'});
@@ -214,6 +218,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
       await api('/api/skills/operations/'+op.id+'/result','POST',receipt);
       if(receipt.result?.bundle){receipts[op.id]={state:receipt.state,result:{published:true}};atomicJson(receiptsFile,receipts);}
       dirty=true;if(!closed)await report();
+      }finally{unlock();}
     }
   }
   return {refresh,report,tick,operation,get inventory(){return state.inventory;},close(){closed=true;scan.close?.();for(const watcher of watchers.values())watcher.close();}};

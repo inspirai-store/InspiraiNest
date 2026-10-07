@@ -6,7 +6,7 @@
   const date=x=>x?new Date(x).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'未上报';
   const short=x=>x?x.slice(0,12):'未记录';
   const split=x=>String(x||'').split(/[,，\s]+/).filter(Boolean);
-  window.createSkillManager=({request,identity=()=>'',openConfig})=>{
+  window.createSkillManager=({request,identity=()=>'',openConfig,onAgents})=>{
     const dialog=document.createElement('dialog');dialog.className='skill-manager';dialog.setAttribute('aria-label','节点技能');document.body.append(dialog);
     let epoch=0,loadRevision=0,current=null,items=[],versions=[],history=[],selected=null,preview=null,comparison=null,busy=false;
     const $=selector=>dialog.querySelector(selector);
@@ -26,7 +26,8 @@
       items=all;versions=v.versions;history=h.operations;preview=null;comparison=null;
       $('[data-skill-updated]').textContent=date(environment.scannedAt);
       $('[data-projects]').value=(environment.projects || []).join('\n');
-      $('[data-agent-summary]').innerHTML=(environment.agents || []).map(a=>`<span>${esc(names[a.name])} · ${esc(a.version || ({not_found:'未找到程序',timeout:'检测超时',failed:'检测失败'}[a.probeState] || '不可用'))} · 内置 ${a.builtinState==='reported'?'已上报':'未确认'}${a.loadErrors?' · 加载错误 '+a.loadErrors:''}</span>`).join('');
+      $('[data-agent-summary]').innerHTML='<table><tbody>'+(environment.agents || []).map(a=>`<tr><td>${esc(names[a.name])}</td><td>${esc(a.version || '—')}</td><td>${esc(a.installed?'已安装':({not_found:'未安装',timeout:'检测超时',failed:'检测失败'}[a.probeState] || '未确认'))}</td>${onAgents?'<td><button type="button" data-agent-manage>管理</button></td>':''}</tr>`).join('')+'</tbody></table>';
+      $('[data-agent-summary]').querySelectorAll('[data-agent-manage]').forEach(button=>button.onclick=()=>onAgents(current));
       $('[data-version]').innerHTML='<option value="">选择私有版本</option>'+versions.map(v=>`<option value="${v.id}">${esc(v.name)} · ${esc(v.declaredVersion || short(v.hash))}</option>`).join('');
       const rolled=new Set(history.filter(o=>o.action==='rollback' && o.state==='succeeded').map(o=>o.syncId));
       $('[data-rollback-version]').innerHTML='<option value="">选择同步记录</option>'+history.filter(o=>o.action==='sync' && o.state==='succeeded' && !rolled.has(o.id)).map(o=>`<option value="${o.id}">${esc(o.name)} · ${date(o.updatedAt)}</option>`).join('');

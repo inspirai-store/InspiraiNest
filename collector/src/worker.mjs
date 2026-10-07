@@ -14,6 +14,7 @@ import { computerMetadata } from './device-identity.mjs';
 import { createSkillRuntime, taskSkillSnapshots } from './skill-runtime.mjs';
 import { fixedSkillProfiles } from './skill-inventory.mjs';
 import { verifySkillExtraction } from './skill-verification.mjs';
+import { createAgentRuntime } from './agent-runtime.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || path.join(project, '..'));
@@ -192,6 +193,15 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let deviceMetadata;
   let skillOperations = [];
   let skillRuntime;
+  const agentRuntime = createAgentRuntime({...config,dataDir},{api:(...args)=>api(config,...args),signal});
+  let agentOperations = [], agentTick;
+  const updateAgents = (idle=false) => {
+    if(agentTick)return agentTick;
+    agentTick=agentRuntime.tick({idle,operationIds:agentOperations}).then(()=>{if(idle)lastProbe=0;}).catch(error=>{
+      if([401,403].includes(error.status)){forbidden=true;current?.controller.abort();agentRuntime.close();}
+      fault('agents',error,'Agent 环境更新失败');
+    }).finally(()=>{agentTick=null;});return agentTick;
+  };
   try {
   const skillCwd = prepareWorkspace({id:'_environment'},dataDir);
   skillRuntime = createSkillRuntime({...config,dataDir},{api:(...args)=>api(config,...args),cwd:skillCwd,
@@ -217,8 +227,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
       skillOperations = Array.isArray(result.skillOperations) ? result.skillOperations : [];
+      agentOperations = Array.isArray(result.agentOperations) ? result.agentOperations : [];
       if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (!result.tasks.every(task => task && typeof task.id === 'string')) throw Object.assign(new Error('心跳任务列表结构异常'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (current && result.tasks.some(task => task.id === current.id && task.state === 'cancelled')) current.controller.abort();
@@ -228,9 +239,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
       control.update({ connection: 'online', lastHeartbeat: new Date().toISOString(), tasks: result.tasks, error: null,
         ...(terminal && !current ? { lastTask: { ...lastTask, state: remoteTask.state } } : {}) });
       journal.recover('heartbeat', '服务连接已恢复，心跳正常');
-      if (current) void updateSkills(false);
+      if (current) { void updateSkills(false); void updateAgents(false); }
     } catch (error) {
-      if ([401, 403].includes(error.status) || error.status === 409 || error.code === 'IDENTITY_CHANGED') { forbidden = true; current?.controller.abort(); }
+      if ([401, 403].includes(error.status) || error.status === 409 || error.code === 'IDENTITY_CHANGED') { forbidden = true; current?.controller.abort(); agentRuntime.close(); }
       control.update({ connection: 'offline', error: error.status === 409 || error.code === 'IDENTITY_CHANGED' ? '设备身份冲突或硬件变化，请确认授权并重新配对；原任务已保留' : [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : `无法连接服务（${error.status || error.name}），本机成果已保留` });
       fault('heartbeat', error, [401, 403].includes(error.status) ? '设备授权已失效，请重新配对' : '心跳失败，正在重连；本机成果已保留');
     } finally {
@@ -247,6 +258,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (Date.now() - lastProbe > 60000) { available = await detectAgents(config.agents); lastProbe = Date.now(); control.update({ agents: available }); }
         await heartbeat();
+        if(agentOperations.length){if(skillTick)await skillTick;await updateAgents(true);if(!forbidden)available=await detectAgents(config.agents);}
+        else void updateAgents(false);
+        if(agentRuntime.operationLock){await sleep(250);continue;}
         if(skillOperations.length)await updateSkills(true);
         else void updateSkills(false);
         if (forbidden || signal?.aborted) break;
@@ -317,6 +331,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
   } finally {
     clearInterval(timer);
     skillRuntime.close();
+    agentRuntime.close();
+    if(agentTick)await agentTick;
     if (skillTick) await skillTick;
     signal?.removeEventListener('abort', abort);
     control.close();

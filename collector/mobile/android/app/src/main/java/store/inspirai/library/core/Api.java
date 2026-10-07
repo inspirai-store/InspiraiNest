@@ -67,6 +67,14 @@ public final class Api {
     JSONObject callBound(String expectedServer, String path, String method, JSONObject body) throws Exception {
         return authenticated(expectedServer, path, method, body).body;
     }
+    public JSONObject agentCall(Credentials.Snapshot expected,String path,String method,JSONObject body) throws Exception {
+        if(expected==null || !expected.samePairing(credentials.snapshot()))throw new Failure(409,"配对状态已改变，请重新打开 Agent。");
+        if(!path.matches("/api/agents/(catalog|devices/[a-fA-F0-9-]{36}/environment|operations(?:\\?deviceId=[a-fA-F0-9-]{36}|/[a-f0-9]{64}/cancel)?)"))throw new Failure(400,"Agent 请求无效。");
+        JSONObject value;
+        try{value=request(expected.server,expected.token,path,method,body).body;}
+        catch(Exception failure){if(!stillPaired(expected))throw new Failure(409,"配对状态已改变，请重新打开 Agent。");throw failure;}
+        if(!stillPaired(expected))throw new Failure(409,"配对状态已改变，请重新打开 Agent。");return value;
+    }
     public JSONObject skillEnvironment(String expectedServer,String deviceId,int offset,String snapshotId) throws Exception {
         if(deviceId==null || !deviceId.matches("[a-fA-F0-9-]{36}") || offset<0 || snapshotId!=null&&!snapshotId.matches("[a-f0-9]{64}"))throw new Failure(400,"清单请求无效。");
         return callBound(expectedServer,"/api/skills/devices/"+deviceId+"/environment?offset="+offset+(snapshotId==null?"":"&snapshotId="+snapshotId),"GET",null);

@@ -74,7 +74,15 @@
   }
   async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>api('/skillhub?' + new URLSearchParams(input)) });
-  const skillManager = window.createSkillManager({identity:()=>String(token || ''),request:input=>{
+  const agentManager=window.createAgentManager({identity:()=>String(token || ''),request:input=>{
+    if(input.kind==='catalog')return api('/agents/catalog');
+    if(input.kind==='environment')return api('/agents/devices/'+encodeURIComponent(input.deviceId)+'/environment');
+    if(input.kind==='history')return api('/agents/operations?deviceId='+encodeURIComponent(input.deviceId));
+    if(input.kind==='cancel')return api('/agents/operations/'+encodeURIComponent(input.operationId)+'/cancel','POST',{});
+    if(input.kind==='create')return api('/agents/operations','POST',input.operation);
+    throw new Error('Agent 请求无效');
+  }});
+  const skillManager = window.createSkillManager({onAgents:device=>agentManager.open(device),identity:()=>String(token || ''),request:input=>{
     if(input.kind==='environment'){const query=new URLSearchParams({offset:String(input.offset || 0)});if(input.snapshotId)query.set('snapshotId',input.snapshotId);return api('/skills/devices/'+encodeURIComponent(input.deviceId)+'/environment?'+query);}
     if(input.kind==='versions')return api('/skills/versions');
     if(input.kind==='history')return api('/skills/operations?deviceId='+encodeURIComponent(input.deviceId));
@@ -122,13 +130,15 @@
       let card = cards.get(device.id);
       if (!card) {
         card = document.createElement('article'); card.className = 'node-card'; card.dataset.nodeId = device.id;
-        card.innerHTML = '<div data-node-body></div><div class="node-card-actions"><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
+        card.innerHTML = '<div data-node-body></div><div class="node-card-actions"><button type="button" data-node-agents>Agent</button><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
+        card.querySelector('[data-node-agents]').onclick=()=>{const current=snapshot?.devices.find(d=>d.id===device.id);if(connected && current)agentManager.open(current);};
         card.querySelector('[data-node-skills]').onclick = () => { const current = snapshot?.devices.find(d => d.id === device.id); if (connected && current) skillManager.open(current); };
         card.querySelector('[data-node-remove]').onclick = () => removeWorkerNode(device.id);
       }
       card.dataset.status = state;
       card.querySelector('[data-node-body]').innerHTML = `<div class="node-card-heading"><span class="node-device-icon">${icon(info.os?.family === 'macOS' ? 'laptop' : 'monitor')}</span><strong>${esc(device.displayName || device.name)}</strong></div><p class="node-state"><span class="node-dot" aria-hidden="true"></span>${connected ? window.deviceView.status(device) : '状态待更新'}${taskCount ? ` · ${taskCount} 项处理中` : ''}</p>${device.name && device.name !== device.displayName ? `<p class="node-remark">备注：${esc(device.name)}</p>` : ''}<dl>${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
       card.querySelector('[data-node-skills]').disabled = !connected;
+      card.querySelector('[data-node-agents]').disabled = !connected;
       const remove = card.querySelector('[data-node-remove]');
       remove.hidden = !connected || device.online !== false || device.id === snapshot?.me.id;
       remove.disabled = removingNodes.has(device.id);

@@ -199,7 +199,7 @@ function registerIPC() {
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
-    skills: input => owner.skills(input), market: input => skillHub.request(input),
+    skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => skillHub.request(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id),

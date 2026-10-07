@@ -29,3 +29,6 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# Disposable simulator build output.
+collector/mobile/ios/DerivedData*/

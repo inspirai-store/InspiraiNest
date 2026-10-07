@@ -4,6 +4,7 @@ import os from 'node:os';
 import spawn from 'cross-spawn';
 import { hash, readJson, now, contained, canonicalJson } from './common.mjs';
 import { agentProfile, execute, terminate, agentEnvironment } from './agents.mjs';
+import { commandEnvironment, agentVersion } from './agent-paths.mjs';
 import { SKILL_AGENTS, skillMetadata, packageSkill, validateSkillPackage, cleanRequirements } from './skill-package.mjs';
 
 const json = file => { try { return readJson(file); } catch { return {}; } };
@@ -73,6 +74,7 @@ export async function fixedSkillProfiles(profiles, snapshots, cwd, {native=codex
   const fixed=snapshots.filter(s=>s.agent==='codex');
   if(!fixed.length)return profiles;
   const profile=agentProfile('codex',profiles),args=configOverrides(profile);
+  env=commandEnvironment(profile,env);
   const [settings,listing]=await Promise.all([native(profile.command,[cwd],{args,env,query:'config/read'}),native(profile.command,[cwd],{args,env})]);
   if(!settings || !listing)throw new Error('当前 Codex 无法确认任务技能快照，请升级后继续');
   const entries=(listing.data || []).flatMap(group=>group.skills || []);
@@ -151,17 +153,18 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
   const globalRoots = globalSkillRoots(home), local = new Map(), items = [], agents = [];
   const contexts = [...new Set([cwd, ...(config.skillProjects || []).filter(p => typeof p === 'string' && path.isAbsolute(p) && fs.existsSync(p))])];
   for (const agent of SKILL_AGENTS) {
-    const profile = agentProfile(agent, config.agents);
-    const probe = await versionProbe(profile.command, profile.versionArgs || ['--version'], { env, timeoutMs: 5000 });
+    const profile = agentProfile(agent, config.agents, { home });
+    const agentEnv = commandEnvironment(profile, env);
+    const probe = await versionProbe(profile.command, profile.versionArgs || ['--version'], { env: agentEnv, timeoutMs: 5000 });
     const available = probe.code === 0;
-    const version=available ? String(probe.tail || '').trim().slice(0,150) : null;
+    const version=available ? agentVersion(probe.tail) || String(probe.tail || '').trim().slice(0,150) : null;
     agents.push({ name: agent, installed: available, version, probeState: available ? 'available' : probe.timedOut ? 'timeout' : probe.spawnError === 'ENOENT' ? 'not_found' : 'failed', executionEnabled: agent !== 'claude' && profile.enabled !== false, profileHash:hash(canonicalJson({profile,version,platform:process.platform,home,cwd})) });
     const settings = settingsFor(home, agent, cwd, profile);
     const roots = [{ root: globalRoots[agent], scope: 'user', context: null }, ...contexts.flatMap(dir => projectRoots(dir, agent)).filter(origin=>path.resolve(origin.root)!==path.resolve(globalRoots[agent])), ...plugins(home, agent, settings)];
     if (agent === 'codex') roots.push({ root: path.join(env.CODEX_HOME || path.join(home, '.codex'), 'skills'), scope: 'legacy-user', context: null }, { root: '/etc/codex/skills', scope: 'admin', context: null });
     if (agent === 'claude') roots.push({root:path.join(process.platform==='darwin'?'/Library/Application Support/ClaudeCode':process.platform==='win32'?path.join(env.ProgramFiles || 'C:\\Program Files','ClaudeCode'):'/etc/claude-code','.claude','skills'),scope:'admin',context:null});
-    const native = agent === 'codex' && available ? await nativeCodex(profile.command, contexts, { args: configOverrides(profile), env }) : null;
-    const nativeConfig = agent === 'codex' && native ? await nativeCodex(profile.command, [cwd], {args:configOverrides(profile),env,query:'config/read'}) : null;
+    const native = agent === 'codex' && available ? await nativeCodex(profile.command, contexts, { args: configOverrides(profile), env:agentEnv }) : null;
+    const nativeConfig = agent === 'codex' && native ? await nativeCodex(profile.command, [cwd], {args:configOverrides(profile),env:agentEnv,query:'config/read'}) : null;
     agents.at(-1).profileHash=hash(canonicalJson({profile,version,platform:process.platform,home,cwd,nativeConfigHash:nativeConfig?.configHash || null}));
     agents.at(-1).discovery = agent === 'codex' && native ? 'native' : 'filesystem';
     agents.at(-1).builtinState = agent === 'codex' && native ? 'reported' : 'unknown';

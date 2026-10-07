@@ -149,6 +149,7 @@ struct Device: Codable, Identifiable, Sendable {
     var loggedOutAt: String? = nil
     var capabilities: [String]? = nil
     var environment: SkillEnvironmentSummary? = nil
+    var agentRuntime: AgentRuntimeSummary? = nil
     var authorizationCategory: String {
         if let category { return category }
         if role == "reader" { return "integration" }
@@ -176,6 +177,22 @@ struct Device: Codable, Identifiable, Sendable {
 }
 
 struct SkillAgent: Codable, Sendable { let name: String; let installed: Bool; let version: String? }
+struct AgentRuntimeSummary: Codable, Sendable { let schemaVersion: Int; let busy: Bool }
+struct AgentRelease: Codable, Sendable { let version: String }
+struct AgentCatalogEntry: Codable, Identifiable, Sendable { let id: String; let name: String; let release: AgentRelease?; let error: String? }
+struct AgentCatalogResponse: Codable, Sendable { let agents: [AgentCatalogEntry] }
+struct NodeAgent: Codable, Identifiable, Sendable {
+    let id: String; let installed: Bool; let version: String?; let probeState: String; let fingerprint: String; let originalSupported: Bool; let custom: Bool
+    var name: String { ["codex":"Codex", "codebuddy":"CodeBuddy", "claude":"Claude Code", "gemini":"Gemini CLI", "opencode":"OpenCode"][id] ?? id }
+}
+struct NodeAgentEnvironment: Codable, Sendable { let agents: [NodeAgent]; let scannedAt: String? }
+struct AgentOperationResult: Codable, Sendable { let version: String?; let error: String? }
+struct AgentOperation: Codable, Identifiable, Sendable {
+    let id: String; let agent: String?; let state: String; let result: AgentOperationResult?; let action: String?
+    var pending: Bool { ["queued", "running", "cancel_requested"].contains(state) }
+    var label: String { ["queued":"等待节点", "running":"执行中", "cancel_requested":"取消中", "cancelled":"已取消", "expired":"已过期", "succeeded":"已完成", "failed":"失败"][state] ?? state }
+}
+struct AgentOperationResponse: Codable, Sendable { let operations: [AgentOperation] }
 struct SkillEnvironmentSummary: Codable, Sendable { let schemaVersion: Int; let scannedAt: String; let count: Int; let agents: [SkillAgent]; let verifiedCount: Int }
 struct SkillDependencies: Codable, Sendable { let state: String; let missing: [String]; let unknown: [String] }
 struct SkillVerification: Codable, Sendable { let state: String; let at: String? }

@@ -17,6 +17,7 @@ import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
 import { createSkillService, taskCapabilities } from './skill-service.mjs';
 import QRCode from 'qrcode';
 import { createSkillHubClient } from './skillhub.mjs';
+import { createAgentService } from './agent-service.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,7 +33,7 @@ function installationKey(input, role) {
   return value ? hash(`${role}:${value.toLowerCase()}`) : null;
 }
 
-export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now, skillHub = createSkillHubClient({ apiKey:process.env.SKILLHUB_API_KEY }) }) {
+export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now, skillHub = createSkillHubClient({ apiKey:process.env.SKILLHUB_API_KEY }), agentCatalog }) {
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
@@ -55,6 +56,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const skills = createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock });
+  const agents = createAgentService({ store, serialized, owner, worker, body, send, clock, catalog: agentCatalog, deploymentId: async () => (await identityPolicy()).namespace });
   const deleted = async archive => Boolean((await store.get('trash', archive.entryId))?.deletedAt);
   async function identityPolicy() {
     return serialized('device-policy', () => store.transaction(async tx => {
@@ -321,6 +323,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/skill-market.css': ['public/skill-market.css', 'text/css; charset=utf-8'],
           '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
           '/skill-manager.css': ['public/skill-manager.css', 'text/css; charset=utf-8'],
+          '/agent-manager.js': ['public/agent-manager.js', 'text/javascript; charset=utf-8'],
+          '/agent-manager.css': ['public/agent-manager.css', 'text/css; charset=utf-8'],
           '/style.css': ['public/style.css', 'text/css; charset=utf-8'],
           '/pairing-dialog.css': ['public/pairing-dialog.css', 'text/css; charset=utf-8'],
           '/library-frame.css': ['public/library-frame.css', 'text/css; charset=utf-8'],
@@ -406,6 +410,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return send(res, 200, await skillHub.request(Object.fromEntries(url.searchParams)));
       }
       if (await skills.handle(req, res, route, device)) return;
+      if (await agents.handle(req, res, route, device)) return;
       if (route.startsWith('/api/browser-trust')) {
         owner(device);
         requireValue(deviceCategory(device) === 'browser' && req.headers.authorization === undefined && cookieValue(req, browserCookie), 'Browser cookie session required', 403);
@@ -499,6 +504,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const target = await store.get('device', revoke[1]);
         requireValue(target, 'Device not found', 404);
         await security.transaction(async (state, tx) => {
+          await agents.cancelDevice(tx, target.id);
           await tx.delete('device', target.id);
           for (const proof of await tx.list('browser-trust')) if (proof.deviceId === target.id) await tx.delete('browser-trust', proof.id);
         });
@@ -520,6 +526,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             && (task.deviceId === target.id || task.state === 'queued' && task.preferredDeviceId === target.id)),
           '该节点还有未结束的任务，请先完成或取消任务', 409);
           const at = new Date(clock()).toISOString();
+          await agents.cancelDevice(tx, target.id);
           await tx.put('device', { ...target, revokedAt: at, nodeRemovedAt: at });
           return { removed: true, id: target.id };
         })));
@@ -531,9 +538,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         const runtime = input.skillRuntime;
+        const agentRuntime = input.agentRuntime;
+        requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
-        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null });
-        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })), skillOperations:runtime?await skills.inbox(device.id):[] });
+        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
@@ -569,6 +578,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (route === '/api/claim' && req.method === 'POST') {
         worker(device);
+        if (device.agentRuntime?.busy) return send(res, 200, { task: null });
         requireValue(workerOnline(device, clock()), 'Heartbeat required', 409);
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
@@ -585,6 +595,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 const live = await tx.getForUpdate('device', device.id);
                 requireValue(live && !live.revokedAt && live.tokenHash === device.tokenHash, 'Device authorization required', 401);
                 requireValue(workerOnline(live, clock()), 'Heartbeat required', 409);
+                if (live.agentRuntime?.busy) return null;
                 return saveTask({ ...candidate, deviceId: device.id, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || candidate.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });
               break;

@@ -61,6 +61,9 @@ jobs:
       - name: Test Web offline worker node removal
         run: node scripts/test-worker-nodes-ui.cjs
         working-directory: collector
+      - name: Test Web Agent management
+        run: node scripts/test-agents-ui.cjs --web
+        working-directory: collector
       - run: npm audit --omit=dev --audit-level=high
         working-directory: collector
     timeout-minutes: 30
@@ -90,6 +93,9 @@ jobs:
         working-directory: collector
       - name: Test shared Linux node actions during refresh
         run: xvfb-run -a node scripts/test-desktop-node-actions.cjs
+        working-directory: collector
+      - name: Test Linux Agent management
+        run: xvfb-run -a node scripts/test-agents-ui.cjs
         working-directory: collector
       - name: Test shared Linux update window shutdown
         run: xvfb-run -a node scripts/test-desktop-update-lifecycle.cjs
@@ -173,6 +179,8 @@ jobs:
       - name: Test packaged Windows skill management
         shell: pwsh
         run: node collector/scripts/test-desktop-skills.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows Agent management
+        run: node collector/scripts/test-agents-ui.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows pairing layout
         shell: pwsh
         run: node collector/scripts/test-desktop-pairing.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -281,6 +289,7 @@ jobs:
           node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-skill-market.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-agents-ui.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login-switch.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-pairing.cjs "$app/Contents/MacOS/灵藏"
@@ -362,3 +371,29 @@ jobs:
           tags: personal-library-collector:ci
       - run: docker image inspect personal-library-collector:ci --format '{{.Id}}'
     timeout-minutes: 30
+
+  agent-installation:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.macos_only }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: collector/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: collector
+      - name: Test native directory and installation transactions
+        run: node --test test/agent-management.test.mjs
+        working-directory: collector
+      - name: Install and verify five official Agents in an isolated home
+        run: node scripts/test-agent-installation.mjs
+        working-directory: collector
+    timeout-minutes: 60

@@ -268,7 +268,7 @@ struct SettingsView: View {
                             if let version = device.deviceInfo?.client.version { Text("版本 \(version)").font(.caption).foregroundStyle(.secondary) }
                             if let identity = device.identity { Text("\(identity.sourceName) \(identity.shortId)").font(.caption).foregroundStyle(.secondary) }
                             if let seen = device.lastSeen { Text("最近活动：\(seen)").font(.caption).foregroundStyle(.secondary) }
-                            if device.canDispatch { NavigationLink("节点技能") { NodeSkillsView(device: device) } }
+                            if device.canDispatch { NavigationLink("Agent") { NodeAgentsView(device: device) }; NavigationLink("节点技能") { NodeSkillsView(device: device) } }
                             if let expires = device.browserExpiresAt { Text("有效至：\(expires)").font(.caption).foregroundStyle(.secondary) }
                             if device.canDispatch { Text("Agent：\(device.agents?.joined(separator: " / ") ?? "无可用 Agent")").font(.caption).foregroundStyle(.secondary) }
                             if device.revokedAt == nil { Button("撤销设备", role: .destructive) { revoking = device }.disabled(model.busy) }
@@ -312,7 +312,9 @@ struct NodeSkillsView: View {
             if let error { Text(error).foregroundStyle(.red) }
             Section("环境") {
                 Text(updated ?? "未上报")
-                ForEach(agents, id: \.name) { agent in Text("\(agent.name) · \(agent.version ?? "未安装")") }
+                ForEach(agents, id: \.name) { agent in
+                    HStack { Text(["codex":"Codex", "codebuddy":"CodeBuddy", "claude":"Claude Code"][agent.name] ?? agent.name); Spacer(); Text(agent.version ?? "—"); Text(agent.installed ? "已安装" : "未安装") }
+                }
             }
             ForEach(items) { skill in
                 Section(skill.name) {

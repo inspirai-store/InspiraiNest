@@ -26,7 +26,7 @@ public class DevicesActivity extends Screen {
     else if(!d.optString("role").equals("reader"))c.addView(label("等待客户端补齐标识",13,false));
     c.addView(label("最近活动："+d.optString("lastSeen"),13,false));
     if(selected==null){c.setFocusable(true);c.setContentDescription("查看设备："+title);c.setOnClickListener(v->startActivity(new Intent(this,DevicesActivity.class).putExtra("deviceId",d.optString("id"))));}
-    else{c.addView(label("授权时间："+d.optString("createdAt"),13,false));if(DevicePresentation.dispatchable(d))button(body,"节点技能",()->loadSkills(d.optString("id")));if(d.isNull("revokedAt"))button(body,"撤销此设备",()->confirm("撤销后，此设备不能再访问资料和任务。",()->work(()->new Api(new Credentials(this)).call("/api/devices/"+d.optString("id")+"/revoke","POST",new JSONObject()),v->finish())));}
+    else{c.addView(label("授权时间："+d.optString("createdAt"),13,false));if(DevicePresentation.dispatchable(d))button(body,"Agent",()->startActivity(new Intent(this,AgentsActivity.class).putExtra("deviceId",d.optString("id")).putExtra("nodeName",d.optString("name")).putExtra("supported",d.optJSONObject("agentRuntime")!=null&&d.optJSONObject("agentRuntime").optInt("schemaVersion")==1)));if(DevicePresentation.dispatchable(d))button(body,"节点技能",()->loadSkills(d.optString("id")));if(d.isNull("revokedAt"))button(body,"撤销此设备",()->confirm("撤销后，此设备不能再访问资料和任务。",()->work(()->new Api(new Credentials(this)).call("/api/devices/"+d.optString("id")+"/revoke","POST",new JSONObject()),v->finish())));}
    }}
    if(visible==0)body.addView(label("没有可显示的授权设备",16,false));
   });
@@ -44,7 +44,7 @@ public class DevicesActivity extends Screen {
   },result->{
    if(!origin.equals(new Credentials(this).server()))return;notice("");
    body.addView(label(result.optString("scannedAt","未上报"),16,false));
-   JSONArray agents=result.optJSONArray("agents");if(agents!=null)for(int i=0;i<agents.length();i++){JSONObject agent=agents.getJSONObject(i);body.addView(label(agent.optString("name")+" · "+agent.optString("version","未安装"),16,false));}
+   JSONArray agents=result.optJSONArray("agents");if(agents!=null)for(int i=0;i<agents.length();i++){JSONObject agent=agents.getJSONObject(i);LinearLayout row=new LinearLayout(this);row.addView(label(agent.optString("name"),16,true),new LinearLayout.LayoutParams(0,-2,1));row.addView(label(agent.isNull("version")?"—":agent.optString("version"),14,false),new LinearLayout.LayoutParams(0,-2,1));row.addView(label(agent.optBoolean("installed")?"已安装":"未安装",14,false));body.addView(row);}
    JSONArray items=result.getJSONArray("items");if(items.length()==0)body.addView(label("未上报",16,false));
    for(int i=0;i<items.length();i++){
     JSONObject skill=items.getJSONObject(i);LinearLayout card=card(body);card.addView(label(skill.optString("name"),20,true));

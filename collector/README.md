@@ -12,6 +12,12 @@ macOS Worker: click the menu-bar icon to toggle its status panel. Closing the ma
 
 Offline nodes: use “删除节点” in the desktop node detail or Web node panel. `POST /api/devices/:id/remove-node` rechecks the heartbeat and rejects online nodes, the current client's own node, and nodes with queued, running, waiting or failed work. Removal revokes the node's authorization while retaining its record and historical tasks/archives. Uploaded results awaiting review remain reviewable.
 
+## 节点 Agent 管理
+
+工作节点详情中的“Agent”提供 Codex、CodeBuddy、Claude Code、Gemini CLI、OpenCode 的列表、安装、更新、刷新和取消。Web、桌面和移动端均可管理电脑节点。默认使用用户目录中的灵藏托管运行时，原有安装仅在来源明确时可选。采集仍沿用 Codex / CodeBuddy。
+
+[接口、安装边界与验收](docs/agent-management.md)。
+
 ## Agent 技能管理
 
 在 Web 的工作节点卡片或桌面的工作节点详情中打开“节点技能”。移动端在设备详情中查看清单与依赖缺口。

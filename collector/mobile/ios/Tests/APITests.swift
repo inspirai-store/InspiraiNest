@@ -36,6 +36,31 @@ final class APITests: XCTestCase {
         XCTAssertEqual(page.items.first?.dependencies.missing, ["Python 模块：requests"])
     }
     override func tearDown() { StubProtocol.handler = nil }
+    func testAgentInstallBindsNodeAndExpectedInstallationAndCancelUsesSameOrigin() async throws {
+        let device = "00000000-0000-4000-8000-000000000001", operation = String(repeating: "a", count: 64)
+        let fingerprint = String(repeating: "b", count: 64)
+        let agent = NodeAgent(id: "gemini", installed: false, version: nil, probeState: "not_found", fingerprint: fingerprint, originalSupported: false, custom: false)
+        var calls = 0
+        StubProtocol.handler = { request in
+            calls += 1
+            XCTAssertEqual(request.url?.host, "fixture.invalid")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-owner")
+            XCTAssertEqual(request.httpMethod, "POST")
+            if calls == 1 {
+                XCTAssertEqual(request.url?.path, "/api/agents/operations")
+                let body = try JSONSerialization.jsonObject(with: self.requestBody(request)) as! [String: String]
+                XCTAssertEqual(body["deviceId"], device); XCTAssertEqual(body["agent"], "gemini")
+                XCTAssertEqual(body["method"], "managed"); XCTAssertEqual(body["expectedFingerprint"], fingerprint)
+            } else { XCTAssertEqual(request.url?.path, "/api/agents/operations/\(operation)/cancel") }
+            return (200, Data("{\"id\":\"\(operation)\",\"agent\":\"gemini\",\"state\":\"queued\",\"result\":null}".utf8))
+        }
+        let client = try api(token: "fixture-owner")
+        _ = try await client.manageAgent(deviceID: device, action: "install", agent: agent)
+        _ = try await client.cancelAgentOperation(operation)
+        do { _ = try await client.manageAgent(deviceID: device, action: "update", agent: agent, method: "original"); XCTFail("Unknown original install must be rejected") } catch {}
+        XCTAssertEqual(calls, 2)
+    }
+
     private func api(token: String? = nil) throws -> CollectorAPI {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [StubProtocol.self]
         return CollectorAPI(origin: try ServerOrigin("https://fixture.invalid"), token: token, configuration: config)

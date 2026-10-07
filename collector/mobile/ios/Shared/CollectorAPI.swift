@@ -69,6 +69,27 @@ final class CollectorAPI: @unchecked Sendable {
         }
         return try await decoded(SkillEnvironmentPage.self, path: path)
     }
+    func agentCatalog() async throws -> AgentCatalogResponse { try await decoded(AgentCatalogResponse.self, path: "/api/agents/catalog") }
+    func agentEnvironment(deviceID: String) async throws -> NodeAgentEnvironment {
+        try await decoded(NodeAgentEnvironment.self, path: "/api/agents/devices/\(identifier(deviceID))/environment")
+    }
+    func agentOperations(deviceID: String) async throws -> AgentOperationResponse {
+        try await decoded(AgentOperationResponse.self, path: "/api/agents/operations?deviceId=\(identifier(deviceID))")
+    }
+    func manageAgent(deviceID: String, action: String, agent: NodeAgent? = nil, method: String = "managed", requestID: UUID = UUID()) async throws -> AgentOperation {
+        guard ["install", "update", "refresh"].contains(action), ["managed", "original"].contains(method) else { throw CollectorError.message("Agent 操作无效。") }
+        var input: [String: Any] = ["deviceId": try identifier(deviceID), "action": action, "requestId": requestID.uuidString]
+        if let agent {
+            guard ["codex", "codebuddy", "claude", "gemini", "opencode"].contains(agent.id), !agent.custom,
+                  method != "original" || agent.originalSupported else { throw CollectorError.message("安装方式无效。") }
+            input["agent"] = agent.id; input["method"] = method; input["expectedFingerprint"] = agent.fingerprint
+        } else if action != "refresh" { throw CollectorError.message("Agent 无效。") }
+        return try await decoded(AgentOperation.self, path: "/api/agents/operations", method: "POST", body: JSONSerialization.data(withJSONObject: input))
+    }
+    func cancelAgentOperation(_ id: String) async throws -> AgentOperation {
+        guard id.count == 64, id.allSatisfy({ $0.isHexDigit }) else { throw CollectorError.message("操作编号无效。") }
+        return try await decoded(AgentOperation.self, path: "/api/agents/operations/\(id)/cancel", method: "POST", body: Data("{}".utf8))
+    }
     func pair(key: String, name: String, installationId: String? = nil, platform: String? = nil, system: String? = nil,
               identity: ScopedDeviceIdentity? = nil, deviceInfo: DeviceInformation? = nil,
               otp: String? = nil, recoveryCode: String? = nil) async throws -> DeviceCredential {

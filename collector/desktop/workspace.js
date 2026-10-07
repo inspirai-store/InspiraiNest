@@ -14,12 +14,13 @@
   let workspaceEpoch = 0, detailSeq = 0, documentSeq = 0, readBusy = false;
   let pairingSeq = 0, pairingExpiryTimer;
   let settingsTab = 'appearance', lastSuccess = null, connected = false;
-  const skillManager = window.createSkillManager({request:input=>window.library.skills(input),identity:()=>auth.server+':'+workspaceEpoch,openConfig:async(device,agent)=>{
+  const agentManager = window.createAgentManager({request:input=>window.library.agents(input),identity:()=>auth.server+':'+workspaceEpoch});
+  const skillManager = window.createSkillManager({onAgents:device=>agentManager.open(device),request:input=>window.library.skills(input),identity:()=>auth.server+':'+workspaceEpoch,openConfig:async(device,agent)=>{
     if(device.id!==(await window.worker.snapshot()).deviceId)return null;
     return window.worker.skillConfig(agent);
   }});
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
-  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onRemove:removeNode,
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onRemove:removeNode,
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();

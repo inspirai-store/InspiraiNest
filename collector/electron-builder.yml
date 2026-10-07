@@ -35,6 +35,8 @@ files:
   - public/pairing-dialog.css
   - public/skill-manager.js
   - public/skill-manager.css
+  - public/agent-manager.js
+  - public/agent-manager.css
   - public/skill-market.js
   - public/skill-market.css
   - src/**

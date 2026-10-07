@@ -12,6 +12,7 @@
         <activity android:name=".PendingActivity" android:exported="false" />
         <activity android:name=".TaskActivity" android:exported="false" />
         <activity android:name=".DevicesActivity" android:exported="false" />
+        <activity android:name=".AgentsActivity" android:exported="false" />
         <activity android:name=".AttachmentActivity" android:exported="false" />
         <activity android:name=".ScanPairingActivity" android:exported="false" />
         <activity android:name=".UpdateActivity" android:exported="false" android:configChanges="orientation|screenSize" />

@@ -92,6 +92,15 @@ export class OwnerClient {
     if (!this.identity) throw new Error('请先配对管理端');
     return this.call(this.identity.server, this.identity.token, route, method, data, binary);
   }
+  agents(input) {
+    if(!input || typeof input !== 'object')throw new Error('Agent 请求无效');
+    if(input.kind==='catalog')return this.api('/api/agents/catalog');
+    if(input.kind==='environment')return this.api('/api/agents/devices/'+taskId(input.deviceId)+'/environment');
+    if(input.kind==='history')return this.api('/api/agents/operations?deviceId='+taskId(input.deviceId));
+    if(input.kind==='cancel')return this.api('/api/agents/operations/'+archiveId(input.operationId)+'/cancel','POST',{});
+    if(input.kind==='create')return this.api('/api/agents/operations','POST',input.operation);
+    throw new Error('Agent 请求无效');
+  }
   skills(input) {
     if (!input || typeof input !== 'object') throw new Error('技能请求无效');
     if (input.kind === 'environment') {

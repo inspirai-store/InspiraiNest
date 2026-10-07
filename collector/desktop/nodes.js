@@ -5,15 +5,17 @@
   const stages = { queued:'等待领取',assigned:'已分配',running:'处理中',uploading:'上传中',waiting_action:'待操作',awaiting_review:'待确认' };
   const types = {article:'文章',webpage:'网页',video:'视频',document:'文档',repository:'代码项目',audio:'音频',image:'图片',note:'笔记',other:'其他'};
   const agents = names => (names || []).map(name => ({codex:'Codex',codebuddy:'CodeBuddy'})[name] || name).join(' / ') || '未上报';
-  window.createNodeView = ({ onDispatch, onTask, onSkills, onRemove, animate }) => {
+  window.createNodeView = ({ onDispatch, onTask, onSkills, onAgents, onRemove, animate }) => {
     let local = null, state = null, connected = false, paired = false, lastSuccess = null, selected = 'local';
     let listSignature = '', detailSignature = '', removing = false;
     const remotes = () => (state?.devices || []).filter(d => window.deviceView.dispatchable(d) && d.id !== local?.deviceId);
     const chosen = () => selected === 'local' ? state?.devices?.find(d => d.id === local?.deviceId) : remotes().find(d => d.id === selected);
     const overview = $('#node-overview');
     // Keep action elements alive across heartbeats and modal focus restoration.
-    overview.innerHTML = '<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow"></span><h1 class="detail-title"></h1><p class="detail-summary"></p><div class="detail-actions" hidden><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
+    overview.innerHTML = '<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow"></span><h1 class="detail-title"></h1><p class="detail-summary"></p><div class="detail-actions" hidden><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button><button type="button" data-node-agents>Agent</button><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
     const dispatch = $('#node-dispatch'), skills = overview.querySelector('[data-node-skills]');
+    const agentButton=overview.querySelector('[data-node-agents]');
+    agentButton.onclick=()=>{const device=chosen();if(paired && connected && device && onAgents)onAgents(device);};
     const remove = overview.querySelector('[data-node-remove]');
     overview.querySelector('[data-node-back]').onclick = () => { $('#node-detail').classList.remove('open'); $('#node-list').querySelector(`[data-node="${CSS.escape(selected)}"]`)?.focus(); };
     dispatch.onclick = () => { const device = chosen(); if (paired && connected && device) onDispatch(device.id); };
@@ -57,7 +59,8 @@
         const element = overview.querySelector(selector); if (element.textContent !== value) element.textContent = value;
       }
       overview.querySelector('.detail-actions').hidden = !paired || !device;
-      dispatch.disabled = skills.disabled = !connected;
+      dispatch.disabled = skills.disabled = agentButton.disabled = !connected;
+      agentButton.hidden = !onAgents;
       dispatch.title = connected ? '' : '恢复管理端连接后可派发任务';
       skills.hidden = !onSkills;
       skills.dataset.nodeSkills = device?.id || '';
