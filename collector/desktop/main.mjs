@@ -202,7 +202,7 @@ function registerIPC() {
     skills: input => owner.skills(input), market: input => skillHub.request(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
-    draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id),
+    draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id),
     trash: () => owner.trash(), remove: id => owner.removeArchive(id), restore: id => owner.restoreArchive(id),
     download: async input => {
       const file = await owner.fileBytes(input);

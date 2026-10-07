@@ -58,6 +58,9 @@ jobs:
       - name: Test Web skill management
         run: node scripts/test-skills-web.cjs
         working-directory: collector
+      - name: Test Web offline worker node removal
+        run: node scripts/test-worker-nodes-ui.cjs
+        working-directory: collector
       - run: npm audit --omit=dev --audit-level=high
         working-directory: collector
     timeout-minutes: 30

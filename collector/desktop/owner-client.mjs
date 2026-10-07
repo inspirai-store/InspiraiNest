@@ -162,6 +162,7 @@ export class OwnerClient {
   }
   pairing() { return this.api('/api/pairings', 'POST', {}); }
   revoke(id) { return this.api(`/api/devices/${encodeURIComponent(taskId(id))}/revoke`, 'POST', {}); }
+  removeNode(id) { return this.api(`/api/devices/${encodeURIComponent(taskId(id))}/remove-node`, 'POST', {}); }
   trash() { return this.api('/api/trash'); }
   removeArchive(id) { return this.api(`/api/archives/${archiveId(id)}`, 'DELETE'); }
   restoreArchive(id) { return this.api(`/api/archives/${archiveId(id)}/restore`, 'POST', {}); }

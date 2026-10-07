@@ -504,6 +504,27 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         });
         return send(res, 200, { revoked: true });
       }
+      const removeNode = route.match(/^\/api\/devices\/([^/]+)\/remove-node$/);
+      if (removeNode && req.method === 'POST') {
+        owner(device);
+        const targetId = removeNode[1];
+        requireValue(targetId !== device.id, '当前客户端的本机节点不能删除', 409);
+        const result = await serialized('claim', () => serialized(`device:${targetId}`, () => store.transaction(async tx => {
+          const target = await tx.getForUpdate('device', targetId);
+          requireValue(target, '节点不存在', 404);
+          if (target.nodeRemovedAt) return { removed: true, id: target.id };
+          requireValue(workerAuthorized(target), '只能删除已授权的工作节点', 409);
+          requireValue(!workerOnline(target, clock()), '节点已上线，无法删除', 409);
+          const unfinished = ['queued', ...active, 'waiting_action', 'failed'];
+          requireValue(!(await tx.list('task')).some(task => unfinished.includes(task.state)
+            && (task.deviceId === target.id || task.state === 'queued' && task.preferredDeviceId === target.id)),
+          '该节点还有未结束的任务，请先完成或取消任务', 409);
+          const at = new Date(clock()).toISOString();
+          await tx.put('device', { ...target, revokedAt: at, nodeRemovedAt: at });
+          return { removed: true, id: target.id };
+        })));
+        return send(res, 200, result);
+      }
       if (route === '/api/heartbeat' && req.method === 'POST') {
         worker(device);
         const input = await body(req);
@@ -560,7 +581,12 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             for (const candidate of candidates) {
               const selected = await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
-              task = await saveTask({ ...candidate, deviceId: device.id, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || candidate.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`);
+              task = await store.transaction(async tx => {
+                const live = await tx.getForUpdate('device', device.id);
+                requireValue(live && !live.revokedAt && live.tokenHash === device.tokenHash, 'Device authorization required', 401);
+                requireValue(workerOnline(live, clock()), 'Heartbeat required', 409);
+                return saveTask({ ...candidate, deviceId: device.id, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || candidate.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
+              });
               break;
             }
           }

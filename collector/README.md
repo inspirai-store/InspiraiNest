@@ -10,6 +10,8 @@ With Node.js 24+, run `npm ci --ignore-scripts`, `npm test`, then `npm start` he
 
 macOS Worker: click the menu-bar icon to toggle its status panel. Closing the manager hides the Dock icon while the Worker stays available; quit waits for active work and synchronization to finish.
 
+Offline nodes: use “删除节点” in the desktop node detail or Web node panel. `POST /api/devices/:id/remove-node` rechecks the heartbeat and rejects online nodes, the current client's own node, and nodes with queued, running, waiting or failed work. Removal revokes the node's authorization while retaining its record and historical tasks/archives. Uploaded results awaiting review remain reviewable.
+
 ## Agent 技能管理
 
 在 Web 的工作节点卡片或桌面的工作节点详情中打开“节点技能”。移动端在设备详情中查看清单与依赖缺口。

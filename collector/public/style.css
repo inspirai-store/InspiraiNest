@@ -52,6 +52,7 @@ html:has(#tasks-dialog[open]){overflow:hidden}
 .node-card dl{display:grid;gap:8px;margin:16px 0 0;font-size:12px}
 .node-card dl>div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px}
 .node-card dt{color:var(--muted)}.node-card dd{margin:0;overflow-wrap:anywhere}
+.node-card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .nodes-empty{grid-column:1/-1;padding:36px 12px;text-align:center;color:var(--muted)}
 @media(max-width:760px){#app .layout{padding-bottom:calc(60px + env(safe-area-inset-bottom))}#app .layout>main{min-height:calc(100dvh - 183px - env(safe-area-inset-bottom))}#app #library-frame{height:calc(100dvh - 183px - env(safe-area-inset-bottom))}.workspace-footer{width:100%;border-right:0;border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom))}.workspace-footer button{width:190px;max-width:100%;min-height:44px}.node-map{padding:20px 16px}.node-hub{flex-wrap:wrap;gap:8px}.node-hub p{max-width:160px}#node-connection-summary{margin-left:8px}}
 @media(max-width:600px){.node-grid{grid-template-columns:minmax(0,1fr);padding-left:16px}.node-grid:before{left:0}.node-grid:after{content:"";position:absolute;top:-18px;left:0;right:50%;height:1px;background:var(--line)}.node-grid .node-card:before{right:auto;left:-17px;width:16px}#worker-nodes-dialog .dialog-heading{gap:8px}#worker-nodes-dialog .dialog-heading h2{font-size:18px}#manage-worker-nodes{font-size:12px;padding:8px}}

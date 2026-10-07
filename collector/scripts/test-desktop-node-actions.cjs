@@ -17,11 +17,18 @@ const { _electron } = require('playwright');
   try {
     await app.firstWindow();
     await app.evaluate(({ ipcMain }) => {
-      const fixture = globalThis.nodeActionsFixture = { revision: 1 };
+      const fixture = globalThis.nodeActionsFixture = { revision: 1, removed: false, removalCalls: 0 };
       const handle = (channel, fn) => { ipcMain.removeHandler(channel); ipcMain.handle(channel, (_event, input) => fn(input)); };
-      const device = id => ({ id, name: id === 'local-node' ? '本机验收' : '远端验收', role: 'worker', clientType: 'worker', online: true, agents: ['codex'], capabilities: ['article'], lastHeartbeatAt: new Date(fixture.revision * 1000).toISOString() });
+      const device = id => ({ id, name: id === 'local-node' ? '本机验收' : id === 'offline-node' ? '离线验收' : '远端验收', role: 'worker', clientType: 'worker', online: id !== 'offline-node', agents: ['codex'], capabilities: ['article'], lastHeartbeatAt: new Date(fixture.revision * 1000).toISOString() });
       handle('library:status', () => ({ paired: true, server: 'https://fixture.example', deviceId: 'owner' }));
-      handle('library:state', () => ({ me: { id: 'owner' }, devices: [device('local-node'), device('remote-node')], tasks: [], archives: [] }));
+      handle('library:state', () => ({ me: { id: 'owner' }, devices: [device('local-node'), device('remote-node'), ...fixture.removed ? [] : [device('offline-node')]], tasks: [], archives: [] }));
+      handle('library:removeNode', async id => {
+        if (id !== 'offline-node') throw Error('Fixture must only remove its offline node');
+        fixture.removalCalls++;
+        if (fixture.removalError) throw Error(fixture.removalError);
+        await new Promise(resolve => { fixture.releaseRemoval = resolve; });
+        fixture.removed = true; return { removed: true, id };
+      });
       handle('library:entries', () => ({ items: [], total: 0 }));
       handle('worker:snapshot', () => ({ paired: true, server: 'https://fixture.example', deviceId: 'local-node', device: '本机验收', running: false, online: true, phase: 'idle', mode: 'running', agents: [], tasks: [], macOS: { capabilities: {} } }));
       handle('library:skills', input => input.kind === 'environment' ? { items: [], agents: [], projects: [], nextOffset: null, snapshotId: 'fixture', scannedAt: new Date().toISOString() } : input.kind === 'versions' ? { versions: [] } : { operations: [] });
@@ -34,6 +41,7 @@ const { _electron } = require('playwright');
     await page.locator('#node-dispatch').waitFor();
     for (const node of ['local', 'remote-node']) {
       await page.locator(`[data-node="${node}"]`).click();
+      assert.equal(await page.locator('[data-node-remove]').isVisible(), false, 'local and online nodes have no delete control');
       for (const selector of ['#node-dispatch', '[data-node-skills]']) {
         const button = await page.locator(selector).elementHandle();
         const bounds = await button.boundingBox();
@@ -60,9 +68,33 @@ const { _electron } = require('playwright');
         await page.locator(selector === '#node-dispatch' ? '[data-close-dialog=capture-dialog][aria-label="关闭"]' : '.skill-manager [data-close]').click();
       }
     }
+    await page.locator('[data-node="offline-node"]').click();
+    const remove = page.locator('[data-node-remove]'); await remove.waitFor({ state: 'visible' });
+    await page.screenshot({ path: path.join(output, 'offline-node-delete.png') });
+    page.once('dialog', dialog => dialog.dismiss()); await remove.click();
+    assert.equal(await app.evaluate(() => globalThis.nodeActionsFixture.removalCalls), 0, 'cancel never invokes deletion');
+    await app.evaluate(() => globalThis.nodeActionsFixture.removalError = '节点已上线，无法删除');
+    page.once('dialog', dialog => dialog.accept()); await remove.click();
+    await page.locator('#workspace-toast').filter({ hasText: '节点已上线' }).waitFor();
+    assert.equal(await page.locator('[data-node="offline-node"]').count(), 1);
+    await app.evaluate(() => { delete globalThis.nodeActionsFixture.removalError; });
+    const heldButton = await remove.elementHandle(), bounds = await heldButton.boundingBox();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2); await page.mouse.down();
+    const previous = await page.locator('#nodes-freshness').innerText();
+    await app.evaluate(() => globalThis.nodeActionsFixture.revision++);
+    await page.waitForFunction(previous => document.querySelector('#nodes-freshness').textContent !== previous, previous);
+    assert.equal(await heldButton.evaluate(el => el.isConnected), true);
+    page.once('dialog', dialog => dialog.accept()); await page.mouse.up();
+    await page.waitForFunction(() => document.querySelector('[data-node-remove]').disabled);
+    await app.evaluate(() => globalThis.nodeActionsFixture.revision++);
+    await page.waitForFunction(() => Boolean(document.querySelector('[data-node-remove]').disabled));
+    assert.equal(await app.evaluate(() => globalThis.nodeActionsFixture.removalCalls), 2);
+    await app.evaluate(() => globalThis.nodeActionsFixture.releaseRemoval());
+    await page.locator('[data-node="offline-node"]').waitFor({ state: 'detached' });
+    assert.equal(await page.locator('[data-node="local"]').getAttribute('aria-pressed'), 'true');
     assert.deepEqual(errors, []);
     await page.screenshot({ path: path.join(output, 'node-actions.png') });
-    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, checks: ['local and remote pointer press during heartbeat refresh', 'dispatch target retained', 'skill dialog close and reopen', 'keyboard activation after modal close'], errors }, null, 2));
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, checks: ['local and remote pointer press during heartbeat refresh', 'dispatch target retained', 'skill dialog close and reopen', 'keyboard activation after modal close', 'offline-only removal, cancellation, server rejection, pending protection and selection fallback'], errors }, null, 2));
     console.log('Desktop node actions: passed');
   } catch (error) {
     if (page && !page.isClosed()) await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});

@@ -19,7 +19,7 @@
     return window.worker.skillConfig(agent);
   }});
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
-  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device),
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onRemove:removeNode,
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();
@@ -28,6 +28,15 @@
   function saveFavorites() { try { localStorage.setItem(favoriteKey(), JSON.stringify([...favorites])); } catch { toast('收藏只在本次运行有效'); } }
   function toast(message) { const el = $('#workspace-toast'); el.textContent = message; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 3800); }
   function errorText(error) { return String(error?.message || error || '操作失败').replace(/^Error invoking remote method '[^']+': Error: /, ''); }
+  async function removeNode(device) {
+    const epoch = workspaceEpoch;
+    if (!confirm(`删除离线节点“${device.name || device.displayName || '未命名节点'}”并撤销其访问权限？`)) return;
+    try {
+      await window.library.removeNode(device.id);
+      if (epoch !== workspaceEpoch) return;
+      toast('节点已删除'); await refresh();
+    } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); }
+  }
   function clearWorkspace(nextAuth) {
     skillManager.close(); skillMarket.hide();
     workspaceEpoch++; entriesSeq++; detailSeq++; documentSeq++; readBusy = false;

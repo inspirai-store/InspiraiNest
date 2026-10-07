@@ -83,6 +83,19 @@
     throw new Error('技能请求无效');
   }});
   const badge = state => `<span class="badge ${esc(state)}">${states[state] || esc(state)}</span>`;
+  const removingNodes = new Set();
+  async function removeWorkerNode(id) {
+    const device = snapshot?.devices.find(d => d.id === id), actor = snapshot?.me.id;
+    if (!connected || removingNodes.has(id) || !device || device.online !== false || id === actor) return;
+    if (!confirm(`删除离线节点“${device.name || device.displayName || '未命名节点'}”并撤销其访问权限？`)) return;
+    removingNodes.add(id); renderWorkerNodes();
+    try {
+      await api(`/devices/${encodeURIComponent(id)}/remove-node`, 'POST', {});
+      if (snapshot?.me.id !== actor) return;
+      await refresh(); notice('节点已删除');
+    } catch (error) { if (snapshot?.me.id === actor) notice(error.message); }
+    finally { removingNodes.delete(id); if (snapshot?.me.id === actor) renderWorkerNodes(); }
+  }
   function renderWorkerNodes() {
     const nodes = (snapshot?.devices || []).filter(window.deviceView.dispatchable);
     const online = nodes.filter(device => device.online).length;
@@ -95,7 +108,9 @@
     $('#node-connection-state').textContent = connected ? '已连接' : '连接中断 · 状态待更新';
     $('#node-connection-summary').textContent = `在线 ${connected ? online : '—'} · 已授权 ${nodes.length}`;
     const sorted = [...nodes].sort((a, b) => Number(b.online) - Number(a.online));
-    $('#worker-nodes').innerHTML = sorted.map(device => {
+    const host = $('#worker-nodes'), cards = new Map([...host.querySelectorAll('[data-node-id]')].map(card => [card.dataset.nodeId, card]));
+    host.querySelector('.nodes-empty')?.remove();
+    sorted.forEach((device, index) => {
       const info = device.deviceInfo || {};
       const state = !connected ? 'unknown' : device.online ? 'online' : 'offline';
       const agents = (device.agents || []).map(agent => ({ codex: 'Codex', codebuddy: 'CodeBuddy' })[agent] || agent).join(' / ');
@@ -104,9 +119,24 @@
         ['可用 Agent', agents || '无可用 Agent'], ['处理能力', (device.capabilities || []).map(type => types[type] || type).join('、') || '未启用'],
         ['最近心跳', device.lastHeartbeatAt ? date(device.lastHeartbeatAt) : '尚无心跳'],
         ['短标识', device.identity?.shortId || device.id.slice(0, 12)]];
-      return `<article class="node-card" data-node-id="${esc(device.id)}" data-status="${state}"><div class="node-card-heading"><span class="node-device-icon">${icon(info.os?.family === 'macOS' ? 'laptop' : 'monitor')}</span><strong>${esc(device.displayName || device.name)}</strong></div><p class="node-state"><span class="node-dot" aria-hidden="true"></span>${connected ? window.deviceView.status(device) : '状态待更新'}${taskCount ? ` · ${taskCount} 项处理中` : ''}</p>${device.name && device.name !== device.displayName ? `<p class="node-remark">备注：${esc(device.name)}</p>` : ''}<dl>${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></article>`;
-    }).join('') || '<div class="nodes-empty">暂无已授权工作节点</div>';
-    $('#worker-nodes').querySelectorAll('[data-node-id]').forEach(card=>{const button=document.createElement('button');button.type='button';button.textContent='节点技能';button.disabled=!connected;button.onclick=()=>skillManager.open(nodes.find(d=>d.id===card.dataset.nodeId));card.append(button);});
+      let card = cards.get(device.id);
+      if (!card) {
+        card = document.createElement('article'); card.className = 'node-card'; card.dataset.nodeId = device.id;
+        card.innerHTML = '<div data-node-body></div><div class="node-card-actions"><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
+        card.querySelector('[data-node-skills]').onclick = () => { const current = snapshot?.devices.find(d => d.id === device.id); if (connected && current) skillManager.open(current); };
+        card.querySelector('[data-node-remove]').onclick = () => removeWorkerNode(device.id);
+      }
+      card.dataset.status = state;
+      card.querySelector('[data-node-body]').innerHTML = `<div class="node-card-heading"><span class="node-device-icon">${icon(info.os?.family === 'macOS' ? 'laptop' : 'monitor')}</span><strong>${esc(device.displayName || device.name)}</strong></div><p class="node-state"><span class="node-dot" aria-hidden="true"></span>${connected ? window.deviceView.status(device) : '状态待更新'}${taskCount ? ` · ${taskCount} 项处理中` : ''}</p>${device.name && device.name !== device.displayName ? `<p class="node-remark">备注：${esc(device.name)}</p>` : ''}<dl>${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
+      card.querySelector('[data-node-skills]').disabled = !connected;
+      const remove = card.querySelector('[data-node-remove]');
+      remove.hidden = !connected || device.online !== false || device.id === snapshot?.me.id;
+      remove.disabled = removingNodes.has(device.id);
+      if (host.children[index] !== card) host.insertBefore(card, host.children[index] || null);
+      cards.delete(device.id);
+    });
+    for (const card of cards.values()) card.remove();
+    if (!sorted.length) host.innerHTML = '<div class="nodes-empty">暂无已授权工作节点</div>';
   }
   const nodeDialog = $('#worker-nodes-dialog');
   $('#worker-nodes-toggle').onclick = () => { if (!nodeDialog.open) { nodeDialog.showModal(); $('#worker-nodes-toggle').setAttribute('aria-expanded', 'true'); } };
