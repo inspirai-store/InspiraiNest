@@ -136,6 +136,9 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     await page.waitForTimeout(300);assert.equal(await app.evaluate(()=>globalThis.workerDesktop().main.isVisible()),false,'login launch stays in tray');
     await page.evaluate(()=>window.worker.action('show'));
     await page.locator('[data-view=nodes]').click();assert.equal(await page.locator('[data-action=start]').isDisabled(),true);await page.locator('[data-action=drain]').click();await wait(()=>!manager.snapshot().running,'drained');
+    // The process can exit before the stop IPC has persisted user intent.
+    // Close only after the UI reports that the completed stop is ready for start.
+    await page.waitForFunction(()=>!document.querySelector('[data-action=start]').disabled);
     await app.close();app=null;await launch();assert.equal(manager.snapshot().running,false,'explicit stop persists after reopen');
     await api(owner,`/api/devices/${offline.device.id}/revoke`,'POST',{});await page.waitForFunction(()=>document.querySelectorAll('#node-list [data-node]').length===1);
     await showSettings(page,'devices');await page.locator('#owner-logout').click();await page.locator('[data-view=nodes]').click();await page.locator('#nodes-auth-hint').waitFor({state:'visible'});
