@@ -46,23 +46,27 @@ export function statusPanelPosition(tray, work, size, gap = 6) {
   };
 }
 
-export function createStatusPanelController({ panel, show, trayBounds, cursor, defer = setImmediate }) {
-  let revision = 0;
-  const hide = () => { revision++; panel.hide(); };
+export function createStatusPanelController({ panel, show, trayBounds, cursor, isActive = () => true, defer = setImmediate }) {
+  let revision = 0, disposed = false;
+  const usable = () => !disposed && isActive() && !panel.isDestroyed();
+  const hide = () => { revision++; if (usable()) panel.hide(); };
   return {
     hide,
+    dispose() { disposed = true; revision++; },
     toggle() {
+      if (!usable()) return;
       revision++;
       if (panel.isVisible()) panel.hide();
       else show();
     },
     blur() {
+      if (!usable()) return;
       // macOS can blur the panel before delivering a click on its menu-bar icon.
       // Keep its visible state until that click toggles it; an outside click hides it.
       if (contains(trayBounds(), cursor())) return;
       const blurredAt = revision;
       defer(() => {
-        if (revision === blurredAt && panel.isVisible() && !panel.isFocused()) hide();
+        if (usable() && revision === blurredAt && panel.isVisible() && !panel.isFocused()) hide();
       });
     },
   };

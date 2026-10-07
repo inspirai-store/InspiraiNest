@@ -79,6 +79,9 @@ jobs:
       - name: Test shared Linux skill management
         run: xvfb-run -a node scripts/test-desktop-skills.cjs
         working-directory: collector
+      - name: Test shared Linux update window shutdown
+        run: xvfb-run -a node scripts/test-desktop-update-lifecycle.cjs
+        working-directory: collector
     timeout-minutes: 20
   android:
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.macos_only }}
@@ -166,6 +169,8 @@ jobs:
         run: |
           $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
           node collector/scripts/test-packaged-update.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe $file.FullName
+      - name: Test packaged Windows update window shutdown
+        run: node collector/scripts/test-desktop-update-lifecycle.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - uses: actions/upload-artifact@v4
         if: always()
         with:

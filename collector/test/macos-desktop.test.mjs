@@ -77,12 +77,14 @@ test('panel placement supports negative display origins, vertical displays and a
 function panelFixture() {
   let visible = false, focused = false, point = { x: 0, y: 100 };
   const deferred = [];
-  const panel = { isVisible: () => visible, isFocused: () => focused, hide: () => { visible = focused = false; } };
+  let destroyed = false;
+  const live = () => { if (destroyed) throw new Error('Object has been destroyed'); };
+  const panel = { isDestroyed: () => destroyed, isVisible: () => { live(); return visible; }, isFocused: () => { live(); return focused; }, hide: () => { live(); visible = focused = false; } };
   const controller = createStatusPanelController({ panel, show: () => { visible = focused = true; },
     trayBounds: () => ({ x: 100, y: 0, width: 24, height: 24 }), cursor: () => point, defer: fn => deferred.push(fn) });
   return { panel, controller, outside: () => { point = { x: 0, y: 100 }; focused = false; },
     atTray: () => { point = { x: 112, y: 12 }; focused = false; },
-    refocus: () => { focused = true; }, flush: () => { while (deferred.length) deferred.shift()(); } };
+    destroy: () => { destroyed = true; }, refocus: () => { focused = true; }, flush: () => { while (deferred.length) deferred.shift()(); } };
 }
 test('each macOS click toggles synchronously, with no double-click manager shortcut', () => {
   const { panel, controller } = panelFixture();
@@ -109,6 +111,17 @@ test('a late blur does not hide a panel which already regained keyboard focus', 
   f.controller.toggle(); f.outside(); f.controller.blur(); f.refocus(); f.flush();
   assert.equal(f.panel.isVisible(), true);
   f.controller.hide(); assert.equal(f.panel.isVisible(), false);
+});
+test('pending blur and tray callbacks do not access a destroyed status panel', () => {
+  const f = panelFixture();
+  f.controller.toggle(); f.outside(); f.controller.blur(); f.destroy();
+  assert.doesNotThrow(() => { f.flush(); f.controller.toggle(); f.controller.hide(); f.controller.blur(); });
+});
+test('disposing a status panel cancels a pending blur and later tray callbacks', () => {
+  const f = panelFixture();
+  f.controller.toggle(); f.outside(); f.controller.blur(); f.controller.dispose(); f.flush();
+  f.controller.toggle(); f.controller.hide();
+  assert.equal(f.panel.isVisible(), true);
 });
 function quitFixture(state, stop = async () => { state.mode = 'draining'; }) {
   const actions = [];

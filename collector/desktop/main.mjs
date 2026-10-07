@@ -67,6 +67,8 @@ const macQuit = isMac ? createDrainQuitController({ snapshot: () => manager.snap
   setImmediate(() => app.quit());
 } }) : null;
 const pageURL = pathToFileURL(path.join(here, 'index.html')).href;
+const liveWindow = window => Boolean(window && !window.isDestroyed());
+const exiting = () => quitting || endingSession || updates?.snapshot().phase === 'installing';
 function makeWindow(compact = false) {
   const window = new BrowserWindow({ width: compact ? 390 : 1240, height: compact ? 350 : 820,
     minWidth: compact ? 390 : 740, minHeight: compact ? 350 : 580,
@@ -82,36 +84,39 @@ function makeWindow(compact = false) {
   window.loadFile(path.join(here, 'index.html'), { query: { ...(compact ? { compact: '1' } : {}), ...(isMac ? { platform: 'darwin' } : {}) } });
   return window;
 }
-function hideStatus() { if (panelController) panelController.hide(); else popover?.hide(); }
+function hideStatus() { if (panelController) panelController.hide(); else if (!exiting() && liveWindow(popover)) popover.hide(); }
 async function openManager() {
-  if (!main) return;
+  if (exiting() || !liveWindow(main)) return;
+  const window = main;
   const revision = ++managerRevision;
   openingManager = true;
   clearTimeout(dockHideTimer);
   hideStatus();
   try {
     if (isMac && !app.dock.isVisible()) await app.dock.show();
+    if (exiting() || !liveWindow(window)) return;
     if (revision !== managerRevision) { hideDock(); return; }
-    if (main.isMinimized()) main.restore();
-    main.show(); main.focus(); trace('manager-open');
+    if (window.isMinimized()) window.restore();
+    window.show(); window.focus(); trace('manager-open');
   } finally { openingManager = false; }
 }
 function hideDock() {
-  if (!isMac) return;
+  if (!isMac || exiting() || !liveWindow(main)) return;
   clearTimeout(dockHideTimer);
   // Electron/macOS can ignore two dock.hide() calls less than a second apart.
   const delay = Math.max(0, lastDockHide + 1100 - Date.now());
-  if (delay) dockHideTimer = setTimeout(() => { if (!main.isVisible()) hideDock(); }, delay);
+  if (delay) dockHideTimer = setTimeout(() => { if (!exiting() && liveWindow(main) && !main.isVisible()) hideDock(); }, delay);
   else { lastDockHide = Date.now(); app.dock.hide(); }
 }
 function hideManager() {
+  if (exiting() || !liveWindow(main)) return;
   managerRevision++;
-  main?.hide();
+  main.hide();
   hideDock();
   trace('manager-hidden');
 }
 function showStatus() {
-  if (!popover || !tray) return;
+  if (exiting() || !liveWindow(popover) || !tray || tray.isDestroyed()) return;
   const bounds = tray.getBounds();
   const work = screen.getDisplayNearestPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }).workArea;
   if (isMac) {
@@ -240,7 +245,7 @@ function refreshTray() {
   const menu = Menu.buildFromTemplate([
     { label: `灵藏 · ${label}`, enabled: false },
     { label: '打开管理窗口', click: () => openManager() }, { type: 'separator' },
-    { label: '检查客户端更新', click: () => { openManager(); main.webContents.send('updates:open'); } },
+    { label: '检查客户端更新', click: async () => { await openManager(); if (!exiting() && liveWindow(main)) main.webContents.send('updates:open'); } },
     { id: 'worker-start', ...itemState('start', '启动工作节点', !s.running && !s.starting && s.paired && !macQuit?.pending), click: () => menuAction('start') },
     { id: 'worker-pause-resume', ...itemState(s.mode === 'paused' ? 'resume' : 'pause', s.mode === 'paused' ? '继续领取' : '暂停领取（当前任务继续）', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction(s.mode === 'paused' ? 'resume' : 'pause') },
     { id: 'worker-drain', ...itemState('drain', isMac ? '停止工作节点（完成当前任务后）' : '完成当前任务后停止', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction('drain') },
@@ -270,12 +275,12 @@ else {
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
     // A status panel may activate this accessory app without requesting its manager.
-    if (!openingManager && (!isMac || !popover?.isVisible())) openManager();
+    if (!exiting() && !openingManager && (!isMac || !liveWindow(popover) || !popover.isVisible())) openManager();
   });
   app.on('before-quit', event => {
     workerSession?.observe();
     if (isMac && !quitting && !endingSession && updates?.snapshot().phase !== 'installing') { event.preventDefault(); void menuAction('quit-after'); return; }
-    quitting = true; clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
+    quitting = true; managerRevision++; loginController?.abort(); panelController?.dispose(); clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
   app.whenReady().then(() => {
     loginItem = new DesktopLoginItem({ app, test: process.env.COLLECTOR_DESKTOP_TEST === '1' });
@@ -291,10 +296,12 @@ else {
         window.webContents.send('desktop-settings:changed', value);
       }
     });
-    updates.on('changed', state => { if (!main.isDestroyed()) main.webContents.send('updates:changed', state); });
+    updates.on('changed', state => { if (liveWindow(main)) main.webContents.send('updates:changed', state); });
     main.on('close', event => {
       loginController?.abort();
-      if (quitting || endingSession) return;
+      // Squirrel closes windows before app.before-quit. Installation must pass
+      // through this handler instead of applying the normal close-to-tray policy.
+      if (exiting()) return;
       workerSession.observe();
       event.preventDefault();
       if (settings.snapshot().closeBehavior === 'quit') {
@@ -305,6 +312,8 @@ else {
     });
     main.on('blur', () => loginController?.abort());
     main.on('hide', () => loginController?.abort());
+    main.once('closed', () => { main = null; managerRevision++; });
+    popover.once('closed', () => { panelController?.dispose(); popover = null; });
     const sessionEnding = () => { endingSession = true; workerSession.observe(); };
     main.on('query-session-end', sessionEnding); main.on('session-end', sessionEnding);
     powerMonitor.on('shutdown', sessionEnding);
@@ -318,13 +327,13 @@ else {
       tray = new Tray(trayImage, guid);
     } else tray = new Tray(trayImage);
     if (isMac) {
-      panelController = createStatusPanelController({ panel: popover, show: showStatus, trayBounds: () => tray.getBounds(), cursor: () => screen.getCursorScreenPoint() });
+      panelController = createStatusPanelController({ panel: popover, show: showStatus, isActive: () => !exiting(), trayBounds: () => tray.getBounds(), cursor: () => screen.getCursorScreenPoint() });
       tray.setIgnoreDoubleClickEvents(true);
       tray.on('click', () => panelController.toggle());
       popover.on('blur', () => panelController.blur());
       popover.webContents.on('before-input-event', (event, input) => { if (input.key === 'Escape') { event.preventDefault(); hideStatus(); } });
     } else {
-      popover.on('blur', () => popover.hide());
+      popover.on('blur', hideStatus);
       tray.on('click', () => { clearTimeout(clickTimer); clickTimer = setTimeout(showStatus, 450); });
       tray.on('double-click', () => { clearTimeout(clickTimer); trace('tray-double-open'); openManager(); });
     }

@@ -118,6 +118,9 @@ jobs:
           node scripts/test-packaged-update.cjs \
             desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
             "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+      - name: Test signed macOS update window shutdown
+        working-directory: public-source/collector
+        run: node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test packaged macOS menu bar and safe Worker lifecycle
         working-directory: public-source/collector
         shell: bash
