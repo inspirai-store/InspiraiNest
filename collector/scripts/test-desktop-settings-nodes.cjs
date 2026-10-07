@@ -34,7 +34,7 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
   }
   try{
     await launch();console.log('Settings fixture: appearance');assert.equal(await page.locator('#theme-toggle').count(),0);
-    assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['overview','tasks','library','nodes','settings']);
+    assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['overview','tasks','library','nodes','skill-market','settings']);
     await showSettings(page,'appearance');
     if(await app.evaluate(({app})=>app.isPackaged)){
       if(process.platform==='win32'){
