@@ -48,7 +48,9 @@ jobs:
           test -f public-source/collector/electron-builder.yml
       - run: npm ci --ignore-scripts
         working-directory: public-source/collector
-      - run: npm test
+      # Keep the self-hosted runner's timing-sensitive Worker fixtures within
+      # their deadlines while still executing the complete test suite.
+      - run: node --test --test-concurrency=4 test/*.test.mjs
         working-directory: public-source/collector
       - name: Build Developer ID signed and notarized macOS packages
         working-directory: public-source/collector
