@@ -161,7 +161,7 @@ export class OwnerClient {
     return this.api('/api/tasks', 'POST', payload);
   }
   taskAction({ id, action }) {
-    if (!['retry', 'cancel', 'approve'].includes(action)) throw new Error('不支持的任务操作');
+    if (!['retry', 'cancel', 'approve', 'reassign'].includes(action)) throw new Error('不支持的任务操作');
     return this.api(`/api/tasks/${taskId(id)}/${action}`, 'POST', {});
   }
   async draft(id) {

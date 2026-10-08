@@ -18,6 +18,7 @@ import { createSkillService, taskCapabilities } from './skill-service.mjs';
 import QRCode from 'qrcode';
 import { createSkillHubClient } from './skillhub.mjs';
 import { createAgentService } from './agent-service.mjs';
+import { canRunTask, nodeFailureCodes, releaseTask } from './task-routing.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -136,11 +137,43 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const origin = publicUrl ? new URL(publicUrl).origin : `${req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.headers.host}`;
     requireValue(req.headers.origin === origin, 'Origin not allowed', 403);
   }
-  async function assigned(device, taskId) {
+  function checkAssignment(device, task, req) {
+    requireValue(task && task.deviceId === device.id, 'Task not assigned to this device', 403);
+    requireValue(!task.assignmentId || req?.headers['x-task-assignment'] === task.assignmentId, 'Task assignment has changed', 409);
+  }
+  async function assigned(device, taskId, req) {
     worker(device);
     const task = await store.get('task', taskId);
-    requireValue(task && task.deviceId === device.id, 'Task not assigned to this device', 403);
+    checkAssignment(device, task, req);
     return task;
+  }
+  async function reroute(task, reason, message, target = store, { manual = false } = {}) {
+    const released = releaseTask(task, reason, message, new Date(clock()).toISOString());
+    const alternatives = (await target.list('device')).filter(d => canRunTask(released, d));
+    if (!alternatives.length) {
+      requireValue(!manual, '没有其他能力匹配的授权节点，请先授权或配置另一台电脑', 409);
+      return saveTask({ ...task, failedDeviceIds: released.failedDeviceIds, failover: { ...released.failover, exhausted: true } }, 'waiting_action',
+        `${message}；没有其他尚未尝试且能力匹配的节点，请修复后继续或切换节点`, target);
+    }
+    return saveTask(released, 'queued', `${message}；等待其他能力匹配的节点接手（原电脑成果保留）`, target);
+  }
+  async function recoverUnavailableTasks() {
+    return serialized('claim', async () => {
+      for (const candidate of await store.list('task')) {
+        if (!['assigned', 'running'].includes(candidate.state) || !candidate.deviceId) continue;
+        const node = await store.get('device', candidate.deviceId);
+        // Older clients cannot fence a previous attempt. Leave their offline work
+        // intact; current clients stop when their assignment disappears on heartbeat.
+        if (node && !node.revokedAt && (!candidate.assignmentId || clock() - Date.parse(node.lastHeartbeatAt || candidate.updatedAt) < 120000)) continue;
+        await store.transaction(async tx => {
+          const liveNode = await tx.getForUpdate('device', candidate.deviceId);
+          const live = await tx.getForUpdate('task', candidate.id);
+          if (!live || live.deviceId !== candidate.deviceId || !['assigned', 'running'].includes(live.state)) return;
+          if (liveNode && !liveNode.revokedAt && (!live.assignmentId || clock() - Date.parse(liveNode.lastHeartbeatAt || live.updatedAt) < 120000)) return;
+          await reroute(live, 'NODE_OFFLINE', '原工作节点超过两分钟未报告心跳或授权已失效', tx);
+        });
+      }
+    });
   }
   async function enroll(name, role, input = {}, transaction, prepared) {
     const token = secret();
@@ -188,14 +221,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     try { return JSON.parse(raw); } catch { fail('Invalid JSON'); }
   }
   async function publish(bundle, device, req, taskId) {
-    const taskRecord = taskId ? await assigned(device, taskId) : null;
+    const taskRecord = taskId ? await assigned(device, taskId, req) : null;
     if (taskRecord?.tags?.length) bundle = { ...bundle, meta: { ...bundle.meta, tags: [...new Set([...(bundle.meta?.tags || []), ...taskRecord.tags])] } };
     validateArchive(bundle);
     requireReadableMetadata(bundle.meta);
     const buffer = Buffer.from(JSON.stringify(bundle));
     const digest = hash(buffer);
     if (taskId) {
-      const task = await assigned(device, taskId);
+      const task = await assigned(device, taskId, req);
       if (task.state === 'completed' && task.archiveId === digest) return store.get('archive', digest);
       if (task.state === 'awaiting_review' && task.draftId === digest) return store.get('draft', digest);
       requireValue(active.includes(task.state), 'Task is not running', 409);
@@ -204,17 +237,29 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     await storage.put(key, buffer);
     // A revoked worker or cancelled task cannot commit a result after an in-flight upload.
     await authenticate(req);
-    if (taskId) requireValue(active.includes((await assigned(device, taskId)).state), 'Task is no longer running', 409);
     const record = { id: digest, entryId: bundle.meta.id, meta: bundle.meta, key, deviceId: device.id, createdAt: now(), omittedCount: bundle.omitted?.length || 0 };
-    if (taskRecord?.autoArchive === false) {
-      const draft = await store.put('draft', record);
-      await saveTask({ ...(await assigned(device, taskId)), draftId: digest }, 'awaiting_review', '分析结果已上传，等待确认归档');
-      return draft;
-    }
-    const archive = (await store.get('archive', digest)) || await store.put('archive', record);
-    void readApi.refresh().catch(() => {});
-    if (taskId) await saveTask({ ...(await assigned(device, taskId)), archiveId: digest }, 'completed', '归档校验完成，资料已上传');
-    return archive;
+    const commit = async tx => {
+      const liveDevice = await tx.getForUpdate('device', device.id);
+      requireValue(liveDevice && !liveDevice.revokedAt && liveDevice.tokenHash === device.tokenHash, 'Device authorization required', 401);
+      const task = taskId ? await tx.getForUpdate('task', taskId) : null;
+      if (taskId) {
+        checkAssignment(device, task, req);
+        if (task.state === 'completed' && task.archiveId === digest) return tx.get('archive', digest);
+        if (task.state === 'awaiting_review' && task.draftId === digest) return tx.get('draft', digest);
+        requireValue(active.includes(task.state), 'Task is no longer running', 409);
+      }
+      if (task?.autoArchive === false) {
+        const draft = await tx.put('draft', record);
+        await saveTask({ ...task, draftId: digest }, 'awaiting_review', '分析结果已上传，等待确认归档', tx);
+        return draft;
+      }
+      const archive = (await tx.get('archive', digest)) || await tx.put('archive', record);
+      if (taskId) await saveTask({ ...task, archiveId: digest }, 'completed', '归档校验完成，资料已上传', tx);
+      return archive;
+    };
+    const result = await serialized('claim', () => store.transaction(commit));
+    if (!taskRecord || taskRecord.autoArchive !== false) void readApi.refresh().catch(() => {});
+    return result;
   }
 
   const server = http.createServer(async (req, res) => {
@@ -477,6 +522,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (route === '/api/state' && req.method === 'GET') {
         owner(device);
+        await recoverUnavailableTasks();
         const archives = [];
         for (const archive of await store.list('archive')) if (!(await deleted(archive))) archives.push(archive);
         const devices = await Promise.all((await store.list('device')).filter(d => !d.revokedAt).map(d => sessions.ensure(d)));
@@ -542,7 +588,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
-        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[] });
+        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
@@ -578,16 +624,26 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (route === '/api/claim' && req.method === 'POST') {
         worker(device);
+        const input = await body(req);
+        requireValue(input.assignmentProtocol === undefined || input.assignmentProtocol === 1, 'Invalid assignment protocol');
         if (device.agentRuntime?.busy) return send(res, 200, { task: null });
         requireValue(workerOnline(device, clock()), 'Heartbeat required', 409);
+        await recoverUnavailableTasks();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
           let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state));
+          if (task && !task.assignmentId && input.assignmentProtocol === 1) {
+            task = await store.transaction(async tx => {
+              const live = await tx.getForUpdate('task', task.id);
+              if (!live || live.deviceId !== device.id || !active.includes(live.state)) return null;
+              return live.assignmentId ? live : tx.put('task', { ...live, assignmentId: id() });
+            });
+          }
           if (!task && device.agents.length) {
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && (t.type === 'auto' ? device.capabilities.length > 0 : device.capabilities.includes(t.type)) && (!t.preferredDeviceId || t.preferredDeviceId === device.id) && (!t.preferredAgent || device.agents.includes(t.preferredAgent)))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
               const selected = await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
@@ -595,8 +651,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 const live = await tx.getForUpdate('device', device.id);
                 requireValue(live && !live.revokedAt && live.tokenHash === device.tokenHash, 'Device authorization required', 401);
                 requireValue(workerOnline(live, clock()), 'Heartbeat required', 409);
-                if (live.agentRuntime?.busy) return null;
-                return saveTask({ ...candidate, deviceId: device.id, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || candidate.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
+                if (live.agentRuntime?.busy || live.skillRuntime?.mode && live.skillRuntime.mode !== 'running') return null;
+                if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
+                const pending = await tx.getForUpdate('task', candidate.id);
+                if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
+                return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });
               break;
             }
@@ -618,7 +677,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         return res.end(buffer);
       }
-      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve)$/);
+      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign)$/);
       if (taskRoute && req.method === 'POST') {
         const [, taskId, action] = taskRoute;
         const input = await body(req);
@@ -637,21 +696,36 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           void readApi.refresh().catch(() => {});
           return send(res, 200, result);
         }
-        if (action === 'retry' || action === 'cancel') {
+        if (['retry', 'cancel', 'reassign'].includes(action)) {
           owner(device);
-          return await serialized('claim', async () => {
-            const task = await store.get('task', taskId);
+          const result = await serialized('claim', () => store.transaction(async tx => {
+            const task = await tx.getForUpdate('task', taskId);
             requireValue(task, 'Task not found', 404);
-            requireValue(action === 'cancel' ? task.state !== 'completed' : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
-            return send(res, 200, await saveTask(task, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑'));
-          });
+            requireValue(action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
+            const next = action === 'retry' ? { ...task, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
+            return saveTask(next, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑', tx);
+          }));
+          return send(res, 200, result);
         }
-        const task = await assigned(device, taskId);
+        await assigned(device, taskId, req);
         if (action === 'result') return send(res, 200, await publish(input, device, req, taskId));
-        requireValue(active.includes(task.state), 'Task is not running', 409);
         requireValue(['running', 'uploading', 'waiting_action', 'failed'].includes(input.state), 'Invalid task state');
-        const executionSkills = (task.selectedSkills || []).filter(s=>s.agent === (input.agent || task.agent));
-        return send(res, 200, await saveTask({ ...task, agent: input.agent || task.agent || null, executionSkills }, input.state, text(input.message, 'progress message', 1000)));
+        requireValue(input.failureCode === undefined || nodeFailureCodes.has(input.failureCode), 'Invalid node failure code');
+        const message = text(input.message, 'progress message', 1000);
+        const result = await serialized('claim', () => store.transaction(async tx => {
+          const live = await tx.getForUpdate('task', taskId);
+          checkAssignment(device, live, req);
+          requireValue(active.includes(live.state), 'Task is not running', 409);
+          const executionSkills = (live.selectedSkills || []).filter(s=>s.agent === (input.agent || live.agent));
+          const updated = { ...live, agent: input.agent || live.agent || null, executionSkills };
+          if (input.state === 'failed' || input.state === 'waiting_action' && nodeFailureCodes.has(input.failureCode)) {
+            await saveTask(updated, input.state, message, tx);
+            return reroute(updated, input.failureCode || 'EXECUTION_FAILED', '原工作节点未能完成采集', tx);
+          }
+          return saveTask(updated, input.state, message, tx);
+        }));
+        return send(res, 200, result);
       }
       if (route === '/api/archives' && req.method === 'POST') {
         requireValue(['owner', 'worker'].includes(device.role), 'Archive publisher permission required', 403);

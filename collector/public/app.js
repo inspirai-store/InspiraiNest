@@ -169,7 +169,7 @@
     renderWorkerNodes();
     $('#queue-summary').textContent = `${devices.filter(d => window.deviceView.dispatchable(d) && d.online).length} 个工作节点在线 · ${tasks.filter(t => t.state === 'queued').length} 项待分配`;
     const filter = $('#status-filter').value;
-    const filtered = tasks.filter(t => filter === 'all' || (filter === 'running' ? ['running', 'assigned', 'uploading'].includes(t.state) : t.state === filter));
+    const filtered = tasks.filter(t => filter === 'all' || (filter === 'unfinished' ? !['completed', 'cancelled'].includes(t.state) : filter === 'running' ? ['running', 'assigned', 'uploading'].includes(t.state) : t.state === filter));
     $('#tasks').innerHTML = filtered.map(task => {
       const machine = devices.find(d => d.id === task.deviceId);
       return `<div class="row">${icon('link')}<div class="row-main"><button class="row-title" data-task="${task.id}">${esc((task.content ?? task.url).slice(0, 180))}</button><p>${esc(task.scenario || '通用摘要')}</p><small>${types[task.type]} · ${date(task.createdAt)} · ${machine ? esc(machine.name) + (machine.online ? '' : '（离线，等待恢复）') : task.deviceId ? '原设备已移除' : '等待电脑'}${task.agent ? ' · ' + esc(task.agent) : ''}</small></div>${badge(task.state)}</div>`;
@@ -208,7 +208,7 @@
     selectedTask = id;
     const task = snapshot.tasks.find(task => task.id === id);
     if (!task) return;
-    $('#task-detail').innerHTML = `${badge(task.state)}<p class="task-content">${esc(task.content ?? task.url)}</p><p>${esc(task.scenario || '通用摘要')}</p><p>${task.autoArchive === false ? '确认后归档' : '自动归档'}${task.tags?.length ? ' · ' + esc(task.tags.join(' / ')) : ''}</p><ol class="events">${task.events.map(e => `<li><time>${date(e.at)}</time><p>${esc(e.message)}</p></li>`).join('')}</ol><div class="actions">${task.state === 'awaiting_review' ? `<button data-preview="${task.id}">${icon('book-open')}查看结果</button><button class="primary" data-approve="${task.id}">确认归档</button>` : ''}${task.archiveId ? `<button data-archive="${task.archiveId}">${icon('book-open')}阅读资料</button>` : ''}${['failed', 'waiting_action'].includes(task.state) ? `<button data-retry="${task.id}" class="primary">${icon('play')}继续</button>` : ''}${!['completed', 'cancelled'].includes(task.state) ? `<button data-cancel="${task.id}" class="danger">取消任务</button>` : ''}</div>`;
+    $('#task-detail').innerHTML = `${badge(task.state)}<p class="task-content">${esc(task.content ?? task.url)}</p><p>${esc(task.scenario || '通用摘要')}</p><p>${task.autoArchive === false ? '确认后归档' : '自动归档'}${task.tags?.length ? ' · ' + esc(task.tags.join(' / ')) : ''}</p><ol class="events">${task.events.map(e => `<li><time>${date(e.at)}</time><p>${esc(e.message)}</p></li>`).join('')}</ol><div class="actions">${task.state === 'awaiting_review' ? `<button data-preview="${task.id}">${icon('book-open')}查看结果</button><button class="primary" data-approve="${task.id}">确认归档</button>` : ''}${task.archiveId ? `<button data-archive="${task.archiveId}">${icon('book-open')}阅读资料</button>` : ''}${['failed', 'waiting_action'].includes(task.state) ? `<button data-retry="${task.id}" class="primary">${icon('play')}继续</button>` : ''}${task.deviceId && ['queued','assigned','running','uploading','waiting_action','failed'].includes(task.state) ? `<button data-reassign="${task.id}">${icon('refresh-cw')}切换其他节点</button>` : ''}${!['completed', 'cancelled'].includes(task.state) ? `<button data-cancel="${task.id}" class="danger">取消任务</button>` : ''}</div>`;
     if (open) $('#detail-dialog').showModal(); icons();
   }
   function buffer(file) { return Uint8Array.from(atob(file.body), char => char.charCodeAt(0)); }
@@ -327,6 +327,7 @@
       if (d.file !== undefined) { const file = currentBundle.files[Number(d.file)]; download(blobURL(file), file.path.split('/').at(-1)); }
       if (d.revoke && confirm('撤销该设备的访问和任务权限？')) { await api(`/devices/${d.revoke}/revoke`, 'POST', {}); await refresh(); }
       if (d.retry || d.cancel) { await api(`/tasks/${d.retry || d.cancel}/${d.retry ? 'retry' : 'cancel'}`, 'POST', {}); $('#detail-dialog').close(); await refresh(); }
+      if (d.reassign && confirm('停止原节点执行，让其他能力匹配的节点重新采集？原电脑的中间文件保留。')) { await api(`/tasks/${d.reassign}/reassign`, 'POST', {}); $('#detail-dialog').close(); await refresh(); notice('已排队，等待其他节点接手'); }
     } catch (error) { notice(error.message); }
   });
   icons(); window.browserSession.ready().then(active => { token = active ? 'cookie' : null; refresh(); }); setInterval(refresh, 5000);

@@ -1,6 +1,7 @@
 import { hash, now, requireValue, canonicalJson } from './common.mjs';
 import { SKILL_AGENTS, cleanSkillPolicy, cleanRequirements, validateSkillPackage } from './skill-package.mjs';
 import { workerAuthorized, workerOnline } from './device-metadata.mjs';
+import { canRunTask } from './task-routing.mjs';
 
 const digest = x => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
 const string = (x, max = 200) => typeof x === 'string' ? x.slice(0, max) : null;
@@ -54,9 +55,8 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       return (env && clock()-Date.parse(env.scannedAt)<=180000?env.items:[]).filter(s=>s.taskContext && s.managedVersion && s.enabled !== false && !['disabled','shadowed','not_loaded','agent_unavailable'].includes(s.loadState) && target.agents.includes(s.agent) && (!task.preferredAgent || s.agent === task.preferredAgent)).map(s=>({agent:s.agent,versionId:s.managedVersion,hash:s.hash,name:s.name,capabilities:s.capabilities}));
     };
     if (!task.requiredCapabilities?.length) return { eligible: true, selectedSkills:await snapshots(claiming) };
-    const candidates = (await store.list('device')).filter(d => workerOnline(d, clock()) && (!d.skillRuntime || d.skillRuntime.mode === 'running' && d.skillRuntime.idle)
-      && !tasks.some(t => t.deviceId === d.id && ['assigned','running','uploading'].includes(t.state)) && (!task.preferredDeviceId || d.id === task.preferredDeviceId)
-      && d.agents?.length && (task.type === 'auto' ? d.capabilities?.length : d.capabilities?.includes(task.type)) && (!task.preferredAgent || d.agents.includes(task.preferredAgent)));
+    const candidates = (await store.list('device')).filter(d => canRunTask(task, d) && workerOnline(d, clock()) && (!d.skillRuntime || d.skillRuntime.mode === 'running' && d.skillRuntime.idle)
+      && !tasks.some(t => t.deviceId === d.id && ['assigned','running','uploading'].includes(t.state)));
     const matches = [];
     for (const d of candidates) for (const s of await verifiedItems(d)) if ((!task.preferredAgent || s.agent === task.preferredAgent) && task.requiredCapabilities.some(c => s.capabilities.includes(c))) matches.push({ device: d, skill: s });
     if (!matches.length) return { eligible: true, selectedSkills:await snapshots(claiming) };

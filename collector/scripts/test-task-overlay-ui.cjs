@@ -6,7 +6,7 @@ const path = require('node:path');
 
 (async () => {
   const { createService } = await import('../src/server.mjs');
-  const { secret } = await import('../src/common.mjs');
+  const { secret, hash } = await import('../src/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-task-overlay-'));
   const key = secret(), service = createService({ dataDir: root, masterKey: key });
   const output = path.resolve(__dirname, '../test-output/task-overlay');
@@ -18,6 +18,8 @@ const path = require('node:path');
       type: 'auto', state: states[i] || 'queued', createdAt: at, updatedAt: at, scenario: null,
       autoArchive: true, tags: ['测试'], events: [{ at, message: '等待可用电脑' }] });
   }
+  for (const id of ['switch-node-a', 'switch-node-b']) await service.store.put('device', { id, name: id, role: 'worker', clientType: 'worker', platform: process.platform, tokenHash: hash(secret()), capabilities: ['article'], agents: ['codex'], lastHeartbeatAt: new Date().toISOString(), revokedAt: null });
+  await service.store.put('task', { ...await service.store.get('task', 'overlay-4'), deviceId: 'switch-node-a' });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${service.server.address().port}`;
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -44,6 +46,15 @@ const path = require('node:path');
     assert.equal(await page.title(), '采集任务 · 灵藏');
     assert.equal(await page.locator('nav [data-view=archives]').getAttribute('aria-current'), 'page');
     assert.equal(await page.locator('#tasks-toggle').getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('#status-filter').inputValue(), 'unfinished');
+    assert.equal(await page.locator('#tasks .row').count(), 43);
+    assert.equal(await page.locator('#tasks [data-task="overlay-7"]').count(), 0);
+    assert.equal(await page.locator('#tasks [data-task="overlay-8"]').count(), 0);
+    assert.equal(await page.locator('#tasks [data-task="overlay-6"]').count(), 1, 'failed work is unfinished');
+    await page.locator('#status-filter').selectOption('completed');
+    assert.equal(await page.locator('#tasks .row').count(), 1);
+    await page.locator('#status-filter').selectOption('all');
+    assert.equal(await page.locator('#tasks .row').count(), 45);
     const box = await page.locator('#tasks-dialog').boundingBox();
     assert.ok(box.width > 1440 * 0.9 && box.height > 900 * 0.9);
     await page.locator('#status-filter').selectOption('queued');
@@ -97,6 +108,14 @@ const path = require('node:path');
     await page.locator('#detail-dialog [data-cancel]').click();
     await page.locator('#detail-dialog').waitFor({ state: 'hidden' });
     await page.locator('#task-count').filter({ hasText: '43' }).waitFor();
+    await page.locator('#status-filter').selectOption('waiting_action');
+    await page.locator('#tasks [data-task="overlay-4"]').click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#task-detail [data-reassign="overlay-4"]').click();
+    await page.locator('#detail-dialog').waitFor({ state: 'hidden' });
+    const switched = await service.store.get('task', 'overlay-4');
+    assert.equal(switched.state, 'queued'); assert.equal(switched.deviceId, null);
+    assert.deepEqual(switched.failedDeviceIds, ['switch-node-a']);
     await page.locator('#status-filter').selectOption('all');
     const beforePoll = await page.locator('#tasks-view').evaluate(element => element.scrollTop = 240);
     await page.waitForResponse(response => response.url() === base + '/api/state' && response.request().method() === 'GET');

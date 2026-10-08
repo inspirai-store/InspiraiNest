@@ -15,16 +15,17 @@ import { createSkillRuntime, taskSkillSnapshots } from './skill-runtime.mjs';
 import { fixedSkillProfiles } from './skill-inventory.mjs';
 import { verifySkillExtraction } from './skill-verification.mjs';
 import { createAgentRuntime } from './agent-runtime.mjs';
+import { nodeFailureCodes } from './task-routing.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || path.join(project, '..'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function api(config, route, method = 'GET', value) {
+export async function api(config, route, method = 'GET', value, assignmentId) {
   let response;
   try {
     response = await fetch(`${remoteURL(config.server)}${route}`, {
-      method, headers: { 'Content-Type': 'application/json', ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
+      method, headers: { 'Content-Type': 'application/json', ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}), ...(assignmentId ? { 'X-Task-Assignment': assignmentId } : {}) },
       body: value === undefined ? undefined : JSON.stringify(value), signal: AbortSignal.timeout(120000), redirect: 'error',
     });
   } catch (cause) {
@@ -84,9 +85,13 @@ export async function processTask(config, task, available, signal, onProgress = 
   const workspace = prepareWorkspace(task, dataDir);
   const skillSnapshots = await taskSkillSnapshots(task, workspace, (...args) => api(config, ...args));
   const checkpoint = path.join(workspace, 'collector-result.json');
-  const progress = (state, message, agent, diagnostic) => {
+  const progress = async (state, message, agent, diagnostic) => {
     onProgress({ state, message, agent, ...(diagnostic ? { diagnostic } : {}) });
-    return api(config, `/api/tasks/${task.id}/progress`, 'POST', { state, message, agent, executionSkills: skillSnapshots.filter(s => s.agent === agent).map(({path,...s}) => s) });
+    const result = await api(config, `/api/tasks/${task.id}/progress`, 'POST', { state, message, agent,
+      ...(state === 'waiting_action' && nodeFailureCodes.has(diagnostic?.code) ? { failureCode: diagnostic.code } : {}),
+      executionSkills: skillSnapshots.filter(s => s.agent === agent).map(({path,...s}) => s) }, task.assignmentId);
+    if (result.state === 'queued' && result.deviceId === null) onProgress({ state: 'queued', message: '本机无法完成，任务已转交其他工作节点；本机文件保留', agent });
+    return result;
   };
   if (fs.existsSync(checkpoint) && readJson(checkpoint).status !== 'ready') {
     fs.renameSync(checkpoint, path.join(workspace, `collector-result.${id()}.json`));
@@ -133,7 +138,7 @@ export async function processTask(config, task, available, signal, onProgress = 
   }
   requireValue(typeof bundle.meta.collected_at === 'string' && bundle.meta.collected_at.includes('T'), 'New collections require second-resolution timestamps');
   await progress('uploading', '轻量资料校验通过，正在上传', chosen);
-  await api(config, `/api/tasks/${task.id}/result`, 'POST', bundle);
+  await api(config, `/api/tasks/${task.id}/result`, 'POST', bundle, task.assignmentId);
   atomicJson(path.join(workspace, '..', 'uploaded.json'), { entry: result.entry, digest: hash(JSON.stringify(bundle)) });
   onProgress({ state: task.autoArchive === false ? 'awaiting_review' : 'completed', message: task.autoArchive === false ? '轻量包已上传，等待远端确认归档' : '归档上传完成；原媒体保留本机', agent: chosen });
 }
@@ -242,7 +247,13 @@ export async function runWorker(config, { once = false, signal, paused = false }
       agentOperations = Array.isArray(result.agentOperations) ? result.agentOperations : [];
       if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (!result.tasks.every(task => task && typeof task.id === 'string')) throw Object.assign(new Error('心跳任务列表结构异常'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
-      if (current && result.tasks.some(task => task.id === current.id && task.state === 'cancelled')) current.controller.abort();
+      if (current) {
+        const assignment = result.tasks.find(task => task.id === current.id);
+        if (!assignment || assignment.state === 'cancelled' || current.assignmentId && assignment.assignmentId !== current.assignmentId) {
+          current.reassigned = !assignment || assignment.state !== 'cancelled';
+          current.controller.abort();
+        }
+      }
       const lastTask = control.state.lastTask;
       const remoteTask = lastTask && result.tasks.find(task => task.id === lastTask.id);
       const terminal = remoteTask && ['completed', 'awaiting_review', 'cancelled', 'failed'].includes(remoteTask.state);
@@ -278,13 +289,13 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (control.state.mode === 'paused') { if (control.state.phase !== 'paused') control.update({ phase: 'paused' }); await sleep(250); continue; }
         control.update({ phase: 'claiming' });
-        const claimed = await api(config, '/api/claim', 'POST', {});
+        const claimed = await api(config, '/api/claim', 'POST', { assignmentProtocol: 1 });
         if (!Object.hasOwn(claimed, 'task')) throw Object.assign(new Error('领取响应缺少任务字段，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
         const { task } = claimed;
         if (task !== null && (!task || typeof task !== 'object' || !/^[a-zA-Z0-9-]{1,100}$/.test(task.id))) throw Object.assign(new Error('领取任务结构异常'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
         journal.recover('poll', '任务领取接口已恢复');
         if (task) {
-          current = { id: task.id, controller: new AbortController() };
+          current = { id: task.id, assignmentId: task.assignmentId, controller: new AbortController() };
           const displayTask = { id: task.id, title: String(task.content || task.url || task.id).slice(0, 400), state: task.state, agent: task.agent || null, message: '准备任务工作目录' };
           control.update({ phase: 'working', current: displayTask });
           journal.event({ taskId: task.id, code: 'TASK_CLAIMED', stage: 'preparing', message: '已领取任务，准备本机采集目录' });
@@ -300,18 +311,24 @@ export async function runWorker(config, { once = false, signal, paused = false }
           };
           try { await processTask(config, task, available, current.controller.signal, progress); }
           catch (error) {
-            if (error.status === 401 || error.status === 403) forbidden = true;
+            if ([403,409].includes(error.status) && ['/progress','/result'].some(s => error.route?.endsWith(s))) {
+              current.reassigned = true;
+              current.controller.abort();
+            } else if (error.status === 401 || error.status === 403) forbidden = true;
             else if (error.status === 400 || (!error.status && error.name !== 'TypeError' && error.name !== 'TimeoutError')) {
               const message = '系统问题阻塞了采集，成果已保留；请查看系统诊断后继续';
-              await api(config, `/api/tasks/${task.id}/progress`, 'POST', { state: 'waiting_action', message }).catch(() => {});
-              Object.assign(displayTask, { state: 'waiting_action', message, errorDomain: 'system' });
+              const nodeFailure = ['EACCES', 'EPERM', 'ENOSPC', 'ENOENT'].includes(error.code) && !['uploading', 'validating'].includes(displayTask.state);
+              const result = await api(config, `/api/tasks/${task.id}/progress`, 'POST', { state: 'waiting_action', message, ...(nodeFailure ? { failureCode: 'AGENT_ENVIRONMENT' } : {}) }, task.assignmentId).catch(() => null);
+              Object.assign(displayTask, { state: result?.state === 'queued' ? 'queued' : 'waiting_action', message: result?.state === 'queued' ? '本机环境无法完成采集，任务已转交其他节点；本机文件保留' : message, errorDomain: 'system' });
             }
-            if (displayTask.state !== 'waiting_action') Object.assign(displayTask, { state: 'interrupted', message: '系统问题中断采集，本机成果已保留；服务恢复后可继续', errorDomain: 'system' });
-            fault(`task:${task.id}:execution`, error, '采集管线发生系统错误，本机成果已保留', task.id);
-            journal.event({ taskId: task.id, code: 'TASK_SYSTEM_BLOCKED', stage: 'waiting_action', level: 'warn', message: '采集中断于系统问题，成果保留本机；请查看系统诊断' });
+            if (!current.reassigned) {
+              if (!['waiting_action', 'queued'].includes(displayTask.state)) Object.assign(displayTask, { state: 'interrupted', message: '系统问题中断采集，本机成果已保留；服务恢复后可继续', errorDomain: 'system' });
+              fault(`task:${task.id}:execution`, error, '采集管线发生系统错误，本机成果已保留', task.id);
+              journal.event({ taskId: task.id, code: 'TASK_SYSTEM_BLOCKED', stage: 'waiting_action', level: 'warn', message: '采集中断于系统问题，成果保留本机；请查看系统诊断' });
+            }
           } finally {
             if (current.controller.signal.aborted) {
-              Object.assign(displayTask, { state: 'interrupted', message: '执行已中断，文件保留本机；请到远端页面确认任务状态。' });
+              Object.assign(displayTask, { state: current.reassigned ? 'queued' : 'interrupted', errorDomain: null, message: current.reassigned ? '任务已切换工作节点，本机执行已停止，文件保留本机' : '执行已中断，文件保留本机；请到远端页面确认任务状态。' });
               journal.event({ taskId: task.id, code: 'TASK_INTERRUPTED', stage: 'interrupted', level: 'warn', message: displayTask.message });
             }
             if (['completed', 'awaiting_review'].includes(displayTask.state)) {

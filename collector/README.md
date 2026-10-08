@@ -12,6 +12,12 @@ macOS Worker: click the menu-bar icon to toggle its status panel. Closing the ma
 
 Offline nodes: use “删除节点” in the desktop node detail or Web node panel. `POST /api/devices/:id/remove-node` rechecks the heartbeat and rejects online nodes, the current client's own node, and nodes with queued, running, waiting or failed work. Removal revokes the node's authorization while retaining its record and historical tasks/archives. Uploaded results awaiting review remain reviewable.
 
+采集任务默认显示“未完成”，包括待操作、待确认及失败任务；已完成、已取消可通过状态筛选查看。
+
+节点因 Agent、工具或权限问题无法完成采集时，任务保留原编号和提交编号，自动排队交给其他能力与指定 Agent 匹配的授权电脑；指定电脑只约束首次分配。每轮排除已失败节点，全部失败后停在“待操作”。任务详情也提供“切换其他节点”；原节点文件保留，新节点重新采集，不搬运原始媒体。来源登录限制、成果校验和上传问题默认保留原机处理。手动“继续任务”复用原机目录，并开始新一轮尝试。
+
+新 Worker 领取任务发送 `assignmentProtocol: 1`，服务端生成 `assignmentId`，进度和上传必须携带 `X-Task-Assignment`。更换分配后旧请求返回 403/409；心跳发现分配变更时停止本机执行，保持 Worker 在线。新版执行中的任务连续两分钟无心跳，可在其他节点领取或管理页面刷新时转交。旧版无分配编号的离线任务及上传阶段保留原机，避免重复执行或丢失已采集成果。服务端无需新增公网资源。
+
 ## 节点 Agent 管理
 
 工作节点详情中的“Agent”提供 Codex、CodeBuddy、Claude Code、Gemini CLI、OpenCode 的列表、安装、更新、刷新和取消。Web、桌面和移动端均可管理电脑节点。默认使用用户目录中的灵藏托管运行时，原有安装仅在来源明确时可选。采集仍沿用 Codex / CodeBuddy。
