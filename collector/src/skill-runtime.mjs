@@ -5,7 +5,7 @@ import { dependencyStatus } from './skill-inventory.mjs';
 import { acquireEnvironmentLock } from './agent-lock.mjs';
 import { agentHome } from './agent-paths.mjs';
 import { createInventoryScanner } from './skill-scan.mjs';
-import { packageSkill, validateSkillPackage, writeSkillPackage, cleanSkillPolicy } from './skill-package.mjs';
+import { packageSkill, validateSkillPackage, writeSkillPackage, cleanSkillPolicy, skillMetadata } from './skill-package.mjs';
 
 const read = (file, fallback) => { try { return readJson(file); } catch { return fallback; } };
 const actualHash = directory => fs.existsSync(directory) ? packageSkill(directory,{validate:false}).hash : null;
@@ -55,7 +55,8 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
       const next=await scan({...config,skillProjects:read(path.join(root,'projects.json'),config.skillProjects || [])},{cwd,home,env});
       if(closed)throw Object.assign(new Error('技能盘点已停止'),{code:'SKILL_SCAN_STOPPED'});
       for(const item of next.inventory.items){
-        const location=next.local.get(item.id), installed=location && ledger.installations[item.agent+':'+location.real];
+        const location=next.local.get(item.id), direct=location && ledger.installations[item.agent+':'+location.real];
+        const installed=direct || (location && item.scope.startsWith('compat-') && Object.entries(ledger.installations).find(([key,value])=>key.endsWith(':'+location.real) && value.hash===item.hash)?.[1]);
         if(installed && installed.hash===item.hash){
           item.managedVersion=installed.versionId; item.capabilities=installed.policy.capabilities;
           item.marketSource=installed.source || null;
@@ -63,7 +64,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
           item.requirements=installed.policy.requirements;
           item.dependencies=await dependencyStatus(item.requirements,{env:next.env,mcp:location.mcp});
           if(installed.source?.provider==='skillhub' && !installed.source.requirementsDeclared){item.dependencies.unknown.push('市场技能未声明依赖');if(item.dependencies.state==='ready')item.dependencies.state='unknown';}
-          if(installed.verification?.state==='passed' && installed.verification.hash===item.hash && installed.verification.profileHash===next.inventory.agents.find(a=>a.name===item.agent)?.profileHash){item.verification=installed.verification;if(item.dependencies.state==='unknown')item.dependencies.state='ready';}
+          if(direct && installed.verification?.state==='passed' && installed.verification.hash===item.hash && installed.verification.profileHash===next.inventory.agents.find(a=>a.name===item.agent)?.profileHash){item.verification=installed.verification;if(item.dependencies.state==='unknown')item.dependencies.state='ready';}
         }
       }
       next.inventory.digest=hash(JSON.stringify({agents:next.inventory.agents,items:next.inventory.items,projects:next.inventory.projects}));
@@ -96,13 +97,14 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
     for(const agent of agents){
       const directory=path.join(state.globalRoots[agent],bundle.name);
       const real=realTarget(directory);
-      const sharedAgents=[...new Set([...Object.entries(state.globalRoots).filter(([,global])=>realTarget(path.join(global,bundle.name))===real).map(([name])=>name),...Array.from(state.local.entries()).filter(([,location])=>location.real===real).map(([skillId])=>state.inventory.items.find(s=>s.id===skillId)?.agent).filter(Boolean)])];
+      const sharedAgents=[...new Set([...Object.entries(state.globalRoots).filter(([,global])=>realTarget(path.join(global,bundle.name))===real).map(([name])=>name),...Array.from(state.local.entries()).filter(([,location])=>location.real===real && !location.origin.scope.startsWith('compat-')).map(([skillId])=>state.inventory.items.find(s=>s.id===skillId)?.agent).filter(Boolean)])];
+      const visibleTo=Object.entries(state.compatibleRoots || {}).filter(([,roots])=>roots.some(root=>realTarget(path.join(root,bundle.name))===real)).map(([name])=>name);
       const currentHash=actualHash(real),managed=ledger.installations[agent+':'+real];
       const previous=currentHash?packageSkill(real,{validate:false}):null;
       const files=new Map((previous?.files || []).map(f=>[f.path,f]));
       const changes=bundle.files.filter(f=>files.get(f.path)?.sha256!==f.sha256 || Boolean(files.get(f.path)?.executable)!==Boolean(f.executable)).map(f=>({path:f.path,state:files.has(f.path)?'modified':'missing'}));
       changes.push(...(previous?.files || []).filter(f=>!bundle.files.some(next=>next.path===f.path)).map(f=>({path:f.path,state:'removed'})));
-      targets.push({agent,targetId:hash(real),directory,realDirectory:real,scope:'user',hash:currentHash,sharedAgents,exists:currentHash!==null,localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
+      targets.push({agent,targetId:hash(real),directory,realDirectory:real,scope:'user',hash:currentHash,sharedAgents,visibleTo,exists:currentHash!==null,localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
     }
     return targets;
   }
@@ -110,6 +112,14 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
     const policy=cleanSkillPolicy(op.policy),targets=targetsFor(bundle,op.agents),problems=[];
     if(!policy.systems.includes(process.platform))problems.push('系统不兼容');
     for(const agent of op.agents){if(!policy.agents.includes(agent))problems.push(agent+' 不兼容');if(!state.inventory.agents.find(a=>a.name===agent)?.installed)problems.push(agent+' 未安装');}
+    if(op.agents.includes('opencode')) {
+      const entry=bundle.files.find(f=>f.path==='SKILL.md');
+      const description=Buffer.from(entry.body,'base64').toString('utf8');
+      if(!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(bundle.name))problems.push('OpenCode 要求技能名称使用单个连字符');
+      // Validate the frontmatter separately from generic portable package rules.
+      const frontmatter=skillMetadata(description);
+      if(typeof frontmatter.description!=='string' || !frontmatter.description.trim() || frontmatter.description.length>1024)problems.push('OpenCode 要求 1–1024 字的技能描述');
+    }
     for(const target of targets)if(target.sharedAgents.some(agent=>!op.agents.includes(agent)))problems.push('共享技能须包含全部 Agent：'+target.sharedAgents.join('、'));
     const dependencies=await dependencyStatus(policy.requirements,{env:state.env});
     return {compatible:problems.length===0,targets,problems,dependencies,versionHash:bundle.hash};

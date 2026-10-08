@@ -1,7 +1,7 @@
 import yauzl from 'yauzl';
 import { crc32 } from 'node:zlib';
 import { hash, now, requireValue, safePath, canonicalJson } from './common.mjs';
-import { MAX_SKILL_BYTES, skillMetadata, skillDigest, validateSkillPackage, cleanSkillPolicy } from './skill-package.mjs';
+import { SKILL_AGENTS, MAX_SKILL_BYTES, skillMetadata, skillDigest, validateSkillPackage, cleanSkillPolicy } from './skill-package.mjs';
 import { workerAuthorized, workerOnline } from './device-metadata.mjs';
 
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -105,7 +105,7 @@ export function createSkillMarketService({store,storage,skillHub,serialized,owne
     return {total:selected.length,page,pageSize,items:selected.slice((page-1)*pageSize,page*pageSize).map(marketItem)};
   }
   async function inventory(input){
-    const agents=['codex','codebuddy','claude'];requireValue(!input.agent || agents.includes(input.agent),'Agent 无效');
+    const agents=SKILL_AGENTS;requireValue(!input.agent || agents.includes(input.agent),'Agent 无效');
     const nodes=(await store.list('device')).filter(d=>!d.revokedAt&&!d.canonicalDeviceId&&workerAuthorized(d)&&(!input.deviceId || d.id===input.deviceId));
     const keyword=label(input.keyword || '').toLocaleLowerCase(),page=Number(input.page || 1);
     requireValue(Number.isSafeInteger(page)&&page>0&&page<=100000,'分页无效');

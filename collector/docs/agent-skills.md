@@ -8,7 +8,11 @@
 | --- | --- | --- | --- |
 | Codex | 当前用户 `~/.agents/skills/<name>` | 项目 `.agents/skills`、`CODEX_HOME/skills` 兼容目录、插件、系统目录 | 原生 `skills/list`；目录存在不等于已加载 |
 | CodeBuddy | 当前用户 `~/.codebuddy/skills/<name>` | 项目 `.codebuddy/skills`、插件 | 目录与配置已确认；新会话实际加载需单独核对 |
+| Gemini CLI | 当前用户 `~/.gemini/skills/<name>` | 项目 `.gemini/skills`、用户/项目 `.agents/skills` 兼容读取 | 目录与配置盘点；使用 `/skills reload` 刷新，未确认原生加载 |
+| OpenCode | 当前用户 `~/.config/opencode/skills/<name>`（遵循 `XDG_CONFIG_HOME`） | 项目 `.opencode/skills`、用户/项目 `.claude/skills` 和 `.agents/skills` 兼容读取、显式自定义目录 | 目录盘点；新会话检查 `skill` 工具和权限，未确认原生加载 |
 | Claude Code | 当前用户 `~/.claude/skills/<name>` | 项目 `.claude/skills`、插件、企业配置 | 目录与配置已确认；新会话实际加载需单独核对 |
+
+兼容读取保留独立 Agent 记录，但不当作独立安装；预览说明哪些 Agent 可从兼容目录读取。物理共享链接仍要求确认全部共享 Agent。Gemini 的禁用设置纳入盘点，OpenCode 权限和实际加载未确认时不标记已加载。
 
 用户先选择节点及 Agent，再预览完整文件、目标绝对路径、共享目录和同名文件差异。确认后沿用原子同步、备份和回滚机制；节点须在线且空闲才能执行。旧节点未上报实际安装路径时提示升级，不能凭方案路径假装已确认安装位置。安装不执行包内脚本，也不自动重启其他 Agent 会话。
 
@@ -18,11 +22,11 @@
 
 下载 ZIP 在内存逐项读取并验证 CRC、大小、文件类型和路径，然后通过现有完整包及 SHA-256 校验；拒绝越界、符号链接、重复文件、疑似凭据、缺失引用和不支持的文件。第三方技能未声明依赖时保持“依赖待确认”；市场下载安装不等于验证了 Agent 适配或实际提取能力。
 
-目录规则核对于 2026-10-08：[Codex](https://developers.openai.com/codex/skills)、[CodeBuddy](https://www.codebuddy.ai/docs/cli/skills)、[Claude Code](https://code.claude.com/docs/en/skills)。SkillHub 当前下载与私有库安装均有独立测试；真实账户的 CodeBuddy/Claude 原生执行验收继续遵守下文边界。
+目录规则核对于 2026-10-08：[Codex](https://developers.openai.com/codex/skills)、[CodeBuddy](https://www.codebuddy.ai/docs/cli/skills)、[Claude Code](https://code.claude.com/docs/en/skills)、[Gemini CLI](https://geminicli.com/docs/cli/using-agent-skills/)、[OpenCode](https://docs.opencode.ai/docs/skills/)。SkillHub 当前下载与私有库安装均有独立测试；真实账户的 CodeBuddy/Claude 原生执行验收继续遵守下文边界。
 
 ## 协议与边界
 
-所有接口沿用当前资料库设备授权。管理端发起操作和读取清单；Worker 只上传自己的清单和回执。旧客户端的 `agents`、`capabilities` 保留，未上报环境时显示“未上报”。Claude 只盘点与同步，不加入采集执行候选。
+所有接口沿用当前资料库设备授权。管理端发起操作和读取清单；Worker 只上传自己的清单和回执。旧客户端的 `agents`、`capabilities` 保留，未上报环境时显示“未上报”。Claude、Gemini CLI、OpenCode 支持盘点与安装，本轮不加入采集执行候选。
 
 | 接口 | 用途 |
 | --- | --- |

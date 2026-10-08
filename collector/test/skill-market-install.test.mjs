@@ -60,26 +60,30 @@ async function installation(t,store){
  t.after(()=>runtime.close());
  await runtime.report();
  const imported=await importing(f.owner),create=(action,extra={})=>api(f.owner,'/api/skills/operations','POST',{deviceId:f.node.device.id,action,requestId:crypto.randomUUID(),...extra});
- const compare=await create('compare',{versionId:imported.version.id,agents:['codex','codebuddy','claude']});await runtime.tick({idle:true,operationIds:[compare.id]});
+ const compare=await create('compare',{versionId:imported.version.id,agents:['codex','codebuddy','claude','gemini','opencode']});await runtime.tick({idle:true,operationIds:[compare.id]});
  const comparison=await api(f.owner,'/api/skills/operations/'+compare.id);
  assert.equal(comparison.state,'succeeded');assert.equal(comparison.result.comparison.compatible,true);
- const roots={codex:'.agents/skills',codebuddy:'.codebuddy/skills',claude:'.claude/skills'};
+ const roots={codex:'.agents/skills',codebuddy:'.codebuddy/skills',claude:'.claude/skills',gemini:'.gemini/skills',opencode:'.config/opencode/skills'};
  for(const target of comparison.result.comparison.targets)assert.equal(target.directory,path.join(home,roots[target.agent],'fixture-market'));
  const input={versionId:imported.version.id,agents:comparison.agents,comparisonId:comparison.id,confirmShared:true};
  const sync=await create('sync',input);await runtime.tick({idle:true,operationIds:[sync.id]});
- const result=await api(f.owner,'/api/skills/operations/'+sync.id);assert.equal(result.result.locations.length,3);
+ const result=await api(f.owner,'/api/skills/operations/'+sync.id);assert.equal(result.result.locations.length,5);
  await runtime.tick({idle:true,operationIds:[sync.id]});await runtime.report();
- const installed=await api(f.owner,'/api/skills/installed?keyword=fixture-market');assert.equal(installed.total,3);
+ const installed=await api(f.owner,'/api/skills/installed?keyword=fixture-market');assert.equal(installed.total,8);
  assert.equal(installed.items.every(s=>s.directory&&s.realDirectory&&s.marketSource.provider==='skillhub'),true);
  assert.equal(installed.items.every(s=>s.dependencies.state==='unknown'),true);
  assert.equal(installed.nodes[0].agents.find(a=>a.name==='codex').skillRoot,path.join(home,'.agents/skills'));
+ assert.equal(installed.items.filter(s=>s.scope==='user').length,5);
+ assert.equal(installed.items.filter(s=>s.scope==='compat-user').length,3);
+ assert.equal(installed.nodes[0].agents.filter(a=>a.executionEnabled).map(a=>a.name).join(','),'codex');
+ assert.equal(comparison.result.comparison.targets.find(t=>t.agent==='codex').visibleTo.join(','),'gemini,opencode');
  const filtered=await api(f.owner,'/api/skills/installed?agent=claude');assert.equal(filtered.total,1);
  const rollback=await create('rollback',{syncId:sync.id});await runtime.tick({idle:true,operationIds:[rollback.id]});await runtime.report();
  assert.equal((await api(f.owner,'/api/skills/installed?keyword=fixture-market')).total,0);
  for(const directory of Object.values(roots))assert.equal(fs.existsSync(path.join(home,directory,'fixture-market')),false);
 }
-test('import, preview, three Agent installation, path inventory, idempotent retry and rollback use isolated homes',t=>installation(t));
-test('MySQL market import and three Agent installation retain path inventory and rollback',{skip:process.env.LINGNEST_TEST_MYSQL!=='1'},async t=>installation(t,await mysqlFixture()));
+test('import, preview, five Agent installation, path inventory, idempotent retry and rollback use isolated homes',t=>installation(t));
+test('MySQL market import and five Agent installation retain path inventory and rollback',{skip:process.env.LINGNEST_TEST_MYSQL!=='1'},async t=>installation(t,await mysqlFixture()));
 test('market inventory excludes revoked clients and denies Worker reads',async t=>{
  const f=await setup(t);await api(f.owner,'/api/devices/'+f.node.device.id+'/revoke','POST',{});
  assert.equal((await api(f.owner,'/api/skills/installed')).nodes.length,0);

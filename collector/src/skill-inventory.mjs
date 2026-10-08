@@ -5,15 +5,23 @@ import spawn from 'cross-spawn';
 import { hash, readJson, now, contained, canonicalJson } from './common.mjs';
 import { agentProfile, execute, terminate, agentEnvironment } from './agents.mjs';
 import { commandEnvironment, agentVersion } from './agent-paths.mjs';
-import { SKILL_AGENTS, skillMetadata, packageSkill, validateSkillPackage, cleanRequirements } from './skill-package.mjs';
+import { SKILL_AGENTS, SKILL_EXECUTION_AGENTS, skillMetadata, packageSkill, validateSkillPackage, cleanRequirements } from './skill-package.mjs';
 
 const json = file => { try { return readJson(file); } catch { return {}; } };
 const canonicalPath = file => {try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
-export function globalSkillRoots(home = os.homedir()) {
-  return { codex: path.join(home, '.agents', 'skills'), codebuddy: path.join(home, '.codebuddy', 'skills'), claude: path.join(home, '.claude', 'skills') };
+export function globalSkillRoots(home = os.homedir(), env = {}) {
+  const configHome=path.isAbsolute(env.XDG_CONFIG_HOME || '')?env.XDG_CONFIG_HOME:path.join(home,'.config');
+  return { codex: path.join(home, '.agents', 'skills'), codebuddy: path.join(home, '.codebuddy', 'skills'), claude: path.join(home, '.claude', 'skills'), gemini:path.join(home,'.gemini','skills'), opencode:path.join(configHome,'opencode','skills') };
+}
+
+export function compatibleSkillRoots(globalRoots, env = {}) {
+  return {gemini:[globalRoots.codex],opencode:[globalRoots.codex,...(!['1','true'].includes(env.OPENCODE_DISABLE_CLAUDE_CODE_SKILLS)?[globalRoots.claude]:[])]};
 }
 
 function settingsFor(home, agent, cwd, profile) {
+  // OpenCode permissions have per-agent overrides and JSONC/managed layers.
+  // Filesystem discovery cannot establish effective native permissions.
+  if(agent==='opencode')return {skillOverrides:{},enabledPlugins:{},mcpServers:{}};
   const files = [path.join(home, '.' + agent, 'settings.json'), path.join(cwd, '.' + agent, 'settings.json'), path.join(cwd, '.' + agent, 'settings.local.json')];
   const result = {skillOverrides:{}, enabledPlugins:{}, mcpServers:{}};
   for (const file of [...new Set(files)]) {
@@ -21,6 +29,10 @@ function settingsFor(home, agent, cwd, profile) {
     Object.assign(result, value, {skillOverrides:{...result.skillOverrides,...Object.fromEntries(Object.entries(value.skillOverrides || {}).filter(([,mode])=>['on','off','name-only','user-invocable-only'].includes(mode)))},enabledPlugins:{...result.enabledPlugins,...value.enabledPlugins},mcpServers:{...result.mcpServers,...value.mcpServers}});
   }
   if(agent === 'claude' && (profile.args || []).some(value=>['--bare','--disable-slash-commands','--safe-mode'].includes(value))) result.skillsDisabled=true;
+  if(agent === 'gemini') {
+    if(result.skills?.enabled===false)result.skillsDisabled=true;
+    for(const name of result.skills?.disabled || [])if(typeof name==='string')result.skillOverrides[name]='off';
+  }
   return result;
 }
 
@@ -150,7 +162,7 @@ export async function dependencyStatus(requirements, { env = agentEnvironment(),
 }
 
 export async function scanSkillInventory(config = {}, { cwd = process.cwd(), home = os.homedir(), env = agentEnvironment(), nativeCodex = codexSkills, versionProbe = execute } = {}) {
-  const globalRoots = globalSkillRoots(home), local = new Map(), items = [], agents = [];
+  const globalRoots = globalSkillRoots(home,env), compatibleRoots=compatibleSkillRoots(globalRoots,env), local = new Map(), items = [], agents = [];
   const contexts = [...new Set([cwd, ...(config.skillProjects || []).filter(p => typeof p === 'string' && path.isAbsolute(p) && fs.existsSync(p))])];
   for (const agent of SKILL_AGENTS) {
     const profile = agentProfile(agent, config.agents, { home });
@@ -158,9 +170,12 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
     const probe = await versionProbe(profile.command, profile.versionArgs || ['--version'], { env: agentEnv, timeoutMs: 5000 });
     const available = probe.code === 0;
     const version=available ? agentVersion(probe.tail) || String(probe.tail || '').trim().slice(0,150) : null;
-    agents.push({ name: agent, installed: available, version, probeState: available ? 'available' : probe.timedOut ? 'timeout' : probe.spawnError === 'ENOENT' ? 'not_found' : 'failed', executionEnabled: agent !== 'claude' && profile.enabled !== false, profileHash:hash(canonicalJson({profile,version,platform:process.platform,home,cwd})) });
+    agents.push({ name: agent, installed: available, version, probeState: available ? 'available' : probe.timedOut ? 'timeout' : probe.spawnError === 'ENOENT' ? 'not_found' : 'failed', executionEnabled: SKILL_EXECUTION_AGENTS.includes(agent) && profile.enabled !== false, profileHash:hash(canonicalJson({profile,version,platform:process.platform,home,cwd})) });
     const settings = settingsFor(home, agent, cwd, profile);
     const roots = [{ root: globalRoots[agent], scope: 'user', context: null }, ...contexts.flatMap(dir => projectRoots(dir, agent)).filter(origin=>path.resolve(origin.root)!==path.resolve(globalRoots[agent])), ...plugins(home, agent, settings)];
+    for(const root of compatibleRoots[agent] || [])roots.push({root,scope:'compat-user',context:null});
+    for(const alias of agent==='gemini'?['codex']:agent==='opencode'?['codex',...(!['1','true'].includes(env.OPENCODE_DISABLE_CLAUDE_CODE_SKILLS)?['claude']:[])]:[])for(const dir of contexts)roots.push(...projectRoots(dir,alias).filter(origin=>path.resolve(origin.root)!==path.resolve(globalRoots[alias])).map(origin=>({...origin,scope:'compat-project'})));
+    if(agent==='opencode' && path.isAbsolute(env.OPENCODE_CONFIG_DIR || ''))roots.push({root:path.join(env.OPENCODE_CONFIG_DIR,'skills'),scope:'custom-user',context:null});
     if (agent === 'codex') roots.push({ root: path.join(env.CODEX_HOME || path.join(home, '.codex'), 'skills'), scope: 'legacy-user', context: null }, { root: '/etc/codex/skills', scope: 'admin', context: null });
     if (agent === 'claude') roots.push({root:path.join(process.platform==='darwin'?'/Library/Application Support/ClaudeCode':process.platform==='win32'?path.join(env.ProgramFiles || 'C:\\Program Files','ClaudeCode'):'/etc/claude-code','.claude','skills'),scope:'admin',context:null});
     const native = agent === 'codex' && available ? await nativeCodex(profile.command, contexts, { args: configOverrides(profile), env:agentEnv }) : null;
@@ -195,8 +210,8 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
       const name = String(metadata.name || path.basename(directory)).slice(0, 100);
       const loaded = nativeEntries.filter(s => typeof s.path === 'string' && canonicalPath(s.path) === path.join(real, 'SKILL.md'));
       const effective=settingsFor(home,agent,origin.context || cwd,profile);
-      let enabled = origin.enabled === false || effective.skillsDisabled ? false : agent === 'codex' ? (native ? loaded.some(s => s.enabled !== false) : null) : origin.scope!=='plugin' && effective.skillOverrides?.[name] === 'off' ? false : true;
-      let loadState = !available ? 'agent_unavailable' : enabled === false ? 'disabled' : agent === 'codex' ? native ? loaded.length ? 'loaded' : 'not_loaded' : 'unknown' : 'configured';
+      let enabled = origin.enabled === false || effective.skillsDisabled ? false : agent === 'codex' ? (native ? loaded.some(s => s.enabled !== false) : null) : origin.scope!=='plugin' && effective.skillOverrides?.[name] === 'off' ? false : agent==='opencode'?null:true;
+      let loadState = !available ? 'agent_unavailable' : enabled === false ? 'disabled' : agent === 'codex' ? native ? loaded.length ? 'loaded' : 'not_loaded' : 'unknown' : agent==='opencode'?'unknown':'configured';
       const toolDependencies = json(path.join(real, 'SKILL.json')).dependencies?.tools || loaded[0]?.dependencies?.tools || [];
       let requirements = { commands: [], env: [], mcp: [], browser: false };
       try {
@@ -220,15 +235,15 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
   for (const item of items) {
     const location = local.get(item.id); if (!location) continue;
     item.sharedWith = items.filter(other => other.id !== item.id && local.get(other.id)?.real === location.real).map(other => ({ id: other.id, agent: other.agent, name: other.name }));
-    if (['codebuddy','claude'].includes(item.agent) && !['plugin','system'].includes(item.scope) && item.enabled !== false) {
+    if (['codebuddy','claude','gemini'].includes(item.agent) && !['plugin','system'].includes(item.scope) && item.enabled !== false) {
       const competing = items.filter(other => other.agent === item.agent && other.name === item.name && other.taskContext && item.taskContext && !['plugin','system'].includes(other.scope) && other.enabled !== false);
-      const score = x => item.agent === 'codebuddy' ? x.scope === 'project' ? 2 : 1 : x.scope === 'admin' ? 3 : x.scope === 'user' ? 2 : 1;
+      const score = x => ['codebuddy','gemini'].includes(item.agent) ? ['project','compat-project'].includes(x.scope) ? 2 : 1 : x.scope === 'admin' ? 3 : x.scope === 'user' ? 2 : 1;
       if (competing.some(other => score(other) > score(item))) item.loadState = 'shadowed';
       if (!agents.find(a => a.name === item.agent)?.installed) item.loadState = 'agent_unavailable';
     }
   }
   const inventory = { schemaVersion: 1, scannedAt: now(), platform: process.platform, agents, items, projects:contexts.filter(directory=>directory!==cwd) };
-  for(const agent of agents)Object.assign(agent,{skillRoot:globalRoots[agent.name],projectSkillDirectory:agent.name==='codex'?'.agents/skills':'.'+agent.name+'/skills',legacySkillRoot:agent.name==='codex'?path.join(env.CODEX_HOME || path.join(home,'.codex'),'skills'):null,loadMethod:agent.name==='codex'?'原生 skills/list 确认加载':'目录及配置盘点；新会话加载确认',installationScope:'user'});
+  for(const agent of agents)Object.assign(agent,{skillRoot:globalRoots[agent.name],compatibleSkillRoots:compatibleRoots[agent.name] || [],projectSkillDirectory:agent.name==='codex'?'.agents/skills':'.'+agent.name+'/skills',legacySkillRoot:agent.name==='codex'?path.join(env.CODEX_HOME || path.join(home,'.codex'),'skills'):null,loadMethod:agent.name==='codex'?'原生 skills/list 确认加载':agent.name==='gemini'?'目录及配置盘点；使用 /skills reload 刷新':agent.name==='opencode'?'目录盘点；新会话检查 skill 工具及权限':'目录及配置盘点；新会话加载确认',installationScope:'user'});
   inventory.digest = hash(JSON.stringify({ agents, items,projects:inventory.projects }));
-  return { inventory, local, globalRoots, contexts, env };
+  return { inventory, local, globalRoots, compatibleRoots, contexts, env };
 }

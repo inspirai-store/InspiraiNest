@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const names={codex:'Codex',codebuddy:'CodeBuddy',claude:'Claude Code'};
+  const names={codex:'Codex',codebuddy:'CodeBuddy',claude:'Claude Code',gemini:'Gemini CLI',opencode:'OpenCode'};
   const states={loaded:'可加载',configured:'已配置',unknown:'加载未确认',disabled:'已禁用',not_loaded:'未加载',shadowed:'被覆盖',agent_unavailable:'Agent 不可用',ready:'就绪',missing:'缺少依赖',passed:'验证通过',failed:'未通过',queued:'等待节点',running:'执行中',succeeded:'已完成'};
   const date=x=>x?new Date(x).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'未上报';
   const short=x=>x?x.slice(0,12):'未记录';

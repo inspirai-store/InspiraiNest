@@ -3,7 +3,8 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { hash, safePath, contained, requireValue } from './common.mjs';
 
-export const SKILL_AGENTS = ['codex', 'codebuddy', 'claude'];
+export const SKILL_AGENTS = ['codex', 'codebuddy', 'claude', 'gemini', 'opencode'];
+export const SKILL_EXECUTION_AGENTS = ['codex', 'codebuddy'];
 export const MAX_SKILL_BYTES = 16 * 1024 * 1024;
 const excluded = /(?:^|\/)(?:\.git|\.ssh|\.aws|\.netrc|\.npmrc|\.pypirc|\.lingnest-package\.json|auth\.json|session\.json|node_modules|\.venv|venv|__pycache__|\.cache|\.DS_Store|\.env(?:\..*)?|tokens?(?:\.[^/]*)?|[^/]*(?:cookies?|credentials?|passwords?|private[-_]?keys?|secrets?|auth[-_]?state|browser[-_]?profiles?|session[-_]?(?:cache|store|state))[^/]*)(?:\/|$)/i;
 const extensions = new Set(['.md','.markdown','.txt','.json','.yaml','.yml','.toml','.ini','.cfg','.lock','.py','.js','.mjs','.cjs','.sh','.bash','.ps1','.html','.css','.csv','.ts','.tsx','.svg','.png','.jpg','.jpeg','.webp','.gif','.pdf','.xml','.sql','.r','.license']);

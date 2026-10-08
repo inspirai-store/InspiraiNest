@@ -37,6 +37,19 @@ function skill(directory,content='original'){
 }
 const versionProbe=async()=>({code:0,tail:'fixture 1.0'});
 const scanner=(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,CODEX_HOME:path.join(options.home,'.codex'),HOME:options.home,USERPROFILE:options.home},versionProbe,nativeCodex:async()=>null});
+
+test('five Agent schemes distinguish compatibility reads, Gemini disabling and OpenCode unknown permissions',async t=>{
+ const home=temporary(t),cwd=path.join(home,'task'),configHome=path.join(home,'xdg');fs.mkdirSync(path.join(cwd,'.git'),{recursive:true});
+ const env={CODEX_HOME:path.join(home,'.codex'),XDG_CONFIG_HOME:configHome,OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:'1'};
+ const roots=globalSkillRoots(home,env);skill(path.join(roots.codex,'article-extract'));skill(path.join(roots.claude,'article-extract'));skill(path.join(roots.gemini,'article-extract'));skill(path.join(roots.opencode,'article-extract'));
+ fs.writeFileSync(path.join(home,'.gemini/settings.json'),JSON.stringify({skills:{disabled:['article-extract']}}));
+ const result=await scanSkillInventory({},{home,cwd,env,versionProbe,nativeCodex:async()=>null});
+ assert.equal(result.inventory.agents.length,5);assert.equal(result.globalRoots.opencode,path.join(configHome,'opencode/skills'));
+ assert.equal(result.inventory.items.filter(s=>s.agent==='gemini').every(s=>s.loadState==='disabled'),true);
+ const open=result.inventory.items.filter(s=>s.agent==='opencode');assert.equal(open.length,2);assert.equal(open.every(s=>s.loadState==='unknown'&&s.enabled===null&&s.verification===null),true);
+ assert.equal(open.filter(s=>s.scope==='compat-user').length,1);
+ assert.equal(result.inventory.agents.filter(a=>['gemini','opencode','claude'].includes(a.name)).some(a=>a.executionEnabled),false);
+});
 async function setup(t,store){
  const dataDir=temporary(t),key=secret(),app=createService({dataDir,masterKey:key,...(store?{store}:{})});
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));cleanup(t,()=>app.close());
@@ -64,7 +77,7 @@ test('inventory distinguishes shared roots, source collisions, disabled/project 
  skill(path.join(cwd,'.codebuddy/skills/article-extract'),'project');
  fs.writeFileSync(path.join(home,'.claude/settings.json'),JSON.stringify({skillOverrides:{'article-extract':'off'}}));
  const snapshot=await scanSkillInventory({},{home,cwd,versionProbe,nativeCodex:async()=>({data:[{cwd,skills:[{path:path.join(global,'SKILL.md'),enabled:true}]}]})});
- const codex=snapshot.inventory.items.find(s=>s.agent==='codex');assert.equal(codex.loadState,'loaded');assert.equal(codex.sharedWith.length,2);
+ const codex=snapshot.inventory.items.find(s=>s.agent==='codex');assert.equal(codex.loadState,'loaded');assert.equal(codex.sharedWith.length,5);
  assert.equal(snapshot.inventory.items.find(s=>s.agent==='claude').loadState,'disabled');
  assert.equal(snapshot.inventory.items.find(s=>s.agent==='codebuddy' && s.scope==='user').loadState,'shadowed');
  assert.equal(snapshot.inventory.items.find(s=>s.agent==='codebuddy' && s.scope==='project').loadState,'configured');
@@ -171,12 +184,12 @@ test('portable execute bits and Windows path restrictions survive installation',
 async function inventoryPages(t,store){
  const service=await setup(t,store),device=await service.node('paged'),home=temporary(t);for(let i=0;i<45;i++)skill(path.join(globalSkillRoots(home).codex,'fixture-'+i));
  const {inventory}=await scanner({}, {home,cwd:home}),snapshotId=hash('snapshot-one');const upload=(page,final)=>api(device,'/api/skills/environment','POST',{...inventory,snapshotId,page,final,items:inventory.items.slice(page*40,page*40+40)});
- await upload(0,false);const route='/api/skills/devices/'+device.deviceId+'/environment';assert.equal((await api(service.owner,route)).total,0);await upload(1,true);const first=await api(service.owner,route);assert.equal(first.items.length,40);assert.equal(first.nextOffset,40);assert.equal((await api(service.owner,route+'?offset=40&snapshotId='+snapshotId)).items.length,5);
+ await upload(0,false);const route='/api/skills/devices/'+device.deviceId+'/environment';assert.equal((await api(service.owner,route)).total,0);const pages=Math.ceil(inventory.items.length/40);for(let page=1;page<pages;page++)await upload(page,page===pages-1);const first=await api(service.owner,route);assert.equal(first.items.length,40);assert.equal(first.nextOffset,40);assert.equal((await api(service.owner,route+'?offset=40&snapshotId='+snapshotId)).items.length,40);
  await assert.rejects(()=>api(service.owner,route+'?offset=40&snapshotId='+hash('other')),e=>e.status===409);await assert.rejects(()=>api(device,route),e=>e.status===403);
  const nextSnapshot=hash('snapshot-two'),nextInventory={...inventory,scannedAt:now(),digest:hash('next-inventory'),items:inventory.items.map(item=>({...item,name:'updated-'+item.name}))};
- for(let page=0;page<2;page++)await api(device,'/api/skills/environment','POST',{...nextInventory,snapshotId:nextSnapshot,page,final:page===1,items:nextInventory.items.slice(page*40,page*40+40)});
+ for(let page=0;page<pages;page++)await api(device,'/api/skills/environment','POST',{...nextInventory,snapshotId:nextSnapshot,page,final:page===pages-1,items:nextInventory.items.slice(page*40,page*40+40)});
  const oldPage=await api(service.owner,route+'?offset=40&snapshotId='+snapshotId);
- assert.equal(oldPage.snapshotId,snapshotId);assert.deepEqual(oldPage.items.map(item=>item.name),inventory.items.slice(40).map(item=>item.name));
+ assert.equal(oldPage.snapshotId,snapshotId);assert.deepEqual(oldPage.items.map(item=>item.name),inventory.items.slice(40,80).map(item=>item.name));
  const latest=await api(service.owner,route);assert.equal(latest.snapshotId,nextSnapshot);assert.ok(latest.items.every(item=>item.name.startsWith('updated-')));
 }
 test('inventory pages commit atomically and stay consistent while Worker replaces the snapshot',t=>inventoryPages(t));

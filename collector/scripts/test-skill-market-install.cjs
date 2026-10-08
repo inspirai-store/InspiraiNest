@@ -33,7 +33,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
   await page.locator('nav [data-view=skill-market]').click();await page.locator('[data-detail]').first().click();
   const dialog=page.locator('.market-dialog');
   await dialog.locator('[data-install-node] option[value="'+target.deviceId+'"]').waitFor({state:'attached'});
-  await dialog.locator('[data-install-node]').selectOption(target.deviceId);await dialog.locator('[data-install-agent][value=claude]').check();await dialog.locator('[data-install-agent][value=codebuddy]').check();
+  await dialog.locator('[data-install-node]').selectOption(target.deviceId);await dialog.locator('[data-install-agent][value=claude]').check();await dialog.locator('[data-install-agent][value=codebuddy]').check();await dialog.locator('[data-install-agent][value=gemini]').check();await dialog.locator('[data-install-agent][value=opencode]').check();
   await dialog.locator('[data-install-compare]').click();
   await dialog.locator('[data-install-status]').filter({hasText:'模拟响应超时'}).waitFor();
   await dialog.locator('[data-install-compare]').click();
@@ -45,7 +45,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
   await dialog.locator('[data-install-status]').filter({hasText:'在「已安装」'}).waitFor();
   for(const directory of Object.values(globalSkillRoots(home)))assert.equal(fs.existsSync(path.join(directory,'fixture-market','SKILL.md')),true);
   await dialog.locator('[data-close]').click();await page.locator('[data-market-provider=installed]').click();
-  await page.locator('[data-installed-rows] tr').filter({hasText:'fixture-market'}).first().waitFor();assert.equal(await page.locator('[data-installed-rows] tr').count(),3);
+  await page.locator('[data-installed-rows] tr').filter({hasText:'fixture-market'}).first().waitFor();assert.equal(await page.locator('[data-installed-rows] tr').count(),8);
   assert.match(await page.locator('[data-installed-rows]').innerText(),/已配置|加载未确认/);assert.match(await page.locator('[data-installed-rows]').innerText(),/依赖待确认/);
   await page.locator('[data-install-schemes] summary').click();assert.match(await page.locator('[data-install-schemes]').innerText(),/当前|Codex/);
   for(const width of [1240,740,390]){
@@ -64,7 +64,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
   for(let i=0;i<100&&fs.existsSync(path.join(globalSkillRoots(home).codex,'fixture-market'));i++)await new Promise(r=>setTimeout(r,100));
   for(const directory of Object.values(globalSkillRoots(home)))assert.equal(fs.existsSync(path.join(directory,'fixture-market')),false);
   await page.emulateMedia({reducedMotion:'reduce'});await page.locator('[data-detail]').click();await dialog.waitFor();assert.equal(await dialog.evaluate(e=>getComputedStyle(e).animationName),'none');await page.keyboard.press('Escape');assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,synthetic:true,checks:['real service and scoped IPC','three Agent target directories','timeout retry retains same request ID','explicit preview confirmation','installation and refreshed inventory','private market reuse','3 sizes no overflow','keyboard close','rollback isolated homes'],errors},null,2));console.log('Skill market installation '+(web?'Web':'desktop')+': passed');
+  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,synthetic:true,checks:['real service and scoped IPC','five Agent target directories','timeout retry retains same request ID','explicit preview confirmation','installation and refreshed inventory','private market reuse','3 sizes no overflow','keyboard close','rollback isolated homes'],errors},null,2));console.log('Skill market installation '+(web?'Web':'desktop')+': passed');
  }catch(e){if(page&&!page.isClosed())await page.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});throw e;}
  finally{clearInterval(timer);while(ticking)await new Promise(r=>setTimeout(r,50));runtime.close();if(app)await app.close();await service.close();fs.rmSync(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

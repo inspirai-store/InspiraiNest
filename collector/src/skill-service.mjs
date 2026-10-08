@@ -1,5 +1,5 @@
 import { hash, now, requireValue, canonicalJson } from './common.mjs';
-import { SKILL_AGENTS, cleanSkillPolicy, cleanRequirements, validateSkillPackage } from './skill-package.mjs';
+import { SKILL_AGENTS, SKILL_EXECUTION_AGENTS, cleanSkillPolicy, cleanRequirements, validateSkillPackage } from './skill-package.mjs';
 import { workerAuthorized, workerOnline } from './device-metadata.mjs';
 import { canRunTask } from './task-routing.mjs';
 
@@ -53,7 +53,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
     if (task.deviceId) return { eligible: !task.selectedSkills?.length || claiming.skillRuntime?.schemaVersion===1, selectedSkills: task.selectedSkills || [] };
     const snapshots = async target => {
       const env=target.skillRuntime?.schemaVersion===1 ? await store.get('skill-environment',target.id) : null;
-      return (env && clock()-Date.parse(env.scannedAt)<=180000?env.items:[]).filter(s=>s.taskContext && s.managedVersion && s.enabled !== false && !['disabled','shadowed','not_loaded','agent_unavailable'].includes(s.loadState) && target.agents.includes(s.agent) && (!task.preferredAgent || s.agent === task.preferredAgent)).map(s=>({agent:s.agent,versionId:s.managedVersion,hash:s.hash,name:s.name,capabilities:s.capabilities}));
+      return (env && clock()-Date.parse(env.scannedAt)<=180000?env.items:[]).filter(s=>SKILL_EXECUTION_AGENTS.includes(s.agent) && s.taskContext && s.managedVersion && s.enabled !== false && !['disabled','shadowed','not_loaded','agent_unavailable'].includes(s.loadState) && target.agents.includes(s.agent) && (!task.preferredAgent || s.agent === task.preferredAgent)).map(s=>({agent:s.agent,versionId:s.managedVersion,hash:s.hash,name:s.name,capabilities:s.capabilities}));
     };
     if (!task.requiredCapabilities?.length) return { eligible: true, selectedSkills:await snapshots(claiming) };
     const candidates = (await store.list('device')).filter(d => canRunTask(task, d) && workerOnline(d, clock()) && (!d.skillRuntime || d.skillRuntime.mode === 'running' && d.skillRuntime.idle)
@@ -74,8 +74,8 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       const input = await body(req);
       requireValue(input.schemaVersion === 1 && digest(input.snapshotId) && digest(input.digest) && Number.isInteger(input.page) && input.page >= 0 && input.page < 150 && Array.isArray(input.items) && input.items.length <= 40, 'Invalid environment page');
       requireValue(Number.isFinite(Date.parse(input.scannedAt)) && Math.abs(clock() - Date.parse(input.scannedAt)) < 10 * 60000, 'Invalid inventory time');
-      requireValue(Array.isArray(input.agents) && input.agents.length<=3,'Invalid inventory Agents');
-      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,3).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), probeState: a.installed === true ? 'available' : ['not_found','timeout','failed'].includes(a.probeState) ? a.probeState : 'failed', profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: a.name !== 'claude' && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0,skillRoot:string(a.skillRoot,1000),projectSkillDirectory:string(a.projectSkillDirectory,100),legacySkillRoot:string(a.legacySkillRoot,1000),loadMethod:string(a.loadMethod,200),installationScope:a.installationScope==='user'?'user':null }));
+      requireValue(Array.isArray(input.agents) && input.agents.length<=SKILL_AGENTS.length,'Invalid inventory Agents');
+      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,SKILL_AGENTS.length).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), probeState: a.installed === true ? 'available' : ['not_found','timeout','failed'].includes(a.probeState) ? a.probeState : 'failed', profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: SKILL_EXECUTION_AGENTS.includes(a.name) && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0,skillRoot:string(a.skillRoot,1000),projectSkillDirectory:string(a.projectSkillDirectory,100),legacySkillRoot:string(a.legacySkillRoot,1000),compatibleSkillRoots:Array.isArray(a.compatibleSkillRoots)?a.compatibleSkillRoots.slice(0,5).map(p=>string(p,1000)).filter(Boolean):[],loadMethod:string(a.loadMethod,200),installationScope:a.installationScope==='user'?'user':null }));
       const items = input.items.map(environmentItem);
       await serialized('skill-environment:' + device.id, () => store.transaction(async tx => {
         const currentDevice = await tx.getForUpdate('device', device.id);
@@ -145,7 +145,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       }
       if (['compare','sync','verify'].includes(action)) { const version=await getVersion(input.versionId); op.versionId=version.id; op.versionHash=version.hash; op.policy=version.policy; op.name=version.name; if(version.source)op.source=version.source; }
       if (['compare','sync'].includes(action)) {
-        requireValue(Array.isArray(input.agents) && input.agents.length > 0 && input.agents.length <= 3 && input.agents.every(a=>SKILL_AGENTS.includes(a)), 'Invalid target Agents'); op.agents=[...new Set(input.agents)];
+        requireValue(Array.isArray(input.agents) && input.agents.length > 0 && input.agents.length <= SKILL_AGENTS.length && input.agents.every(a=>SKILL_AGENTS.includes(a)), 'Invalid target Agents'); op.agents=[...new Set(input.agents)];
       }
       if (action === 'sync') {
         const comparison = await store.get('skill-operation',input.comparisonId);
