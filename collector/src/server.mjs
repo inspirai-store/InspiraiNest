@@ -364,6 +364,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/client-prompt.js': ['../assets/client-prompt.js', 'text/javascript; charset=utf-8'],
           '/client-prompt.css': ['../assets/client-prompt.css', 'text/css; charset=utf-8'],
           '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
+        '/node-presentation.js': ['public/node-presentation.js', 'text/javascript; charset=utf-8'],
+        '/node-name-editor.js': ['public/node-name-editor.js', 'text/javascript; charset=utf-8'],
+        '/node-presentation.css': ['public/node-presentation.css', 'text/css; charset=utf-8'],
           '/skill-market.js': ['public/skill-market.js', 'text/javascript; charset=utf-8'],
           '/skill-market.css': ['public/skill-market.css', 'text/css; charset=utf-8'],
           '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
@@ -543,6 +546,21 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           qrDataUrl = await QRCode.toDataURL(payload, { width: 420, margin: 4, errorCorrectionLevel: 'M' });
         }
         return send(res, 201, { key, expiresAt: pairing.expiresAt, qrDataUrl });
+      }
+      const renameNode = route.match(/^\/api\/devices\/([^/]+)\/name$/);
+      if (renameNode && req.method === 'POST') {
+        owner(device);
+        const input = await body(req);
+        requireValue(input && Object.keys(input).length === 1 && typeof input.name === 'string', '只允许修改节点名称');
+        const name = input.name.trim();
+        requireValue(name.length > 0 && name.length <= 80 && !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(name), '节点名称须为 1–80 个字符，不含换行或控制字符');
+        const updated = await serialized(`device:${renameNode[1]}`, () => store.transaction(async tx => {
+          const target = await tx.getForUpdate('device', renameNode[1]);
+          requireValue(target && !target.revokedAt, '节点不存在或授权已撤销', 404);
+          requireValue(workerAuthorized(target), '只能修改已授权工作节点的名称', 409);
+          return tx.put('device', { ...target, name });
+        }));
+        return send(res, 200, publicDevice(updated));
       }
       const revoke = route.match(/^\/api\/devices\/([^/]+)\/revoke$/);
       if (revoke && req.method === 'POST') {

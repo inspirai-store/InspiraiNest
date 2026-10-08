@@ -45,6 +45,7 @@ const { _electron } = require('playwright');
     assert.equal(await page.title(), '灵藏 · 桌面工作台');
     const appPath = await app.evaluate(({ app }) => app.getAppPath());
     assert.equal(fs.existsSync(path.join(appPath, 'public/device-view.js')), true, 'Missing authorization presentation helper');
+    for (const resource of ['node-presentation.js','node-name-editor.js','node-presentation.css']) assert.equal(fs.existsSync(path.join(appPath,'public',resource)),true,`Missing node presentation resource: ${resource}`);
     assert.equal(fs.existsSync(path.join(appPath, 'public/pairing-dialog.css')), true, 'Missing pairing dialog stylesheet');
     assert.equal(fs.existsSync(path.join(appPath, '..', 'library', 'scripts', 'catalog.mjs')), true);
     const jsonWriter = path.join(appPath, '..', 'library', 'scripts', 'write-collection-json.mjs');

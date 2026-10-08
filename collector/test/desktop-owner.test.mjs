@@ -35,6 +35,10 @@ test('owner authorization stays separate, encrypted at rest and bound to the Wor
   await assert.rejects(client.taskAction({ id: randomUUID(), action: 'reassign' }), /Not found/);
   assert.match(calls.at(-1).url, /\/api\/tasks\/[a-f0-9-]+\/reassign$/);
   assert.throws(() => client.taskAction({ id: randomUUID(), action: 'arbitrary' }), /不支持/);
+  await assert.rejects(client.renameNode({id:'node-1',name:' 开发站 '}),/Not found/);
+  assert.equal(calls.at(-1).url,'https://library.example/api/devices/node-1/name');
+  assert.deepEqual(JSON.parse(calls.at(-1).options.body),{name:'开发站'});
+  for (const input of [{id:'node-1',name:''},{id:'../escape',name:'新名称'},{id:'node-1',name:'x'.repeat(81)},{id:'node-1',name:'新名称',url:'https://other.example'}]) assert.throws(()=>client.renameNode(input),/无效|字符/);
   const reopened = new OwnerClient({ file, workerServer: () => 'https://library.example', encryption, fetcher });
   assert.equal(reopened.status().deviceId, 'owner-1');
   reopened.logout();

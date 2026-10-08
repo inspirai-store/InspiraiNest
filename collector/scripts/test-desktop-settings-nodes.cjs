@@ -81,6 +81,34 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     assert.equal(await page.locator(`[data-node="${manager.configuration().deviceId}"]`).count(),0,'local ID deduplicated');
     await page.locator(`[data-node="${online.device.id}"]`).click();assert.match(await page.locator('#node-remote-content').innerText(),/MacBookPro18,3/);
     assert.equal(await page.locator('#node-remote-content script').count(),0);
+    const originalNode=await service.store.get('device',online.device.id);
+    const rename=page.locator('[data-node-rename]'); await rename.click();
+    assert.equal(await page.locator('.node-name-dialog code').textContent(),online.device.id);
+    await page.locator('#node-name-input').fill('MacBook 开发工作站');
+    await api(online,'/api/heartbeat','POST',{capabilities:['article'],agents:['codex']});
+    assert.equal(await page.locator('#node-name-input').inputValue(),'MacBook 开发工作站');
+    await page.locator('.node-name-dialog [type=submit]').click(); await page.locator('.node-name-dialog').waitFor({state:'hidden'});
+    await page.locator('#node-overview .detail-title').filter({hasText:'MacBook 开发工作站'}).waitFor();
+    assert.equal((await service.store.get('device',online.device.id)).tokenHash,originalNode.tokenHash);
+    const completedNodeTask={id:crypto.randomUUID(),state:'completed',deviceId:online.device.id,createdAt:new Date().toISOString(),content:'节点展示合成任务',type:'article',events:[]};
+    await service.store.put('task',completedNodeTask); await page.locator('[data-view=tasks]').click(); await page.locator('#task-filter').selectOption('all');
+    await page.locator(`[data-task="${completedNodeTask.id}"] .task-node`).filter({hasText:'MacBook 开发工作站'}).waitFor();
+    await page.locator(`[data-task="${completedNodeTask.id}"]`).click(); assert.match(await page.locator('#task-detail .task-node').innerText(),/完成节点/);
+    assert.ok((await page.locator('#task-detail .task-node').innerText()).includes(online.device.id));
+    for(const theme of ['dark','light']){
+      await setTheme(page,theme);await page.screenshot({path:path.join(output,`task-node-${theme}.png`)});
+      await app.evaluate(()=>globalThis.workerDesktop().main.setSize(740,580));
+      assert.ok(await page.locator('#task-detail').evaluate(el=>el.scrollWidth<=el.clientWidth));
+      await page.screenshot({path:path.join(output,`task-node-minimum-${theme}.png`)});
+      await app.evaluate(()=>globalThis.workerDesktop().main.setSize(1240,820));
+    }
+    await page.locator('[data-view=nodes]').click(); await page.locator(`[data-node="${online.device.id}"]`).click();
+    await rename.click(); await page.locator('#node-name-input').fill('不保存'); await page.keyboard.press('Escape');
+    for(const theme of ['dark','light']){
+      await setTheme(page,theme);await rename.click();await page.screenshot({path:path.join(output,`node-name-${theme}.png`)});await page.keyboard.press('Escape');
+    }
+    assert.equal((await service.store.get('device',online.device.id)).name,'MacBook 开发工作站');
+    await assert.rejects(compact.evaluate(input=>window.library.renameNode(input),{id:online.device.id,name:'托盘无权修改'}),/主窗口/);
     await app.evaluate(()=>globalThis.workerDesktop().main.setSize(740,580));
     await page.locator('#node-dispatch').focus();
     const scrollBefore=await page.locator('#node-detail').evaluate(el=>{el.scrollTop=80;return el.scrollTop;});

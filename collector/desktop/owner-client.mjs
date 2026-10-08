@@ -172,6 +172,12 @@ export class OwnerClient {
   pairing() { return this.api('/api/pairings', 'POST', {}); }
   revoke(id) { return this.api(`/api/devices/${encodeURIComponent(taskId(id))}/revoke`, 'POST', {}); }
   removeNode(id) { return this.api(`/api/devices/${encodeURIComponent(taskId(id))}/remove-node`, 'POST', {}); }
+  renameNode(input) {
+    if (!input || Object.keys(input).some(key => !['id','name'].includes(key)) || typeof input.name !== 'string') throw new Error('节点名称无效');
+    const id = taskId(input.id), name = input.name.trim();
+    if (!name || name.length > 80 || /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(name)) throw new Error('节点名称须为 1–80 个字符，不含换行或控制字符');
+    return this.api(`/api/devices/${encodeURIComponent(id)}/name`, 'POST', {name});
+  }
   trash() { return this.api('/api/trash'); }
   removeArchive(id) { return this.api(`/api/archives/${archiveId(id)}`, 'DELETE'); }
   restoreArchive(id) { return this.api(`/api/archives/${archiveId(id)}/restore`, 'POST', {}); }

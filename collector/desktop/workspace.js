@@ -20,7 +20,9 @@
     return window.worker.skillConfig(agent);
   }});
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
-  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onRemove:removeNode,
+  const nodeNames = window.createNodeNameEditor({save:input=>window.library.renameNode(input),identity:()=>auth.server+':'+workspaceEpoch,
+    onSaved:async device=>{ if (state) { state.devices = state.devices.map(d=>d.id === device.id ? device : d); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state,{connected,paired:auth.paired,lastSuccess}); } toast('节点名称已保存'); await refresh(); } });
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onRemove:removeNode, onRename:device=>nodeNames.open(device),
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();
@@ -39,7 +41,7 @@
     } catch (error) { if (epoch === workspaceEpoch) toast(errorText(error)); }
   }
   function clearWorkspace(nextAuth) {
-    skillManager.close(); skillMarket.hide();
+    nodeNames.close(); skillManager.close(); skillMarket.hide();
     workspaceEpoch++; entriesSeq++; detailSeq++; documentSeq++; readBusy = false;
     auth = nextAuth; state = null; entries = []; total = offset = 0;
     selectedTask = selectedEntry = currentEntry = currentFile = nextCursor = null; currentText = '';
@@ -145,21 +147,21 @@
   function renderTasks() {
     if (!state) return;
     const filter = $('#task-filter').value;
-    const signature = JSON.stringify([state.tasks, filter, selectedTask]);
+    const signature = JSON.stringify([state.tasks, state.devices.map(d=>[d.id,d.name,d.displayName,d.revokedAt]), filter, selectedTask]);
     if (signature === lastTaskSignature) return;
     lastTaskSignature = signature;
     const tasks = state.tasks.filter(t => filter === 'all' || (filter === 'unfinished' ? !['completed','cancelled'].includes(t.state) : filter === 'active' ? ['queued','assigned','running','uploading'].includes(t.state) : t.state === filter));
     if (selectedTask && !tasks.some(t => t.id === selectedTask)) { selectedTask = null; $('#task-detail').classList.remove('open'); }
     $('#tasks-count').textContent = `${tasks.length} 项任务 · ${state.devices.filter(d => window.deviceView.dispatchable(d) && d.online).length} 个工作节点在线`;
-    $('#remote-tasks').innerHTML = tasks.length ? tasks.map(t => `<button class="list-item" data-task="${esc(t.id)}" aria-selected="${t.id === selectedTask}"><small>${states[t.state] || esc(t.state)} · ${esc(types[t.type] || '自动识别')}</small><strong>${esc(taskTitle(t))}</strong><p>${esc(t.events?.at(-1)?.message || t.scenario || '通用摘要')}</p><time>${date(t.createdAt)}</time></button>`).join('') : '<div class="empty-detail">没有匹配的任务。</div>';
+    $('#remote-tasks').innerHTML = tasks.length ? tasks.map(t => `<button class="list-item" data-task="${esc(t.id)}" aria-selected="${t.id === selectedTask}"><small>${states[t.state] || esc(t.state)} · ${esc(types[t.type] || '自动识别')}</small><strong>${esc(taskTitle(t))}</strong>${window.nodePresentation.render(t,state.devices)}<p>${esc(t.events?.at(-1)?.message || t.scenario || '通用摘要')}</p><time>${date(t.createdAt)}</time></button>`).join('') : '<div class="empty-detail">没有匹配的任务。</div>';
     $('#remote-tasks').querySelectorAll('[data-task]').forEach(b => b.onclick = () => { selectedTask = b.dataset.task; renderTasks(); renderTaskDetail(); if (innerWidth <= 740) $('#task-detail').focus({preventScroll:true}); });
-    renderTaskDetail();
+    renderTaskDetail(); icons();
   }
   function renderTaskDetail() {
     const host = $('#task-detail'), t = state?.tasks.find(item => item.id === selectedTask);
     if (!t) { host.innerHTML = '<div class="empty-detail">选择一项任务查看过程和操作。</div>'; return; }
-    host.innerHTML = `<button class="back-detail" data-back="tasks">← 返回任务</button><span class="eyebrow">TASK / ${states[t.state] || esc(t.state)}</span><h2 class="detail-title">${esc(taskTitle(t))}</h2><p class="detail-summary">${esc(t.scenario || '通用摘要')} · ${t.autoArchive === false ? '确认后归档' : '自动归档'}</p><div class="detail-meta"><span>${esc(types[t.type] || '自动识别')}</span><span>${date(t.createdAt)}</span><span>${esc(t.agent || t.preferredAgent || '自动选择 Agent')}</span></div><div class="detail-actions">${t.state === 'awaiting_review' ? `<button data-task-action="draft" class="primary">预览结果</button><button data-task-action="approve">确认归档</button>` : ''}${t.archiveId ? `<button data-task-action="read" class="primary">阅读资料</button>` : ''}${['failed','waiting_action'].includes(t.state) ? `<button data-task-action="retry" class="primary">继续任务</button>` : ''}${t.deviceId && ['queued','assigned','running','uploading','waiting_action','failed'].includes(t.state) ? '<button data-task-action="reassign">切换其他节点</button>' : ''}${!['completed','cancelled'].includes(t.state) ? `<button data-task-action="cancel" class="danger-button">取消任务</button>` : ''}</div><section class="detail-section"><h3>过程记录</h3><div class="event-list">${(t.events || []).map(e => `<div><time>${date(e.at)} · ${states[e.state] || esc(e.state)}</time><p>${esc(e.message)}</p></div>`).join('')}</div></section><section id="draft-preview" class="detail-section" hidden></section>`;
-    host.classList.add('open');
+    host.innerHTML = `<button class="back-detail" data-back="tasks">← 返回任务</button><span class="eyebrow">TASK / ${states[t.state] || esc(t.state)}</span><h2 class="detail-title">${esc(taskTitle(t))}</h2><p class="detail-summary">${esc(t.scenario || '通用摘要')} · ${t.autoArchive === false ? '确认后归档' : '自动归档'}</p><div class="detail-meta"><span>${esc(types[t.type] || '自动识别')}</span><span>${date(t.createdAt)}</span><span>${esc(t.agent || t.preferredAgent || '自动选择 Agent')}</span></div>${window.nodePresentation.render(t,state.devices,true)}<div class="detail-actions">${t.state === 'awaiting_review' ? `<button data-task-action="draft" class="primary">预览结果</button><button data-task-action="approve">确认归档</button>` : ''}${t.archiveId ? `<button data-task-action="read" class="primary">阅读资料</button>` : ''}${['failed','waiting_action'].includes(t.state) ? `<button data-task-action="retry" class="primary">继续任务</button>` : ''}${t.deviceId && ['queued','assigned','running','uploading','waiting_action','failed'].includes(t.state) ? '<button data-task-action="reassign">切换其他节点</button>' : ''}${!['completed','cancelled'].includes(t.state) ? `<button data-task-action="cancel" class="danger-button">取消任务</button>` : ''}</div><section class="detail-section"><h3>过程记录</h3><div class="event-list">${(t.events || []).map(e => `<div><time>${date(e.at)} · ${states[e.state] || esc(e.state)}</time><p>${esc(e.message)}</p></div>`).join('')}</div></section><section id="draft-preview" class="detail-section" hidden></section>`;
+    host.classList.add('open'); icons();
     host.querySelector('[data-back]')?.addEventListener('click', () => { host.classList.remove('open'); $('#remote-tasks').querySelector('[aria-selected="true"]')?.focus({preventScroll:true}); });
     host.querySelectorAll('[data-task-action]').forEach(b => b.onclick = () => taskAction(t,b.dataset.taskAction));
   }
@@ -211,7 +213,7 @@
   function fillCaptureDevices() {
     if ($('#capture-dialog').open) return;
     const picker = $('#capture-device'), chosen = picker.value;
-    picker.innerHTML = '<option value="">自动派发</option>' + (state?.devices || []).filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(d.name)}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); picker.value = chosen;
+    picker.innerHTML = '<option value="">自动派发</option>' + (state?.devices || []).filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(window.nodePresentation.label(d))}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); picker.value = chosen;
   }
   $('#task-filter').addEventListener('change', renderTasks);
   function markdown(host,text) {

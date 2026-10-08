@@ -32,6 +32,9 @@ files:
   - desktop/trayTemplate@2x.png
   - desktop/vendor/**
   - public/device-view.js
+  - public/node-presentation.js
+  - public/node-name-editor.js
+  - public/node-presentation.css
   - public/pairing-dialog.css
   - public/skill-manager.js
   - public/skill-manager.css
