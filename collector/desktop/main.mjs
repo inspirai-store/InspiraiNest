@@ -84,7 +84,13 @@ function makeWindow(compact = false) {
   window.setMenu(null);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
-  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  // Clipboard writes support explicit copy buttons in the trusted local UI.
+  // Clipboard reads and requests from embedded or external pages remain denied.
+  const canWriteClipboard = (contents, permission, details) => permission === 'clipboard-sanitized-write'
+    && contents === main?.webContents && details.isMainFrame === true
+    && details.requestingUrl?.split('?')[0] === pageURL;
+  window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => canWriteClipboard(contents, permission, details));
+  window.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => callback(canWriteClipboard(contents, permission, details)));
   window.loadFile(path.join(here, 'index.html'), { query: { ...(compact ? { compact: '1' } : {}), ...(isMac ? { platform: 'darwin' } : {}) } });
   return window;
 }

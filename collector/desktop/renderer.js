@@ -172,6 +172,21 @@ function logTime(value) {
   return { time: date.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }),
     date: date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }) };
 }
+async function copyLogRecord(button, value, label) {
+  button.disabled = true;
+  text('#log-copy-status', '');
+  try {
+    await navigator.clipboard.writeText(value);
+    button.textContent = '已复制';
+    text('#log-copy-status', '已复制，可粘贴到其他地方。诊断中的凭据已隐藏。');
+  } catch {
+    button.textContent = '重试复制';
+    text('#log-copy-status', '复制失败，请重试；也可展开详情，选中文字后复制。');
+  } finally {
+    button.disabled = false;
+    setTimeout(() => { if (button.isConnected) button.textContent = label; }, 2000);
+  }
+}
 function renderLogs() {
   text('#log-issue-count', logData.activeIssues || 0);
   const issues = logData.activeIssues || 0;
@@ -187,6 +202,7 @@ function renderLogs() {
   const root = $('#logs');
   const opened = new Set([...root.querySelectorAll('details[open]')].map(row => row.dataset.eventId));
   const focused = document.activeElement?.closest('[data-event-id]')?.dataset.eventId;
+  const focusedCopy = document.activeElement?.matches('[data-copy-log]');
   const scroll = root.scrollTop;
   const rows = entries.map(event => {
     const row = document.createElement('details'); row.className = 'log-event ' + event.level; row.dataset.eventId = event.id;
@@ -204,7 +220,12 @@ function renderLogs() {
     const message = document.createElement('span'); message.className = 'event-message'; message.textContent = event.message;
     content.append(meta, message);
     const arrow = document.createElement('span'); arrow.className = 'event-expand'; arrow.textContent = '详情';
-    summary.append(time, content, arrow);
+    const actions = document.createElement('span'); actions.className = 'event-actions';
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'small-button event-copy'; copy.dataset.copyLog = '';
+    const copyLabel = event.domain === 'system' ? '复制问题' : '复制记录';
+    copy.textContent = copyLabel; copy.setAttribute('aria-label', `${copyLabel}：${event.message}`);
+    actions.append(arrow, copy);
+    summary.append(time, content, actions);
     const detail = document.createElement('div'); detail.className = 'event-detail';
     const suggestions = { NETWORK: '检查网络及服务地址，服务恢复后自动重连。', REMOTE_HTTP: '核对 HTTP 状态与接口路径；持续的 5xx 错误需要检查服务端和代理日志。', REMOTE_FORMAT: '检查所列接口、服务版本和代理配置；响应必须是有效 JSON。', AUTH: '重新登录客户端，或在官网生成设备配对码后连接。', EPERM: '状态文件被占用或权限受限，已自动重试；持续发生时检查文件权限和安全软件。', EACCES: '检查本机数据目录的读写权限。', AGENT_PERMISSION: '检查本机采集程序的非交互权限设置后继续。', AGENT_START: '检查采集程序版本、安装位置和已配置的候选程序。', AGENT_EXIT: '展开本任务执行输出，查看退出前的具体错误；修复后继续原任务。', AGENT_TIMEOUT: '检查执行输出和网络，保留成果后继续原任务。', AGENT_RESULT: '检查采集程序是否成功运行并生成规定的结果文件。', AGENT_ENVIRONMENT: '按采集程序上报的说明补齐工具或权限配置，再继续原任务。', STEP_ENCODING: '采集说明发生编码损坏，原始输出已保留；检查每次 PowerShell 调用的 UTF-8 设置。', ARCHIVE_ENCODING: '资料元数据存在乱码；从原始记录修复对应字段、重建索引，再继续原任务，不必重新下载或转录。' };
     const fields = { '事件': event.code, '记录来源': event.reportedBy === 'agent' ? '采集程序上报，时间为本机接收时间' : '本机管线', '任务': event.taskId, '运行': event.runId, '发生时间': time.title,
@@ -212,6 +233,13 @@ function renderLogs() {
       ...(event.firstAt ? { '首次发生': logTime(event.firstAt).date + ' ' + logTime(event.firstAt).time, '最近发生': logTime(event.lastAt).date + ' ' + logTime(event.lastAt).time } : {}),
       ...(event.resolvedAt ? { '恢复时间': logTime(event.resolvedAt).date + ' ' + logTime(event.resolvedAt).time } : {}), ...event.details };
     const pre = document.createElement('pre'); pre.textContent = Object.entries(fields).filter(([, value]) => value !== undefined && value !== null).map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`).join('\n');
+    const copiedText = ['灵藏 · ' + (event.domain === 'system' ? '系统问题' : '采集过程'), `描述: ${event.message}`, `状态: ${state}`,
+      `节点: ${snapshot?.device || '本机'}`, ...(event.agent ? [`Agent: ${event.agent}`] : []),
+      ...(event.count > 1 ? [`重复次数: ${event.count}`] : []), pre.textContent, '（诊断中的凭据已隐藏）'].join('\n');
+    copy.addEventListener('click', event => {
+      event.preventDefault(); event.stopPropagation();
+      void copyLogRecord(copy, copiedText, copyLabel);
+    });
     detail.append(pre);
     if (event.taskId) {
       const raw = document.createElement('button'); raw.className = 'small-button'; raw.textContent = '查看本任务执行输出';
@@ -221,7 +249,7 @@ function renderLogs() {
   });
   root.replaceChildren(...(rows.length ? rows : [document.createTextNode(logDomain === 'collection' ? '暂无采集过程记录。新任务开始后会按阶段显示；历史原始输出可在下方展开。' : '暂无系统问题记录。旧版报错可在下方的历史日志中查看。')]));
   root.scrollTop = scroll;
-  if (focused) [...root.querySelectorAll('[data-event-id]')].find(row => row.dataset.eventId === focused)?.querySelector('summary').focus({ preventScroll: true });
+  if (focused) [...root.querySelectorAll('[data-event-id]')].find(row => row.dataset.eventId === focused)?.querySelector(focusedCopy ? '[data-copy-log]' : 'summary').focus({ preventScroll: true });
 }
 let rawRequest = 0;
 async function loadRawLogs(taskId = logsTaskId) {

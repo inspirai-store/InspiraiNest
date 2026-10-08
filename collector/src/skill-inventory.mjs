@@ -6,6 +6,7 @@ import { hash, readJson, now, contained, canonicalJson } from './common.mjs';
 import { agentProfile, execute, terminate, agentEnvironment } from './agents.mjs';
 import { commandEnvironment, agentVersion } from './agent-paths.mjs';
 import { SKILL_AGENTS, SKILL_EXECUTION_AGENTS, skillMetadata, packageSkill, validateSkillPackage, cleanRequirements } from './skill-package.mjs';
+import { sharedSkillRoot } from './skill-links.mjs';
 
 const json = file => { try { return readJson(file); } catch { return {}; } };
 const canonicalPath = file => {try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
@@ -243,7 +244,7 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
     }
   }
   const inventory = { schemaVersion: 1, scannedAt: now(), platform: process.platform, agents, items, projects:contexts.filter(directory=>directory!==cwd) };
-  for(const agent of agents)Object.assign(agent,{skillRoot:globalRoots[agent.name],compatibleSkillRoots:compatibleRoots[agent.name] || [],projectSkillDirectory:agent.name==='codex'?'.agents/skills':'.'+agent.name+'/skills',legacySkillRoot:agent.name==='codex'?path.join(env.CODEX_HOME || path.join(home,'.codex'),'skills'):null,loadMethod:agent.name==='codex'?'原生 skills/list 确认加载':agent.name==='gemini'?'目录及配置盘点；使用 /skills reload 刷新':agent.name==='opencode'?'目录盘点；新会话检查 skill 工具及权限':'目录及配置盘点；新会话加载确认',installationScope:'user'});
+  for(const agent of agents)Object.assign(agent,{skillRoot:globalRoots[agent.name],sharedSkillRoot:sharedSkillRoot(home),installationMode:'shared-link',compatibleSkillRoots:compatibleRoots[agent.name] || [],projectSkillDirectory:agent.name==='codex'?'.agents/skills':'.'+agent.name+'/skills',legacySkillRoot:agent.name==='codex'?path.join(env.CODEX_HOME || path.join(home,'.codex'),'skills'):null,loadMethod:agent.name==='codex'?'原生 skills/list 确认加载':agent.name==='gemini'?'目录及配置盘点；使用 /skills reload 刷新':agent.name==='opencode'?'目录盘点；新会话检查 skill 工具及权限':'目录及配置盘点；新会话加载确认',installationScope:'user'});
   inventory.digest = hash(JSON.stringify({ agents, items,projects:inventory.projects }));
-  return { inventory, local, globalRoots, compatibleRoots, contexts, env };
+  return { inventory, local, globalRoots, sharedRoot:sharedSkillRoot(home), compatibleRoots, contexts, env };
 }

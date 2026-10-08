@@ -10,6 +10,7 @@ import {packageSkill,validateSkillPackage,writeSkillPackage,skillDigest} from '.
 import {scanSkillInventory,globalSkillRoots,dependencyStatus,fixedSkillProfiles} from '../src/skill-inventory.mjs';
 import {createSkillRuntime,taskSkillSnapshots} from '../src/skill-runtime.mjs';
 import {mysqlFixture} from './mysql-fixture.mjs';
+import {sharedSkillRoot} from '../src/skill-links.mjs';
 
 const resources=new WeakMap();
 function resource(t) {
@@ -203,4 +204,51 @@ test('shared global directories require the whole Agent group and roll back as o
  const comparison=await runtime.operation({...base,id:hash('comparison'),action:'compare',agents:['codex','codebuddy']});assert.equal(comparison.result.comparison.compatible,true);assert.equal(comparison.result.comparison.targets[0].sharedAgents.length,2);
  const sync={...base,id:hash('sync'),action:'sync',agents:['codex','codebuddy'],expectedTargets:comparison.result.comparison.targets};await assert.rejects(()=>runtime.operation(sync),/共享/);await runtime.operation({...sync,confirmShared:true});assert.equal(packageSkill(directory).hash,bundle.hash);assert.equal(fs.realpathSync(path.join(roots.codebuddy,'article-extract')),fs.realpathSync(directory));
  await runtime.operation({schemaVersion:1,id:hash('rollback'),action:'rollback',syncId:sync.id,expectedHash:bundle.hash});assert.equal(packageSkill(directory).hash,before.hash);
+});
+
+test('shared installation consolidates distinct copies, updates once, and restores each original directory',async t=>{
+ const home=temporary(t),roots=globalSkillRoots(home),agents=['codex','codebuddy','claude'];
+ const originals=new Map(agents.map(agent=>[agent,skill(path.join(roots[agent],'article-extract'),agent+' original')]));
+ const legacy=path.join(home,'.codex/skills/article-extract'),legacyBundle=skill(legacy,'distinct legacy copy');
+ fs.writeFileSync(path.join(legacy,'.env'),'LOCAL_FIXTURE=preserve-on-rollback');
+ let bundle=skill(path.join(home,'incoming'),'first shared version');
+ const runtime=createSkillRuntime({server:'https://fixture.example',deviceId:'fixture',token:'fixture',dataDir:path.join(home,'data')},{home,cwd:home,scan:scanner,api:async()=>bundle});cleanup(t,()=>runtime.close());
+ const base=()=>({schemaVersion:1,versionId:hash(bundle.hash),versionHash:bundle.hash,name:bundle.name,policy:{agents,systems:['darwin','win32','linux'],requirements:{}}});
+ const sync=async id=>{
+  const comparison=await runtime.operation({...base(),id:hash(id+'-compare'),action:'compare',agents});
+  assert.equal(comparison.result.comparison.compatible,true);
+  const op={...base(),id:hash(id),action:'sync',agents,confirmShared:true,expectedTargets:comparison.result.comparison.targets};
+  await runtime.operation(op);return op;
+ };
+ const first=await sync('first');const source=path.join(sharedSkillRoot(home),bundle.name);
+ assert.equal(fs.lstatSync(source).isSymbolicLink(),false);
+ for(const agent of agents){const reference=path.join(roots[agent],bundle.name);assert.equal(fs.lstatSync(reference).isSymbolicLink(),true);assert.equal(fs.realpathSync(reference),fs.realpathSync(source));}
+ assert.equal(fs.lstatSync(legacy).isSymbolicLink(),true);assert.equal(fs.realpathSync(legacy),fs.realpathSync(source));
+ for(const agent of agents)assert.deepEqual(fs.readdirSync(roots[agent]),['article-extract'],'Agent skill roots contain only the live reference, not backup copies');
+ const firstHash=bundle.hash;bundle=skill(path.join(home,'incoming'),'second shared version');
+ const second=await sync('second');
+ for(const agent of agents)assert.equal(packageSkill(path.join(roots[agent],bundle.name)).hash,bundle.hash);
+ const single=await runtime.operation({...base(),id:hash('single-agent-update'),action:'compare',agents:['codex']});assert.equal(single.result.comparison.compatible,false,'updating a shared source needs its whole attached Agent group');
+ await runtime.operation({schemaVersion:1,id:hash('undo-second'),action:'rollback',syncId:second.id,expectedHash:bundle.hash});
+ for(const agent of agents)assert.equal(packageSkill(path.join(roots[agent],bundle.name)).hash,firstHash);
+ await runtime.operation({schemaVersion:1,id:hash('undo-first'),action:'rollback',syncId:first.id,expectedHash:firstHash});
+ for(const agent of agents){const directory=path.join(roots[agent],'article-extract');assert.equal(fs.lstatSync(directory).isSymbolicLink(),false);assert.equal(packageSkill(directory).hash,originals.get(agent).hash);}
+ assert.equal(fs.lstatSync(legacy).isSymbolicLink(),false);assert.equal(packageSkill(legacy).hash,legacyBundle.hash);
+ assert.equal(fs.readFileSync(path.join(legacy,'.env'),'utf8'),'LOCAL_FIXTURE=preserve-on-rollback');
+ assert.equal(fs.existsSync(source),false);
+});
+
+test('link creation failure restores the shared source and all original Agent directories',async t=>{
+ const home=temporary(t),roots=globalSkillRoots(home),agents=['codex','codebuddy'];
+ const original=skill(path.join(roots.codex,'article-extract'),'original'),bundle=skill(path.join(home,'incoming'),'new');
+ const runtime=createSkillRuntime({server:'https://fixture.example',deviceId:'fixture',token:'fixture',dataDir:path.join(home,'data')},{home,cwd:home,scan:scanner,api:async()=>bundle});cleanup(t,()=>runtime.close());
+ const base={schemaVersion:1,versionId:hash(bundle.hash),versionHash:bundle.hash,name:bundle.name,policy:{agents,systems:['darwin','win32','linux'],requirements:{}}};
+ const comparison=await runtime.operation({...base,id:hash('failure-compare'),action:'compare',agents});
+ const previous=fs.symlinkSync;let count=0;
+ fs.symlinkSync=(...args)=>{if(++count===2)throw Object.assign(new Error('fixture link permission denied'),{code:'EPERM'});return previous(...args);};
+ try{await assert.rejects(runtime.operation({...base,id:hash('failure-install'),action:'sync',agents,confirmShared:true,expectedTargets:comparison.result.comparison.targets}),/permission denied/);}finally{fs.symlinkSync=previous;}
+ assert.equal(fs.lstatSync(path.join(roots.codex,bundle.name)).isSymbolicLink(),false);
+ assert.equal(packageSkill(path.join(roots.codex,bundle.name)).hash,original.hash);
+ assert.equal(fs.existsSync(path.join(roots.codebuddy,bundle.name)),false);
+ assert.equal(fs.existsSync(path.join(sharedSkillRoot(home),bundle.name)),false);
 });

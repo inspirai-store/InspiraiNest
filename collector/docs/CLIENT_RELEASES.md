@@ -1,5 +1,20 @@
 # 桌面工作台下载记录
 
+## 后续发布约定（2026-10-09）
+
+每次桌面客户端发布必须同时交付 Windows 和 macOS 全部现有架构，使用公开仓库同一个源码提交及同一个桌面版本号，作为同一批次发布。
+
+| 平台 | 必交付文件 |
+|---|---|
+| Windows x64 | `InspiraiNest-v<版本>-Windows-x64.exe`（NSIS） |
+| macOS Apple Silicon（arm64） | `InspiraiNest-v<版本>-macOS-arm64.dmg`、`InspiraiNest-v<版本>-macOS-arm64.zip` |
+| macOS Intel（x64） | `InspiraiNest-v<版本>-macOS-x64.dmg`、`InspiraiNest-v<版本>-macOS-x64.zip` |
+
+- Windows 复用公开仓库 `collector-build.yml` 的已验证产物；macOS 使用同一提交的 `collector-release.yml` 签名发布流程，开启 `include_macos`，完成 Developer ID 签名、Apple 公证及两种架构验证。普通 CI 的未签名 Mac 包不能作为正式交付。
+- 所有平台产物验证完成后，再更新 GitHub Release、官网发布清单、下载页及各平台自动更新文件（包括 blockmap）。核对源码提交、版本、文件大小、SHA-256、更新清单校验值与包内资源；完整下载每个平台的正式链接验证。
+- 发布记录逐项列出 Windows、Mac arm64、Mac x64 的构建与验收结果。任一必交付平台未完成时，整批发布标记为未完成，不能仅以 Windows 上线宣告客户端发布完成；保留上一批可用产物作为回滚目标。
+- Android、iOS 沿用各自的版本号、签名身份与现有分发渠道；涉及移动端改动时也须列入对应发布及验收记录，明确尚未交付的平台。
+
 ## macOS 0.1.11 与 Web 更新（2026-10-05）
 
 Apple Silicon 和 Intel 的签名、公证 DMG/ZIP 已由公开仓库 CI 构建并保存到 OSS。官网下载页和 macOS 自动更新地址均已切换到 0.1.11，Windows 0.1.11、Android 1.3.4、只读 CLI 0.1.1 的文件与清单保持一致。

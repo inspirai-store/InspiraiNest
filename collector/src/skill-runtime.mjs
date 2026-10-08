@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { hash, atomicJson, readJson, now, requireValue, safePath, contained, canonicalJson } from './common.mjs';
 import { dependencyStatus } from './skill-inventory.mjs';
 import { acquireEnvironmentLock } from './agent-lock.mjs';
 import { agentHome } from './agent-paths.mjs';
 import { createInventoryScanner } from './skill-scan.mjs';
 import { packageSkill, validateSkillPackage, writeSkillPackage, cleanSkillPolicy, skillMetadata } from './skill-package.mjs';
+import { sharedSkillRoot, entryPath, referenceState, pointsTo, pathExists, skillArtifacts, applySkillLinks, recoverSkillLinks } from './skill-links.mjs';
 
 const read = (file, fallback) => { try { return readJson(file); } catch { return fallback; } };
 const actualHash = directory => fs.existsSync(directory) ? packageSkill(directory,{validate:false}).hash : null;
@@ -16,7 +18,7 @@ const realTarget = file => {
   const parent=path.dirname(file);requireValue(parent!==file,'目标目录无效');return path.join(realTarget(parent),path.basename(file));
 };
 
-export function createSkillRuntime(config, { api, cwd, scan = createInventoryScanner(), verify, home, env } = {}) {
+export function createSkillRuntime(config, { api, cwd, scan = createInventoryScanner(), verify, home = os.homedir(), env } = {}) {
   const namespace = hash(config.server + ':' + config.deviceId + ':' + hash(config.token || ''));
   const root = path.join(path.resolve(config.dataDir), 'environments', namespace);
   fs.mkdirSync(root,{recursive:true});
@@ -32,6 +34,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   }
   function recover() {
     const transaction=read(transactionFile,null);if(!transaction)return;
+    recoverSkillLinks(transaction);
     if(!transaction.committed) for(const target of [...transaction.targets].reverse()) {
       if(fs.existsSync(target.backup)){
         if(fs.existsSync(target.real)){
@@ -94,17 +97,31 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   }
   function targetsFor(bundle,agents) {
     const targets=[];
+    const source=referenceState(path.join(state.sharedRoot || sharedSkillRoot(home),bundle.name));
+    requireValue(source.kind!=='link','统一技能源不能是软链接，请先整理该技能');
+    const attached=Object.entries(state.globalRoots).filter(([,global])=>{
+      const directory=path.join(global,bundle.name);
+      return fs.existsSync(directory) && fs.realpathSync(directory)===source.entry;
+    }).map(([agent])=>agent);
+    const sharedAgents=[...new Set([...agents,...attached,...Array.from(state.local.entries())
+      .filter(([,location])=>location.real===source.entry && !location.origin.scope.startsWith('compat-'))
+      .map(([id])=>state.inventory.items.find(item=>item.id===id)?.agent).filter(Boolean)])].sort();
     for(const agent of agents){
       const directory=path.join(state.globalRoots[agent],bundle.name);
-      const real=realTarget(directory);
-      const sharedAgents=[...new Set([...Object.entries(state.globalRoots).filter(([,global])=>realTarget(path.join(global,bundle.name))===real).map(([name])=>name),...Array.from(state.local.entries()).filter(([,location])=>location.real===real && !location.origin.scope.startsWith('compat-')).map(([skillId])=>state.inventory.items.find(s=>s.id===skillId)?.agent).filter(Boolean)])];
-      const visibleTo=Object.entries(state.compatibleRoots || {}).filter(([,roots])=>roots.some(root=>realTarget(path.join(root,bundle.name))===real)).map(([name])=>name);
-      const currentHash=actualHash(real),managed=ledger.installations[agent+':'+real];
-      const previous=currentHash?packageSkill(real,{validate:false}):null;
+      const reference=referenceState(directory),real=source.entry;
+      const legacy=agent==='codex'?path.join(state.env.CODEX_HOME || path.join(home,'.codex'),'skills',bundle.name):null;
+      const references=[reference,...(legacy && path.resolve(legacy)!==path.resolve(directory) && pathExists(legacy)?[referenceState(legacy)]:[])];
+      const existingShared=reference.hash===null?[]:Object.entries(state.globalRoots).filter(([,global])=>fs.existsSync(path.join(global,bundle.name)) && fs.realpathSync(path.join(global,bundle.name))===reference.real).map(([name])=>name);
+      const affected=[...new Set([...sharedAgents,...existingShared])].sort();
+      const visibleTo=Object.entries(state.compatibleRoots || {}).filter(([,roots])=>roots.some(root=>agents.some(name=>path.resolve(root)===path.resolve(state.globalRoots[name])) || (fs.existsSync(path.join(root,bundle.name)) && fs.realpathSync(path.join(root,bundle.name))===real))).map(([name])=>name);
+      const currentHash=reference.hash,managed=ledger.installations[agent+':'+real] || ledger.installations[agent+':'+reference.real];
+      const previous=currentHash?packageSkill(reference.real,{validate:false}):null;
       const files=new Map((previous?.files || []).map(f=>[f.path,f]));
       const changes=bundle.files.filter(f=>files.get(f.path)?.sha256!==f.sha256 || Boolean(files.get(f.path)?.executable)!==Boolean(f.executable)).map(f=>({path:f.path,state:files.has(f.path)?'modified':'missing'}));
       changes.push(...(previous?.files || []).filter(f=>!bundle.files.some(next=>next.path===f.path)).map(f=>({path:f.path,state:'removed'})));
-      targets.push({agent,targetId:hash(real),directory,realDirectory:real,scope:'user',hash:currentHash,sharedAgents,visibleTo,exists:currentHash!==null,localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
+      targets.push({agent,targetId:hash(real),directory,realDirectory:real,sourceDirectory:real,sourceHash:source.hash,sourceFingerprint:source.fingerprint,
+        reference,references,linkedDirectories:references.map(ref=>ref.entry),installationMode:'shared-link',scope:'user',hash:currentHash,sharedAgents:affected,visibleTo,exists:currentHash!==null,
+        localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
     }
     return targets;
   }
@@ -126,27 +143,38 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   }
   function install(op,bundle,targets) {
     const groups=new Map();
+    const links=new Map();
     for(const target of targets){
-      const directory=path.join(state.globalRoots[target.agent],bundle.name), real=realTarget(directory);
-      requireValue(actualHash(real)===target.hash,'目标 Skill 已修改，请重新比较');
-      requireValue(hash(real)===target.targetId,'目标链接已修改，请重新比较');
-      if(!groups.has(real))groups.set(real,{real,stage:path.join(path.dirname(real),'.lingnest-stage-'+op.id),backup:path.join(path.dirname(real),'.lingnest-backup-'+op.id),originalHash:target.hash,agents:target.sharedAgents,directories:[]});
+      const directory=path.join(state.globalRoots[target.agent],bundle.name), reference=referenceState(directory), real=entryPath(target.sourceDirectory);
+      requireValue(reference.fingerprint===target.reference.fingerprint && referenceState(real).fingerprint===target.sourceFingerprint,'目标 Skill 或链接已修改，请重新比较');
+      requireValue(hash(real)===target.targetId,'统一技能源已变化，请重新比较');
+      if(!groups.has(real))groups.set(real,{real,...skillArtifacts(real,op.id),originalHash:target.sourceHash,agents:target.sharedAgents,directories:[]});
+      for(const ref of target.references){
+        requireValue(referenceState(ref.entry).fingerprint===ref.fingerprint,'技能兼容入口已修改，请重新比较');
+        // A root already linked to the source needs no per-skill self-link.
+        if(ref.entry!==real && !pointsTo(ref.entry,real) && !links.has(ref.entry))links.set(ref.entry,{
+          entry:ref.entry,destination:real,...skillArtifacts(ref.entry,op.id),
+          originalKind:ref.kind,originalLink:ref.link,originalHash:ref.hash,
+        });
+      }
       groups.get(real).directories.push(directory);
     }
-    const transaction={id:op.id,targets:[...groups.values()],committed:false,installHash:bundle.hash};
+    const transaction={id:op.id,targets:[...groups.values()],links:[...links.values()],committed:false,installHash:bundle.hash};
     // Persist the restore plan before the first rename; recovery also runs after a process crash.
     atomicJson(transactionFile,transaction);
     try{
       for(const target of transaction.targets){
-        fs.mkdirSync(path.dirname(target.real),{recursive:true});
+        fs.mkdirSync(path.dirname(target.real),{recursive:true});fs.mkdirSync(path.dirname(target.backup),{recursive:true});
         requireValue(!fs.existsSync(target.backup) && !fs.existsSync(target.stage),'同步临时目录已存在');
         writeSkillPackage(bundle,target.stage);
         requireValue(actualHash(target.stage)===bundle.hash && actualHash(target.real)===target.originalHash,'目标 Skill 已修改，请重新比较');
         if(target.originalHash!==null){fs.renameSync(target.real,target.backup);requireValue(actualHash(target.backup)===target.originalHash,'目标 Skill 在提交时被修改');}
         fs.renameSync(target.stage,target.real);
       }
+      applySkillLinks(transaction.links);
+      requireValue(targets.every(target=>fs.realpathSync(target.directory)===target.sourceDirectory),'技能链接校验失败');
       const next=structuredClone(ledger);
-      next.backups[op.id]={targets:transaction.targets,versionHash:bundle.hash,previousInstallations:ledger.installations};
+      next.backups[op.id]={targets:transaction.targets,links:transaction.links,versionHash:bundle.hash,previousInstallations:ledger.installations};
       for(const target of transaction.targets)for(const agent of target.agents)next.installations[agent+':'+target.real]={versionId:op.versionId,hash:bundle.hash,policy:op.policy,source:op.source || {provider:'lingnest'},operationId:op.id};
       const receipt={state:'succeeded',result:{installed:true,versionId:op.versionId,hash:bundle.hash,agents:op.agents,locations:targets.map(({agent,directory,realDirectory})=>({agent,directory,realDirectory}))}};
       Object.assign(transaction,{committed:true,ledger:next,receipt});atomicJson(transactionFile,transaction);
@@ -157,12 +185,19 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   function rollback(op) {
     const backup=ledger.backups[op.syncId];requireValue(backup && !backup.restored,'没有可恢复的旧版本');
     for(const target of backup.targets)requireValue(target.directories.every(directory=>realTarget(directory)===target.real) && actualHash(target.real)===op.expectedHash && (target.originalHash===null || actualHash(target.backup)===target.originalHash),'Skill 已被修改，请先保留本地版本');
+    for(const link of backup.links || [])requireValue(pointsTo(link.entry,link.destination) && (link.originalKind==='missing' || (link.originalKind==='link'
+      ? fs.lstatSync(link.backup).isSymbolicLink() && fs.readlinkSync(link.backup)===link.originalLink
+      : actualHash(link.backup)===link.originalHash)),'技能链接或原目录备份已修改，请先保留本地版本');
     // Rollback is itself a staged installation, so an interruption cannot leave half a shared group.
-    const transaction={id:op.id,committed:false,targets:backup.targets.map(t=>({...t,originalHash:op.expectedHash,installHash:t.originalHash,backup:path.join(path.dirname(t.real),'.lingnest-backup-'+op.id),stage:path.join(path.dirname(t.real),'.lingnest-stage-'+op.id)}))};
+    const transaction={id:op.id,committed:false,targets:backup.targets.map(t=>({...t,originalHash:op.expectedHash,installHash:t.originalHash,...skillArtifacts(t.real,op.id)})),
+      links:(backup.links || []).map(link=>({...link,originalKind:'link',...skillArtifacts(link.entry,op.id),
+        ...(link.originalKind==='missing'?{remove:true}:{restore:link.backup})}))};
     atomicJson(transactionFile,transaction);
     try{
+      applySkillLinks(transaction.links);
       for(let i=0;i<backup.targets.length;i++){
         const old=backup.targets[i],target=transaction.targets[i];
+        fs.mkdirSync(path.dirname(target.backup),{recursive:true});
         if(old.originalHash!==null)writeSkillPackage(packageSkill(old.backup),target.stage);
         requireValue(actualHash(target.real)===op.expectedHash,'Skill 已修改');
         fs.renameSync(target.real,target.backup);

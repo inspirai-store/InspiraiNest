@@ -113,6 +113,7 @@ jobs:
           node scripts/test-desktop-skills.cjs "$executable"
           node scripts/test-agents-ui.cjs "$executable"
           node scripts/test-desktop-pairing.cjs "$executable"
+          node scripts/test-worker-logs-ui.cjs "$executable"
       - name: Test signed Apple Silicon update download
         working-directory: public-source/collector
         shell: bash

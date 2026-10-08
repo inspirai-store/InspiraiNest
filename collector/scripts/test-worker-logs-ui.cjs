@@ -33,6 +33,9 @@ const { _electron } = require('playwright');
   const output = path.resolve(__dirname, '../test-output/worker-logs'); fs.mkdirSync(output, { recursive: true });
   try {
     await app.firstWindow();
+    await app.evaluate(async ({ clipboard }) => {
+      globalThis.workerLogClipboardBefore = await clipboard.read();
+    });
     let page;
     for (let n = 0; n < 100 && !page; n++) { page = app.windows().find(p => p.url().startsWith('file:') && !p.url().includes('compact=1')); if (!page) await new Promise(r => setTimeout(r, 100)); }
     assert.ok(page);
@@ -47,15 +50,34 @@ const { _electron } = require('playwright');
     assert.equal(await page.evaluate(() => window.logXss), undefined);
     const timestamps = await page.locator('#logs time').evaluateAll(nodes => nodes.map(node => Date.parse(node.dateTime)));
     assert.deepEqual(timestamps, [...timestamps].sort((a,b) => b-a));
+    const collectionCopy = page.locator('#logs .log-event').first().locator('[data-copy-log]');
+    await app.evaluate(() => globalThis.workerDesktop().main.focus());
+    await collectionCopy.click();
+    await page.waitForFunction(() => document.querySelector('#log-copy-status').textContent.includes('已复制'));
+    const copiedCollection = await app.evaluate(({ clipboard }) => clipboard.readText());
+    assert.match(copiedCollection, /采集过程\r?\n描述: 轻量资料已归档/);
+    assert.match(copiedCollection, /任务: task-fixture/);
+    assert.equal(await page.evaluate(async () => { try { await navigator.clipboard.readText(); return 'allowed'; } catch { return 'denied'; } }), 'denied');
+    assert.equal(await page.locator('#logs .log-event').first().getAttribute('open'), null, 'copy must not expand details');
     await page.locator('#logs .log-event summary').first().click();
     await page.waitForTimeout(1700);
     assert.equal(await page.locator('#logs .log-event').first().getAttribute('open'), '');
     await page.locator('#logs-system').click();
     assert.equal(await page.locator('#logs .log-event').count(), 1);
     assert.match(await page.locator('#logs').innerText(), /重复 12 次/);
+    const issueCopy = page.locator('#logs [data-copy-log]');
+    await issueCopy.focus(); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('#log-copy-status').textContent.includes('已复制'));
+    const copiedIssue = await app.evaluate(({ clipboard }) => clipboard.readText());
+    assert.match(copiedIssue, /系统问题\r?\n描述: 本机状态暂时无法保存/);
+    for (const field of [/状态: 需处理/, /节点:/, /事件: EPERM/, /重复次数: 12/, /发生时间: .*\d{2}:\d{2}:\d{2}（北京时间）/, /处理建议:/, /sharing violation/, /首次发生:/]) assert.match(copiedIssue, field);
+    assert.ok(!copiedIssue.includes('private-fixture-token'));
+    assert.equal(await page.locator('#logs .log-event').getAttribute('open'), null);
     await page.locator('#logs .log-event summary').click();
     assert.match(await page.locator('#logs .event-detail').innerText(), /EPERM|处理建议/);
     assert.ok(!(await page.locator('body').innerText()).includes('private-fixture-token'));
+    await page.waitForFunction(() => document.querySelector('#logs [data-copy-log]').textContent === '复制问题');
+    await page.locator('#logs-panel').screenshot({ path: path.join(output, 'copy-problem-dark.png') });
     await page.screenshot({ path: path.join(output, 'system-dark.png') });
     await page.locator('#logs-collection').click();
     await page.screenshot({ path: path.join(output, 'collection-dark.png') });
@@ -65,6 +87,15 @@ const { _electron } = require('playwright');
     await page.locator('[data-node=local]').click();
     await page.screenshot({ path: path.join(output, 'collection-minimum-light.png') });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.locator('#logs-system').click();
+    await page.evaluate(() => { window.logClipboardWrite = navigator.clipboard.writeText; navigator.clipboard.writeText = async () => { throw new Error('fixture denied'); }; });
+    await page.locator('#logs [data-copy-log]').click();
+    await page.waitForFunction(() => document.querySelector('#log-copy-status').textContent.includes('复制失败'));
+    assert.equal(await page.locator('#logs [data-copy-log]').isEnabled(), true);
+    await page.evaluate(() => { navigator.clipboard.writeText = window.logClipboardWrite; delete window.logClipboardWrite; });
+    await page.locator('#logs [data-copy-log]').focus(); await page.keyboard.press('Space');
+    await page.waitForFunction(() => document.querySelector('#log-copy-status').textContent.includes('已复制'));
+    assert.equal(await page.evaluate(() => document.querySelector('#logs').scrollWidth <= document.querySelector('#logs').clientWidth), true);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.locator('#logs-collection').focus(); await page.keyboard.press('ArrowRight');
     assert.equal(await page.locator('#logs-system').getAttribute('aria-selected'), 'true');
@@ -75,8 +106,11 @@ const { _electron } = require('playwright');
     await page.waitForFunction(() => document.querySelector('#log-raw-output').textContent.includes('SyntaxError'));
     assert.ok(!(await page.locator('#log-raw-output').innerText()).includes('private-fixture-token'));
     assert.deepEqual(errors, []);
-    console.log('Worker log UI: newest-first, Chinese stages, system separation, dedup/recovery, expandable diagnostics, redaction, themes, minimum size and keyboard: passed');
+    console.log('Worker log UI: newest-first, Chinese stages, system separation, dedup/recovery, expandable diagnostics, native clipboard/redaction/retry, themes, minimum size and keyboard: passed');
   } finally {
+    await app.evaluate(async ({ clipboard }) => {
+      if (globalThis.workerLogClipboardBefore) { await clipboard.write(globalThis.workerLogClipboardBefore); delete globalThis.workerLogClipboardBefore; }
+    }).catch(() => {});
     // The lock belongs to this synthetic fixture, not a real Worker. Remove it
     // before macOS safe quit tries to send a control command to the test runner.
     try { fs.unlinkSync(path.join(root, 'worker.lock')); } catch {}

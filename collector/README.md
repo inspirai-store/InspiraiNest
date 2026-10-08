@@ -2,6 +2,8 @@
 
 See [installation and configuration](../docs/SELF_HOSTING.md), [security boundaries](../SECURITY.md), [rights decisions](../docs/RIGHTS.md) and [third-party notices](../docs/THIRD_PARTY.md).
 
+桌面客户端每次发布须同批交付 Windows x64、macOS arm64 和 macOS x64，统一源码提交与桌面版本号，并同步官网下载和自动更新入口。见 [发布约定与记录](docs/CLIENT_RELEASES.md)。
+
 Owner credential changes and authenticator binding are available at `/security`.
 See [account security](docs/ACCOUNT_SECURITY.md) for persistence, recovery codes,
 MFA-compatible pairing and deployment requirements.

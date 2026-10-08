@@ -9,6 +9,7 @@ import {secret,hash} from '../src/common.mjs';
 import {skillZip} from '../src/skill-market-service.mjs';
 import {scanSkillInventory} from '../src/skill-inventory.mjs';
 import {createSkillRuntime} from '../src/skill-runtime.mjs';
+import {sharedSkillRoot} from '../src/skill-links.mjs';
 import {mysqlFixture} from './mysql-fixture.mjs';
 
 import {zip,files} from './fixtures/skill-market.mjs';
@@ -68,10 +69,18 @@ async function installation(t,store){
  const input={versionId:imported.version.id,agents:comparison.agents,comparisonId:comparison.id,confirmShared:true};
  const sync=await create('sync',input);await runtime.tick({idle:true,operationIds:[sync.id]});
  const result=await api(f.owner,'/api/skills/operations/'+sync.id);assert.equal(result.result.locations.length,5);
+ const source=path.join(sharedSkillRoot(home),'fixture-market');
+ for(const directory of Object.values(roots)){
+  const reference=path.join(home,directory,'fixture-market');
+  assert.equal(fs.lstatSync(reference).isSymbolicLink(),true);
+  assert.equal(fs.realpathSync(reference),fs.realpathSync(source));
+ }
  await runtime.tick({idle:true,operationIds:[sync.id]});await runtime.report();
  const installed=await api(f.owner,'/api/skills/installed?keyword=fixture-market');assert.equal(installed.total,8);
  assert.equal(installed.items.every(s=>s.directory&&s.realDirectory&&s.marketSource.provider==='skillhub'),true);
  assert.equal(installed.items.every(s=>s.dependencies.state==='unknown'),true);
+ assert.equal(new Set(installed.items.map(s=>s.realDirectory)).size,1,'all Agent records read the same physical package');
+ assert.equal(installed.nodes[0].agents.every(a=>a.sharedSkillRoot===sharedSkillRoot(home)&&a.installationMode==='shared-link'),true);
  assert.equal(installed.nodes[0].agents.find(a=>a.name==='codex').skillRoot,path.join(home,'.agents/skills'));
  assert.equal(installed.items.filter(s=>s.scope==='user').length,5);
  assert.equal(installed.items.filter(s=>s.scope==='compat-user').length,3);
@@ -81,6 +90,7 @@ async function installation(t,store){
  const rollback=await create('rollback',{syncId:sync.id});await runtime.tick({idle:true,operationIds:[rollback.id]});await runtime.report();
  assert.equal((await api(f.owner,'/api/skills/installed?keyword=fixture-market')).total,0);
  for(const directory of Object.values(roots))assert.equal(fs.existsSync(path.join(home,directory,'fixture-market')),false);
+ assert.equal(fs.existsSync(source),false);
 }
 test('import, preview, five Agent installation, path inventory, idempotent retry and rollback use isolated homes',t=>installation(t));
 test('MySQL market import and five Agent installation retain path inventory and rollback',{skip:process.env.LINGNEST_TEST_MYSQL!=='1'},async t=>installation(t,await mysqlFixture()));
