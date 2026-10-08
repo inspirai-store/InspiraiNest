@@ -208,7 +208,7 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
       const dependencies = await dependencyStatus(requirements, { env, mcp });
       if(!metadata.metadata?.['lingnest-requirements'] && !toolDependencies.length){dependencies.unknown.push('依赖未声明');if(dependencies.state==='ready')dependencies.state='unknown';}
       const item = { id: skillId, agent, name, description: String(metadata.description || '').slice(0, 1024), declaredVersion: String(metadata.metadata?.version || metadata.version || origin.nativeVersion || '').slice(0, 100),
-        hash: bundle?.hash || null, scope: origin.scope, source: origin.plugin || (agent==='codex' && origin.scope==='plugin'?path.relative(origin.root,directory).split(path.sep).slice(0,3).join('/'):origin.scope), context: origin.context ? path.basename(origin.context) : '采集环境', enabled, loadState,
+        hash: bundle?.hash || null, directory:path.resolve(directory), realDirectory:real, scope: origin.scope, source: origin.plugin || (agent==='codex' && origin.scope==='plugin'?path.relative(origin.root,directory).split(path.sep).slice(0,3).join('/'):origin.scope), context: origin.context ? path.basename(origin.context) : '采集环境', enabled, loadState,
         portable, requirements, dependencies, issue, capabilities: [], applicableAgents:[],systems:[],verification: null, sharedWith: [], taskContext: !origin.context || path.resolve(origin.context) === path.resolve(cwd) };
       const watchDirectories=[...new Set([real,...(bundle?.files || []).map(file=>path.dirname(path.join(real,file.path)))])].filter(dir=>contained(real,dir));
       items.push(item); local.set(skillId, { directory, real, origin, globalRoot: globalRoots[agent], profile, metadata, mcp, watchDirectories });
@@ -228,6 +228,7 @@ export async function scanSkillInventory(config = {}, { cwd = process.cwd(), hom
     }
   }
   const inventory = { schemaVersion: 1, scannedAt: now(), platform: process.platform, agents, items, projects:contexts.filter(directory=>directory!==cwd) };
+  for(const agent of agents)Object.assign(agent,{skillRoot:globalRoots[agent.name],projectSkillDirectory:agent.name==='codex'?'.agents/skills':'.'+agent.name+'/skills',legacySkillRoot:agent.name==='codex'?path.join(env.CODEX_HOME || path.join(home,'.codex'),'skills'):null,loadMethod:agent.name==='codex'?'原生 skills/list 确认加载':'目录及配置盘点；新会话加载确认',installationScope:'user'});
   inventory.digest = hash(JSON.stringify({ agents, items,projects:inventory.projects }));
   return { inventory, local, globalRoots, contexts, env };
 }

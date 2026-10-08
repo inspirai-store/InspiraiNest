@@ -12,7 +12,8 @@ export function environmentItem(input) {
   requireValue(input.sharedWith===undefined || Array.isArray(input.sharedWith),'Invalid shared skill group');
   const list = x => Array.isArray(x) ? x.slice(0, 60).map(v => string(v, 120)).filter(Boolean) : [];
   return { id: input.id, agent: input.agent, name: string(input.name, 100), description: string(input.description, 1024), declaredVersion: string(input.declaredVersion, 100),
-    hash: input.hash, scope: string(input.scope, 30), source: string(input.source, 150), context: string(input.context, 100), taskContext: input.taskContext === true,
+    hash: input.hash, directory:string(input.directory,1000),realDirectory:string(input.realDirectory,1000),scope: string(input.scope, 30), source: string(input.source, 150), context: string(input.context, 100), taskContext: input.taskContext === true,
+    marketSource:input.marketSource && ['skillhub','lingnest'].includes(input.marketSource.provider)?{provider:input.marketSource.provider,slug:string(input.marketSource.slug),version:string(input.marketSource.version,100),archiveSha256:digest(input.marketSource.archiveSha256)?input.marketSource.archiveSha256:null}:null,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : null, loadState: input.loadState, portable: input.portable === true,
     requirements: cleanRequirements(input.requirements), dependencies: { state: ['ready','missing','unknown'].includes(input.dependencies?.state) ? input.dependencies.state : 'unknown', missing: list(input.dependencies?.missing), unknown: list(input.dependencies?.unknown) },
     issue: string(input.issue, 400), capabilities: list(input.capabilities).filter(c => /^[a-z][a-z0-9.-]{1,99}$/.test(c)),
@@ -74,7 +75,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       requireValue(input.schemaVersion === 1 && digest(input.snapshotId) && digest(input.digest) && Number.isInteger(input.page) && input.page >= 0 && input.page < 150 && Array.isArray(input.items) && input.items.length <= 40, 'Invalid environment page');
       requireValue(Number.isFinite(Date.parse(input.scannedAt)) && Math.abs(clock() - Date.parse(input.scannedAt)) < 10 * 60000, 'Invalid inventory time');
       requireValue(Array.isArray(input.agents) && input.agents.length<=3,'Invalid inventory Agents');
-      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,3).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), probeState: a.installed === true ? 'available' : ['not_found','timeout','failed'].includes(a.probeState) ? a.probeState : 'failed', profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: a.name !== 'claude' && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0 }));
+      const agents = input.agents.filter(a => a && SKILL_AGENTS.includes(a.name)).slice(0,3).map(a => ({ name: a.name, installed: a.installed === true, version: string(a.version,150), probeState: a.installed === true ? 'available' : ['not_found','timeout','failed'].includes(a.probeState) ? a.probeState : 'failed', profileHash:digest(a.profileHash)?a.profileHash:null, executionEnabled: a.name !== 'claude' && a.executionEnabled === true, discovery:a.discovery === 'native'?'native':'filesystem', builtinState:a.builtinState==='reported'?'reported':'unknown', loadErrors:Number.isSafeInteger(a.loadErrors)?Math.min(a.loadErrors,1000):0,skillRoot:string(a.skillRoot,1000),projectSkillDirectory:string(a.projectSkillDirectory,100),legacySkillRoot:string(a.legacySkillRoot,1000),loadMethod:string(a.loadMethod,200),installationScope:a.installationScope==='user'?'user':null }));
       const items = input.items.map(environmentItem);
       await serialized('skill-environment:' + device.id, () => store.transaction(async tx => {
         const currentDevice = await tx.getForUpdate('device', device.id);
@@ -142,7 +143,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
         requireValue(preview?.action === 'prepare-publish' && preview.state === 'succeeded' && preview.deviceId === target.id && preview.skillId === op.skillId && preview.expectedHash === op.expectedHash, 'Publication preview required',409);
         op.previewId=preview.id; op.policy=cleanSkillPolicy(input.policy);
       }
-      if (['compare','sync','verify'].includes(action)) { const version=await getVersion(input.versionId); op.versionId=version.id; op.versionHash=version.hash; op.policy=version.policy; op.name=version.name; }
+      if (['compare','sync','verify'].includes(action)) { const version=await getVersion(input.versionId); op.versionId=version.id; op.versionHash=version.hash; op.policy=version.policy; op.name=version.name; if(version.source)op.source=version.source; }
       if (['compare','sync'].includes(action)) {
         requireValue(Array.isArray(input.agents) && input.agents.length > 0 && input.agents.length <= 3 && input.agents.every(a=>SKILL_AGENTS.includes(a)), 'Invalid target Agents'); op.agents=[...new Set(input.agents)];
       }

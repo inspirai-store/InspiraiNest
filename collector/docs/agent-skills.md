@@ -1,5 +1,25 @@
 # Agent 技能盘点与私有同步
 
+## 技能市场与安装位置（0.1.26）
+
+网页与桌面的“技能市场”提供 SkillHub、灵藏技能库和已安装三个入口。灵藏技能库复用当前服务端的私有版本和对象存储，只有已授权客户端能读取、预览和安装，不额外创建公网服务。节点技能中的“预览发布版本”继续用于将完整本机技能发布到远端；市场导入的版本也能在其他节点复用。
+
+| Agent | 新安装方案 | 其他盘点位置 | 加载确认 |
+| --- | --- | --- | --- |
+| Codex | 当前用户 `~/.agents/skills/<name>` | 项目 `.agents/skills`、`CODEX_HOME/skills` 兼容目录、插件、系统目录 | 原生 `skills/list`；目录存在不等于已加载 |
+| CodeBuddy | 当前用户 `~/.codebuddy/skills/<name>` | 项目 `.codebuddy/skills`、插件 | 目录与配置已确认；新会话实际加载需单独核对 |
+| Claude Code | 当前用户 `~/.claude/skills/<name>` | 项目 `.claude/skills`、插件、企业配置 | 目录与配置已确认；新会话实际加载需单独核对 |
+
+用户先选择节点及 Agent，再预览完整文件、目标绝对路径、共享目录和同名文件差异。确认后沿用原子同步、备份和回滚机制；节点须在线且空闲才能执行。旧节点未上报实际安装路径时提示升级，不能凭方案路径假装已确认安装位置。安装不执行包内脚本，也不自动重启其他 Agent 会话。
+
+“已安装”支持技能名称或路径、节点和 Agent 筛选，按 40 个安装位置分页。每行分别展示逻辑目录、符号链接指向的实际目录、作用域、市场来源、固定版本、安装状态、加载状态及依赖状态；离线节点明确显示最后盘点时间。相同名称在不同 Agent、目录、项目或插件中保留独立记录。整个客户端撤销授权后不再展示其清单或允许安装。
+
+新增限定接口：`GET /api/skills/market?provider=skillhub|lingnest&kind=search|categories|detail`、`POST /api/skills/market/import`、`GET /api/skills/installed`。导入必须固定 SkillHub 版本及幂等 requestId；只从核对过的官方 API 和分发域名下载，库授权不会发给 SkillHub。导入预览返回文件哈希和技能 Markdown；同一 requestId 超时重试不会重复下载或创建版本。安装继续使用 compare/sync 操作，响应丢失时重试复用同一操作标识。
+
+下载 ZIP 在内存逐项读取并验证 CRC、大小、文件类型和路径，然后通过现有完整包及 SHA-256 校验；拒绝越界、符号链接、重复文件、疑似凭据、缺失引用和不支持的文件。第三方技能未声明依赖时保持“依赖待确认”；市场下载安装不等于验证了 Agent 适配或实际提取能力。
+
+目录规则核对于 2026-10-08：[Codex](https://developers.openai.com/codex/skills)、[CodeBuddy](https://www.codebuddy.ai/docs/cli/skills)、[Claude Code](https://code.claude.com/docs/en/skills)。SkillHub 当前下载与私有库安装均有独立测试；真实账户的 CodeBuddy/Claude 原生执行验收继续遵守下文边界。
+
 ## 协议与边界
 
 所有接口沿用当前资料库设备授权。管理端发起操作和读取清单；Worker 只上传自己的清单和回执。旧客户端的 `agents`、`capabilities` 保留，未上报环境时显示“未上报”。Claude 只盘点与同步，不加入采集执行候选。

@@ -73,7 +73,7 @@
     return value;
   }
   async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; nodeNames.close(); $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
-  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>api('/skillhub?' + new URLSearchParams(input)) });
+  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>input.kind==='import'?api('/skills/market/import','POST',input):api((input.kind==='installed'?'/skills/installed?':'/skills/market?')+new URLSearchParams(input)),skills:input=>{if(input.kind==='create')return api('/skills/operations','POST',input.operation);if(input.kind==='operation')return api('/skills/operations/'+encodeURIComponent(input.operationId));if(input.kind==='environment')return api('/skills/devices/'+encodeURIComponent(input.deviceId)+'/environment?offset='+Number(input.offset || 0));throw new Error('技能请求无效');},identity:()=>String(token || ''),onInventory:device=>skillManager.open(device) });
   const clientUpdates=window.createClientUpdateManager({identity:()=>String(token || ''),request:input=>{
     if(input.kind==='history')return api('/client-updates/operations?deviceId='+encodeURIComponent(input.deviceId));
     if(input.kind==='create')return api('/client-updates/operations','POST',{deviceId:input.deviceId,requestId:input.requestId,targetVersion:input.targetVersion});

@@ -43,6 +43,7 @@ files:
   - public/skill-manager.css
   - public/agent-manager.js
   - public/agent-manager.css
+  - public/skill-market-install.js
   - public/skill-market.js
   - public/skill-market.css
   - src/**

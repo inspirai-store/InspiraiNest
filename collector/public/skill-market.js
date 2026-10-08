@@ -4,22 +4,26 @@
   const number = value => Number(value || 0).toLocaleString('zh-CN');
   const sourceName = value => ({ official:'官方', community:'社区', enterprise:'企业', clawhub:'ClawHub' }[value] || value || '未记录');
   const errorText = error => String(error?.message || '请求失败').replace(/^Error invoking remote method '[^']+': Error: /, '');
-  window.createSkillMarket = ({ root, request }) => {
+  window.createSkillMarket = ({ root, request:providerRequest, skills, identity=()=>'', onInventory }) => {
+    let provider='skillhub', installer=null;
+    const request=input=>providerRequest({...input,provider});
     root.classList.add('skill-market');
     root.innerHTML = `<div class="market-heading"><h1>技能市场</h1><span class="market-provider">SkillHub</span></div>
-      <form class="market-search"><label class="market-keyword">关键词<input name="keyword" type="search" maxlength="200" autocomplete="off" placeholder="搜索 Skill"></label>
+      <p class="market-hint">从市场安装到指定节点，或查看每个 Agent 的实际安装目录。</p><div class="market-tabs" role="group" aria-label="技能来源"><button type="button" data-market-provider="skillhub" aria-pressed="true">SkillHub</button><button type="button" data-market-provider="lingnest" aria-pressed="false">灵藏技能库</button><button type="button" data-market-provider="installed" aria-pressed="false">已安装</button></div><section data-market-installed hidden></section>
+      <form class="market-search" data-market-search><label class="market-keyword">关键词<input name="keyword" type="search" maxlength="200" autocomplete="off" placeholder="搜索 Skill"></label>
       <label>分类<select name="category"><option value="">全部分类</option></select></label>
       <label>来源<select name="source"><option value="">全部来源</option><option value="official">官方</option><option value="community">社区</option><option value="enterprise">企业</option><option value="clawhub">ClawHub</option></select></label>
       <label>排序<select name="sortBy"><option value="downloads">下载最多</option><option value="updated_at">最近更新</option><option value="stars">收藏最多</option><option value="installs">安装最多</option><option value="score">综合排序</option></select></label><button class="primary" type="submit">搜索</button></form>
       <div class="market-category-error" hidden><span role="alert"></span><button type="button" data-categories-retry>重试分类</button></div>
       <div class="market-summary" role="status" aria-live="polite"></div><div class="market-error" role="alert" hidden></div>
-      <div class="market-results"></div><div class="market-paging" hidden><button type="button" data-previous>上一页</button><span data-page></span><button type="button" data-next>下一页</button></div>`;
+      <div class="market-results"></div><div class="market-paging" data-market-paging hidden><button type="button" data-previous>上一页</button><span data-page></span><button type="button" data-next>下一页</button></div>`;
     const $ = selector => root.querySelector(selector), form = $('.market-search'), results = $('.market-results');
     const dialog = document.createElement('dialog');
     dialog.className = 'market-dialog';
     dialog.innerHTML = `<div class="market-dialog-heading"><h2>技能详情</h2><button type="button" data-close aria-label="关闭技能详情">×</button></div><div class="market-detail" aria-live="polite"></div>`;
     document.body.append(dialog);
     const detail = dialog.querySelector('.market-detail'), title = dialog.querySelector('h2');
+    const installed=window.createInstalledSkillList?.({root:$('[data-market-installed]'),request:providerRequest,onInventory,identity});
     const headingId = root.id + '-detail-title'; title.id = headingId; dialog.setAttribute('aria-labelledby', headingId);
     let visible = false, initialized = false, categoriesLoaded = false, searchSeq = 0, detailSeq = 0, categorySeq = 0;
     let page = 1, total = 0, items = [], busy = false, currentQuery = null, committedQuery = null, needsSearch = true;
@@ -30,12 +34,12 @@
       $('[data-page]').textContent = `${page} / ${Math.max(1, Math.ceil(total / 20))}`;
       form.querySelector('[type=submit]').disabled = busy && JSON.stringify(query()) === JSON.stringify(currentQuery);
     }
-    function closeDetail() { detailSeq++; if (dialog.open) dialog.close(); }
+    function closeDetail() { detailSeq++; installer?.close(); installer=null; if (dialog.open) dialog.close(); }
     dialog.querySelector('[data-close]').onclick = closeDetail;
     dialog.addEventListener('close', () => {
       // A queued close event must not cancel a detail reopened in the same turn.
       if (dialog.open) return;
-      detailSeq++; detail.textContent = ''; detail.removeAttribute('aria-busy');
+      detailSeq++; installer?.close(); installer=null; detail.textContent = ''; detail.removeAttribute('aria-busy');
     });
     dialog.addEventListener('cancel', () => { detailSeq++; });
     dialog.addEventListener('click', event => {
@@ -58,7 +62,7 @@
       }
     }
     async function openDetail(item) {
-      const seq = ++detailSeq;
+      const seq = ++detailSeq; installer?.close(); installer=null;
       title.textContent = item.name; detail.textContent = '正在加载…'; detail.setAttribute('aria-busy', 'true');
       if (!dialog.open) dialog.showModal();
       try {
@@ -73,6 +77,7 @@
           <dt>下载</dt><dd>${number(value.downloads)}</dd><dt>收藏</dt><dd>${number(value.stars)}</dd><dt>安装</dt><dd>${number(value.installs)}</dd>
           <dt>API Key</dt><dd>${yesNo(value.requiresApiKey)}</dd><dt>付费</dt><dd>${yesNo(value.paid)}</dd>
           </dl>${value.changelog ? `<h3>版本更新</h3><p class="market-full-description">${esc(value.changelog)}</p>` : ''}`;
+        if(skills && window.createSkillInstaller){const host=document.createElement('div');detail.append(host);installer=window.createSkillInstaller({root:host,request:providerRequest,skills,item:value,provider,identity});}
       } catch (error) {
         if (!visible || seq !== detailSeq || !dialog.open) return;
         detail.innerHTML = `<p role="alert">${esc(errorText(error))}</p><button type="button" data-detail-retry>重试</button>`;
@@ -83,7 +88,7 @@
       closeDetail();
       const seq = ++searchSeq; currentQuery = query(); busy = true; needsSearch = true; page = nextPage;
       $('.market-error').hidden = true; $('.market-summary').textContent = '正在搜索…';
-      results.textContent = ''; results.setAttribute('aria-busy', 'true'); $('.market-paging').hidden = true; controls();
+      results.textContent = ''; results.setAttribute('aria-busy', 'true'); $('[data-market-paging]').hidden = true; controls();
       try {
         const value = await request({ kind:'search', ...currentQuery, page, pageSize:20, order:'desc' });
         if (!visible || seq !== searchSeq) return;
@@ -92,7 +97,7 @@
         results.innerHTML = items.length ? items.map((item,index) => `<article class="market-card"><div class="market-card-heading"><h2>${esc(item.name)}</h2><span>${esc(item.version)}</span></div>
           <p class="market-description">${esc(item.description)}</p><div class="market-card-meta"><span>${esc(item.owner || '未记录')}</span><span>${esc(sourceName(item.source))}</span></div>
           <div class="market-card-footer"><span>下载 ${number(item.downloads)}</span><span>收藏 ${number(item.stars)}</span><button type="button" data-detail="${index}" aria-label="${esc('查看 ' + item.name + ' 详情')}">查看详情</button></div></article>`).join('') : '<div class="market-empty">没有匹配的 Skill</div>';
-        $('.market-paging').hidden = total <= 20;
+        $('[data-market-paging]').hidden = total <= 20;
       } catch (error) {
         if (!visible || seq !== searchSeq) return;
         $('.market-summary').textContent = '';
@@ -101,6 +106,18 @@
         if (seq === searchSeq) { busy = false; results.removeAttribute('aria-busy'); controls(); }
       }
     }
+    root.querySelectorAll('[data-market-provider]').forEach(button=>button.onclick=()=>{
+      closeDetail();searchSeq++;categorySeq++;busy=false;installed?.hide();
+      const target=button.dataset.marketProvider;
+      root.querySelectorAll('[data-market-provider]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+      $('[data-market-installed]').hidden=target!=='installed';
+      for(const element of [form,results,$('.market-summary'),$('.market-error'),$('[data-market-paging]'),$('.market-category-error')])element.hidden=target==='installed';
+      if(target==='installed'){$('.market-provider').textContent='各节点的最后盘点';installed?.show();return;}
+      provider=target;$('.market-provider').textContent=provider==='skillhub'?'SkillHub':'灵藏 · 当前服务的私有版本';
+      form.elements.category.value='';form.elements.source.value='';
+      form.elements.source.closest('label').hidden=provider!=='skillhub';form.elements.sortBy.closest('label').hidden=provider!=='skillhub';
+      categoriesLoaded=false;void categories();void search();
+    });
     form.addEventListener('submit', event => { event.preventDefault(); void search(); });
     form.addEventListener('input', controls);
     form.addEventListener('change', event => { if (event.target.tagName === 'SELECT') void search(); });
@@ -111,13 +128,13 @@
     return {
       show() {
         if (visible) return;
-        visible = true;
+        visible = true; if(!$('[data-market-installed]').hidden){installed?.show();return;}
         if (!categoriesLoaded) void categories();
         if (!initialized || needsSearch || JSON.stringify(query()) !== JSON.stringify(committedQuery)) void search();
         initialized = true;
       },
       hide() {
-        visible = false; searchSeq++; categorySeq++; busy = false; closeDetail();
+        visible = false; searchSeq++; categorySeq++; busy = false; closeDetail(); installed?.hide();
         results.removeAttribute('aria-busy'); controls();
       },
     };

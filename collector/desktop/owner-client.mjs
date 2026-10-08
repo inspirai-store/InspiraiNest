@@ -103,6 +103,13 @@ export class OwnerClient {
     if(input.kind==='create')return this.api('/api/agents/operations','POST',input.operation);
     throw new Error('Agent 请求无效');
   }
+  market(input) {
+    if(!input || typeof input!=='object' || !['skillhub','lingnest',undefined].includes(input.provider))throw new Error('技能市场请求无效');
+    if(input.kind==='import')return this.api('/api/skills/market/import','POST',{provider:input.provider,slug:input.slug,version:input.version,versionId:input.versionId,requestId:input.requestId});
+    if(input.kind==='installed')return this.api('/api/skills/installed?'+new URLSearchParams(Object.entries({keyword:input.keyword,deviceId:input.deviceId,agent:input.agent,page:input.page}).filter(([,v])=>v!==undefined)));
+    if(['search','categories','detail'].includes(input.kind))return this.api('/api/skills/market?'+new URLSearchParams(Object.entries({provider:input.provider || 'skillhub',kind:input.kind,keyword:input.keyword,category:input.category,source:input.source,sortBy:input.sortBy,order:input.order,page:input.page,pageSize:input.pageSize,slug:input.slug}).filter(([,v])=>v!==undefined)));
+    throw new Error('不支持的技能市场请求');
+  }
   skills(input) {
     if (!input || typeof input !== 'object') throw new Error('技能请求无效');
     if (input.kind === 'environment') {

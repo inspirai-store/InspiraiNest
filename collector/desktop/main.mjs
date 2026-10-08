@@ -202,7 +202,7 @@ function registerIPC() {
     logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
     clientUpdates: input => owner.clientUpdates(input),
-    skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => skillHub.request(input),
+    skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id), renameNode: input => owner.renameNode(input),

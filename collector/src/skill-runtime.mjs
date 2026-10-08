@@ -58,9 +58,11 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
         const location=next.local.get(item.id), installed=location && ledger.installations[item.agent+':'+location.real];
         if(installed && installed.hash===item.hash){
           item.managedVersion=installed.versionId; item.capabilities=installed.policy.capabilities;
+          item.marketSource=installed.source || null;
           item.applicableAgents=installed.policy.agents;item.systems=installed.policy.systems;
           item.requirements=installed.policy.requirements;
           item.dependencies=await dependencyStatus(item.requirements,{env:next.env,mcp:location.mcp});
+          if(installed.source?.provider==='skillhub' && !installed.source.requirementsDeclared){item.dependencies.unknown.push('市场技能未声明依赖');if(item.dependencies.state==='ready')item.dependencies.state='unknown';}
           if(installed.verification?.state==='passed' && installed.verification.hash===item.hash && installed.verification.profileHash===next.inventory.agents.find(a=>a.name===item.agent)?.profileHash){item.verification=installed.verification;if(item.dependencies.state==='unknown')item.dependencies.state='ready';}
         }
       }
@@ -100,7 +102,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
       const files=new Map((previous?.files || []).map(f=>[f.path,f]));
       const changes=bundle.files.filter(f=>files.get(f.path)?.sha256!==f.sha256 || Boolean(files.get(f.path)?.executable)!==Boolean(f.executable)).map(f=>({path:f.path,state:files.has(f.path)?'modified':'missing'}));
       changes.push(...(previous?.files || []).filter(f=>!bundle.files.some(next=>next.path===f.path)).map(f=>({path:f.path,state:'removed'})));
-      targets.push({agent,targetId:hash(real),hash:currentHash,sharedAgents,exists:currentHash!==null,localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
+      targets.push({agent,targetId:hash(real),directory,realDirectory:real,scope:'user',hash:currentHash,sharedAgents,exists:currentHash!==null,localModified:Boolean(managed && managed.hash!==currentHash),name:bundle.name,changes});
     }
     return targets;
   }
@@ -135,8 +137,8 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
       }
       const next=structuredClone(ledger);
       next.backups[op.id]={targets:transaction.targets,versionHash:bundle.hash,previousInstallations:ledger.installations};
-      for(const target of transaction.targets)for(const agent of target.agents)next.installations[agent+':'+target.real]={versionId:op.versionId,hash:bundle.hash,policy:op.policy,operationId:op.id};
-      const receipt={state:'succeeded',result:{installed:true,versionId:op.versionId,hash:bundle.hash,agents:op.agents}};
+      for(const target of transaction.targets)for(const agent of target.agents)next.installations[agent+':'+target.real]={versionId:op.versionId,hash:bundle.hash,policy:op.policy,source:op.source || {provider:'lingnest'},operationId:op.id};
+      const receipt={state:'succeeded',result:{installed:true,versionId:op.versionId,hash:bundle.hash,agents:op.agents,locations:targets.map(({agent,directory,realDirectory})=>({agent,directory,realDirectory}))}};
       Object.assign(transaction,{committed:true,ledger:next,receipt});atomicJson(transactionFile,transaction);
       ledger=next;atomicJson(ledgerFile,ledger);receipts[op.id]=receipt;atomicJson(receiptsFile,receipts);fs.rmSync(transactionFile,{force:true});
       return receipt.result;

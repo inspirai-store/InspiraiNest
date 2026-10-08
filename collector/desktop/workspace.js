@@ -20,7 +20,7 @@
     if(device.id!==(await window.worker.snapshot()).deviceId)return null;
     return window.worker.skillConfig(agent);
   }});
-  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
+  const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input),skills:input=>window.library.skills(input),identity:()=>auth.server+':'+workspaceEpoch,onInventory:device=>skillManager.open(device) });
   const nodeNames = window.createNodeNameEditor({save:input=>window.library.renameNode(input),identity:()=>auth.server+':'+workspaceEpoch,
     onSaved:async device=>{ if (state) { state.devices = state.devices.map(d=>d.id === device.id ? {...d,...device} : d); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state,{connected,paired:auth.paired,lastSuccess}); } toast('节点名称已保存'); await refresh(); } });
   const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onUpdate:device=>clientUpdates.open(device), onRemove:removeNode, onRename:device=>nodeNames.open(device),

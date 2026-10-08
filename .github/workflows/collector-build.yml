@@ -57,6 +57,9 @@ jobs:
       - name: Test SkillHub Web search
         run: node scripts/test-skill-market.cjs --web
         working-directory: collector
+      - name: Test Web market installation and inventory
+        working-directory: collector
+        run: node scripts/test-skill-market-install.cjs --web
       - name: Test Web skill management
         run: node scripts/test-skills-web.cjs
         working-directory: collector
@@ -93,6 +96,9 @@ jobs:
       - name: Test SkillHub Linux desktop search
         run: xvfb-run -a node scripts/test-skill-market.cjs
         working-directory: collector
+      - name: Test Linux market installation and inventory
+        working-directory: collector
+        run: xvfb-run -a node scripts/test-skill-market-install.cjs
       - name: Test shared Linux skill management
         run: xvfb-run -a node scripts/test-desktop-skills.cjs
         working-directory: collector
@@ -184,6 +190,9 @@ jobs:
       - name: Test SkillHub packaged Windows search
         shell: pwsh
         run: node collector/scripts/test-skill-market.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows market installation
+        shell: pwsh
+        run: node collector/scripts/test-skill-market-install.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows skill management
         shell: pwsh
         run: node collector/scripts/test-desktop-skills.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -296,6 +305,7 @@ jobs:
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-skill-market.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-skill-market-install.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-agents-ui.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"

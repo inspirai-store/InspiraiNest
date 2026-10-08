@@ -18,6 +18,7 @@ import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
 import { createSkillService, taskCapabilities } from './skill-service.mjs';
 import QRCode from 'qrcode';
 import { createSkillHubClient } from './skillhub.mjs';
+import { createSkillMarketService } from './skill-market-service.mjs';
 import { createAgentService } from './agent-service.mjs';
 import { canRunTask, nodeFailureCodes, releaseTask } from './task-routing.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
@@ -35,7 +36,7 @@ function installationKey(input, role) {
   return value ? hash(`${role}:${value.toLowerCase()}`) : null;
 }
 
-export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now, skillHub = createSkillHubClient({ apiKey:process.env.SKILLHUB_API_KEY }), agentCatalog }) {
+export function createService({ dataDir, masterKey, storage = new LocalStorage(path.join(dataDir, 'objects')), store = new Store(path.join(dataDir, 'state.sqlite')), releaseDir = process.env.COLLECTOR_RELEASE_DIR || path.join(project, 'mobile/dist'), publicUrl = process.env.COLLECTOR_PUBLIC_URL, reviewExpiresAt = process.env.COLLECTOR_REVIEW_EXPIRES_AT, clock = Date.now, skillHub = createSkillHubClient({ apiKey:process.env.SKILLHUB_API_KEY }), agentCatalog, skillMarketFetch }) {
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
@@ -59,6 +60,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const skills = createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock });
+  const skillMarket = createSkillMarketService({ store, storage, skillHub, serialized, owner, body, send, clock, fetcher:skillMarketFetch });
   const agents = createAgentService({ store, serialized, owner, worker, body, send, clock, catalog: agentCatalog, deploymentId: async () => (await identityPolicy()).namespace });
   const deleted = async archive => Boolean((await store.get('trash', archive.entryId))?.deletedAt);
   async function identityPolicy() {
@@ -421,6 +423,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         '/node-presentation.css': ['public/node-presentation.css', 'text/css; charset=utf-8'],
         '/client-update-manager.js': ['public/client-update-manager.js', 'text/javascript; charset=utf-8'],
         '/client-update-manager.css': ['public/client-update-manager.css', 'text/css; charset=utf-8'],
+          '/skill-market-install.js': ['public/skill-market-install.js', 'text/javascript; charset=utf-8'],
           '/skill-market.js': ['public/skill-market.js', 'text/javascript; charset=utf-8'],
           '/skill-market.css': ['public/skill-market.css', 'text/css; charset=utf-8'],
           '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
@@ -511,6 +514,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(req.method === 'GET', 'Method not allowed', 405);
         return send(res, 200, await skillHub.request(Object.fromEntries(url.searchParams)));
       }
+      if (await skillMarket.handle(req, res, route, device)) return;
       if (await skills.handle(req, res, route, device)) return;
       if (await agents.handle(req, res, route, device)) return;
       if (await clientUpdates.handle(req, res, route, device)) return;

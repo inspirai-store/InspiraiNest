@@ -32,7 +32,7 @@ async function exercise(page, fixture, output) {
   const nav=page.locator('nav [data-view=skill-market]'), market=page.locator('#skill-market-view');
   await nav.click(); await market.locator('.market-card').waitFor();
   await market.locator('[data-categories-retry]').click(); await market.locator('select[name=category] option[value=article]').waitFor({state:'attached'});
-  const keyword=market.locator('[name=keyword]'), submit=market.locator('[type=submit]');
+  const keyword=market.locator('[data-market-search] [name=keyword]'), submit=market.locator('[data-market-search] [type=submit]');
   const barrier=()=>page.evaluate(async()=>{if(window.library)await window.library.market({kind:'detail',slug:'barrier'});else await (await fetch('/api/skillhub?kind=detail&slug=barrier')).json();});
   async function search(value){await keyword.fill(value);await submit.click();}
   await search('wechat'); await market.getByRole('heading',{name:'wechat Skill 1',exact:true}).waitFor();
@@ -57,7 +57,7 @@ async function exercise(page, fixture, output) {
   // The old detail completion is queued before this next request and must not reopen/overwrite the dialog.
   await page.keyboard.press('Escape'); await search('unsafe'); await market.getByRole('heading',{name:'<img src=x onerror="window.marketInjection=true">',exact:true}).waitFor();
   assert.equal(await market.locator('img').count(),0);assert.equal(await page.evaluate(()=>Boolean(window.marketInjection)),false);
-  await search('empty'); await market.getByText('没有匹配的 Skill',{exact:true}).waitFor();assert.equal(await market.locator('.market-paging').isVisible(),false);
+  await search('empty'); await market.getByText('没有匹配的 Skill',{exact:true}).waitFor();assert.equal(await market.locator('[data-market-paging]').isVisible(),false);
   await search('error');await market.getByRole('alert').filter({hasText:'请求过于频繁'}).waitFor();assert.equal(await submit.isEnabled(),true);
   await search('final');await market.getByRole('heading',{name:'final Skill 1',exact:true}).waitFor();
   await page.screenshot({path:path.join(output,'market.png')});
