@@ -96,6 +96,17 @@ test('migration requires both native credentials, the installation binding and f
   assert.deepEqual(await f.app.store.get('device', f.ownerRecord.id), f.ownerRecord);
 });
 
+test('legacy configurations without an installation ID migrate without altering either existing binding', async t => {
+  const f = await fixture(t), input = { ...f.input }; delete input.installationId;
+  const before = await f.app.store.get('device', f.workerRecord.id);
+  await assert.rejects(f.unify({ ...input, workerToken: secret() }), { status: 401 });
+  await assert.rejects(f.unify({ ...input, identity: { ...f.identity, digest: hash('another-computer') } }), { status: 409 });
+  assert.equal((await f.unify(input)).device.id, f.workerRecord.id);
+  assert.equal((await f.app.store.get('device', before.id)).installationKey, before.installationKey);
+  assert.equal((await f.app.store.get('device', f.ownerRecord.id)).installationKey, f.ownerRecord.installationKey);
+  assert.equal((await api(f.owner, '/api/state')).me.id, before.id);
+});
+
 test('migration is idempotent across simultaneous servers and rejects aliases of another client', async t => {
   const f = await fixture(t), sharedStore = new Proxy(f.app.store, { get(object, key) {
     if (key === 'close') return () => {};

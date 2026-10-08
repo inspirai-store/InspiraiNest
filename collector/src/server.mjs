@@ -125,7 +125,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       requireValue(target && workerAuthorized(target) && target.tokenHash === hash(input.workerToken)
         && credential && !credential.revokedAt && credential.role === (credential.ownerTokenHash === actor.credentialTokenHash ? 'worker' : 'owner')
         && [credential.tokenHash, credential.ownerTokenHash].includes(actor.credentialTokenHash), '客户端授权已失效', 401);
-      requireValue(deviceCategory(credential) === 'desktop' && (!target.installationKey || target.installationKey === key), '客户端安装身份不匹配', 409);
+      // Old Worker configurations retain the installation ID only in the data
+      // directory. Both credentials and the full hardware identity prove the
+      // client; preserve its existing binding when no ID was supplied.
+      requireValue(deviceCategory(credential) === 'desktop' && (!target.installationKey || !key || target.installationKey === key), '客户端安装身份不匹配', 409);
       if (credential.id === target.id || credential.canonicalDeviceId === target.id) return { device: publicDevice(target), unified: true };
       requireValue(!credential.canonicalDeviceId, '旧授权已属于另一客户端', 409);
       const matches = identity => identity && data.identity && identity.digest === data.identity.digest
