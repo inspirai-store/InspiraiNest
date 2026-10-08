@@ -17,8 +17,8 @@
     "doctor": "node src/worker.mjs doctor",
     "build:worker-template": "node scripts/stage-worker-template.mjs",
     "build:worker:win": "npm run build:brand-icons && npm run build:worker-template && electron-builder --win nsis --x64 --publish never",
-    "build:worker:mac": "npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=鐏佃棌 --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
-    "build:worker:mac:release": "npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=鐏佃棌 --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never"
+    "build:worker:mac": "npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=灵藏 --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
+    "build:worker:mac:release": "npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=灵藏 --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never"
   },
   "dependencies": {
     "ali-oss": "^6.23.0",
