@@ -7,20 +7,21 @@ import { desktopExecutionEnvironment } from '../desktop/execution-environment.mj
 import { execute } from '../src/agents.mjs';
 import { scanSkillInventory } from '../src/skill-inventory.mjs';
 
-test('Mac GUI worker discovers all three CLIs from the user shell with a restricted launch PATH', { skip: process.platform !== 'darwin' }, async t => {
+test('Mac GUI worker discovers all five CLIs from the user shell with a restricted launch PATH', { skip: process.platform !== 'darwin' }, async t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lingnest-cli-path-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const bin = path.join(home, 'tools with spaces'); fs.mkdirSync(bin);
-  for (const name of ['codex', 'codebuddy', 'claude']) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nprintf "fixture 1.0\\n"\n', { mode: 0o755 });
+  const names = ['codex', 'codebuddy', 'claude', 'gemini', 'opencode'];
+  for (const name of names) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nprintf "fixture 1.0\\n"\n', { mode: 0o755 });
   fs.writeFileSync(path.join(home, '.zshrc'), 'export PATH=' + JSON.stringify(bin) + ':$PATH\nexport NEVER_IMPORT_FROM_SHELL=fixture\n');
   const original = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: home, ZDOTDIR: home, SHELL: '/bin/zsh', COLLECTOR_ELECTRON_NODE: '1' };
   assert.equal((await execute('codex', ['--version'], { env: original })).spawnError, 'ENOENT');
   const env = await desktopExecutionEnvironment(original);
   assert.equal(env.NEVER_IMPORT_FROM_SHELL, undefined);
   assert.equal(original.PATH, '/usr/bin:/bin:/usr/sbin:/sbin');
-  for (const name of ['codex', 'codebuddy', 'claude']) assert.equal((await execute(name, ['--version'], { env })).code, 0);
+  for (const name of names) assert.equal((await execute(name, ['--version'], { env })).code, 0);
   const { inventory } = await scanSkillInventory({}, { cwd: home, home, env, nativeCodex: async () => null });
-  assert.deepEqual(inventory.agents.map(a => [a.name, a.installed, a.probeState]), [['codex', true, 'available'], ['codebuddy', true, 'available'], ['claude', true, 'available']]);
+  assert.deepEqual(inventory.agents.map(a => [a.name, a.installed, a.probeState]), names.map(name => [name, true, 'available']));
 });
 
 test('shell PATH recovery strips service credentials and ignores banner output and exported values', async () => {
