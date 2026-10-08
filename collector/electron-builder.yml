@@ -11,6 +11,7 @@ files:
   - desktop/execution-environment.mjs
   - desktop/owner-client.mjs
   - desktop/updater.mjs
+  - desktop/remote-update.mjs
   - desktop/settings.mjs
   - desktop/login-item.mjs
   - desktop/worker-session.mjs
@@ -32,6 +33,8 @@ files:
   - desktop/trayTemplate@2x.png
   - desktop/vendor/**
   - public/device-view.js
+  - public/client-update-manager.js
+  - public/client-update-manager.css
   - public/node-presentation.js
   - public/node-name-editor.js
   - public/node-presentation.css

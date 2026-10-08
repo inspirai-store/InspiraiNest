@@ -17,5 +17,21 @@
   };
   const groups = devices => [['desktop', '电脑客户端'], ['mobile', '移动端'], ['browser', '浏览器登录'], ['integration', '应用授权'], ['unknown', '待识别']]
     .map(([key, title]) => ({ key, title, devices: devices.filter(d => category(d) === key) })).filter(g => g.devices.length || ['desktop', 'mobile', 'browser'].includes(g.key));
-  window.deviceView = { category, dispatchable, status, groups };
+  const displayGroups = devices => groups(devices).map(group=>{
+    if(group.key!=='desktop')return group;
+    const computers=new Map();
+    for(const device of group.devices){const key=device.physicalGroupId || device.id;const items=computers.get(key) || [];items.push(device);computers.set(key,items);}
+    return {...group,devices:[...computers.values()].map(grants=>{
+      const sorted=[...grants].sort((a,b)=>Number(dispatchable(b))-Number(dispatchable(a)) || Number(b.online)-Number(a.online));
+      return {...sorted[0],authorizations:grants};
+    })};
+  });
+  const versions = d => ({client:d.clientRuntime?.version || d.deviceInfo?.client.version || null,worker:d.workerRuntime?.version || null});
+  const capture = root => ({open:new Set([...root.querySelectorAll('details[open][data-computer]')].map(e=>e.dataset.computer)),
+    focus:root.contains(document.activeElement)?document.activeElement.dataset.revoke || null:null});
+  const restore = (root,saved) => {
+    root.querySelectorAll('details[data-computer]').forEach(e=>e.open=saved.open.has(e.dataset.computer));
+    if(saved.focus)root.querySelector(`[data-revoke="${CSS.escape(saved.focus)}"]`)?.focus({preventScroll:true});
+  };
+  window.deviceView = { category, dispatchable, status, groups, displayGroups, versions, capture, restore };
 })();

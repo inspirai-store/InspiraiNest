@@ -82,6 +82,16 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     await page.locator(`[data-node="${online.device.id}"]`).click();assert.match(await page.locator('#node-remote-content').innerText(),/MacBookPro18,3/);
     assert.equal(await page.locator('#node-remote-content script').count(),0);
     const originalNode=await service.store.get('device',online.device.id);
+    for(const theme of ['dark','light']){
+      await setTheme(page,theme);await page.locator('[data-node-update]').click();
+      await page.locator('.client-update-manager [data-update-status]').filter({hasText:'本机升级'}).waitFor();
+      assert.equal(await page.locator('.client-update-manager [data-update-start]').isEnabled(),false);
+      await page.screenshot({path:path.join(output,`remote-update-${theme}.png`)});
+      await app.evaluate(()=>globalThis.workerDesktop().main.setSize(740,580));
+      assert.ok(await page.locator('.client-update-manager').evaluate(e=>e.scrollWidth<=e.clientWidth));
+      await page.screenshot({path:path.join(output,`remote-update-minimum-${theme}.png`)});
+      await page.keyboard.press('Escape');await app.evaluate(()=>globalThis.workerDesktop().main.setSize(1240,820));
+    }
     const rename=page.locator('[data-node-rename]'); await rename.click();
     assert.equal(await page.locator('.node-name-dialog code').textContent(),online.device.id);
     await page.locator('#node-name-input').fill('MacBook 开发工作站');

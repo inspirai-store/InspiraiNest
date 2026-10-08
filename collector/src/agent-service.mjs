@@ -119,6 +119,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
           if (!pending.has(current.state)) return current;
           requireValue(input.state === 'running' || current.state !== 'queued' || input.state === 'waiting', '操作尚未开始', 409);
           if (input.state === 'running') {
+            requireValue(!(await tx.list('client-update')).some(o=>o.deviceId===device.id && ['waiting_worker','installing'].includes(o.state)), '客户端正在更新，稍后重试', 409);
             if (current.state !== 'queued') return current;
             requireValue(current.startedAt || Date.parse(current.expiresAt) > clock(), '操作已过期', 409);
             requireValue(!(await tx.list('task')).some(t => t.deviceId === device.id && ['assigned', 'running', 'uploading'].includes(t.state)), '当前任务尚未结束', 409);

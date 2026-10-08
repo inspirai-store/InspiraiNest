@@ -8,7 +8,7 @@ import { loadWorkerConfig } from '../src/config.mjs';
 import { workerSnapshot, sendControl, readOptional, redact } from '../src/worker-control.mjs';
 import { atomicJson, contained, remoteURL } from '../src/common.mjs';
 import { readWorkerEvents } from '../src/worker-events.mjs';
-import { computerMetadata } from '../src/device-identity.mjs';
+import { computerMetadata, appVersion } from '../src/device-identity.mjs';
 import { clientOrigin, loginFailure } from '../src/client-login.mjs';
 import { desktopExecutionEnvironment } from './execution-environment.mjs';
 
@@ -63,6 +63,7 @@ export class WorkerManager {
     if (state.legacy) state.error = '检测到旧版工作节点，正在保留其运行。它尚无本地控制接口；结束后重新启动即可接入。当前阶段与联网状态未知。';
     return JSON.parse(redact(JSON.stringify({ ...state, starting: this.starting,
       device: config.name || os.hostname(), deviceId: config.deviceId || null, server: config.server ? remoteURL(config.server) : '',
+      clientVersion: appVersion(),
       paired: Boolean(config.token && config.server), defaultAgent: config.defaultAgent || 'codex',
       dataDir: this.dataDir, launchError: this.error }), config.token));
   }

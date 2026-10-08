@@ -8,6 +8,7 @@ import { WorkerManager } from './manager.mjs';
 import { OwnerClient } from './owner-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
+import { RemoteClientUpdate } from './remote-update.mjs';
 import { DesktopSettings } from './settings.mjs';
 import { DesktopLoginItem } from './login-item.mjs';
 import { WorkerSession } from './worker-session.mjs';
@@ -23,6 +24,7 @@ if (app.isPackaged) {
   process.env.COLLECTOR_CONFIG ||= path.join(home, 'worker.local.json');
   process.env.COLLECTOR_NODE = process.execPath;
   process.env.COLLECTOR_ELECTRON_NODE = '1';
+  if(['win32','darwin'].includes(process.platform))process.env.COLLECTOR_DESKTOP_UPDATER='1';
   process.env.COLLECTOR_LIBRARY_ROOT = path.join(process.resourcesPath, 'library');
   if (!fs.existsSync(process.env.COLLECTOR_CONFIG)) {
     fs.copyFileSync(path.join(here, '..', 'worker.production.example.json'), process.env.COLLECTOR_CONFIG);
@@ -40,7 +42,7 @@ const ownsLock = app.requestSingleInstanceLock();
 const credentialEncryption = process.env.COLLECTOR_DESKTOP_TEST === '1' && process.env.COLLECTOR_DESKTOP_STORAGE_FIXTURE === '1'
   ? { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('fixture:' + value), decryptString: value => value.toString().slice(8) }
   : safeStorage;
-let owner, updates, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
+let owner, updates, remoteUpdates, remoteUpdateTimer, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
@@ -199,6 +201,7 @@ function registerIPC() {
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => { loginController?.abort(); return owner.logout(); },
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
+    clientUpdates: input => owner.clientUpdates(input),
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => skillHub.request(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
@@ -273,7 +276,7 @@ function applicationMenu() {
 }
 if (!ownsLock) app.quit();
 else {
-  app.on('second-instance', (_event, argv) => { if (!argv.includes('--startup')) openManager(); });
+  app.on('second-instance', (_event, argv) => { if(argv.includes('--remote-update'))void remoteUpdates?.tick();else if (!argv.includes('--startup')) openManager(); });
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
     // A status panel may activate this accessory app without requesting its manager.
@@ -281,6 +284,7 @@ else {
   });
   app.on('before-quit', event => {
     workerSession?.observe();
+    remoteUpdates?.dispose();clearInterval(remoteUpdateTimer);
     if (isMac && !quitting && !endingSession && updates?.snapshot().phase !== 'installing') { event.preventDefault(); void menuAction('quit-after'); return; }
     quitting = true; managerRevision++; loginController?.abort(); panelController?.dispose(); clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
@@ -290,7 +294,15 @@ else {
     workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: credentialEncryption, identityDir: manager.dataDir });
-    updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater });
+    updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
+      beforeInstall:()=>remoteUpdates?.beforeInstall() });
+    remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:app.getVersion(),updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),
+      request:async(route,method='GET',value)=>{
+        if(!/^\/api\/client-updates\/(runtime|inbox|operations\/[a-f0-9]{64}\/result)$/.test(route))throw new Error('更新请求无效');
+        const config=manager.configuration();
+        const response=await fetch(clientOrigin(config.server)+route,{method,headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'},body:value===undefined?undefined:JSON.stringify(value),redirect:'error',signal:AbortSignal.timeout(8000)});
+        const result=await response.json();if(!response.ok)throw Object.assign(new Error('远程更新请求失败'),{status:response.status});return result;
+      } });
     main = makeWindow(); popover = makeWindow(true);
     settings.on('changed', value => {
       for (const window of [main, popover]) if (window && !window.isDestroyed()) {
@@ -343,6 +355,7 @@ else {
     registerIPC(); applicationMenu(); refreshTray(); refreshTimer = setInterval(refreshTray, 2000);
     void workerSession.restore().then(() => refreshTray());
     if (process.env.COLLECTOR_DESKTOP_TEST !== '1') {
+      void remoteUpdates.tick();remoteUpdateTimer=setInterval(()=>remoteUpdates.tick(),5000);
       initialUpdateTimer = setTimeout(() => updates.check(), 15000);
       updateTimer = setInterval(() => updates.check(), 6 * 60 * 60 * 1000);
     }

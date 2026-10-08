@@ -10,12 +10,13 @@ const updateError = error => {
 };
 
 export class DesktopUpdater extends EventEmitter {
-  constructor({ app, manager, updater, platform = process.platform, pollMs = 2000 }) {
+  constructor({ app, manager, updater, platform = process.platform, pollMs = 2000, beforeInstall = async () => {} }) {
     super();
     this.app = app;
     this.manager = manager;
     this.updater = updater;
     this.pollMs = pollMs;
+    this.beforeInstall = beforeInstall;
     this.supported = Boolean(app.isPackaged && supportedPlatform(platform));
     this.state = { version: app.getVersion(), phase: this.supported ? 'idle' : 'unsupported', availableVersion: null,
       progress: null, error: null, supported: this.supported };
@@ -49,7 +50,7 @@ export class DesktopUpdater extends EventEmitter {
   async download() {
     if (this.state.phase !== 'available') throw new Error('当前没有可下载的客户端更新');
     this.set({ phase: 'downloading', progress: 0, error: null });
-    try { await this.updater.downloadUpdate(); }
+    try { this.downloadedFiles = await this.updater.downloadUpdate(); }
     catch (error) { this.set({ phase: 'error', error: updateError(error) }); }
     return this.snapshot();
   }
@@ -64,21 +65,23 @@ export class DesktopUpdater extends EventEmitter {
       this.installWhenStopped();
       return this.snapshot();
     }
-    this.startInstall();
+    await this.startInstall();
     return this.snapshot();
   }
-  installWhenStopped() {
+  async installWhenStopped() {
     if (this.state.phase !== 'waiting_worker') { this.stopWaiting(); return; }
     if (!this.manager.snapshot().running) {
-      try { this.startInstall(); } catch { /* The downloaded update remains available for another attempt. */ }
+      await this.startInstall().catch(() => {});
     }
   }
-  startInstall() {
+  async startInstall() {
+    if(this.installStarting)return;
+    this.installStarting=true;
     this.stopWaiting();
-    this.set({ phase: 'installing' });
     // The detached Worker runs from this application bundle, so its process must exit first.
-    try { this.updater.quitAndInstall(false, true); }
+    try { await this.beforeInstall(); this.set({ phase: 'installing' }); this.updater.quitAndInstall(false, true); }
     catch (error) { this.set({ phase: 'downloaded', error: updateError(error) }); throw error; }
+    finally {this.installStarting=false;}
   }
   stopWaiting() { if (this.workerTimer) clearInterval(this.workerTimer); this.workerTimer = null; }
   dispose() { this.stopWaiting(); this.removeAllListeners(); }

@@ -71,7 +71,7 @@ export function clientDownload({ releaseDir, publicUrl }) {
       return [...metadata, workers.macos_arm64, workers.macos_x64].map(item => ({ ...item, url: '/updates/macos/' + item.filename }));
     } catch { return []; }
   }
-  return async (req, res, route) => {
+  const handler = async (req, res, route) => {
     if (!['/client-release.json', '/download/qr.svg'].includes(route) && !route.startsWith('/downloads/') && !route.startsWith('/updates/macos/')) return false;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return true; }
     const meta = release();
@@ -102,4 +102,6 @@ export function clientDownload({ releaseDir, publicUrl }) {
     if (req.method === 'HEAD') res.end(); else fs.createReadStream(file).pipe(res);
     return true;
   };
+  handler.workerReleases = workerReleases;
+  return handler;
 }

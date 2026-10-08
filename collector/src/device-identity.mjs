@@ -36,7 +36,7 @@ export async function probeComputer(platform = process.platform, execute = run) 
   return { source: 'local', value: null, os: { family: 'Linux', version: null }, model: null };
 }
 let version;
-function appVersion() {
+export function appVersion() {
   version ??= JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url))).version;
   return version;
 }

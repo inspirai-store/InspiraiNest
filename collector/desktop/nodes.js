@@ -5,7 +5,7 @@
   const stages = { queued:'等待领取',assigned:'已分配',running:'处理中',uploading:'上传中',waiting_action:'待操作',awaiting_review:'待确认' };
   const types = {article:'文章',webpage:'网页',video:'视频',document:'文档',repository:'代码项目',audio:'音频',image:'图片',note:'笔记',other:'其他'};
   const agents = names => (names || []).map(name => ({codex:'Codex',codebuddy:'CodeBuddy'})[name] || name).join(' / ') || '未上报';
-  window.createNodeView = ({ onDispatch, onTask, onSkills, onAgents, onRemove, onRename, animate }) => {
+  window.createNodeView = ({ onDispatch, onTask, onSkills, onAgents, onRemove, onRename, onUpdate, animate }) => {
     let local = null, state = null, connected = false, paired = false, lastSuccess = null, selected = 'local';
     let listSignature = '', detailSignature = '', removing = false;
     const remotes = () => (state?.devices || []).filter(d => window.deviceView.dispatchable(d) && d.id !== local?.deviceId);
@@ -14,6 +14,9 @@
     // Keep action elements alive across heartbeats and modal focus restoration.
     overview.innerHTML = '<button type="button" class="back-detail" data-node-back>← 返回节点</button><span class="eyebrow"></span><h1 class="detail-title"></h1><code class="node-stable-id"></code><p class="detail-summary"></p><div class="detail-actions" hidden><button type="button" class="primary" id="node-dispatch">向此节点派发任务</button><button type="button" data-node-rename>编辑名称</button><button type="button" data-node-agents>Agent</button><button type="button" data-node-skills>节点技能</button><button type="button" class="danger" data-node-remove hidden>删除节点</button></div>';
     const rename = overview.querySelector('[data-node-rename]');
+    const versionLine=document.createElement('div');versionLine.className='node-version-line';overview.querySelector('.detail-summary').before(versionLine);
+    const updateButton=document.createElement('button');updateButton.type='button';updateButton.dataset.nodeUpdate='';updateButton.textContent='客户端更新';overview.querySelector('.detail-actions').append(updateButton);
+    updateButton.onclick=()=>{const device=chosen();if(paired && connected && device && onUpdate)onUpdate(device);};
     rename.onclick = () => { const device = chosen(); if (paired && connected && device && onRename) onRename(device); };
     const dispatch = $('#node-dispatch'), skills = overview.querySelector('[data-node-skills]');
     const agentButton=overview.querySelector('[data-node-agents]');
@@ -40,7 +43,7 @@
       if (selected !== 'local' && !remote.some(d => d.id === selected)) selected = 'local';
       const runtime = !local ? '状态读取中' : !local.paired ? '未配对' : local.starting ? '启动中' : !local.running ? '已停止' : local.mode === 'draining' ? '完成后停止' : local.mode === 'paused' ? '暂停领取' : local.online ? '在线' : '连接中断';
       const localDevice = state?.devices?.find(d => d.id === local?.deviceId);
-      const rows = [{id:'local',name:localDevice ? window.nodePresentation.name(localDevice) : local?.device || '本机',status:runtime,local:true,online:Boolean(local?.online),agent:'本机控制'},...remote.map(d => ({id:d.id,name:d.name || d.displayName || '未命名节点',status:connected ? window.deviceView.status(d) : '状态待更新',online:connected && d.online,agent:agents(d.agents),local:false}))];
+      const rows = [{id:'local',name:localDevice ? window.nodePresentation.name(localDevice) : local?.device || '本机',status:runtime,local:true,online:Boolean(local?.online),agent:'本机控制',version:local?.clientVersion},...remote.map(d => ({id:d.id,name:d.name || d.displayName || '未命名节点',status:connected ? window.deviceView.status(d) : '状态待更新',online:connected && d.online,agent:agents(d.agents),local:false,version:window.deviceView.versions(d).client}))];
       $('#nodes-count').textContent = paired ? `${connected ? remote.filter(d=>d.online).length : '—'} 个远端在线 · ${remote.length} 个远端已授权` : '本机节点 · 管理端未连接';
       $('#nodes-freshness').textContent = !paired ? '本机状态独立可用' : !connected ? `连接中断 · 状态待更新${lastSuccess ? ' · 最后更新 '+date(lastSuccess) : ''}` : '最后更新 '+date(lastSuccess)+' · 北京时间';
       $('#nodes-freshness').classList.toggle('stale', paired && !connected); $('#nodes-auth-hint').hidden = paired;
@@ -48,12 +51,16 @@
       if (signature !== listSignature) {
         listSignature = signature; const host = $('#node-list'), scroll = host.scrollTop;
         const focused = host.contains(document.activeElement) ? document.activeElement?.dataset.node : null;
-        host.innerHTML = rows.map(row=>`<button type="button" class="list-item node-item" data-node="${esc(row.id)}" aria-pressed="${row.id === selected}" data-status="${row.online ? 'online' : 'other'}"><div class="node-item-title"><i data-lucide="${row.local ? 'monitor' : 'laptop'}"></i><strong>${esc(row.name)}</strong>${row.local ? '<span class="node-local-tag">本机</span>' : ''}</div><p class="node-item-status"><span class="node-dot" aria-hidden="true"></span>${esc(row.status)}</p><small>${esc(row.agent)}${(row.local ? local?.deviceId : row.id) ? " · "+esc(window.nodePresentation.shortId(row.local ? local.deviceId : row.id)) : ""}</small></button>`).join('');
+        host.innerHTML = rows.map(row=>`<button type="button" class="list-item node-item" data-node="${esc(row.id)}" aria-pressed="${row.id === selected}" data-status="${row.online ? 'online' : 'other'}"><div class="node-item-title"><i data-lucide="${row.local ? 'monitor' : 'laptop'}"></i><strong>${esc(row.name)}</strong>${row.local ? '<span class="node-local-tag">本机</span>' : ''}</div><p class="node-item-status"><span class="node-dot" aria-hidden="true"></span>${esc(row.status)}</p><span class="node-version-label">客户端 ${row.version?'v'+esc(row.version):'未上报'}</span><br><small>${esc(row.agent)}${(row.local ? local?.deviceId : row.id) ? " · "+esc(window.nodePresentation.shortId(row.local ? local.deviceId : row.id)) : ""}</small></button>`).join('');
         host.querySelectorAll('[data-node]').forEach(button=>button.onclick=()=>select(button.dataset.node,true)); host.scrollTop = scroll;
         if (focused) [...host.querySelectorAll('[data-node]')].find(button=>button.dataset.node === focused)?.focus({preventScroll:true});
         window.lucide?.createIcons({attrs:{'aria-hidden':'true'}});
       }
       const device = chosen(), isLocal = selected === 'local'; $('#worker-view').hidden = !isLocal; $('#node-remote-content').hidden = isLocal;
+      const versions=device?window.deviceView.versions(device):{};
+      const clientVersion=isLocal?local?.clientVersion:versions.client,workerVersion=isLocal?local?.workerVersion || versions.worker:versions.worker;
+      versionLine.innerHTML=`<span class="node-version-label">客户端 ${clientVersion?'v'+esc(clientVersion):'未上报'}</span><span class="node-version-label">Worker ${workerVersion?'v'+esc(workerVersion):'旧版未单独上报'}</span>`;
+      updateButton.hidden=!onUpdate;updateButton.disabled=!connected;
       const target = isLocal ? local?.deviceId : selected;
       const tasks = target ? (state?.tasks || []).filter(t => stages[t.state] && (t.deviceId === target || !t.deviceId && t.state === 'queued' && !t.failedDeviceIds?.length && t.preferredDeviceId === target)) : [];
       const title = device ? window.nodePresentation.name(device) : isLocal ? local?.device || '本机' : '节点信息';

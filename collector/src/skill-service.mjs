@@ -198,6 +198,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
           requireValue(Buffer.byteLength(JSON.stringify(result))<(op.action==='prepare-publish'?24:2)*1024*1024,'Operation result too large',413);
           const updated=await store.transaction(async tx=>{
             const authorization=await tx.getForUpdate('device',device.id);requireValue(authorization && !authorization.revokedAt && authorization.tokenHash===device.tokenHash,'Device authorization required',401);
+            if(input.state==='running')requireValue(!(await tx.list('client-update')).some(o=>o.deviceId===device.id && ['waiting_worker','installing'].includes(o.state)),'客户端正在更新，稍后重试',409);
             if(publication && !await tx.get('skill-version',publication.id))await tx.put('skill-version',publication);
             return tx.put('skill-operation',{...current,state:input.state,result,updatedAt:now()});
           });send(res,200,updated);return true;

@@ -28,7 +28,7 @@ test('desktop update checks and downloads, then waits for detached Worker to exi
   assert.equal(drains, 1);
   assert.equal(fake.installs, 0);
   running = false;
-  updates.installWhenStopped();
+  await updates.installWhenStopped();
   assert.equal(updates.snapshot().phase, 'installing');
   assert.equal(fake.installs, 1);
   updates.dispose();

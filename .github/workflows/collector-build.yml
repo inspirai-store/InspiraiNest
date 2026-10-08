@@ -63,6 +63,9 @@ jobs:
       - name: Test Web offline worker node removal
         run: node scripts/test-worker-nodes-ui.cjs
         working-directory: collector
+      - name: Test Web node client updates and physical device grouping
+        run: node scripts/test-client-updates-ui.cjs
+        working-directory: collector
       - name: Test Web Agent management
         run: node scripts/test-agents-ui.cjs --web
         working-directory: collector

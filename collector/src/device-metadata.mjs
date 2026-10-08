@@ -1,4 +1,4 @@
-import { requireValue, text } from './common.mjs';
+import { requireValue, text, hash } from './common.mjs';
 
 export const identitySources = ['smbios', 'ioplatform', 'android-id', 'keychain', 'browser-profile', 'local'];
 const families = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Unknown'];
@@ -80,4 +80,23 @@ export function publicDeviceMetadata(device, clock = Date.now()) {
     ...(identity ? { identity: { version: identity.version, source: identity.source, shortId: identity.digest.slice(0, 12) } } : {}),
     category: deviceCategory(device), workerAuthorized: workerAuthorized(device), readyForDispatch: readyForDispatch(device, clock),
     online: workerOnline(device, clock) };
+}
+
+// Group display only. Never combine tokens, installations, task owners or grants.
+// Short hardware labels and model names are not sufficient proof of identity.
+export function publicDevices(devices, clock = Date.now()) {
+  return devices.map(device => ({ ...publicDeviceMetadata(device, clock),
+    physicalGroupId: deviceCategory(device) === 'desktop' && ['smbios','ioplatform'].includes(device.identity?.source)
+      ? hash(`${device.identity.namespace}:${device.identity.source}:${device.identity.digest}`) : device.id,
+    managementAuthorized: device.role === 'owner' || Boolean(device.ownerTokenHash),
+  }));
+}
+
+export function clientRuntime(input) {
+  if (input === undefined) return undefined;
+  requireValue(input && input.schemaVersion === 1 && /^\d+\.\d+\.\d+$/.test(input.version)
+    && ['win32','darwin','linux'].includes(input.platform) && ['x64','arm64'].includes(input.arch)
+    && typeof input.remoteUpdate === 'boolean', 'Invalid client runtime');
+  return { schemaVersion:1, version:input.version, platform:input.platform, arch:input.arch,
+    remoteUpdate:input.remoteUpdate && ['win32','darwin'].includes(input.platform) };
 }

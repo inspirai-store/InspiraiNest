@@ -10,7 +10,8 @@ import { libraryBrowser } from './library-browser.mjs';
 import { clientDownload } from './client-download.mjs';
 import { readerAuthorization } from './reader-auth.mjs';
 import { createReadApi } from './read-api.mjs';
-import { deviceMetadata, publicDeviceMetadata, deviceCategory, workerAuthorized, workerOnline } from './device-metadata.mjs';
+import { deviceMetadata, publicDeviceMetadata, publicDevices, clientRuntime, deviceCategory, workerAuthorized, workerOnline } from './device-metadata.mjs';
+import { createClientUpdateService, updateBlocksTasks } from './client-update-service.mjs';
 import { browserSessions, browserCookie, browserValid } from './browser-session.mjs';
 import { accountSecurity } from './account-security.mjs';
 import { browserTrust, trustCookie, cookieValue } from './browser-trust.mjs';
@@ -54,6 +55,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const security = accountSecurity({ store, masterKey, serialized, clock });
   const trust = browserTrust({ clock });
   const download = clientDownload({ releaseDir, publicUrl });
+  const clientUpdates = createClientUpdateService({ store, serialized, owner, worker, body, send, clock, releases:download.workerReleases });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const skills = createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock });
@@ -367,6 +369,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         '/node-presentation.js': ['public/node-presentation.js', 'text/javascript; charset=utf-8'],
         '/node-name-editor.js': ['public/node-name-editor.js', 'text/javascript; charset=utf-8'],
         '/node-presentation.css': ['public/node-presentation.css', 'text/css; charset=utf-8'],
+        '/client-update-manager.js': ['public/client-update-manager.js', 'text/javascript; charset=utf-8'],
+        '/client-update-manager.css': ['public/client-update-manager.css', 'text/css; charset=utf-8'],
           '/skill-market.js': ['public/skill-market.js', 'text/javascript; charset=utf-8'],
           '/skill-market.css': ['public/skill-market.css', 'text/css; charset=utf-8'],
           '/skill-manager.js': ['public/skill-manager.js', 'text/javascript; charset=utf-8'],
@@ -459,6 +463,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (await skills.handle(req, res, route, device)) return;
       if (await agents.handle(req, res, route, device)) return;
+      if (await clientUpdates.handle(req, res, route, device)) return;
       if (route.startsWith('/api/browser-trust')) {
         owner(device);
         requireValue(deviceCategory(device) === 'browser' && req.headers.authorization === undefined && cookieValue(req, browserCookie), 'Browser cookie session required', 403);
@@ -529,7 +534,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const archives = [];
         for (const archive of await store.list('archive')) if (!(await deleted(archive))) archives.push(archive);
         const devices = await Promise.all((await store.list('device')).filter(d => !d.revokedAt).map(d => sessions.ensure(d)));
-        return send(res, 200, { me: publicDevice(device), devices: devices.filter(Boolean).map(publicDevice), tasks: (await store.list('task')).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+        return send(res, 200, { me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
       }
       if (route === '/api/pairings' && req.method === 'POST') {
         owner(device);
@@ -569,6 +574,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(target, 'Device not found', 404);
         await security.transaction(async (state, tx) => {
           await agents.cancelDevice(tx, target.id);
+          await clientUpdates.cancelDevice(tx, target.id);
           await tx.delete('device', target.id);
           for (const proof of await tx.list('browser-trust')) if (proof.deviceId === target.id) await tx.delete('browser-trust', proof.id);
         });
@@ -591,6 +597,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '该节点还有未结束的任务，请先完成或取消任务', 409);
           const at = new Date(clock()).toISOString();
           await agents.cancelDevice(tx, target.id);
+          await clientUpdates.cancelDevice(tx, target.id);
           await tx.put('device', { ...target, revokedAt: at, nodeRemovedAt: at });
           return { removed: true, id: target.id };
         })));
@@ -605,8 +612,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const agentRuntime = input.agentRuntime;
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
-        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
-        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[] });
+        const reported = clientRuntime(input.clientRuntime);
+        await updateDevice(device, input, { lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
@@ -670,6 +678,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 requireValue(live && !live.revokedAt && live.tokenHash === device.tokenHash, 'Device authorization required', 401);
                 requireValue(workerOnline(live, clock()), 'Heartbeat required', 409);
                 if (live.agentRuntime?.busy || live.skillRuntime?.mode && live.skillRuntime.mode !== 'running') return null;
+                if ((await tx.list('client-update')).some(o=>o.deviceId===device.id && updateBlocksTasks(o))) return null;
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;

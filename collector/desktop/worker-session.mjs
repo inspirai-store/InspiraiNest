@@ -57,4 +57,9 @@ export class WorkerSession {
     })();
     return this.restoring;
   }
+  async recoverUpdate() {
+    if(this.mode==='stopped')return true;
+    const state=this.manager.snapshot();if(state.running)return state.mode!=='draining';
+    this.restoring=null;return this.restore();
+  }
 }

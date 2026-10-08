@@ -15,14 +15,15 @@
   let pairingSeq = 0, pairingExpiryTimer;
   let settingsTab = 'appearance', lastSuccess = null, connected = false;
   const agentManager = window.createAgentManager({request:input=>window.library.agents(input),identity:()=>auth.server+':'+workspaceEpoch});
+  const clientUpdates = window.createClientUpdateManager({request:input=>window.library.clientUpdates(input),identity:()=>auth.server+':'+workspaceEpoch});
   const skillManager = window.createSkillManager({onAgents:device=>agentManager.open(device),request:input=>window.library.skills(input),identity:()=>auth.server+':'+workspaceEpoch,openConfig:async(device,agent)=>{
     if(device.id!==(await window.worker.snapshot()).deviceId)return null;
     return window.worker.skillConfig(agent);
   }});
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>window.library.market(input) });
   const nodeNames = window.createNodeNameEditor({save:input=>window.library.renameNode(input),identity:()=>auth.server+':'+workspaceEpoch,
-    onSaved:async device=>{ if (state) { state.devices = state.devices.map(d=>d.id === device.id ? device : d); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state,{connected,paired:auth.paired,lastSuccess}); } toast('节点名称已保存'); await refresh(); } });
-  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onRemove:removeNode, onRename:device=>nodeNames.open(device),
+    onSaved:async device=>{ if (state) { state.devices = state.devices.map(d=>d.id === device.id ? {...d,...device} : d); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state,{connected,paired:auth.paired,lastSuccess}); } toast('节点名称已保存'); await refresh(); } });
+  const nodes = window.createNodeView({ animate: animateDetail, onDispatch: openCapture,onSkills:device=>skillManager.open(device), onAgents:device=>agentManager.open(device), onUpdate:device=>clientUpdates.open(device), onRemove:removeNode, onRename:device=>nodeNames.open(device),
     onTask: id => { selectedTask = id; $('#task-filter').value = 'all'; go('tasks'); renderTasks(); } });
   addEventListener('worker:snapshot', event => nodes.updateLocal(event.detail));
   let favorites = new Set();
@@ -179,8 +180,9 @@
     lastDeviceSignature = signature;
     const identityNames = { smbios:'硬件标识', ioplatform:'硬件标识', 'android-id':'系统标识', keychain:'Keychain 标识', 'browser-profile':'浏览器档案', local:'本地标识' };
     const deviceIcons = { desktop:'monitor', mobile:'smartphone', browser:'globe', integration:'key-round', unknown:'monitor-smartphone' };
-    $('#device-list').innerHTML = window.deviceView.groups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h3>${g.title}<span>${g.devices.length}</span></h3>${g.devices.map(d => {
-      const current = d.id === state.me.id, status = window.deviceView.status(d);
+    const disclosure=window.deviceView.capture($('#device-list'));
+    $('#device-list').innerHTML = window.deviceView.displayGroups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h3>${g.title}<span>${g.devices.length}</span></h3>${g.devices.map(d => {
+      const grants=d.authorizations || [d],current = grants.some(grant=>grant.id === state.me.id), status = window.deviceView.status(d);
       const fields = [
         ['型号', d.deviceInfo?.model],
         ['客户端', d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '未上报'],
@@ -188,9 +190,10 @@
         ...(window.deviceView.dispatchable(d) ? [['Agent', d.agents?.join(' / ') || '无可用 Agent']] : []),
         ...(d.browserExpiresAt ? [['有效至', date(d.browserExpiresAt)]] : [])
       ].filter(([,value]) => value);
-      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
+      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>${grants.length>1?`<details class="device-grants" data-computer="${esc(d.physicalGroupId || d.id)}"><summary>同一台电脑 · ${grants.length} 份独立授权</summary>${grants.map(grant=>`<div class="device-grant"><div><strong>${esc(grant.name)}</strong><small>${window.deviceView.dispatchable(grant)?'采集端'+(grant.managementAuthorized?' + 管理端':''):'管理端'}${grant.id===state.me.id?' · 当前登录':''}</small><code>授权 ID · ${esc(grant.id)}</code></div><button type="button" class="subtle device-revoke" data-revoke="${esc(grant.id)}">撤销此授权</button></div>`).join('')}</details>`:''}<div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${grants.length>1?'hidden':''} ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
     }).join('') || '<p class="quiet">暂无授权设备</p>'}</section>`).join('');
     icons();
+    window.deviceView.restore($('#device-list'),disclosure);
     $('#device-list').querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => {
       if (!confirm('撤销该设备的访问权限？')) return;
       try { await window.library.revoke(b.dataset.revoke); toast('设备已撤销'); await refresh(); } catch (error) { toast(errorText(error)); }

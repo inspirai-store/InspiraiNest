@@ -16,6 +16,7 @@ import { fixedSkillProfiles } from './skill-inventory.mjs';
 import { verifySkillExtraction } from './skill-verification.mjs';
 import { createAgentRuntime } from './agent-runtime.mjs';
 import { nodeFailureCodes } from './task-routing.mjs';
+import { runningClient, desktopUpdateWake } from './client-update-wake.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || path.join(project, '..'));
@@ -206,6 +207,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let heartbeatPending = false;
   let lastHeartbeatAttempt = 0;
   let deviceMetadata;
+  const wakeUpdater = desktopUpdateWake();
+  let clientUpdateBarrier=false;
   let skillOperations = [];
   let skillRuntime;
   const agentRuntime = createAgentRuntime({...config,dataDir},{api:(...args)=>api(config,...args),signal});
@@ -242,7 +245,10 @@ export async function runWorker(config, { once = false, signal, paused = false }
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, clientRuntime:runningClient(), capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      wakeUpdater(result.clientUpdates);
+      clientUpdateBarrier=Array.isArray(result.clientUpdates) && result.clientUpdates.some(o=>['waiting_worker','installing'].includes(o.state));
+      control.update({ workerVersion:runningClient().version });
       skillOperations = Array.isArray(result.skillOperations) ? result.skillOperations : [];
       agentOperations = Array.isArray(result.agentOperations) ? result.agentOperations : [];
       if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
@@ -279,6 +285,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (Date.now() - lastProbe > 60000) { available = await detectAgents(config.agents); lastProbe = Date.now(); control.update({ agents: available }); }
         await heartbeat();
+        if(clientUpdateBarrier){await sleep(250);continue;}
         if(agentOperations.length){if(skillTick)await skillTick;await updateAgents(true);if(!forbidden)available=await detectAgents(config.agents);}
         else void updateAgents(false);
         if(agentRuntime.operationLock){await sleep(250);continue;}

@@ -179,6 +179,13 @@ export class OwnerClient {
     return this.api(`/api/devices/${encodeURIComponent(id)}/name`, 'POST', {name});
   }
   trash() { return this.api('/api/trash'); }
+  clientUpdates(input) {
+    if(!input || Object.keys(input).some(k=>!['kind','deviceId','operationId','requestId','targetVersion'].includes(k)))throw new Error('更新请求无效');
+    if(input.kind==='history')return this.api('/api/client-updates/operations?deviceId='+encodeURIComponent(taskId(input.deviceId)));
+    if(input.kind==='create')return this.api('/api/client-updates/operations','POST',{deviceId:taskId(input.deviceId),requestId:input.requestId,targetVersion:input.targetVersion});
+    if(input.kind==='cancel' && /^[a-f0-9]{64}$/.test(input.operationId || ''))return this.api('/api/client-updates/operations/'+input.operationId+'/cancel','POST',{});
+    throw new Error('更新请求无效');
+  }
   removeArchive(id) { return this.api(`/api/archives/${archiveId(id)}`, 'DELETE'); }
   restoreArchive(id) { return this.api(`/api/archives/${archiveId(id)}/restore`, 'POST', {}); }
 }
