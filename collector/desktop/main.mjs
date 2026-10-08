@@ -293,7 +293,7 @@ else {
     settings = new DesktopSettings({ file: path.join(app.getPath('userData'), 'desktop-settings.json'), nativeTheme, loginItem });
     workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
-      workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', encryption: credentialEncryption, identityDir: manager.dataDir });
+      workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', workerConfiguration: () => manager.configuration(), encryption: credentialEncryption, identityDir: manager.dataDir });
     updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
       beforeInstall:()=>remoteUpdates?.beforeInstall() });
     remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:app.getVersion(),updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),

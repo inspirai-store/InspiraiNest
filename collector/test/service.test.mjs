@@ -73,7 +73,7 @@ test('temporary review service refuses all access after its expiry', async t => 
   assert.equal((await fetch(server + '/api/pair', { method: 'POST', body: '{}' })).status, 410);
 });
 
-test('installation identity replaces stale authorization and revoke removes its record', async t => {
+test('installation identity retains the client ID, rotates credentials and revokes the whole client', async t => {
   const { owner, app } = await setup(t);
   const ownerInstallation = crypto.randomUUID();
   await api(owner, '/api/devices/me/info', 'POST', { installationId: ownerInstallation, platform: 'browser', system: 'Test browser' });
@@ -84,10 +84,11 @@ test('installation identity replaces stale authorization and revoke removes its 
   const first = await api(owner, '/api/pair', 'POST', { key: firstKey.key, name: '电脑 A', installationId, platform: 'win32', system: 'Windows test' });
   const secondKey = await api(owner, '/api/pairings', 'POST', { role: 'worker' });
   const second = await api(owner, '/api/pair', 'POST', { key: secondKey.key, name: '电脑 A', installationId, platform: 'win32', system: 'Windows test' });
-  assert.notEqual(first.device.id, second.device.id);
+  assert.equal(first.device.id, second.device.id);
   await assert.rejects(api({ server: owner.server, token: first.token }, '/api/heartbeat', 'POST', { capabilities: [], agents: [] }), { status: 401 });
   const devices = (await api(owner, '/api/state')).devices;
-  assert.equal(devices.filter(device => device.installationKey === second.device.installationKey).length, 1);
+  assert.equal(devices.filter(device => device.id === second.device.id).length, 1);
+  assert.equal(devices.find(device => device.id === second.device.id).installationKey, undefined);
   assert.equal(devices.find(device => device.id === second.device.id).system, 'Windows test');
   await api(owner, `/api/devices/${second.device.id}/revoke`, 'POST', {});
   assert.equal(await app.store.get('device', second.device.id), null);

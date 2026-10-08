@@ -133,7 +133,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
       const input = await body(req);
       requireValue(['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.action) && typeof input.requestId === 'string' && /^[\w-]{1,100}$/.test(input.requestId), 'Invalid skill operation');
       const target = await store.get('device',input.deviceId); requireValue(target && workerAuthorized(target), 'Worker not found',404);
-      const action = input.action, operationId = hash(device.id + ':' + input.requestId);
+      const action = input.action, operationId = hash((device.credentialId || device.id) + ':' + input.requestId);
       const op = { id:operationId, schemaVersion:1, deviceId:target.id, action, createdAt:now(), state:'queued' };
       if(action==='configure-projects'){requireValue(Array.isArray(input.projects) && input.projects.length<=10 && input.projects.every(p=>typeof p==='string' && p.length>1 && p.length<=1000 && !/[\u0000-\u001f]/.test(p)),'Invalid project directories');op.projects=[...new Set(input.projects)];}
       if (['prepare-publish','publish'].includes(action)) { requireValue(digest(input.skillId) && digest(input.expectedHash),'Invalid source skill'); op.skillId=input.skillId; op.expectedHash=input.expectedHash; }

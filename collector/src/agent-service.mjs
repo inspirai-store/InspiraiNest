@@ -71,7 +71,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
       const definition = input.action === 'refresh' ? null : agentDefinition(input.agent);
       const request = { deviceId: input.deviceId, action: input.action, agent: definition?.id || null, method: definition ? input.method : null, expectedFingerprint: definition ? input.expectedFingerprint : null, targetVersion:definition?input.targetVersion || null:null };
       requireValue(!definition || ['managed', 'original'].includes(request.method) && identifier(request.expectedFingerprint), '安装方式或安装状态无效');
-      const operationId = hash(device.id + ':' + input.requestId), requestHash = hash(canonicalJson(request));
+      const operationId = hash((device.credentialId || device.id) + ':' + input.requestId), requestHash = hash(canonicalJson(request));
       const previous = await store.get('agent-operation', operationId);
       if (previous) { requireValue(previous.requestHash === requestHash, '操作编号已使用', 409); send(res, 200, await settle(previous)); return true; }
       const release = definition ? await catalog.release(definition.id) : null;

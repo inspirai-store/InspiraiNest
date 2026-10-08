@@ -63,7 +63,7 @@
     $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
     $('#overview-connect-banner').hidden = auth.paired;
     $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
-    $('#owner-indicator').textContent = auth.paired ? '管理端 · 已连接' : '管理端未配对';
+    $('#owner-indicator').textContent = auth.paired ? '客户端 · 已登录' : '客户端未登录';
     loadFavorites();
   }
   function animateDetail(host) {
@@ -118,7 +118,7 @@
       $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
       $('#overview-connect-banner').hidden = auth.paired;
       $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
-      $('#owner-indicator').textContent = auth.paired ? '管理端 · 已连接' : '管理端未配对';
+      $('#owner-indicator').textContent = auth.paired ? '客户端 · 已登录' : '客户端未登录';
       if (auth.paired) { await refresh(); await loadEntries(); }
       else { $('#remote-tasks').textContent = ''; $('#remote-entries').textContent = ''; }
     } catch (error) { toast(errorText(error)); }
@@ -128,7 +128,7 @@
   window.library.onChanged?.(async next => { if (next.deviceId === auth.deviceId && next.paired === auth.paired && next.server === auth.server) return; clearWorkspace(next); if (auth.paired) { await refresh(); await loadEntries(); } });
   window.addEventListener('desktop-login', async event => { clearWorkspace(event.detail); await refresh(); await loadEntries(); go('overview'); });
   $('#owner-logout').addEventListener('click', async () => {
-      try { clearWorkspace(await window.library.logout()); showSettings('devices'); toast('已退出管理端'); await workerStatus(); }
+      try { clearWorkspace(await window.library.logout()); showSettings('devices'); toast('已退出客户端登录'); await workerStatus(); }
     catch (error) { toast(errorText(error)); }
   });
   function taskTitle(task) { return short(task.content || task.url || '未命名任务'); }
@@ -182,15 +182,15 @@
     const deviceIcons = { desktop:'monitor', mobile:'smartphone', browser:'globe', integration:'key-round', unknown:'monitor-smartphone' };
     const disclosure=window.deviceView.capture($('#device-list'));
     $('#device-list').innerHTML = window.deviceView.displayGroups(state.devices).map(g => `<section class="device-group" data-category="${g.key}"><h3>${g.title}<span>${g.devices.length}</span></h3>${g.devices.map(d => {
-      const grants=d.authorizations || [d],current = grants.some(grant=>grant.id === state.me.id), status = window.deviceView.status(d);
+      const current = d.id === state.me.id, status = window.deviceView.status(d);
       const fields = [
         ['型号', d.deviceInfo?.model],
-        ['客户端', d.deviceInfo?.client.version ? 'v'+d.deviceInfo.client.version : '未上报'],
+        ['客户端', window.deviceView.versions(d).client ? 'v'+window.deviceView.versions(d).client : '未上报'],
         [d.identity ? identityNames[d.identity.source] || '设备标识' : '设备标识', d.identity?.shortId || '未上报'],
         ...(window.deviceView.dispatchable(d) ? [['Agent', d.agents?.join(' / ') || '无可用 Agent']] : []),
         ...(d.browserExpiresAt ? [['有效至', date(d.browserExpiresAt)]] : [])
       ].filter(([,value]) => value);
-      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>${grants.length>1?`<details class="device-grants" data-computer="${esc(d.physicalGroupId || d.id)}"><summary>同一台电脑 · ${grants.length} 份独立授权</summary>${grants.map(grant=>`<div class="device-grant"><div><strong>${esc(grant.name)}</strong><small>${window.deviceView.dispatchable(grant)?'采集端'+(grant.managementAuthorized?' + 管理端':''):'管理端'}${grant.id===state.me.id?' · 当前登录':''}</small><code>授权 ID · ${esc(grant.id)}</code></div><button type="button" class="subtle device-revoke" data-revoke="${esc(grant.id)}">撤销此授权</button></div>`).join('')}</details>`:''}<div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${grants.length>1?'hidden':''} ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
+      return `<article class="device-card"><div class="device-card-heading"><span class="device-kind-icon"><i data-lucide="${deviceIcons[g.key]}" aria-hidden="true"></i></span><div class="device-card-title"><strong>${esc(d.name)}</strong><span>${esc(d.displayName || '设备类型未上报')}</span></div>${current ? '<span class="device-current">当前设备</span>' : ''}</div><div class="device-status" data-online="${!d.revokedAt && (g.key === 'desktop' ? d.online && window.deviceView.dispatchable(d) : status === '已登录' || status === '只读授权') ? 'true' : 'false'}"><span aria-hidden="true"></span>${esc(status)}</div><dl class="device-facts">${fields.map(([label,value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><div class="device-card-footer"><span>最近活动 <time datetime="${esc(d.lastSeen || '')}">${date(d.lastSeen)}</time></span><button type="button" data-revoke="${esc(d.id)}" class="subtle device-revoke" ${current ? 'title="撤销当前设备后需要重新配对"' : ''}>撤销授权</button></div></article>`;
     }).join('') || '<p class="quiet">暂无授权设备</p>'}</section>`).join('');
     icons();
     window.deviceView.restore($('#device-list'),disclosure);
@@ -202,12 +202,12 @@
   async function refresh() {
     if (!auth.paired || refreshBusy) return;
     refreshBusy = true; const epoch = workspaceEpoch;
-    try { const result = await window.library.state(); if (epoch !== workspaceEpoch) return; state = result; connected = true; lastSuccess = new Date().toISOString(); lastRefreshError = ''; $('#owner-indicator').textContent = result.identityWarning ? '设备标识需处理' : '管理端 · 已连接'; $('#owner-indicator').title = result.identityWarning || ''; renderOverview(); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state, {connected,paired:auth.paired,lastSuccess}); updateCaptureHint(); }
+    try { const result = await window.library.state(); if (epoch !== workspaceEpoch) return; state = result; connected = true; lastSuccess = new Date().toISOString(); lastRefreshError = ''; $('#owner-indicator').textContent = result.identityWarning ? '设备标识需处理' : '客户端 · 已登录'; $('#owner-indicator').title = result.identityWarning || ''; renderOverview(); renderTasks(); renderDevices(); fillCaptureDevices(); nodes.updateRemote(state, {connected,paired:auth.paired,lastSuccess}); updateCaptureHint(); }
     catch (error) {
       if (epoch !== workspaceEpoch) return;
       connected = false;
       if (errorText(error).includes('授权已失效')) { clearWorkspace(await window.library.logout()); go('overview'); }
-      else $('#owner-indicator').textContent = '管理端 · 连接中断';
+      else $('#owner-indicator').textContent = '客户端 · 连接中断';
       nodes.updateRemote(state, {connected,paired:auth.paired,lastSuccess}); updateCaptureHint();
       if (lastRefreshError !== errorText(error)) { lastRefreshError = errorText(error); toast(lastRefreshError); }
     }
@@ -336,15 +336,15 @@
   }
   function updateCaptureHint() {
     const target = $('#capture-device').value, device = state?.devices.find(d=>d.id === target);
-    $('#capture-target-hint').textContent = !connected ? '管理端连接中断，恢复连接后可提交任务。'
+    $('#capture-target-hint').textContent = !connected ? '客户端连接中断，恢复连接后可提交任务。'
       : target && (!device || !window.deviceView.dispatchable(device)) ? '目标节点授权已失效，请重新选择。'
       : target && !device.online ? '目标节点离线；任务将等待该节点上线且处理能力匹配，不会自动改派。'
       : target ? '任务将派发至所选节点，等待该节点领取。' : '由可用工作节点自动领取任务。';
     $('#capture-form button[type=submit]').disabled = !connected || Boolean(target && (!device || !window.deviceView.dispatchable(device))) || $('#capture-form').dataset.submitting === '1';
   }
   function openCapture(deviceId = '') {
-    if (!auth.paired) { showSettings('devices'); toast('请先连接管理端'); return; }
-    if (!connected) { toast('管理端连接中断，请恢复连接后再派发任务'); return; }
+    if (!auth.paired) { showSettings('devices'); toast('请先登录客户端'); return; }
+    if (!connected) { toast('客户端连接中断，请恢复连接后再派发任务'); return; }
     fillCaptureDevices(); if (deviceId) $('#capture-device').value = deviceId;
     updateCaptureHint(); $('#capture-dialog').showModal();
   }

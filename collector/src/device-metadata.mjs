@@ -20,7 +20,7 @@ export function deviceCategory(device) {
 }
 
 export function workerAuthorized(device) {
-  return device.role === 'worker' && deviceCategory(device) === 'desktop' && !device.revokedAt;
+  return device.role === 'worker' && !device.canonicalDeviceId && deviceCategory(device) === 'desktop' && !device.revokedAt;
 }
 
 export function workerOnline(device, clock = Date.now()) {
@@ -75,20 +75,19 @@ export function deviceLabel(device) {
 }
 
 export function publicDeviceMetadata(device, clock = Date.now()) {
-  const { tokenHash, ownerTokenHash, deviceRole, identity, ...record } = device;
+  const { tokenHash, ownerTokenHash, deviceRole, identity, credentialId, credentialTokenHash, canonicalDeviceId, installationKey, ...record } = device;
   return { ...record, displayName: deviceLabel(device), deviceInfo: device.deviceInfo || legacyDeviceInfo(device),
     ...(identity ? { identity: { version: identity.version, source: identity.source, shortId: identity.digest.slice(0, 12) } } : {}),
     category: deviceCategory(device), workerAuthorized: workerAuthorized(device), readyForDispatch: readyForDispatch(device, clock),
     online: workerOnline(device, clock) };
 }
 
-// Group display only. Never combine tokens, installations, task owners or grants.
-// Short hardware labels and model names are not sufficient proof of identity.
+// Legacy credentials are aliases of a client, never additional visible devices.
 export function publicDevices(devices, clock = Date.now()) {
-  return devices.map(device => ({ ...publicDeviceMetadata(device, clock),
+  return devices.filter(device => !device.canonicalDeviceId).map(device => ({ ...publicDeviceMetadata(device, clock),
     physicalGroupId: deviceCategory(device) === 'desktop' && ['smbios','ioplatform'].includes(device.identity?.source)
       ? hash(`${device.identity.namespace}:${device.identity.source}:${device.identity.digest}`) : device.id,
-    managementAuthorized: device.role === 'owner' || Boolean(device.ownerTokenHash),
+    managementAuthorized: device.role === 'owner' || Boolean(device.ownerTokenHash) || device.clientIdentityVersion === 1,
   }));
 }
 

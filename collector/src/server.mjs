@@ -74,9 +74,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   }
   async function identityConflict(tx, data, deviceId, clientType) {
     if (!data.identity) return;
-    const duplicate = (await tx.list('device')).some(d => d.id !== deviceId && !d.revokedAt
+    const duplicate = (await tx.list('device')).some(d => d.id !== deviceId && !d.revokedAt && !d.canonicalDeviceId
       && d.identity?.digest === data.identity.digest && d.identity?.namespace === data.identity.namespace
-      && (d.deviceInfo?.client.type || d.clientType) === (data.deviceInfo?.client.type || clientType));
+      && (deviceCategory(d) === 'desktop' && deviceCategory({ ...data, clientType }) === 'desktop'
+        || (d.deviceInfo?.client.type || d.clientType) === (data.deviceInfo?.client.type || clientType)));
     requireValue(!duplicate, 'This device identity is already authorized; review the existing authorization before pairing again', 409);
   }
   async function updateDevice(device, input, changes = {}) {
@@ -87,20 +88,56 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (data.identity) await tx.getForUpdate('setting', 'device-identity-v2');
       const record = await tx.getForUpdate('device', device.id);
       requireValue(record && !record.revokedAt && record.tokenHash === device.tokenHash, 'Device authorization required', 401);
+      const credential = device.credentialId ? await tx.getForUpdate('device', device.credentialId) : record;
+      requireValue(credential && !credential.revokedAt && (!device.credentialTokenHash
+        || [credential.tokenHash, credential.ownerTokenHash].includes(device.credentialTokenHash))
+        && (!credential.canonicalDeviceId || credential.canonicalDeviceId === record.id), 'Device authorization required', 401);
+      const alias = Boolean(credential.canonicalDeviceId);
+      const boundKey = alias ? installationKey(input, credential.role) : key;
       const category = deviceCategory(record);
       if (data.deviceInfo) requireValue(category === 'unknown' || (category === 'desktop' ? ['desktop', 'worker', ...(record.clientType === 'web' ? ['web'] : [])].includes(data.deviceInfo.client.type)
         : category === 'mobile' ? ['android', 'ios'].includes(data.deviceInfo.client.type) : data.deviceInfo.client.type === 'web'), 'Client category cannot be changed', 409);
-      requireValue(!record.installationKey || !key || key === record.installationKey, 'Installation ID does not match this authorization', 409);
-      if (key) requireValue(!(await tx.list('device')).some(d => d.id !== record.id && d.installationKey === key), 'Installation already paired; use the current authorization', 409);
+      requireValue(!credential.installationKey || !boundKey || boundKey === credential.installationKey, 'Installation ID does not match this authorization', 409);
+      if (boundKey) requireValue(!(await tx.list('device')).some(d => d.id !== record.id && d.id !== credential.id && !d.canonicalDeviceId && d.installationKey === boundKey), 'Installation already paired; use the current authorization', 409);
       requireValue(!record.identity || !data.identity || record.identity.digest === data.identity.digest
         && record.identity.namespace === data.identity.namespace && record.identity.source === data.identity.source,
       'Device identity changed; confirm a new pairing', 409);
-      await identityConflict(tx, data, record.id, record.clientType);
-      const updated = { ...record, ...changes, ...data, installationKey: key || record.installationKey || null,
+      // Existing legacy records remain usable until the desktop proves both
+      // credentials. Only establishing an identity needs a duplicate check.
+      if (!record.identity) await identityConflict(tx, data, record.id, record.clientType);
+      const updated = { ...record, ...changes, ...data, installationKey: alias ? record.installationKey : key || record.installationKey || null,
         platform: input.platform ? text(input.platform, 'platform', 40) : record.platform || null,
         system: input.system ? text(input.system, 'system', 100) : record.system || null };
       if (category === 'unknown') { delete updated.category; Object.assign(updated, sessions.fields(updated)); }
       return tx.put('device', updated);
+    }));
+  }
+  async function unifyClient(actor, input) {
+    owner(actor);
+    requireValue(deviceCategory(actor) === 'desktop', '仅电脑客户端可以迁移旧客户端身份', 403);
+    requireValue(input && Object.keys(input).every(key => ['workerDeviceId', 'workerToken', 'installationId', 'identity', 'deviceInfo'].includes(key))
+      && typeof input.workerDeviceId === 'string' && typeof input.workerToken === 'string' && input.workerToken.length <= 200, '客户端迁移请求无效');
+    const data = await metadata(input), key = installationKey(input, 'worker');
+    return serialized('client-identity', () => store.transaction(async tx => {
+      await tx.getForUpdate('setting', 'device-identity-v2');
+      const target = await tx.getForUpdate('device', input.workerDeviceId);
+      const credential = await tx.getForUpdate('device', actor.credentialId || actor.id);
+      requireValue(target && workerAuthorized(target) && target.tokenHash === hash(input.workerToken)
+        && credential && !credential.revokedAt && credential.role === (credential.ownerTokenHash === actor.credentialTokenHash ? 'worker' : 'owner')
+        && [credential.tokenHash, credential.ownerTokenHash].includes(actor.credentialTokenHash), '客户端授权已失效', 401);
+      requireValue(deviceCategory(credential) === 'desktop' && (!target.installationKey || target.installationKey === key), '客户端安装身份不匹配', 409);
+      if (credential.id === target.id || credential.canonicalDeviceId === target.id) return { device: publicDevice(target), unified: true };
+      requireValue(!credential.canonicalDeviceId, '旧授权已属于另一客户端', 409);
+      const matches = identity => identity && data.identity && identity.digest === data.identity.digest
+        && identity.namespace === data.identity.namespace && identity.source === data.identity.source;
+      requireValue(['smbios', 'ioplatform'].includes(data.identity?.source) && matches(target.identity)
+        && (!credential.identity || matches(credential.identity)), '两份旧授权不属于同一台电脑，请重新登录客户端', 409);
+      // Retain the node ID, name, Worker credential, heartbeats and task ownership.
+      // The old encrypted credential becomes a compatibility alias, with its
+      // original limited scope and installation binding; it never grants upload.
+      const client = await tx.put('device', { ...target, clientType: 'desktop', clientIdentityVersion: 1 });
+      await tx.put('device', { ...credential, canonicalDeviceId: client.id, clientIdentityVersion: 1 });
+      return { device: publicDevice(client), unified: true };
     }));
   }
   async function readable(archive) { requireValue(archive && !(await deleted(archive)), 'Archive not found', 404); }
@@ -117,6 +154,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       || (req.method === 'GET' && req.url.startsWith('/library/') && req.headers.cookie?.match(/(?:^|;\s*)library_session=([^;]+)/)?.[1]);
     let device = token && (await store.list('device')).find(d => (d.tokenHash === hash(token) || d.ownerTokenHash === hash(token)) && !d.revokedAt
       && (d.role !== 'reader' || (d.scope === 'library:read' && Date.parse(d.expiresAt) > Date.now())));
+    let credential;
+    if (device?.canonicalDeviceId) {
+      credential = device;
+      device = await store.get('device', credential.canonicalDeviceId);
+      requireValue(credential.role === 'owner' && device && !device.revokedAt && !device.canonicalDeviceId
+        && deviceCategory(device) === 'desktop', 'Device authorization required', 401);
+    }
     if (device) device = await sessions.ensure(device);
     requireValue(device && browserValid(device, clock()), 'Device authorization required', 401);
     if (explicit === undefined && cookie) {
@@ -131,7 +175,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       requireValue(device && !device.revokedAt && device.role === 'reader' && device.scope === 'library:read'
         && Date.parse(device.expiresAt) > Date.now() && device.tokenHash === hash(token), 'Device authorization required', 401);
     }
-    return device.ownerTokenHash === hash(token) ? { ...device, deviceRole: device.role, role: 'owner' } : device;
+    const actor = { ...device, credentialId: credential?.id || device.id, credentialTokenHash: hash(token) };
+    return credential || device.ownerTokenHash === hash(token) ? { ...actor, deviceRole: device.role, role: 'owner' } : actor;
   }
   function owner(device) { requireValue(device.role === 'owner', 'Owner permission required', 403); }
   function worker(device) { requireValue(workerAuthorized(device), 'Worker permission required', 403); }
@@ -189,16 +234,18 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const category = inferred === 'unknown' && input.clientType === 'web' ? 'browser' : inferred;
     const write = async tx => {
       if (data.identity) await tx.getForUpdate('setting', 'device-identity-v2');
-      let previousBrowser;
+      let previousBrowser, previousClient;
       if (key) for (const old of await tx.list('device')) {
-        if (old.installationKey !== key) continue;
+        if (old.installationKey !== key || old.canonicalDeviceId) continue;
         if (deviceCategory(old) === 'browser' && category === 'browser') { previousBrowser = old; continue; }
         const busy = (await tx.list('task')).some(task => task.deviceId === old.id && [...active, 'waiting_action', 'queued'].includes(task.state));
         requireValue(!busy, 'This computer has an unfinished task; resume or cancel it before pairing again', 409);
-        await tx.delete('device', old.id);
+        if (deviceCategory(old) === 'desktop' && category === 'desktop') previousClient = old;
+        else await tx.delete('device', old.id);
       }
-      await identityConflict(tx, data, previousBrowser?.id, input.clientType);
-      const record = { id: previousBrowser?.id || id(), name: previousBrowser?.name || text(name, 'device name', 100), role, clientType: input.clientType || (role === 'worker' ? 'worker' : 'web'), tokenHash: hash(token), ...(ownerToken ? { ownerTokenHash: hash(ownerToken) } : {}), installationKey: key, platform, system, ...data, createdAt: previousBrowser?.createdAt || now(), lastSeen: now(), lastHeartbeatAt: null, revokedAt: null, capabilities: [], agents: [],
+      await identityConflict(tx, data, previousBrowser?.id || previousClient?.id, input.clientType);
+      const previous = previousClient || previousBrowser;
+      const record = { ...previousClient, id: previous?.id || id(), name: previous?.name || text(name, 'device name', 100), role, clientType: previousClient?.clientType === 'desktop' ? 'desktop' : input.clientType || (role === 'worker' ? 'worker' : 'web'), tokenHash: hash(token), ...(ownerToken ? { ownerTokenHash: hash(ownerToken) } : {}), installationKey: key, platform, system, ...data, createdAt: previous?.createdAt || now(), lastSeen: now(), lastHeartbeatAt: null, revokedAt: null, capabilities: previousClient?.capabilities || [], agents: previousClient?.agents || [],
         ...(category === 'browser' ? { browserTrustMigrated: previousBrowser ? previousBrowser.browserTrustMigrated === true : true } : {}) };
       const device = await tx.put('device', { ...record, ...sessions.fields({ ...record, category }) });
       return { device: publicDevice(device), token, ...(ownerToken ? { ownerToken } : {}) };
@@ -514,6 +561,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const updated = await updateDevice(device, input, { lastSeen: now() });
         return send(res, 200, publicDevice(updated));
       }
+      if (route === '/api/devices/me/unify-client' && req.method === 'POST') return send(res, 200, await unifyClient(device, await body(req)));
       if (route === '/api/trash' && req.method === 'GET') {
         owner(device);
         return send(res, 200, (await store.list('trash')).filter(item => item.deletedAt).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt)));
@@ -570,12 +618,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       const revoke = route.match(/^\/api\/devices\/([^/]+)\/revoke$/);
       if (revoke && req.method === 'POST') {
         owner(device);
-        const target = await store.get('device', revoke[1]);
+        const requested = await store.get('device', revoke[1]);
+        const target = requested?.canonicalDeviceId ? await store.get('device', requested.canonicalDeviceId) : requested;
         requireValue(target, 'Device not found', 404);
         await security.transaction(async (state, tx) => {
           await agents.cancelDevice(tx, target.id);
           await clientUpdates.cancelDevice(tx, target.id);
           await tx.delete('device', target.id);
+          for (const alias of await tx.list('device')) if (alias.canonicalDeviceId === target.id) await tx.delete('device', alias.id);
           for (const proof of await tx.list('browser-trust')) if (proof.deviceId === target.id) await tx.delete('browser-trust', proof.id);
         });
         return send(res, 200, { revoked: true });

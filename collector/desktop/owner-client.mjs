@@ -21,12 +21,14 @@ const archiveId = value => {
 };
 
 export class OwnerClient {
-  constructor({ file, workerServer, encryption, fetcher = fetch, identityDir = path.dirname(file) }) {
+  constructor({ file, workerServer, workerConfiguration, encryption, fetcher = fetch, identityDir = path.dirname(file), metadataProvider = computerMetadata }) {
     this.file = file;
     this.workerServer = workerServer;
+    this.workerConfiguration = workerConfiguration;
     this.encryption = encryption;
     this.fetcher = fetcher;
     this.identityDir = identityDir;
+    this.metadataProvider = metadataProvider;
     this.identityAttemptAt = 0;
     this.identityError = null;
     this.identity = null;
@@ -44,15 +46,15 @@ export class OwnerClient {
   serverForPair(input) {
     const worker = this.workerServer();
     const server = clientOrigin(input.server || worker);
-    if (worker && server !== worker) throw new Error('管理端必须连接本机工作节点使用的同一服务地址');
-    if (this.identity && server !== this.identity.server) throw new Error('请先退出当前管理端授权，再连接其他服务');
+    if (worker && server !== worker) throw new Error('客户端必须连接本机工作节点使用的同一服务地址');
+    if (this.identity && server !== this.identity.server) throw new Error('请先退出当前客户端登录，再连接其他服务');
     return server;
   }
   assertWorkerServer(server) {
-    if (this.identity && remoteURL(server) !== this.identity.server) throw new Error('工作节点必须连接管理端使用的同一服务地址');
+    if (this.identity && remoteURL(server) !== this.identity.server) throw new Error('工作节点必须连接客户端使用的同一服务地址');
   }
   async pair(input) {
-    if (!this.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存管理端授权');
+    if (!this.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存客户端授权');
     const server = this.serverForPair(input);
     const key = String(input.key || '');
     const name = String(input.name || os.hostname()).trim().slice(0, 100);
@@ -66,7 +68,7 @@ export class OwnerClient {
     if (!this.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
     if (typeof token !== 'string' || !token || !deviceId) throw new Error('设备授权无效');
     server = allowServerChange ? clientOrigin(server) : this.serverForPair({ server });
-    if (allowServerChange && this.workerServer() && clientOrigin(this.workerServer()) !== server) throw new Error('管理端与工作节点地址不一致');
+    if (allowServerChange && this.workerServer() && clientOrigin(this.workerServer()) !== server) throw new Error('客户端连接地址不一致');
     const stored = { server, deviceId, installationId, encryptedToken: this.encryption.encryptString(token).toString('base64') };
     atomicJson(this.file, stored);
     this.identity = { server, deviceId, installationId, token };
@@ -82,14 +84,14 @@ export class OwnerClient {
       let message, body;
       try { body = await response.json(); message = body.error; } catch {}
       if (route === '/api/pair' && !token) throw loginFailure(response.status, body);
-      if (response.status === 401 && token) throw new Error('管理端授权已失效，请重新配对');
+      if (response.status === 401 && token) throw new Error('客户端授权已失效，请重新配对');
       if (response.status === 404 && route.startsWith('/api/read/v1/')) throw new Error('服务端尚未提供新版资料阅读接口，请先升级服务端');
       throw new Error(message || `服务请求失败（${response.status}）`);
     }
     return binary ? { bytes: Buffer.from(await response.arrayBuffer()), sha256: response.headers.get('x-content-sha256') } : response.json();
   }
   api(route, method = 'GET', data, binary = false) {
-    if (!this.identity) throw new Error('请先配对管理端');
+    if (!this.identity) throw new Error('请先登录客户端');
     return this.call(this.identity.server, this.identity.token, route, method, data, binary);
   }
   agents(input) {
@@ -114,16 +116,38 @@ export class OwnerClient {
     if (input.kind === 'create' && ['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.operation?.action)) return this.api('/api/skills/operations','POST',input.operation);
     throw new Error('不支持的技能请求');
   }
-  async state() {
+  async syncIdentity() {
+    if (this.identitySync) return this.identitySync;
+    this.identitySync = this.updateIdentity().finally(() => { this.identitySync = null; });
+    return this.identitySync;
+  }
+  async updateIdentity() {
     const identity = this.identity;
     if (identity && Date.now() - this.identityAttemptAt > 60000) {
       this.identityAttemptAt = Date.now();
       try {
-        const info = await computerMetadata({ server: identity.server, dataDir: this.identityDir, installationId: identity.installationId, clientType: 'desktop', fetcher: this.fetcher });
-        if (this.identity === identity) await this.api('/api/devices/me/info', 'POST', info);
+        const info = await this.metadataProvider({ server: identity.server, dataDir: this.identityDir, installationId: identity.installationId, clientType: 'desktop', fetcher: this.fetcher });
+        if (this.identity === identity) {
+          const worker = this.workerConfiguration?.();
+          if (worker?.deviceId && worker.token && worker.deviceId !== identity.deviceId) {
+            if (remoteURL(worker.server) !== identity.server) throw new Error('客户端连接地址不一致，请重新登录');
+            const result = await this.call(identity.server, identity.token, '/api/devices/me/unify-client', 'POST', {
+              workerDeviceId: worker.deviceId, workerToken: worker.token, installationId: worker.installationId,
+              identity: info.identity, deviceInfo: info.deviceInfo,
+            });
+            if (this.identity !== identity) throw new Error('登录状态已变化，请重新打开页面');
+            if (result.device?.id !== worker.deviceId || result.unified !== true) throw new Error('客户端身份迁移未确认');
+            this.saveCredential({ ...identity, deviceId: worker.deviceId });
+            this.identityAttemptAt = Date.now();
+          }
+          if (this.identity?.token === identity.token) await this.api('/api/devices/me/info', 'POST', info);
+        }
         this.identityError = null;
       } catch (error) { this.identityError = error.message; }
     }
+  }
+  async state() {
+    await this.syncIdentity();
     const result = await this.api('/api/state');
     return { ...result, identityWarning: this.identityError };
   }

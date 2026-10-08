@@ -44,7 +44,7 @@
       const runtime = !local ? '状态读取中' : !local.paired ? '未配对' : local.starting ? '启动中' : !local.running ? '已停止' : local.mode === 'draining' ? '完成后停止' : local.mode === 'paused' ? '暂停领取' : local.online ? '在线' : '连接中断';
       const localDevice = state?.devices?.find(d => d.id === local?.deviceId);
       const rows = [{id:'local',name:localDevice ? window.nodePresentation.name(localDevice) : local?.device || '本机',status:runtime,local:true,online:Boolean(local?.online),agent:'本机控制',version:local?.clientVersion},...remote.map(d => ({id:d.id,name:d.name || d.displayName || '未命名节点',status:connected ? window.deviceView.status(d) : '状态待更新',online:connected && d.online,agent:agents(d.agents),local:false,version:window.deviceView.versions(d).client}))];
-      $('#nodes-count').textContent = paired ? `${connected ? remote.filter(d=>d.online).length : '—'} 个远端在线 · ${remote.length} 个远端已授权` : '本机节点 · 管理端未连接';
+      $('#nodes-count').textContent = paired ? `${connected ? remote.filter(d=>d.online).length : '—'} 个远端在线 · ${remote.length} 个远端已授权` : '本机节点 · 客户端未登录';
       $('#nodes-freshness').textContent = !paired ? '本机状态独立可用' : !connected ? `连接中断 · 状态待更新${lastSuccess ? ' · 最后更新 '+date(lastSuccess) : ''}` : '最后更新 '+date(lastSuccess)+' · 北京时间';
       $('#nodes-freshness').classList.toggle('stale', paired && !connected); $('#nodes-auth-hint').hidden = paired;
       const signature = JSON.stringify([rows,selected]);
@@ -73,7 +73,7 @@
       dispatch.disabled = skills.disabled = agentButton.disabled = !connected;
       rename.hidden = !onRename; rename.disabled = !connected;
       agentButton.hidden = !onAgents;
-      dispatch.title = connected ? '' : '恢复管理端连接后可派发任务';
+      dispatch.title = connected ? '' : '恢复客户端连接后可派发任务';
       skills.hidden = !onSkills;
       skills.dataset.nodeSkills = device?.id || '';
       remove.hidden = !onRemove || isLocal || !connected || !device || device.online !== false;

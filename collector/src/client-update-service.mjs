@@ -48,7 +48,7 @@ export function createClientUpdateService({store,serialized,worker,owner,body,se
         owner(actor);const input=await body(req);
         requireValue(input && Object.keys(input).every(k=>['deviceId','requestId','targetVersion'].includes(k)) && typeof input.deviceId==='string'
           && /^[a-f0-9-]{36}$/i.test(input.requestId || '') && /^\d+\.\d+\.\d+$/.test(input.targetVersion || ''),'更新请求无效');
-        const opId=hash(`${actor.id}:${input.requestId}`),fingerprint=hash(JSON.stringify([input.deviceId,input.targetVersion]));
+        const opId=hash(`${actor.credentialId || actor.id}:${input.requestId}`),fingerprint=hash(JSON.stringify([input.deviceId,input.targetVersion]));
         await settle(input.deviceId);
         const op=await serialized(`device:${input.deviceId}`,()=>store.transaction(async tx=>{
           const d=await tx.getForUpdate('device',input.deviceId);requireValue(d && workerAuthorized(d),'工作节点不存在或授权已撤销',404);
