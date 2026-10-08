@@ -12,7 +12,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
  const target={server,...await api({server},'/api/pair','POST',{key:pairing.key,name:'测试节点',platform:process.platform})};target.deviceId=target.device.id;target.dataDir=path.join(root,'worker');
  await api(target,'/api/heartbeat','POST',{agents:['codex','codebuddy'],capabilities:['article']});
  const home=path.join(root,'home');fs.mkdirSync(home);
- const runtime=createSkillRuntime(target,{home,cwd:home,api:(...args)=>api(target,...args),scan:(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,CODEX_HOME:path.join(home,'.codex')},versionProbe:async()=>({code:0,tail:'fixture 1'}),nativeCodex:async()=>null})});
+ const runtime=createSkillRuntime(target,{home,cwd:home,api:(...args)=>api(target,...args),scan:(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,HOME:home,USERPROFILE:home,XDG_CONFIG_HOME:path.join(home,'.config'),CODEX_HOME:path.join(home,'.codex'),OPENCODE_CONFIG_DIR:'',OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:''},versionProbe:async()=>({code:0,tail:'fixture 1'}),nativeCodex:async()=>null})});
  await runtime.report();let ticking=false;
  const timer=setInterval(async()=>{if(ticking)return;ticking=true;try{const {operations}=await api(target,'/api/skills/operations');await runtime.tick({idle:true,operationIds:operations.map(o=>o.id)});}catch(e){console.error(e.message);}finally{ticking=false;}},100);
  const output=path.resolve(__dirname,'../test-output/market-install-'+(web?'web':'desktop'));fs.mkdirSync(output,{recursive:true});

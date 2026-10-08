@@ -56,7 +56,7 @@ test('SkillHub refuses arbitrary redirection, wrong version, oversized response 
 async function installation(t,store){
  const f=await setup(t,{store}),home=path.join(f.root,'home'),cwd=path.join(f.root,'project');fs.mkdirSync(home);fs.mkdirSync(cwd);
  const config={...f.node,dataDir:path.join(f.root,'worker')};
- const runtime=createSkillRuntime(config,{home,cwd,api:(...args)=>api(f.node,...args),scan:(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,CODEX_HOME:path.join(home,'.codex')},versionProbe:async()=>({code:0,tail:'fixture 1.0'}),nativeCodex:async()=>null})});
+ const runtime=createSkillRuntime(config,{home,cwd,api:(...args)=>api(f.node,...args),scan:(config,options)=>scanSkillInventory(config,{...options,env:{...process.env,HOME:home,USERPROFILE:home,XDG_CONFIG_HOME:path.join(home,'.config'),CODEX_HOME:path.join(home,'.codex'),OPENCODE_CONFIG_DIR:'',OPENCODE_DISABLE_CLAUDE_CODE_SKILLS:''},versionProbe:async()=>({code:0,tail:'fixture 1.0'}),nativeCodex:async()=>null})});
  t.after(()=>runtime.close());
  await runtime.report();
  const imported=await importing(f.owner),create=(action,extra={})=>api(f.owner,'/api/skills/operations','POST',{deviceId:f.node.device.id,action,requestId:crypto.randomUUID(),...extra});
