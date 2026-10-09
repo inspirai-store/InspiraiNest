@@ -8,7 +8,7 @@ const {_electron}=require('playwright');
  const env={...process.env,COLLECTOR_CONFIG:file,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;
  const electron=(()=>{try{return require('../desktop/node_modules/electron');}catch{return require('electron');}})();
  const packaged=process.argv[2];
- const app=await _electron.launch({executablePath:packaged?path.resolve(packaged):electron,args:packaged?[]:[path.resolve(__dirname,'../desktop')],env});
+ const app=await _electron.launch({executablePath:packaged?path.resolve(packaged):electron,args:[...(packaged?[]:[path.resolve(__dirname,'../desktop')]),...(process.platform==='linux'?['--no-sandbox']:[])],env});
  try{
   let page;for(let n=0;n<100&&!page;n++){page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('compact=1'));if(!page)await new Promise(r=>setTimeout(r,100));}assert.ok(page);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));await page.locator('#record-view').waitFor({state:'visible'});const frame=page.frameLocator('#record-frame');await frame.locator('html[data-theme]').waitFor({state:'attached',timeout:5000});await frame.locator('#record-text').fill('未连接也可以立即记录');
