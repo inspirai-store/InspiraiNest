@@ -22,7 +22,7 @@ struct PersonalLibraryApp: App {
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
-    @State private var selectedTab = 0
+    @State private var selectedTab = -1
     var body: some View {
         VStack(spacing: 0) {
             if let notice = model.notice {
@@ -33,6 +33,8 @@ struct RootView: View {
                 }.padding().background(.thinMaterial)
             }
             TabView(selection: $selectedTab) {
+                CaptureView { target in selectedTab = target == "library" ? 2 : target == "tasks" ? 0 : 3 }
+                    .toolbar(.hidden, for: .tabBar).tabItem { Label("记录", systemImage: "square.and.pencil") }.tag(-1)
                 NavigationStack { TasksView() }.id(model.sessionID).tabItem { Label("任务", systemImage: "list.bullet.rectangle") }.tag(0)
                 NavigationStack { OutboxView() }.tabItem { Label("发件箱", systemImage: "tray.and.arrow.up") }.tag(1)
                 NavigationStack { LibraryReaderView() }.id(model.sessionID).tabItem { Label("资料库", systemImage: "books.vertical") }.tag(2)

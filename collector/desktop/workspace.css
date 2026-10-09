@@ -198,3 +198,12 @@ body.compact main{grid-template-rows:36px minmax(0,1fr) auto}
 @media(max-width:1100px){.node-detail .worker-page .body{grid-template-columns:1fr}.node-detail .worker-page .left{border-right:0}.node-detail .worker-page .controls{grid-template-columns:repeat(2,minmax(0,1fr))}.node-detail .worker-page .right{padding:14px 0}}
 @media(max-width:740px){.nodes-page{grid-template-columns:1fr}.settings-tabs{padding:0 18px 12px}.settings-appearance{padding:20px 18px}.setting-row{align-items:flex-start;flex-direction:column;gap:14px}.node-detail{padding:21px 18px}.node-info dl{grid-template-columns:85px minmax(0,1fr)}}
 .compact #nodes-view{display:block!important}.compact .node-list-pane,.compact #node-overview,.compact #node-remote-content{display:none!important}.compact #node-detail{display:block!important;padding:0;position:static;height:100%;max-width:none}.compact #worker-view{display:block!important}
+
+.capture-page{padding:0!important;height:100%;overflow:hidden}.capture-page iframe{display:block;width:100%;height:100%;border:0;background:var(--bg)}
+body[data-workspace-view="record"] .nav-section,
+body[data-workspace-view="record"] .nav-foot,
+body[data-workspace-view="record"] .statusbar,
+body[data-workspace-view="record"] .brand b,
+body[data-workspace-view="record"] #heartbeat-top,
+body[data-workspace-view="record"] #mode-badge{display:none!important}
+body[data-workspace-view="record"]>main{grid-template-rows:48px minmax(0,1fr)}

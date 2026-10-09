@@ -73,10 +73,12 @@
     ],{duration:240,easing:'cubic-bezier(.2,.7,.2,1)'});
   }
   function go(view) {
+    if (view === 'inbox') { window.captureFramePage?.('inbox'); view = 'record'; } else if (view === 'record') window.captureFramePage?.('record');
     if (['devices','updates'].includes(view)) { showSettings(view); return; }
     if (view === 'worker') { view = 'nodes'; nodes.selectLocal(); }
-    if (!['overview','nodes','settings','skill-market'].includes(view) && !auth.paired) { showSettings('devices'); $('#owner-pair input[name=key]').focus(); return; }
+    if (!['record','overview','nodes','settings','skill-market'].includes(view) && !auth.paired) { showSettings('devices'); $('#owner-pair input[name=key]').focus(); return; }
     activeView = view;
+    document.body.dataset.workspaceView = view;
     document.querySelectorAll('.workspace-nav [data-view]').forEach(button => button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false'));
     document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== view + '-view'; page.classList.toggle('active', !page.hidden); });
     if (view === 'skill-market') skillMarket.show(); else skillMarket.hide();
@@ -114,7 +116,7 @@
     } catch { $('#worker-indicator').textContent = '工作节点 状态不可用'; }
   }
   async function setup() {
-    try { auth = await window.library.status(); loadFavorites(); $('#owner-pair input[name=server]').value = auth.server || ''; if (!auth.paired) showSettings('devices');
+    try { auth = await window.library.status(); loadFavorites(); $('#owner-pair input[name=server]').value = auth.server || '';
       $('#owner-gate').hidden = auth.paired; $('#overview-data').hidden = !auth.paired;
       $('#overview-connect-banner').hidden = auth.paired;
       $('#pair-device').disabled = $('#owner-logout').disabled = !auth.paired;
@@ -441,5 +443,7 @@
     }
   }
   setInterval(() => { if (auth.paired) void refresh(); void workerStatus(); },5000);
+  window.addEventListener('capture:navigate',event => go(event.detail));
+  go('record');
   setup();
 })();

@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { WorkerManager } from './manager.mjs';
 import { OwnerClient } from './owner-client.mjs';
+import { captureRequest } from './capture-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
 import { RemoteClientUpdate } from './remote-update.mjs';
@@ -89,8 +90,13 @@ function makeWindow(compact = false) {
   const canWriteClipboard = (contents, permission, details) => permission === 'clipboard-sanitized-write'
     && contents === main?.webContents && details.isMainFrame === true
     && details.requestingUrl?.split('?')[0] === pageURL;
-  window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => canWriteClipboard(contents, permission, details));
-  window.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => callback(canWriteClipboard(contents, permission, details)));
+  const canCapture = (contents, permission, details) => permission === 'media' && contents === main?.webContents
+    && details.requestingUrl?.split('?')[0] === pathToFileURL(path.join(here,'../public/capture/index.html')).href;
+  window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => canWriteClipboard(contents, permission, details) || canCapture(contents,permission,details));
+  window.webContents.session.setPermissionRequestHandler(async (contents, permission, callback, details) => {
+    if (!canCapture(contents,permission,details)) { callback(canWriteClipboard(contents,permission,details)); return; }
+    try { if (isMac) for (const type of details.mediaTypes || []) if (['audio','video'].includes(type) && !await systemPreferences.askForMediaAccess(type==='audio'?'microphone':'camera')) { callback(false); return; } callback(true); } catch { callback(false); }
+  });
   window.loadFile(path.join(here, 'index.html'), { query: { ...(compact ? { compact: '1' } : {}), ...(isMac ? { platform: 'darwin' } : {}) } });
   return window;
 }
@@ -203,6 +209,7 @@ function registerIPC() {
     },
   })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
   const library = {
+    capture: input => captureRequest(owner,input),
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => { loginController?.abort(); return owner.logout(); },

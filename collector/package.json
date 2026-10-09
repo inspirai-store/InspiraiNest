@@ -1,6 +1,6 @@
 {
   "name": "inspirainest-collector",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -11,6 +11,7 @@
     "start": "node src/server.mjs",
     "worker": "node src/worker.mjs",
     "desktop": "node scripts/launch-desktop.mjs",
+    "stage:capture": "node scripts/stage-capture.mjs",
     "build:brand-icons": "node scripts/build-brand-icons.mjs",
     "build:macos-tray-icon": "node scripts/build-macos-tray-icon.mjs",
     "test": "node --test test/*.test.mjs",

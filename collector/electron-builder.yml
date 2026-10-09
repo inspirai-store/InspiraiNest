@@ -10,6 +10,9 @@ files:
   - desktop/manager.mjs
   - desktop/execution-environment.mjs
   - desktop/owner-client.mjs
+  - desktop/capture-client.mjs
+  - desktop/capture-frame.js
+  - public/capture/**
   - desktop/updater.mjs
   - desktop/remote-update.mjs
   - desktop/settings.mjs
@@ -60,6 +63,9 @@ nsis:
   oneClick: true
   perMachine: false
 mac:
+  extendInfo:
+    NSMicrophoneUsageDescription: 用于保存你主动录制的语音记录。
+    NSCameraUsageDescription: 用于拍照记录。
   icon: desktop/icon.png
   target:
     - zip

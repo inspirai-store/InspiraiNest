@@ -1,5 +1,7 @@
 param([switch]$SkipChecks)
 $ErrorActionPreference = 'Stop'
+& node (Join-Path $PSScriptRoot '../../scripts/stage-capture.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Capture assets could not be staged.' }
 $androidProject = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../android'))
 if (-not $env:ANDROID_HOME -and (Test-Path "$env:LOCALAPPDATA/Android/Sdk")) {
     $env:ANDROID_HOME = "$env:LOCALAPPDATA/Android/Sdk"

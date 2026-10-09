@@ -51,6 +51,9 @@ jobs:
         working-directory: collector
       - run: npm test
         working-directory: collector
+      - name: Test mixed capture in Chrome
+        run: node scripts/test-capture.cjs
+        working-directory: collector
       - name: Test isolated MySQL authorization and skills
         run: node scripts/test-auth-mysql.cjs
         working-directory: collector
@@ -89,6 +92,9 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
       - run: npm ci --ignore-scripts && node node_modules/electron/install.js
+        working-directory: collector
+      - name: Test Linux quick capture
+        run: xvfb-run -a node scripts/test-desktop-capture.cjs
         working-directory: collector
       - name: Test shared Linux desktop login
         run: xvfb-run -a node scripts/test-desktop-login.cjs
@@ -176,6 +182,8 @@ jobs:
           $feed = Get-Content collector/desktop/dist/win-unpacked/resources/app-update.yml -Raw
           if ($feed -notmatch 'provider: github' -or $feed -notmatch 'repo: InspiraiNest') { throw 'Windows update feed is missing' }
           (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -LiteralPath "$($file.FullName).sha256" -Encoding ascii
+      - name: Test packaged Windows quick capture
+        run: node collector/scripts/test-desktop-capture.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows settings and nodes
         shell: pwsh
         run: node collector/scripts/test-desktop-settings-nodes.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
@@ -302,6 +310,7 @@ jobs:
             arch=x64
             app=desktop/dist/mac/灵藏.app
           fi
+          node scripts/test-desktop-capture.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-skill-market.cjs "$app/Contents/MacOS/灵藏"

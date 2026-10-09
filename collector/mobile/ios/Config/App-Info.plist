@@ -15,7 +15,8 @@
   <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
   <key>CollectorAppGroup</key><string>$(COLLECTOR_APP_GROUP)</string>
   <key>CollectorKeychainGroup</key><string>$(AppIdentifierPrefix)$(COLLECTOR_KEYCHAIN_SUFFIX)</string>
-  <key>NSCameraUsageDescription</key><string>用于扫描管理端生成的一次性配对二维码。</string>
+  <key>NSCameraUsageDescription</key><string>用于拍照记录与扫描设备配对二维码。</string>
+  <key>NSMicrophoneUsageDescription</key><string>用于保存你主动录制的语音记录。</string>
   <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><false/></dict>
 </dict></plist>

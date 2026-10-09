@@ -3,6 +3,8 @@ param(
     [string]$CollectorServer
 )
 $ErrorActionPreference = 'Stop'
+& node (Join-Path $PSScriptRoot '../../scripts/stage-capture.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Capture asset staging failed.' }
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../android'))
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$env:LOCALAPPDATA/Android/Sdk" }
 if (-not $env:JAVA_HOME) { throw 'Set JAVA_HOME to JDK 17 or later.' }

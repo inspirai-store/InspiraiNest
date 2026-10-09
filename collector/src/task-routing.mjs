@@ -6,6 +6,7 @@ export const nodeFailureCodes = new Set(['AGENT_START', 'AGENT_PERMISSION', 'AGE
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
   return workerAuthorized(device) && Boolean(device.agents?.length)
+    && (!task.recordId || device.recordProtocol === 1)
     && (task.type === 'auto' ? Boolean(device.capabilities?.length) : device.capabilities?.includes(task.type))
     && (!task.preferredAgent || device.agents.includes(task.preferredAgent))
     && !(task.failedDeviceIds || []).includes(device.id)

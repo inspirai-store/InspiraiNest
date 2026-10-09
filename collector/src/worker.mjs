@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { prepareRecordInput, recordPrompt, preserveRecordOriginal } from './record-input.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -84,6 +85,7 @@ export function taskPrompt(task, localInstructions = '') {
 export async function processTask(config, task, available, signal, onProgress = () => {}) {
   const dataDir = path.resolve(config.dataDir || path.join(project, 'worker-data'));
   const workspace = prepareWorkspace(task, dataDir);
+  await prepareRecordInput(config,task,workspace,signal);
   const skillSnapshots = await taskSkillSnapshots(task, workspace, (...args) => api(config, ...args));
   const checkpoint = path.join(workspace, 'collector-result.json');
   const progress = async (state, message, agent, diagnostic) => {
@@ -106,7 +108,7 @@ export async function processTask(config, task, available, signal, onProgress = 
       const stopSteps = watchCollectionSteps(workspace, step => onProgress({ state: 'running', agent: name, ...step }), error => onProgress({ state: 'running', agent: name,
         message: error.code === 'STEP_ENCODING' ? '采集程序的阶段记录存在乱码，请改用 UTF-8 写入；执行继续，上传前再次校验' : '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: error.code === 'STEP_ENCODING' ? 'STEP_ENCODING' : 'STEP_LOG_READ', details: errorDetails(error) } }));
       let result;
-      try { const profiles=await fixedSkillProfiles(config.agents || {},skillSnapshots.filter(s=>s.agent===name),workspace); result = await runAgent(name, profiles, { cwd: workspace, prompt: taskPrompt(task, instructions), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
+      try { const profiles=await fixedSkillProfiles(config.agents || {},skillSnapshots.filter(s=>s.agent===name),workspace); result = await runAgent(name, profiles, { cwd: workspace, prompt: taskPrompt(task, instructions) + recordPrompt(task), signal, timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 }); }
       finally { stopSteps(); }
       if (result.aborted) return;
       if (result.permissionBlocked) { await progress('waiting_action', `${name} 的非交互权限不足，已停止执行。请在本机客户端配置权限后继续。`, name, { code: 'AGENT_PERMISSION', details: { agent: name } }); return; }
@@ -125,6 +127,8 @@ export async function processTask(config, task, available, signal, onProgress = 
   safePath(result.entry);
   const entryRoot = fs.realpathSync(path.join(workspace, result.entry));
   requireValue(contained(fs.realpathSync(workspace), entryRoot), 'Result outside task workspace');
+  preserveRecordOriginal(task,entryRoot);
+  if(task.recordSnapshot){const build=await execute(process.execPath,['scripts/catalog.mjs','build'],{cwd:workspace});requireValue(build.code===0,'Record result indexes could not be rebuilt');}
   onProgress({ state: 'validating', message: '正在校验本机资料与文件清单', agent: chosen });
   const check = await execute(process.execPath, ['scripts/catalog.mjs', 'check'], { cwd: workspace });
   requireValue(check.code === 0, 'Catalog validation failed; inspect local entry and rebuild its indexes');
@@ -245,7 +249,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, clientRuntime:runningClient(), capabilities: config.capabilities || ['article', 'webpage'], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
       wakeUpdater(result.clientUpdates);
       clientUpdateBarrier=Array.isArray(result.clientUpdates) && result.clientUpdates.some(o=>['waiting_worker','installing'].includes(o.state));
       control.update({ workerVersion:runningClient().version });

@@ -34,7 +34,7 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
   }
   try{
     await launch();console.log('Settings fixture: appearance');assert.equal(await page.locator('#theme-toggle').count(),0);
-    assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['overview','tasks','library','nodes','skill-market','settings']);
+    assert.deepEqual(await page.locator('.workspace-nav [data-view]').evaluateAll(xs=>xs.map(x=>x.dataset.view)),['record','inbox','overview','tasks','library','nodes','skill-market','settings']);
     await showSettings(page,'appearance');
     if(await app.evaluate(({app})=>app.isPackaged)){
       if(process.platform==='win32'){
@@ -74,7 +74,7 @@ const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
     await page.locator('#owner-pair [name=key]').fill(pairing.key);
     await page.locator('#owner-pair button[type=submit]').click();
     console.log('Settings fixture: login submitted');
-    await wait(async()=>{const message=await page.locator('#owner-pair [data-login-error]').textContent();if(message)throw new Error('Login fixture: '+message);return page.locator('#overview-data').isVisible();},'native login');
+    await wait(async()=>{const message=await page.locator('#owner-pair [data-login-error]').textContent();if(message)throw new Error('Login fixture: '+message);return page.locator('#owner-pair').isHidden();},'native login');
     console.log('Settings fixture: logged in');
     const online=await remote('MacBook <script>坏标题</script>',true),offline=await remote('离线 Mac mini — 很长的设备名称用于验证文本截断',false);
     await page.locator('[data-view=nodes]').click();await wait(async()=>await page.locator(`[data-node="${online.device.id}"]`).count()===1,'remote discovery');

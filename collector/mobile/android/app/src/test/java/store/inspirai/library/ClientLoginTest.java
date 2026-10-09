@@ -26,7 +26,7 @@ public class ClientLoginTest {
         return null;
     }
     @Test public void firstLoginIsBlankAndBackgroundClearsPassword() {
-        var controller=Robolectric.buildActivity(MainActivity.class).create().start().resume().visible();
+        var controller=Robolectric.buildActivity(MainActivity.class,new android.content.Intent(org.robolectric.RuntimeEnvironment.getApplication(),MainActivity.class).putExtra("legacy",true)).create().start().resume().visible();
         MainActivity activity=controller.get();View root=activity.getWindow().getDecorView();
         EditText server=input(root,"https://"),password=input(root,"登录密码");
         assertNotNull(server);assertEquals("",server.getText().toString());assertNotNull(password);
@@ -43,7 +43,7 @@ public class ClientLoginTest {
     @Test @Config(shadows={FailingCredentials.class,LoginApi.class},instrumentedPackages={"store.inspirai.library.core"})
     public void credentialSaveFailureKeepsOriginalConnectionAndClearsPassword() throws Exception {
         FailingCredentials.attempts=0;LoginApi.password="";
-        var controller=Robolectric.buildActivity(MainActivity.class).create().start().resume().visible();
+        var controller=Robolectric.buildActivity(MainActivity.class,new android.content.Intent(org.robolectric.RuntimeEnvironment.getApplication(),MainActivity.class).putExtra("legacy",true)).create().start().resume().visible();
         MainActivity activity=controller.get();ReflectionHelpers.callInstanceMethod(activity,"login");
         View root=activity.getWindow().getDecorView();
         input(root,"https://").setText("https://review.example");input(root,"登录密码").setText("  fixture password  ");
