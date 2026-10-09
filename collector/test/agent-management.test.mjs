@@ -94,6 +94,12 @@ test('Worker waits until idle, retains receipts, handles failure and ignores ano
 test('Managed installation switches only a verified version; integrity, cancellation and local conflicts preserve the previous executable',async t=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-installer-'));t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
  const bytes=Buffer.from('official-fixture'),crypto=await import('node:crypto'),root=agentHome(home);fs.mkdirSync(root,{recursive:true});
+ let lockRetries=0;
+ if(process.platform==='win32'){
+  const rename=fs.renameSync;
+  fs.renameSync=(from,to)=>{if(String(from).startsWith(root+path.sep)&&path.basename(from)==='prefix'&&lockRetries<2){lockRetries++;throw Object.assign(new Error('Fixture Windows file lock'),{code:'EPERM'});}return rename(from,to);};
+  t.after(()=>{fs.renameSync=rename;});
+ }
  const runtime={node:process.execPath,npm:path.join(root,'npm-cli.js')};let fail=false,installs=0;
  const installer=createAgentInstaller({}, {home,env:{HOME:home,PATH:''},ensureRuntime:async()=>runtime,fetcher:async()=>new Response(bytes),probe:async()=>({code:0,tail:'codex-cli 1.2.3'}),run:async(command,args)=>{
   if(args.includes('install')){installs++;const prefix=args[args.indexOf('--prefix')+1];fs.mkdirSync(path.join(prefix,process.platform==='win32'?'node_modules/@openai/codex':'lib/node_modules/@openai/codex'),{recursive:true});atomicJson(path.join(prefix,process.platform==='win32'?'node_modules/@openai/codex/package.json':'lib/node_modules/@openai/codex/package.json'),{name:'@openai/codex',version:'1.2.3'});const bin=path.join(prefix,process.platform==='win32'?'codex.cmd':'bin/codex');fs.mkdirSync(path.dirname(bin),{recursive:true});fs.writeFileSync(bin,'fixture');fs.chmodSync(bin,0o755);return {code:0};}
@@ -103,6 +109,7 @@ test('Managed installation switches only a verified version; integrity, cancella
  await assert.rejects(installer.install({...op,release:release('codex')}),/完整性/);assert.equal(installs,0);
  fail=true;await assert.rejects(installer.install(op),/安装验证/);assert.equal(fs.existsSync(path.join(root,'current.json')),false);
  fail=false;const abort=new AbortController();await assert.rejects(installer.install(op,{signal:abort.signal,beforeCommit:async()=>abort.abort()}),/取消/);assert.equal(fs.existsSync(path.join(root,'current.json')),false);
+ if(process.platform==='win32')assert.equal(lockRetries,2,'Temporary executable locks must release before installation verification');
  await assert.rejects(installer.install(op,{beforeCommit:async()=>{const other=path.join(root,'codex/other');fs.writeFileSync(other,'other');fs.chmodSync(other,0o755);atomicJson(path.join(root,'current.json'),{codex:{command:other,runtime:runtime.node}});}}),/状态已变化/);
  fs.rmSync(path.join(root,'current.json'),{force:true});
  const result=await installer.install(op);assert.equal(result.version,'codex-cli 1.2.3');const active=JSON.parse(fs.readFileSync(path.join(root,'current.json')));assert.equal(active.codex.operationId,op.id);

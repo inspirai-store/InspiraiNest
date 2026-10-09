@@ -23,4 +23,4 @@ try{
   console.log(JSON.stringify(results.at(-1)));
  }
  console.log('AGENT_INSTALLATION_ACCEPTANCE_PASSED');
-}finally{fs.rmSync(home,{recursive:true,force:true});}
+}finally{fs.rmSync(home,{recursive:true,force:true,maxRetries:process.platform==='win32'?10:0,retryDelay:200});}

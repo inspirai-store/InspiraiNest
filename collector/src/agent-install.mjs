@@ -8,6 +8,16 @@ import { agentHome, managedState, executable, resolveAgentProfile, commandEnviro
 import { atomicJson, contained, requireValue } from './common.mjs';
 
 const read = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; } };
+async function moveInstalledPrefix(from, to, platform) {
+  for (let attempt = 0; ; attempt++) {
+    try { fs.renameSync(from, to); return; }
+    catch (error) {
+      if (platform !== 'win32' || !['EPERM', 'EBUSY'].includes(error.code) || attempt >= 10) throw error;
+      // Windows may still be scanning the vendor executable after npm exits.
+      await new Promise(resolve => setTimeout(resolve, Math.min(1000, (attempt + 1) * 200)));
+    }
+  }
+}
 export function installerEnvironment(source = process.env) {
   // npm must not inherit cloud credentials, Agent API keys or authentication files.
   const allowed = /^(?:HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|PATH|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|TEMP|TMP|TMPDIR|LANG|LC_ALL|SHELL)$/i;
@@ -215,7 +225,7 @@ export function createAgentInstaller(config, options = {}) {
         requireValue(read(path.join(modules,entry.package,'package.json')).version === release.version, '安装版本不一致');
         fs.mkdirSync(path.dirname(directory), { recursive:true });
         if (fs.existsSync(directory)) fs.rmSync(directory, {recursive:true,force:true});
-        fs.renameSync(path.join(staging,'prefix'), directory);
+        await moveInstalledPrefix(path.join(staging,'prefix'), directory, platform);
       }
       const command = path.join(directory, platform === 'win32' ? entry.command + '.cmd' : 'bin/' + entry.command);
       const check = await run(command,['--version'],{env:runtimeEnv,signal,timeoutMs:15000});
@@ -229,7 +239,7 @@ export function createAgentInstaller(config, options = {}) {
       const state = managedState(home, platform), previous = state[entry.id] ? {...state[entry.id],previous:undefined} : null;
       atomicJson(path.join(root,'current.json'), { ...state, [entry.id]: { command, runtime:runtime.node, version:release.version, operationId:op.id, previous } });
       return { version:agentVersion(check.tail) };
-    } finally { fs.rmSync(staging,{recursive:true,force:true}); }
+    } finally { fs.rmSync(staging,{recursive:true,force:true,maxRetries:platform==='win32'?10:0,retryDelay:200}); }
   }
   return { scan, install, root };
 }
