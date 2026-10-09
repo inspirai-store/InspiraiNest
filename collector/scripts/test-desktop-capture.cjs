@@ -17,7 +17,7 @@ const {_electron}=require('playwright');
   await frame.locator('#retry-sync').click();await frame.locator('#detail-state').filter({hasText:'未加工'}).waitFor();
   assert.equal((await api({server,token:auth.token},'/api/records')).records.length,1);assert.equal((await api({server,token:auth.token},'/api/state')).tasks.length,0);
   await page.locator('[data-view="nodes"]').click();await page.locator('#nodes-view').waitFor({state:'visible'});await page.locator('[data-view="record"]').click();await page.locator('#record-view').waitFor({state:'visible'});
-  assert.equal(await frame.locator('#record-text').isVisible(),true);assert.deepEqual(errors,[]);
+  await frame.locator('#record-screen').waitFor({state:'visible'});assert.equal(await frame.locator('#record-text').isVisible(),true);assert.deepEqual(errors,[]);
   const output=path.resolve(__dirname,'../test-output/capture');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'windows-native.png')});console.log(JSON.stringify({passed:6,errors,actualElectron:true,physicalMediaTested:false,output}));
  }finally{await app.close();await service.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
