@@ -8,7 +8,7 @@ const {_electron}=require('playwright');
  const env={...process.env,COLLECTOR_CONFIG:file,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;
  const electron=(()=>{try{return require('../desktop/node_modules/electron');}catch{return require('electron');}})();
  const packaged=process.argv[2];
- const app=await _electron.launch({executablePath:packaged?path.resolve(packaged):electron,args:[...(packaged?[]:[path.resolve(__dirname,'../desktop')]),...(process.platform==='linux'?['--no-sandbox']:[])],env});
+ const app=await _electron.launch({executablePath:packaged?path.resolve(packaged):electron,args:[...(packaged?[]:[path.resolve(__dirname,'../desktop')]),...(process.platform==='linux'?['--no-sandbox']:[]),...(process.platform!=='darwin'?['--use-fake-device-for-media-stream']:[])],env});
  try{
   let page;for(let n=0;n<100&&!page;n++){page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('compact=1'));if(!page)await new Promise(r=>setTimeout(r,100));}assert.ok(page);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));await page.locator('#record-view').waitFor({state:'visible'});const frame=page.frameLocator('#record-frame');await frame.locator('html[data-theme]').waitFor({state:'attached',timeout:5000});await frame.locator('#record-text').fill('未连接也可以立即记录');
@@ -18,6 +18,12 @@ const {_electron}=require('playwright');
   assert.equal((await api({server,token:auth.token},'/api/records')).records.length,1);assert.equal((await api({server,token:auth.token},'/api/state')).tasks.length,0);
   await page.locator('[data-view="nodes"]').click();await page.locator('#nodes-view').waitFor({state:'visible'});await page.locator('[data-view="record"]').click();await page.locator('#record-view').waitFor({state:'visible'});
   await frame.locator('#record-screen').waitFor({state:'visible'});assert.equal(await frame.locator('#record-text').isVisible(),true);assert.deepEqual(errors,[]);
-  const output=path.resolve(__dirname,'../test-output/capture');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'windows-native.png')});console.log(JSON.stringify({passed:6,errors,actualElectron:true,physicalMediaTested:false,output}));
+  const child=page.frames().find(f=>f.url().includes('/public/capture/index'));assert.ok(await child.evaluate(()=>document.featurePolicy.allowsFeature('microphone')&&document.featurePolicy.allowsFeature('camera')),'The local file iframe must receive camera and microphone delegation');
+  if(process.platform!=='darwin'){
+   await frame.locator('#voice').click();await frame.locator('#recording-bar').waitFor({state:'visible'});await page.waitForTimeout(1100);await frame.locator('#finish-recording').click();await frame.locator('.attachment').waitFor();
+   await frame.locator('#camera').click();await frame.locator('#camera-dialog[open]').waitFor();await child.waitForFunction(()=>document.querySelector('#camera-preview').videoWidth>0);await frame.locator('#take-photo').click();await child.waitForFunction(()=>document.querySelectorAll('.attachment').length===2);
+   await page.reload();await page.frameLocator('#record-frame').locator('.attachment').first().waitFor();assert.equal(await page.frameLocator('#record-frame').locator('.attachment').count(),2,'Recorded audio and camera image survive reload');
+  }
+  const output=path.resolve(__dirname,'../test-output/capture');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'windows-native.png')});console.log(JSON.stringify({passed:process.platform==='darwin'?7:9,errors,actualElectron:true,physicalMediaTested:false,output}));
  }finally{await app.close();await service.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
