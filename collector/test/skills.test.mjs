@@ -110,6 +110,18 @@ async function lifecycle(t,store){
  const claimed=(await api(target,'/api/claim','POST',{})).task;assert.equal(claimed.id,task.id);assert.equal(claimed.selectedSkills[0].versionId,versionId);
  const workspace=path.join(targetHome,'workspace');fs.mkdirSync(workspace);const snapshots=await taskSkillSnapshots(claimed,workspace,(...args)=>api(target,...args));assert.equal(snapshots[0].hash,bundle.hash);assert.equal(snapshots[0].path,'.agents/skills/article-extract');
  await api(target,'/api/tasks/'+claimed.id+'/progress','POST',{state:'waiting_action',message:'Fixture source requires user action',agent:'codex'});
+ const legacy=await api(service.owner,'/api/tasks','POST',{content:raw,submissionId:crypto.randomUUID(),autoArchive:true});
+ delete legacy.requiredCapabilities;
+ await service.app.store.put('task',{...legacy,state:'waiting_action',deviceId:source.deviceId,selectedSkills:[],executionSkills:[],assignmentId:null});
+ const unverified=await service.node('legacy-unverified');
+ const released=await api(service.owner,'/api/tasks/'+legacy.id+'/reassign','POST',{});
+ assert.equal(released.id,legacy.id);assert.equal(released.submissionId,legacy.submissionId);
+ assert.equal(released.requiredCapabilities,undefined);assert.equal(released.state,'queued');
+ assert.equal((await api(unverified,'/api/claim','POST',{assignmentProtocol:1})).task,null,'Legacy source must prefer the verified specialist');
+ const recovered=(await api(target,'/api/claim','POST',{assignmentProtocol:1})).task;
+ assert.equal(recovered.id,legacy.id);assert.equal(recovered.deviceId,target.deviceId);
+ assert.equal(recovered.selectedSkills[0].versionId,versionId);assert.ok(recovered.assignmentId);
+ await api(target,'/api/tasks/'+legacy.id+'/progress','POST',{state:'waiting_action',message:'Fixture legacy extraction inspected',agent:'codex'},recovered.assignmentId);
  const generic=await api(service.owner,'/api/tasks','POST',{content:'https://example.com/no-specialist',submissionId:crypto.randomUUID()});assert.equal((await api(source,'/api/claim','POST',{})).task.id,generic.id);
  const before=await execute(target,destination,await service.create(target,'compare',{versionId,agents:['codex']}));fs.appendFileSync(path.join(targetDir,'scripts/extract.mjs'),'// local edit\n');
  const conflict=await execute(target,destination,await service.create(target,'sync',{versionId,agents:['codex'],comparisonId:before.id}));assert.equal(conflict.state,'failed');assert.match(conflict.result.error,/变化|修改/);

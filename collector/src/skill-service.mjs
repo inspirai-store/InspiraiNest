@@ -51,15 +51,18 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
   }
   async function selection(task, claiming, tasks) {
     if (task.deviceId) return { eligible: !task.selectedSkills?.length || claiming.skillRuntime?.schemaVersion===1, selectedSkills: task.selectedSkills || [] };
+    // Tasks created before capability routing have no stored requirements.
+    // Reassignment must still use a verified specialist for their source.
+    const requiredCapabilities = task.requiredCapabilities ?? taskCapabilities(task);
     const snapshots = async target => {
       const env=target.skillRuntime?.schemaVersion===1 ? await store.get('skill-environment',target.id) : null;
       return (env && clock()-Date.parse(env.scannedAt)<=180000?env.items:[]).filter(s=>SKILL_EXECUTION_AGENTS.includes(s.agent) && s.taskContext && s.managedVersion && s.enabled !== false && !['disabled','shadowed','not_loaded','agent_unavailable'].includes(s.loadState) && target.agents.includes(s.agent) && (!task.preferredAgent || s.agent === task.preferredAgent)).map(s=>({agent:s.agent,versionId:s.managedVersion,hash:s.hash,name:s.name,capabilities:s.capabilities}));
     };
-    if (!task.requiredCapabilities?.length) return { eligible: true, selectedSkills:await snapshots(claiming) };
+    if (!requiredCapabilities.length) return { eligible: true, selectedSkills:await snapshots(claiming) };
     const candidates = (await store.list('device')).filter(d => canRunTask(task, d) && workerOnline(d, clock()) && (!d.skillRuntime || d.skillRuntime.mode === 'running' && d.skillRuntime.idle)
       && !tasks.some(t => t.deviceId === d.id && ['assigned','running','uploading'].includes(t.state)));
     const matches = [];
-    for (const d of candidates) for (const s of await verifiedItems(d)) if ((!task.preferredAgent || s.agent === task.preferredAgent) && task.requiredCapabilities.some(c => s.capabilities.includes(c))) matches.push({ device: d, skill: s });
+    for (const d of candidates) for (const s of await verifiedItems(d)) if ((!task.preferredAgent || s.agent === task.preferredAgent) && requiredCapabilities.some(c => s.capabilities.includes(c))) matches.push({ device: d, skill: s });
     if (!matches.length) return { eligible: true, selectedSkills:await snapshots(claiming) };
     const best = matches.sort((a,b) => a.device.id.localeCompare(b.device.id) || a.skill.id.localeCompare(b.skill.id))[0];
     const selectedSkills = await snapshots(best.device);
