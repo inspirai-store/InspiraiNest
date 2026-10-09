@@ -55,6 +55,7 @@ const {showSettings,setTheme} = require('./desktop-test-helpers.cjs');
     }
     assert.ok(page);
     await page.reload();
+    await page.locator('[data-view=overview]').click();
     await page.locator('#overview-data').waitFor({ state: 'visible' });
     await setTheme(page,'dark');await showSettings(page,'devices');
     assert.equal(await page.locator('.device-card').count(), 16);
