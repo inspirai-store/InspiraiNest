@@ -57,10 +57,13 @@ export function verifyInputCoverage(task,workspace,entryRoot) {
   for (const file of task.inputAttachments) {
     const item = coverage.attachments.find(f=>f.id === file.id);
     requireValue(item && !ids.has(item.id) && item.sha256 === file.sha256 && item.status === 'parsed' && Array.isArray(item.files) && item.files.length, `附件尚未完成解析：${file.name}`); ids.add(item.id);
+    let hasText = false;
     for (const relative of item.files) {
       safePath(relative); const target = fs.realpathSync(path.join(entryRoot,relative));
-      requireValue(contained(fs.realpathSync(entryRoot),target) && /\.(md|markdown|txt|srt|vtt)$/i.test(relative) && meta.files.some(f=>f.path === relative) && fs.statSync(target).size > 0, `附件解析正文缺失：${file.name}`);
+      requireValue(contained(fs.realpathSync(entryRoot),target) && meta.files.some(f=>f.path === relative) && fs.statSync(target).size > 0, `附件解析文件缺失：${file.name}`);
+      if (/\.(md|markdown|txt|srt|vtt)$/i.test(relative) && fs.readFileSync(target,'utf8').trim().length > 0) hasText = true;
     }
+    requireValue(hasText, `附件解析正文缺失：${file.name}`);
   }
   meta.inputAttachments = task.inputAttachments;
   const note = `分享附件 ${task.inputAttachments.map(f=>f.name).join('、')}；原件独立保存在远端对象存储和本机任务目录。`;
