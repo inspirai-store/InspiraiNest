@@ -452,8 +452,8 @@ public final class CoreTest extends Assert {
         JSONObject copied=inputs.copy(submission,new JSONObject().put("id",attachment).put("selected",true),uri);assertEquals(copied.toString(),"ready",copied.getString("state"));String sha=copied.getString("sha256");
         AtomicInteger puts=new AtomicInteger(),posts=new AtomicInteger(),heads=new AtomicInteger();
         try(Fixture server=new Fixture(request->{
-            if(request.line.startsWith("HEAD ")){heads.incrementAndGet();if(puts.get()==0)return reply(404,"{}");return ("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "+copied.getLong("bytes")+"\r\nX-Content-SHA256: "+sha+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII);}
-            if(request.line.startsWith("PUT ")){assertArrayEquals(Files.readAllBytes(source.toPath()),request.raw);puts.incrementAndGet();return null;}
+            if(request.line.startsWith("HEAD ")){assertEquals("identity",request.acceptEncoding);heads.incrementAndGet();if(puts.get()==0)return reply(404,"{}");return ("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "+copied.getLong("bytes")+"\r\nX-Content-SHA256: "+sha+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII);}
+            if(request.line.startsWith("PUT ")){assertEquals("identity",request.acceptEncoding);assertArrayEquals(Files.readAllBytes(source.toPath()),request.raw);puts.incrementAndGet();return null;}
             if(posts.incrementAndGet()==1)return null;return taskReply(request,201);
         })){
             credentials.save(server.origin(),TOKEN,"test-device");JSONObject payload=new JSONObject().put("submissionId",submission).put("content","").put("attachments",InputFiles.selected(new JSONArray().put(copied)));new Outbox(context).enqueue(payload,server.origin());
@@ -462,6 +462,13 @@ public final class CoreTest extends Assert {
             assertFalse(Outbox.flush(context));assertEquals("sent",new Outbox(context).list().getJSONObject(0).getString("state"));assertEquals(1,puts.get());assertEquals(2,heads.get());assertEquals(2,posts.get());
             new Outbox(context).remove(submission);assertFalse(inputs.file(submission,attachment).isFile());
         }finally{source.delete();}
+    }
+    @Test public void testOriginalDownloadUsesUncompressedLengthAndHash() throws Exception {
+        if(!BuildConfig.DEBUG)return;
+        File source=new File(directory,"original.txt"),target=new File(directory,"downloaded.txt");byte[] bytes="网关传输原件，保留中文与原始大小。".getBytes(StandardCharsets.UTF_8);Files.write(source.toPath(),bytes);String sha=InputFiles.sha256(source);
+        try(Fixture server=new Fixture(request->{assertTrue(request.line.startsWith("GET /api/tasks/"));assertEquals("identity",request.acceptEncoding);ByteArrayOutputStream reply=new ByteArrayOutputStream();reply.write(("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "+bytes.length+"\r\nX-Content-SHA256: "+sha+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));reply.write(bytes);return reply.toByteArray();})){
+            credentials.save(server.origin(),TOKEN,"test-device");JSONObject meta=new JSONObject().put("mime","text/plain").put("bytes",bytes.length).put("sha256",sha);File downloaded=new Api(credentials).downloadInput(credentials.snapshot(),"/api/tasks/"+UUID.randomUUID()+"/input-files/"+sha,meta,target);assertArrayEquals(bytes,Files.readAllBytes(downloaded.toPath()));assertEquals(sha,InputFiles.sha256(downloaded));
+        }
     }
     private interface Checked { void run() throws Exception; }
     private void expectFailure(Checked action) throws Exception {
@@ -502,8 +509,9 @@ public final class CoreTest extends Assert {
         final String authorization;
         final JSONObject body;
         final byte[] raw;
-        Request(String line, String authorization, JSONObject body, byte[] raw) {
-            this.line = line; this.authorization = authorization; this.body = body; this.raw=raw;
+        final String acceptEncoding;
+        Request(String line, String authorization, JSONObject body, byte[] raw, String acceptEncoding) {
+            this.line = line; this.authorization = authorization; this.body = body; this.raw=raw;this.acceptEncoding=acceptEncoding;
         }
     }
 
@@ -521,7 +529,7 @@ public final class CoreTest extends Assert {
                     try (Socket socket = server.accept()) {
                         socket.setSoTimeout(5000);
                         InputStream input = socket.getInputStream();
-                        String first = line(input), auth = null, header, contentType="";
+                        String first = line(input), auth = null, header, contentType="",acceptEncoding="";
                         int length = 0;
                         while (!(header = line(input)).isEmpty()) {
                             int colon = header.indexOf(':');
@@ -530,6 +538,7 @@ public final class CoreTest extends Assert {
                             if (name.equalsIgnoreCase("Content-Length")) length = Integer.parseInt(value);
                             if (name.equalsIgnoreCase("Authorization")) auth = value;
                             if (name.equalsIgnoreCase("Content-Type")) contentType=value;
+                            if (name.equalsIgnoreCase("Accept-Encoding")) acceptEncoding=value;
                         }
                         if (length < 0 || length > 96 * 1024) throw new Exception("Invalid fixture request length.");
                         byte[] bytes = new byte[length];
@@ -539,7 +548,7 @@ public final class CoreTest extends Assert {
                             offset += count;
                         }
                         Request request = new Request(first, auth, length == 0 || !contentType.startsWith("application/json") ? new JSONObject()
-                                : new JSONObject(new String(bytes, StandardCharsets.UTF_8)),bytes);
+                                : new JSONObject(new String(bytes, StandardCharsets.UTF_8)),bytes,acceptEncoding);
                         requests.add(request);
                         byte[] response = responder.respond(request);
                         if (response != null) {

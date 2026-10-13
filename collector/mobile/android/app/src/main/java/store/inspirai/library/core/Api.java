@@ -122,7 +122,7 @@ public final class Api {
         requireBackground(); checkInterrupted();
         if(expected==null || !stillPaired(expected))throw new Failure(0,"配对状态已改变，请重新尝试。");
         if(!path.matches("/api/(records/media/[a-f0-9]{64}|tasks/[a-fA-F0-9-]{36}/input-files/[a-f0-9]{64}|archives/[a-f0-9]{64}/input-files/[a-f0-9]{64})"))throw new Failure(400,"附件地址无效。");
-        HttpURLConnection c=(HttpURLConnection)new URL(expected.server+path).openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setUseCaches(false);c.setRequestMethod(method);c.setRequestProperty("Authorization","Bearer "+expected.token);return c;
+        HttpURLConnection c=(HttpURLConnection)new URL(expected.server+path).openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setUseCaches(false);c.setRequestMethod(method);c.setRequestProperty("Authorization","Bearer "+expected.token);c.setRequestProperty("Accept-Encoding","identity");return c;
     }
     public void uploadInput(Credentials.Snapshot expected,File file,JSONObject meta,TransferProgress progress)throws Exception {
         String sha=meta.getString("sha256"),mime=meta.getString("mime");long size=meta.getLong("bytes");
