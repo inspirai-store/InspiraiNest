@@ -7,7 +7,7 @@ export function libraryBrowser({ dataDir, storage }) {
   const pending = new Map();
   const root = path.join(dataDir, 'browser-cache');
   async function prepare(archive) {
-    if (pending.has(archive.id)) return pending.get(archive.id);
+    if (pending.has(archive.id)) { const result = await pending.get(archive.id); return { ...result, entry: { ...result.entry, inputAttachments: archive.inputAttachments || [] } }; }
     const job = (async () => {
       const folder = path.join(root, archive.id);
       try { return JSON.parse(await fs.readFile(path.join(folder, 'index.json'), 'utf8')); }
@@ -35,7 +35,7 @@ export function libraryBrowser({ dataDir, storage }) {
       return result;
     })();
     pending.set(archive.id, job);
-    try { return await job; } finally { pending.delete(archive.id); }
+    try { const result = await job; return { ...result, entry: { ...result.entry, inputAttachments: archive.inputAttachments || [] } }; } finally { pending.delete(archive.id); }
   }
   async function file(archive, relative) {
     const index = await prepare(archive);

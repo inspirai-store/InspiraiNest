@@ -102,11 +102,12 @@ public final class CoreTest extends Assert {
     @Test public void testOriginValidation() throws Exception {
         assertEquals("https://example.org", Credentials.normalizeServer("https://EXAMPLE.org:443/"));
         assertEquals("https://example.org:8443", Credentials.normalizeServer("https://example.org:8443"));
+        assertEquals("https://example.org", Credentials.normalizeServer(" https://example.org "));
         for (String origin : new String[]{"https://u:p@example.org", "https://example.org/a", "https://example.org?",
                 "https://example.org/#", "https://example.org/%2f", "https://example.org:", "https://example.org:0",
                 "https://example.org:65536", "http://example.org", "http://127.0.0.2", "http://localhost.evil.test",
-                "http://127.1", "http://[::1]", "file:///tmp", "//example.org", " https://example.org", "https://example.org\\@evil.org"}) {
-            expectFailure(() -> Credentials.normalizeServer(origin));
+                "http://127.1", "http://[::1]", "file:///tmp", "//example.org", "https://example.org\\@evil.org"}) {
+            try{Credentials.normalizeServer(origin);fail("Accepted invalid origin: "+origin);}catch(AssertionError failure){throw failure;}catch(Exception expected){}
         }
         for (String host : new String[]{"127.0.0.1", "10.0.2.2", "localhost"}) {
             String origin = "http://" + host + ":4317";
@@ -443,6 +444,25 @@ public final class CoreTest extends Assert {
         }
     }
 
+    @Test public void testBinaryUploadLostAcknowledgementAndTaskRetry() throws Exception {
+        if(!BuildConfig.DEBUG)return;
+        Context target=InstrumentationRegistry.getInstrumentation().getTargetContext();File source=new File(target.getCacheDir(),"input-files/test-share.txt");source.getParentFile().mkdirs();Files.write(source.toPath(),"中文附件全文".getBytes(StandardCharsets.UTF_8));
+        String submission=UUID.randomUUID().toString(),attachment=UUID.randomUUID().toString();InputFiles inputs=new InputFiles(context);
+        android.net.Uri uri=androidx.core.content.FileProvider.getUriForFile(target,target.getPackageName()+".inputs",source);
+        JSONObject copied=inputs.copy(submission,new JSONObject().put("id",attachment).put("selected",true),uri);assertEquals(copied.toString(),"ready",copied.getString("state"));String sha=copied.getString("sha256");
+        AtomicInteger puts=new AtomicInteger(),posts=new AtomicInteger(),heads=new AtomicInteger();
+        try(Fixture server=new Fixture(request->{
+            if(request.line.startsWith("HEAD ")){heads.incrementAndGet();if(puts.get()==0)return reply(404,"{}");return ("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "+copied.getLong("bytes")+"\r\nX-Content-SHA256: "+sha+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII);}
+            if(request.line.startsWith("PUT ")){assertArrayEquals(Files.readAllBytes(source.toPath()),request.raw);puts.incrementAndGet();return null;}
+            if(posts.incrementAndGet()==1)return null;return taskReply(request,201);
+        })){
+            credentials.save(server.origin(),TOKEN,"test-device");JSONObject payload=new JSONObject().put("submissionId",submission).put("content","").put("attachments",InputFiles.selected(new JSONArray().put(copied)));new Outbox(context).enqueue(payload,server.origin());
+            assertTrue(Outbox.flush(context));assertEquals(1,puts.get());assertEquals("pending",new Outbox(context).list().getJSONObject(0).getString("state"));
+            assertTrue(Outbox.flush(context));assertEquals(1,puts.get());assertEquals(1,posts.get());assertTrue(inputs.progress(submission).getJSONObject("uploaded").getBoolean(sha));
+            assertFalse(Outbox.flush(context));assertEquals("sent",new Outbox(context).list().getJSONObject(0).getString("state"));assertEquals(1,puts.get());assertEquals(2,heads.get());assertEquals(2,posts.get());
+            new Outbox(context).remove(submission);assertFalse(inputs.file(submission,attachment).isFile());
+        }finally{source.delete();}
+    }
     private interface Checked { void run() throws Exception; }
     private void expectFailure(Checked action) throws Exception {
         try { action.run(); }
@@ -481,8 +501,9 @@ public final class CoreTest extends Assert {
         final String line;
         final String authorization;
         final JSONObject body;
-        Request(String line, String authorization, JSONObject body) {
-            this.line = line; this.authorization = authorization; this.body = body;
+        final byte[] raw;
+        Request(String line, String authorization, JSONObject body, byte[] raw) {
+            this.line = line; this.authorization = authorization; this.body = body; this.raw=raw;
         }
     }
 
@@ -500,7 +521,7 @@ public final class CoreTest extends Assert {
                     try (Socket socket = server.accept()) {
                         socket.setSoTimeout(5000);
                         InputStream input = socket.getInputStream();
-                        String first = line(input), auth = null, header;
+                        String first = line(input), auth = null, header, contentType="";
                         int length = 0;
                         while (!(header = line(input)).isEmpty()) {
                             int colon = header.indexOf(':');
@@ -508,6 +529,7 @@ public final class CoreTest extends Assert {
                             String name = header.substring(0, colon), value = header.substring(colon + 1).trim();
                             if (name.equalsIgnoreCase("Content-Length")) length = Integer.parseInt(value);
                             if (name.equalsIgnoreCase("Authorization")) auth = value;
+                            if (name.equalsIgnoreCase("Content-Type")) contentType=value;
                         }
                         if (length < 0 || length > 96 * 1024) throw new Exception("Invalid fixture request length.");
                         byte[] bytes = new byte[length];
@@ -516,8 +538,8 @@ public final class CoreTest extends Assert {
                             if (count < 0) throw new Exception("Truncated fixture request.");
                             offset += count;
                         }
-                        Request request = new Request(first, auth, length == 0 ? new JSONObject()
-                                : new JSONObject(new String(bytes, StandardCharsets.UTF_8)));
+                        Request request = new Request(first, auth, length == 0 || !contentType.startsWith("application/json") ? new JSONObject()
+                                : new JSONObject(new String(bytes, StandardCharsets.UTF_8)),bytes);
                         requests.add(request);
                         byte[] response = responder.respond(request);
                         if (response != null) {

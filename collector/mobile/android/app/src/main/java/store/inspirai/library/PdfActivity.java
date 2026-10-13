@@ -27,11 +27,13 @@ public class PdfActivity extends Screen {
         save=button(body,"保存 PDF",()->startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT).setType("application/pdf").addCategory(android.content.Intent.CATEGORY_OPENABLE).putExtra(android.content.Intent.EXTRA_TITLE,new File(getIntent().getStringExtra("file")).getName()),84));save.setEnabled(false);
         image=new ImageView(this);image.setAdjustViewBounds(true);image.setContentDescription("PDF 当前页面");body.addView(image,new LinearLayout.LayoutParams(-1,-2));
         String route=getIntent().getStringExtra("route"),file=getIntent().getStringExtra("file");
-        if(route==null||file==null||!route.matches("/api/(archives/[a-f0-9]{64}|tasks/[^/]+/draft)")){notice("无效附件地址");return;}
+        String inputMeta=getIntent().getStringExtra("inputMeta");
+        if(route==null||file==null||!(inputMeta!=null?route.matches("/api/(archives/[a-f0-9]{64}|tasks/[a-fA-F0-9-]{36})/input-files/[a-f0-9]{64}"):route.matches("/api/(archives/[a-f0-9]{64}|tasks/[^/]+/draft)"))){notice("无效附件地址");return;}
         notice("正在读取私有 PDF…");
         work(()->{
-            JSONArray files=new Api(new Credentials(this)).call(route,"GET",null).getJSONArray("files");byte[] bytes=null;
-            for(int i=0;i<files.length();i++){JSONObject f=files.getJSONObject(i);if(file.equals(f.getString("path")))bytes=Base64.decode(f.getString("body"),Base64.DEFAULT);}
+            byte[] bytes=null;
+            if(inputMeta!=null){Credentials c=new Credentials(this);File original=new Api(c).downloadInput(c.snapshot(),route,new JSONObject(inputMeta),new File(getCacheDir(),"input-files/pdf-"+new JSONObject(inputMeta).getString("sha256")+".pdf"));bytes=InputFiles.preview(original,(int)InputFiles.FILE_LIMIT);}
+            else{JSONArray files=new Api(new Credentials(this)).call(route,"GET",null).getJSONArray("files");for(int i=0;i<files.length();i++){JSONObject f=files.getJSONObject(i);if(file.equals(f.getString("path")))bytes=Base64.decode(f.getString("body"),Base64.DEFAULT);}}
             if(bytes==null)throw new IOException("附件已不可用");pdfBytes=bytes;
             File temp=File.createTempFile("library-pdf-",".pdf",getCacheDir());
             ParcelFileDescriptor descriptor=null;

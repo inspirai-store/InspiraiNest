@@ -41,6 +41,7 @@ final class LibraryPane {
  private void action(Uri uri){try{switch(uri.getHost()){
   case "theme":host.appearance();break;
   case "new":host.startActivity(new Intent(host,ShareActivity.class));break;
+  case "inputs":String inputArchive=uri.getQueryParameter("archive");if(inputArchive!=null&&inputArchive.matches("[a-f0-9]{64}"))host.startActivity(new Intent(host,BundleActivity.class).putExtra("route","/api/archives/"+inputArchive));break;
   case "exit":host.finish();break;
   case "copy":String entry=uri.getQueryParameter("entry");if(entry!=null){((android.content.ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("资料地址",credentials.server()+"/library/#entry="+Uri.encode(entry)));android.widget.Toast.makeText(host,"资料地址已复制",android.widget.Toast.LENGTH_SHORT).show();}break;
   case "save":String file=uri.getQueryParameter("file");if(file!=null&&file.startsWith("files/"))save(credentials.server()+"/library/"+Uri.encode(file,"/"));break;

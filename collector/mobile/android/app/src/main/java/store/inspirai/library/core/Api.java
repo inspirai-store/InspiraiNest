@@ -9,6 +9,9 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -112,6 +115,43 @@ public final class Api {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             throw new IllegalStateException("网络请求必须在后台线程执行。");
         }
+    }
+
+    public interface TransferProgress { void update(long bytes) throws Exception; }
+    private HttpURLConnection inputConnection(Credentials.Snapshot expected,String path,String method)throws Exception {
+        requireBackground(); checkInterrupted();
+        if(expected==null || !stillPaired(expected))throw new Failure(0,"配对状态已改变，请重新尝试。");
+        if(!path.matches("/api/(records/media/[a-f0-9]{64}|tasks/[a-fA-F0-9-]{36}/input-files/[a-f0-9]{64}|archives/[a-f0-9]{64}/input-files/[a-f0-9]{64})"))throw new Failure(400,"附件地址无效。");
+        HttpURLConnection c=(HttpURLConnection)new URL(expected.server+path).openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setUseCaches(false);c.setRequestMethod(method);c.setRequestProperty("Authorization","Bearer "+expected.token);return c;
+    }
+    public void uploadInput(Credentials.Snapshot expected,File file,JSONObject meta,TransferProgress progress)throws Exception {
+        String sha=meta.getString("sha256"),mime=meta.getString("mime");long size=meta.getLong("bytes");
+        if(!file.isFile() || size<=0 || size>InputFiles.FILE_LIMIT || file.length()!=size || !sha.equals(InputFiles.sha256(file)))throw new Failure(400,"附件本机副本缺失或校验失败，请重新添加后提交。");
+        String route="/api/records/media/"+sha;HttpURLConnection c=null;
+        try {
+            c=inputConnection(expected,route,"HEAD");int status=c.getResponseCode();
+            if(status==200){verifyInputHeaders(c,meta);if(!stillPaired(expected))throw new Failure(0,"配对状态已改变，请重试。");progress.update(size);return;}
+            if(status!=404)throw new Failure(status,statusMessage(status));c.disconnect();
+            c=inputConnection(expected,route,"PUT");c.setDoOutput(true);c.setRequestProperty("Content-Type",mime);c.setFixedLengthStreamingMode(size);
+            try(InputStream in=new FileInputStream(file);OutputStream out=c.getOutputStream()){byte[] buffer=new byte[65536];int count;long sent=0,last=0;while((count=in.read(buffer))!=-1){checkInterrupted();out.write(buffer,0,count);sent+=count;if(sent-last>=256*1024||sent==size){progress.update(sent);last=sent;}}}
+            status=c.getResponseCode();if(status<200||status>=300)throw new Failure(status,statusMessage(status));
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] buffer=new byte[1024];int count;while((count=in.read(buffer))!=-1){if(bytes.size()+count>8192)throw new Failure(0,"附件确认信息无效，可安全重试。");bytes.write(buffer,0,count);}}
+            JSONObject ack=new JSONObject(bytes.toString("UTF-8"));if(!sha.equals(ack.optString("sha256"))||!compatibleMime(mime,ack.optString("mime"))||size!=ack.optLong("bytes"))throw new Failure(0,"附件确认信息无效，可安全重试。");
+            if(!stillPaired(expected))throw new Failure(0,"配对状态已改变，请重试。");
+        }catch(Failure failure){throw failure;}catch(Exception ignored){throw new Failure(0,"附件上传中断，原件保留，可安全重试。");}finally{if(c!=null)c.disconnect();}
+    }
+    private static void verifyInputHeaders(HttpURLConnection c,JSONObject meta)throws Exception {
+        String type=c.getContentType();if(type!=null)type=type.split(";")[0];
+        if(!meta.getString("sha256").equals(c.getHeaderField("X-Content-SHA256")) || meta.getLong("bytes")!=c.getContentLengthLong() || !compatibleMime(meta.getString("mime"),type))throw new Failure(0,"附件大小、类型或哈希与清单不符。");
+    }
+    private static boolean compatibleMime(String a,String b){return a.equals(b)||("text/plain".equals(a)||"text/markdown".equals(a))&&("text/plain".equals(b)||"text/markdown".equals(b));}
+    public File downloadInput(Credentials.Snapshot expected,String route,JSONObject meta,File target)throws Exception {
+        long size=meta.getLong("bytes");if(size<=0||size>InputFiles.FILE_LIMIT)throw new Failure(400,"附件大小无效。");
+        HttpURLConnection c=null;File temp=new File(target.getPath()+".tmp");
+        try{c=inputConnection(expected,route,"GET");int status=c.getResponseCode();if(status!=200)throw new Failure(status,statusMessage(status));verifyInputHeaders(c,meta);if(!target.getParentFile().isDirectory()&&!target.getParentFile().mkdirs())throw new Failure(400,"无法保存附件，请检查剩余空间。");
+            long bytes=0;try(InputStream in=c.getInputStream();FileOutputStream out=new FileOutputStream(temp)){byte[] buffer=new byte[65536];int count;while((count=in.read(buffer))!=-1){checkInterrupted();bytes+=count;if(bytes>size)throw new Failure(0,"附件超过清单大小。");out.write(buffer,0,count);}out.getFD().sync();}
+            if(bytes!=size||!meta.getString("sha256").equals(InputFiles.sha256(temp)))throw new Failure(0,"附件下载校验失败，请重试。");if(!stillPaired(expected))throw new Failure(0,"配对状态已改变，请重新打开附件。");if(!temp.renameTo(target))throw new Failure(0,"无法保存附件。");return target;
+        }catch(Failure failure){throw failure;}catch(Exception ignored){throw new Failure(0,"附件下载中断，请检查网络或剩余空间后重试。");}finally{temp.delete();if(c!=null)c.disconnect();}
     }
 
     private static Reply request(String server, String token, String path, String method, JSONObject body) throws Exception {

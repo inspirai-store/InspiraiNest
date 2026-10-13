@@ -1,10 +1,11 @@
 import { hash, id, now, requireValue } from './common.mjs';
 import { workerAuthorized } from './device-metadata.mjs';
+import { documentExtensions, validDocument } from './input-attachments.mjs';
 
 export const MEDIA_LIMIT = 32 * 1024 * 1024;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const digest = /^[a-f0-9]{64}$/;
-export const mediaExtensions = { 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','audio/mp4':'m4a','audio/aac':'aac','audio/mpeg':'mp3','audio/wav':'wav','audio/x-wav':'wav','audio/webm':'webm','audio/ogg':'ogg','audio/flac':'flac' };
+export const mediaExtensions = { ...documentExtensions,'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','audio/mp4':'m4a','audio/aac':'aac','audio/mpeg':'mp3','audio/wav':'wav','audio/x-wav':'wav','audio/webm':'webm','audio/ogg':'ogg','audio/flac':'flac' };
 export const recordPresets = { summary:'整理摘要', extract:'转写 / 识字', actions:'提炼行动项', custom:'自定义' };
 const identify = value => { requireValue(typeof value === 'string' && uuid.test(value), 'Invalid record/request ID'); return value.toLowerCase(); };
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
@@ -33,6 +34,18 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     res.writeHead(200,{'Content-Type':media.mime,'Content-Length':bytes.length,'Content-Disposition':`inline; filename="${sha}.${mediaExtensions[media.mime]}"`,'X-Content-SHA256':sha}); res.end(bytes);
   }
   async function handle(req,res,route,device) {
+    const inputFile=route.match(/^\/api\/tasks\/([^/]+)\/input-files\/([a-f0-9]{64})$/);
+    if(inputFile&&req.method==='GET'){
+      let task;
+      if(device.role==='owner'){owner(device);task=await store.get('task',inputFile[1]);requireValue(task,'Task not found',404);}
+      else {requireValue(device.inputAttachmentProtocol===1,'Input attachment protocol required',403);task=await assigned(device,inputFile[1],req);requireValue(['assigned','running','uploading'].includes(task.state),'Task is no longer active',403);}
+      requireValue(task.inputAttachments?.some(file=>file.sha256===inputFile[2]),'Input file not assigned to this task',403);
+      const media=await store.get('record-media',inputFile[2]);requireValue(media,'Input file not found',404);
+      const bytes=await storage.get(media.key);await authenticate(req);
+      if(device.role!=='owner')requireValue(['assigned','running','uploading'].includes((await assigned(device,task.id,req)).state),'Task is no longer active',403);
+      requireValue(bytes.length===media.bytes&&hash(bytes)===media.id,'Input file checksum mismatch',500);
+      res.writeHead(200,{'Content-Type':media.mime,'Content-Length':bytes.length,'X-Content-SHA256':media.id});res.end(bytes);return true;
+    }
     const taskMedia = route.match(/^\/api\/tasks\/([^/]+)\/record-media\/([a-f0-9]{64})$/);
     if (taskMedia && req.method === 'GET') {
       const task = await assigned(device,taskMedia[1],req);
@@ -47,13 +60,17 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     const mediaRoute = route.match(/^\/api\/records\/media\/([a-f0-9]{64})$/);
     if (mediaRoute) {
       const sha = mediaRoute[1];
+      if (req.method === 'HEAD') {
+        const media = await store.get('record-media',sha); requireValue(media,'Media not found',404);
+        res.setHeader('Content-Length',media.bytes); res.setHeader('Content-Type',media.mime); res.setHeader('X-Content-SHA256',sha); res.end(); return true;
+      }
       if (req.method === 'GET') { await readMedia(req,res,sha); return true; }
       requireValue(req.method === 'PUT','Method not allowed',405);
       const mime = req.headers['content-type']?.split(';')[0]; requireValue(mediaExtensions[mime],'Unsupported media type',415);
       const chunks = []; let size = 0;
       for await (const chunk of req) { size += chunk.length; requireValue(size <= MEDIA_LIMIT,'Media exceeds 32 MiB',413); chunks.push(chunk); }
       const buffer = Buffer.concat(chunks); requireValue(size > 0 && hash(buffer) === sha,'Media checksum mismatch');
-      requireValue(validMedia(buffer,mime),'File does not match its media type',415);
+      requireValue(documentExtensions[mime]?await validDocument(buffer,mime):validMedia(buffer,mime),'File does not match its media type',415);
       const result = await serialized(`record-media:${sha}`,async () => {
         const old = await store.get('record-media',sha);
         if (old) { requireValue(old.mime === mime,'Media type mismatch',409); return old; }

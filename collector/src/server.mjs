@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { createRecords } from './records.mjs';
+import { resolveInputAttachments, inputReferences } from './input-attachments.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -277,7 +278,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     try { return JSON.parse(raw); } catch { fail('Invalid JSON'); }
   }
   async function publish(bundle, device, req, taskId) {
+    if (Object.hasOwn(bundle,'inputAttachments')) { const {inputAttachments,...archiveBundle} = bundle; bundle = archiveBundle; }
     const taskRecord = taskId ? await assigned(device, taskId, req) : null;
+    if (taskRecord?.inputAttachments?.length) bundle = { ...bundle, meta: { ...bundle.meta, inputAttachments: taskRecord.inputAttachments } };
     if (taskRecord?.tags?.length) bundle = { ...bundle, meta: { ...bundle.meta, tags: [...new Set([...(bundle.meta?.tags || []), ...taskRecord.tags])] } };
     validateArchive(bundle);
     requireReadableMetadata(bundle.meta);
@@ -293,7 +296,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     await storage.put(key, buffer);
     // A revoked worker or cancelled task cannot commit a result after an in-flight upload.
     await authenticate(req);
-    const record = { id: digest, entryId: bundle.meta.id, meta: bundle.meta, key, deviceId: device.id, createdAt: now(), omittedCount: bundle.omitted?.length || 0 };
+    const record = { id: digest, entryId: bundle.meta.id, meta: bundle.meta, key, deviceId: device.id, createdAt: now(), omittedCount: bundle.omitted?.length || 0, ...(taskRecord?.inputAttachments?.length ? { inputAttachments: taskRecord.inputAttachments } : {}) };
     const commit = async tx => {
       const liveDevice = await tx.getForUpdate('device', device.id);
       requireValue(liveDevice && !liveDevice.revokedAt && liveDevice.tokenHash === device.tokenHash, 'Device authorization required', 401);
@@ -669,21 +672,23 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
+        requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
         const agentRuntime = input.agentRuntime;
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
         const input = await body(req);
+        const inputAttachments = await resolveInputAttachments(store, input.attachments);
         const rawSubmission = Object.hasOwn(input, 'content');
-        if (rawSubmission) text(input.content, 'collection content', 10000);
-        const content = rawSubmission ? input.content : null;
-        const source = rawSubmission ? null : sourceURL(text(input.url, 'URL', 4000));
+        if (rawSubmission) requireValue(typeof input.content === 'string' && input.content.length <= 10000 && (input.content.trim().length > 0 || inputAttachments.length > 0), 'Invalid collection content');
+        const content = rawSubmission ? input.content : inputAttachments.length && !input.url ? '' : null;
+        const source = content !== null ? null : sourceURL(text(input.url, 'URL', 4000));
         const taskType = input.type ?? 'auto';
         requireValue(taskType === 'auto' || types.includes(taskType), 'Invalid task type');
         const autoArchive = input.autoArchive ?? true;
@@ -701,12 +706,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return await serialized(`submission:${submissionId}`, async () => {
           const existing = (await store.list('task')).find(t => t.submissionId === submissionId);
           if (existing) {
+            requireValue(JSON.stringify(inputReferences(existing.inputAttachments || [])) === JSON.stringify(inputReferences(inputAttachments)), 'Submission ID already used', 409);
             requireValue((existing.content ?? null) === content && existing.url === (source?.href || null) && existing.scenario === (input.scenario?.trim() || null) && existing.type === taskType && existing.preferredAgent === (input.agent || null) && (existing.autoArchive ?? true) === autoArchive && JSON.stringify(existing.tags || []) === JSON.stringify(tags) && (existing.preferredDeviceId || null) === preferredDeviceId, 'Submission ID already used', 409);
             return send(res, 200, existing);
           }
-          const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now() };
+          const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now(), ...(inputAttachments.length ? { inputAttachments } : {}) };
           task.requiredCapabilities = taskCapabilities(task);
-          return send(res, 201, await saveTask(task, 'queued', '等待可用电脑'));
+          return send(res, 201, await saveTask(task, 'queued', inputAttachments.length ? '等待支持附件协议的新版采集电脑，请将 Worker 更新至 0.1.29 或更高版本' : '等待可用电脑'));
         });
       }
       if (route === '/api/claim' && req.method === 'POST') {
@@ -718,7 +724,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await recoverUnavailableTasks();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -730,7 +736,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
               const selected = await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
@@ -742,6 +748,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('client-update')).some(o=>o.deviceId===device.id && updateBlocksTasks(o))) return null;
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
+                if (pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
                 return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });
@@ -762,8 +769,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await authenticate(req);
         requireValue((await store.get('task', task.id))?.state === 'awaiting_review', 'No pending review', 409);
         requireValue(hash(buffer) === draft.id, 'Draft checksum mismatch', 500);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        return res.end(buffer);
+        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [] });
       }
       const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign)$/);
       if (taskRoute && req.method === 'POST') {
@@ -827,7 +833,23 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await readable(archive);
         await authenticate(req);
         requireValue(hash(buffer) === archive.id, 'Stored archive checksum mismatch', 500);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: archive.inputAttachments || [] });
+      }
+      const originalRoute = route.match(/^\/api\/archives\/([a-f0-9]{64})\/input-files\/([a-f0-9]{64})$/);
+      if (originalRoute && req.method === 'GET') {
+        owner(device);
+        const archive = await store.get('archive', originalRoute[1]);
+        await readable(archive);
+        const file = archive.inputAttachments?.find(f => f.sha256 === originalRoute[2]);
+        requireValue(file, 'Input file not found', 404);
+        const media = await store.get('record-media', file.sha256);
+        requireValue(media, 'Input file not found', 404);
+        const buffer = await storage.get(media.key);
+        await authenticate(req);
+        await readable(await store.get('archive', archive.id));
+        requireValue(buffer.length === file.bytes && hash(buffer) === file.sha256, 'Input file checksum mismatch', 500);
+        res.setHeader('Content-Type', file.mime); res.setHeader('Content-Length', buffer.length);
+        res.setHeader('X-Content-SHA256', file.sha256);
         return res.end(buffer);
       }
       fail('Not found', 404);

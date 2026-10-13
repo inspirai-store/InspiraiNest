@@ -75,7 +75,7 @@ public final class Outbox {
             try (Database helper = new Database(context);
                  Cursor cursor = helper.getReadableDatabase().query("outbox", null, null, null, null, null, "seq ASC")) {
                 JSONArray result = new JSONArray();
-                while (cursor.moveToNext()) result.put(record(cursor));
+                while (cursor.moveToNext()) {JSONObject row=record(cursor);if(row.getJSONObject("payload").optJSONArray("attachments")!=null)row.put("progress",new InputFiles(context).progress(row.getString("id")));result.put(row);}
                 return result;
             } catch (Exception ignored) {
                 throw new IllegalStateException("无法读取待提交列表，已保留原始数据。");
@@ -100,6 +100,7 @@ public final class Outbox {
         synchronized (DB_LOCK) {
             try (Database helper = new Database(context)) {
                 helper.getWritableDatabase().delete("outbox", "id=?", new String[]{id});
+                new InputFiles(context).discard(id);
             }
         }
     }
@@ -137,6 +138,23 @@ public final class Outbox {
                 }
                 if (Thread.currentThread().isInterrupted()) return queue.hasPending();
                 try {
+                    JSONArray files=row.getJSONObject("payload").optJSONArray("attachments");
+                    if(files!=null&&files.length()>0){
+                        InputFiles inputs=new InputFiles(context);JSONObject saved=inputs.progress(row.getString("id"));
+                        JSONObject done=pairing.server.equals(saved.optString("server"))?saved.optJSONObject("uploaded"):null;if(done==null)done=new JSONObject();
+                        JSONObject progress=new JSONObject().put("server",pairing.server).put("uploaded",done);long completed=0,total=0;
+                        for(int n=0;n<files.length();n++)total+=inputs.read(row.getString("id"),files.getJSONObject(n).getString("id")).getLong("bytes");
+                        for(int n=0;n<files.length();n++){
+                            JSONObject ref=files.getJSONObject(n),meta=inputs.read(row.getString("id"),ref.getString("id"));String sha=ref.getString("sha256");
+                            if(!sha.equals(meta.optString("sha256")))throw new Exception("附件清单已改变");
+                            long before=completed,all=total;progress.put("name",ref.getString("name")).put("total",all).put("index",n+1).put("count",files.length());
+                            if(!done.optBoolean(sha)){
+                                api.uploadInput(pairing,inputs.file(row.getString("id"),ref.getString("id")),meta,bytes->{progress.put("bytes",before+bytes);inputs.progress(row.getString("id"),progress);});
+                                done.put(sha,true);
+                            }
+                            completed+=meta.getLong("bytes");progress.put("bytes",completed);inputs.progress(row.getString("id"),progress);
+                        }
+                    }
                     JSONObject response = api.callBound(row.getString("server"), "/api/tasks", "POST",
                             row.getJSONObject("payload"));
                     Object task = response.opt("id");

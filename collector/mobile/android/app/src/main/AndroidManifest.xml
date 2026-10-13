@@ -10,13 +10,15 @@
         <activity android:name=".CaptureActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.capture" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/capture_paths" /></provider>
         <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|uiMode" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".ShareActivity" android:exported="true" android:label="保存到灵藏" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.SEND" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /></intent-filter></activity>
+        <activity android:name=".ShareActivity" android:exported="true" android:label="保存到灵藏" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.SEND" /><action android:name="android.intent.action.SEND_MULTIPLE" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="*/*" /></intent-filter></activity>
         <activity android:name=".ReaderActivity" android:exported="false" android:configChanges="orientation|screenSize|uiMode" />
         <activity android:name=".PendingActivity" android:exported="false" />
         <activity android:name=".TaskActivity" android:exported="false" />
         <activity android:name=".DevicesActivity" android:exported="false" />
         <activity android:name=".AgentsActivity" android:exported="false" />
         <activity android:name=".AttachmentActivity" android:exported="false" />
+        <activity android:name=".InputAttachmentActivity" android:exported="false" />
+        <provider android:name=".InputFileProvider" android:authorities="${applicationId}.inputs" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/input_paths" /></provider>
         <activity android:name=".ScanPairingActivity" android:exported="false" />
         <activity android:name=".UpdateActivity" android:exported="false" android:configChanges="orientation|screenSize" />
         <provider android:name=".UpdateFileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">
