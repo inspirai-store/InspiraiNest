@@ -13,11 +13,63 @@ on:
         description: Build Android using the existing release signing identity
         type: boolean
         default: false
+      include_windows_ci:
+        description: Relay a verified Windows CI artifact to private OSS
+        type: boolean
+        default: false
+      windows_ci_run:
+        description: Successful main-branch Collector builds run ID
+        type: string
+        default: ''
+      windows_source_commit:
+        description: Exact Windows CI source commit
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  windows-ci-oss:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_windows_ci
+    environment: signed-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate the trusted CI source before downloading or exposing OSS credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_CI_RUN: ${{ inputs.windows_ci_run }}
+          WINDOWS_SOURCE_COMMIT: ${{ inputs.windows_source_commit }}
+        run: node collector/scripts/upload-windows-ci-oss.mjs validate
+      - uses: actions/download-artifact@v4
+        with:
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.windows_ci_run }}
+          name: InspiraiNest-Windows-x64
+          path: collector/desktop/dist
+      - run: npm ci --ignore-scripts
+        working-directory: collector
+      - name: Verify and relay the unchanged Windows CI files
+        working-directory: collector
+        env:
+          OSS_RELEASE_REGION: ${{ secrets.OSS_RELEASE_REGION }}
+          OSS_RELEASE_BUCKET: ${{ secrets.OSS_RELEASE_BUCKET }}
+          OSS_RELEASE_ACCESS_KEY_ID: ${{ secrets.OSS_RELEASE_ACCESS_KEY_ID }}
+          OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
+          OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/upload-windows-ci-oss.mjs upload
   signed-macos:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_macos
     environment: signed-release
