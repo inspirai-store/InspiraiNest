@@ -9,7 +9,7 @@ test('任务入口只计当前会话远端任务，保留另一账号本机记�
  const service=new RecordsService(store,transport);
  await service.refresh();assert.equal((await service.load()).taskCount,1);
  service.invalidateSession();assert.equal((await service.load()).taskCount,0);
- account='B';await service.refresh();assert.equal((await service.load()).taskCount,1);assert.equal((await service.load()).records.length,2);
+ account='B';await service.refresh();assert.equal((await service.load()).taskCount,1);assert.equal((await service.load()).records.length,1);assert.equal((await service.load()).records[0].text,'B');
  service.invalidateSession();account='C';await service.refresh();assert.equal((await service.load()).taskCount,0);
 });
 test('迟到的上一会话任务不能更新任务入口',async()=>{

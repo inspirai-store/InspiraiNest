@@ -5,11 +5,11 @@ export type Attachment = { id: string; name: string; mime: string; sha256: strin
 export type ProcessRequest = { requestId: string; baseVersion: number; preset: string; instructions: string; deviceId: string | null; agent: string | null };
 export type RecordTask = { id: string; state: string; recordVersion?: number; events?: { message: string }[] };
 export type RecordPayload = { requestId: string; baseVersion: number; text: string; document?: RichDocument; createdAt: string; attachments: { id: string; name: string; sha256: string; thumbnailSha256?: string }[] };
-export type LocalRecord = { id: string; text: string; document?: RichDocument; attachments: Attachment[]; createdAt: string; version: number; remoteVersion: number; server: string | null; sync: 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict'; error: string; payload?: RecordPayload | null; pendingProcess?: ProcessRequest; tasks?: RecordTask[]; [key: string]: unknown };
-export type LocalDraft = { id: 'draft'; recordId: string; editingId?: string; baseVersion?: number; text: string; document?: RichDocument; attachments: Attachment[]; [key: string]: unknown };
+export type LocalRecord = { accountScope?: string; id: string; text: string; document?: RichDocument; attachments: Attachment[]; createdAt: string; version: number; remoteVersion: number; server: string | null; sync: 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict'; error: string; payload?: RecordPayload | null; pendingProcess?: ProcessRequest; tasks?: RecordTask[]; [key: string]: unknown };
+export type LocalDraft = { accountScope?: string; id: 'draft'; recordId: string; editingId?: string; baseVersion?: number; text: string; document?: RichDocument; attachments: Attachment[]; [key: string]: unknown };
 export type StoredItem = LocalRecord | LocalDraft;
 export type Connection = { paired: boolean; server: string; deviceId?: string | null };
-export type CaptureInput = { route: string; method?: 'GET' | 'PUT' | 'POST'; server?: string; json?: unknown; bytes?: string; mime?: string };
+export type CaptureInput = { route: string; method?: 'GET' | 'PUT' | 'POST'; server?: string; deviceId?: string | null; json?: unknown; bytes?: string; mime?: string };
 export type CaptureReply = { status: number; json?: unknown; bytes?: string; mime?: string };
-export interface RecordStore { all(): Promise<StoredItem[]>; get(id: string): Promise<StoredItem | undefined>; put(item: StoredItem): Promise<void>; commit(item: LocalRecord, draft: LocalDraft): Promise<void>; }
+export interface RecordStore { all(): Promise<StoredItem[]>; putMany?(items: StoredItem[]): Promise<void>; get(id: string): Promise<StoredItem | undefined>; put(item: StoredItem): Promise<void>; commit(item: LocalRecord, draft: LocalDraft): Promise<void>; }
 export interface RecordTransport { status(): Promise<Connection>; request(input: CaptureInput): Promise<CaptureReply>; }

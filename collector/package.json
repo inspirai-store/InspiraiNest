@@ -1,6 +1,6 @@
 {
   "name": "inspirainest-collector",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
@@ -20,8 +20,8 @@
     "doctor": "node src/worker.mjs doctor",
     "build:worker-template": "node scripts/stage-worker-template.mjs",
     "build:worker:win": "npm run build:desktop-ui && npm run build:brand-icons && npm run build:worker-template && electron-builder --win nsis --x64 --publish never",
-    "build:worker:mac": "npm run build:desktop-ui && npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=灵藏 --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
-    "build:worker:mac:release": "npm run build:desktop-ui && npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=灵藏 --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never",
+    "build:worker:mac": "npm run build:desktop-ui && npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=\u7075\u85cf --mac zip dmg --x64 --arm64 -c.mac.identity=- --publish never",
+    "build:worker:mac:release": "npm run build:desktop-ui && npm run build:brand-icons && npm run build:macos-tray-icon && npm run build:worker-template && electron-builder -c.productName=\u7075\u85cf --mac zip dmg --x64 --arm64 -c.mac.forceCodeSigning=true --publish never",
     "build:desktop-ui": "npm --prefix desktop/frontend run build"
   },
   "dependencies": {

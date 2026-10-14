@@ -66,7 +66,7 @@ function Workbench({ area, view }: { area: 'records' | 'library'; view: 'list' |
   useLayoutEffect(() => { restorePage(root.current, view === 'list' ? pages.get(area + ':last') ?? pages.get(pageKey) : pages.get(pageKey) ?? pages.get(area + ':last')); }, [pageKey, location.key, pages, area, view]);
   useEffect(() => {
     const requestedModal=new URLSearchParams(location.search).get('modal');
-    if (requestedModal === 'process' || requestedModal === 'conflict' || requestedModal === 'camera') {const button=Array.from(root.current?.querySelectorAll<HTMLButtonElement>('button')??[]).find(el=>el.textContent===(requestedModal==='camera'?'拍照':'交给 Agent 加工'));if(button)setModal({kind:requestedModal,invoker:button});}
+    if (requestedModal === 'process' || requestedModal === 'conflict' || requestedModal === 'camera') {const button=Array.from(root.current?.querySelectorAll<HTMLButtonElement>('button')??[]).find(el=>el.textContent===(requestedModal==='camera'?'拍照':'加工'));if(button)setModal({kind:requestedModal,invoker:button});}
     if (requestedModal === 'tags') {
       const button = Array.from(root.current?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(el => el.textContent === '标签');
       if (button) setModal({kind:'tags',invoker:button});

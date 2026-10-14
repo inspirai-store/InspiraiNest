@@ -36,7 +36,7 @@ export function ComponentsShowcase() {
             </ListPane>
             <ContentPane label="记录内容" backLabel="记录列表" onBack={() => navigate('/records' + location.search)}>
               <ContentHeader title={entry.title} actions={<Badge>{entry.state}</Badge>} />
-              <SourceActions source={entry.date}><IconAction icon={Bookmark} label="收藏资料" aria-pressed={bookmarked} onClick={() => setBookmarked(value => !value)} /><Action icon={ExternalLink} compact kind="ghost">打开来源</Action><MoreMenu icon={Ellipsis} compact onAction={(kind, invoker) => { if (kind !== 'copy') setModal({kind, invoker}); }} /></SourceActions>
+              <SourceActions source={entry.date}><IconAction icon={Bookmark} label="收藏资料" aria-pressed={bookmarked} onClick={() => setBookmarked(value => !value)} /><Action icon={ExternalLink} compact kind="ghost">来源</Action><MoreMenu icon={Ellipsis} compact onAction={(kind, invoker) => { if (kind !== 'copy') setModal({kind, invoker}); }} /></SourceActions>
               <p>{entry.excerpt}</p><AttachmentCard name="阅读想法.m4a" duration="02:18" />
             </ContentPane>
           </SplitPane>

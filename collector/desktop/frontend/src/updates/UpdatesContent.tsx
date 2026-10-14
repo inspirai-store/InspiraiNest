@@ -1,3 +1,4 @@
+import {errorMessage} from '../shared/errors.ts';
 import {RemoteUpdatesContent} from './RemoteUpdatesContent';
 import {ModuleContent,ModuleHeader} from '../components/ModuleLayout';
 import {useLocation,useParams} from 'react-router-dom';
@@ -12,9 +13,9 @@ export function UpdatesContent(){const {updateNodeId}=useParams();return updateN
 function LocalUpdatesContent(){
  const location=useLocation(),handledCheck=useRef<unknown>(null),actionPending=useRef(false);
  const [state,setState]=useState<UpdateSnapshot|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);const live=useRef(0),revision=useRef(0);
- const load=async()=>{const bridge=updateBridge();if(!bridge){setError('更新接口不可用');return;}const generation=live.current,started=revision.current;try{const value=updateSnapshot(await bridge.status());if(live.current===generation&&revision.current===started){setState(value);setError('');}}catch(e){if(live.current===generation&&revision.current===started)setError(e instanceof Error?e.message:String(e));}};
- useEffect(()=>{const generation=++live.current;const off=updateBridge()?.onChanged(value=>{if(live.current!==generation)return;revision.current++;try{setState(updateSnapshot(value));setError('');}catch(e){setError(e instanceof Error?e.message:String(e));}});void load();return()=>{live.current++;off?.();};},[]);
- const act=async(action:'check'|'download'|'install')=>{if(actionPending.current)return;const bridge=updateBridge();if(!bridge)return;const generation=live.current,started=revision.current;actionPending.current=true;setBusy(true);setError('');try{const value=updateSnapshot(await bridge[action]());if(generation===live.current&&started===revision.current)setState(value);}catch(e){if(generation===live.current)setError(e instanceof Error?e.message:String(e));}finally{actionPending.current=false;if(generation===live.current)setBusy(false);}};
+ const load=async()=>{const bridge=updateBridge();if(!bridge){setError('更新接口不可用');return;}const generation=live.current,started=revision.current;try{const value=updateSnapshot(await bridge.status());if(live.current===generation&&revision.current===started){setState(value);setError('');}}catch(e){if(live.current===generation&&revision.current===started)setError(errorMessage(e));}};
+ useEffect(()=>{const generation=++live.current;const off=updateBridge()?.onChanged(value=>{if(live.current!==generation)return;revision.current++;try{setState(updateSnapshot(value));setError('');}catch(e){setError(errorMessage(e));}});void load();return()=>{live.current++;off?.();};},[]);
+ const act=async(action:'check'|'download'|'install')=>{if(actionPending.current)return;const bridge=updateBridge();if(!bridge)return;const generation=live.current,started=revision.current;actionPending.current=true;setBusy(true);setError('');try{const value=updateSnapshot(await bridge[action]());if(generation===live.current&&started===revision.current)setState(value);}catch(e){if(generation===live.current)setError(errorMessage(e));}finally{actionPending.current=false;if(generation===live.current)setBusy(false);}};
  const checkRequest=location.state?.updateCheckRequest;
  useEffect(()=>{if(!checkRequest||!state||handledCheck.current===checkRequest)return;handledCheck.current=checkRequest;if(state.supported)void act('check');},[checkRequest,state]);
  const phase=state?.phase,waiting=phase==='checking'||phase==='downloading'||phase==='waiting_worker'||phase==='installing',action=phase==='available'?'download':phase==='downloaded'?'install':'check';

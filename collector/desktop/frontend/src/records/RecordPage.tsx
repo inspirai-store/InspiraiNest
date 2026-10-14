@@ -49,7 +49,7 @@ export function RecordDetail({ go, selectedIndex, onAction }: { onAction: (actio
   return <>
     <ContentHeader title={entry.title} actions={<Badge>{entry.state}</Badge>} />
     <div className={styles.recordInfo} data-region="记录信息"><span>{entry.date}</span><span className={styles.accentText}>已同步</span></div>
-    <div className={styles.recordActions} data-region="记录操作"><Action icon={Sparkles} kind="primary">交给 Agent 加工</Action><Action icon={Pencil} onClick={() => go('/records/new')}>继续补充</Action><MoreMenu icon={Ellipsis} onAction={onAction} /></div>
+    <div className={styles.recordActions} data-region="记录操作"><Action icon={Sparkles} kind="primary">加工</Action><Action icon={Pencil} onClick={() => go('/records/new')}>编辑</Action><MoreMenu icon={Ellipsis} onAction={onAction} /></div>
     <div className={styles.divider} data-region="内容分隔线" />
     <div className={styles.original} data-region="原始内容"><p><span>{selectedIndex === 0 ? recordBody : entry.excerpt}</span></p></div>
     <h3 className={styles.attachmentTitle}>附件</h3>

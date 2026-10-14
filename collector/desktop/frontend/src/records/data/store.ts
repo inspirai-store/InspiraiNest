@@ -20,6 +20,7 @@ export class IndexedRecordStore implements RecordStore {
   }
   all() { return this.transaction<StoredItem[]>('readonly', s => s.getAll()); }
   get(id: string) { return this.transaction<StoredItem | undefined>('readonly', s => s.get(id)); }
+  async putMany(items: StoredItem[]) { if (!items.length) return; await this.transaction('readwrite', s => { for (const item of items.slice(0,-1)) s.put(item); return s.put(items.at(-1)!); }); }
   async put(item: StoredItem) { await this.transaction('readwrite', s => s.put(item)); }
   async commit(item: LocalRecord, draft: LocalDraft) { await this.transaction('readwrite', s => { s.put(item); return s.put(draft); }); }
 }

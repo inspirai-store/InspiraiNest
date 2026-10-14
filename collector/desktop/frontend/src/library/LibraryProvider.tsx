@@ -1,3 +1,4 @@
+import {errorMessage} from '../shared/errors.ts';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,14 +29,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       const scope = bookmarkScope(connection);
       if (scope) { setBookmarks(bookmarkStore.read(scope)); setScope(scope); }
-    }).catch(error => { if(active) setBookmarkError(String(error)); });
+    }).catch(error => { if(active) setBookmarkError(errorMessage(error)); });
     return () => { active = false; };
   }, [bridge, session, bookmarkStore]);
   const toggleBookmark = (id:string) => {
     if (!scope) return;
     const next = bookmarks.includes(id) ? bookmarks.filter(value => value !== id) : [...bookmarks, id];
     try { bookmarkStore.write(scope, next); setBookmarks(next); setBookmarkError(''); }
-    catch (error) { setBookmarkError(String(error)); }
+    catch (error) { setBookmarkError(errorMessage(error)); }
   };
   useEffect(() => {
     const changed = () => {
@@ -56,3 +57,5 @@ export function useLibrarySession() {
   if (!context) throw new Error('LibraryProvider required');
   return context;
 }
+
+export function useOptionalLibrarySession(){return useContext(Context);}

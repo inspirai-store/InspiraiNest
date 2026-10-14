@@ -4,6 +4,7 @@ export async function captureRequest(owner,input) {
   const identity = owner.identity;
   if (!identity) throw new Error('请先登录资料空间；记录已保存在本机');
   if (input.server && input.server !== identity.server) throw new Error('此记录属于另一资料空间，请恢复原连接后重试');
+  if(input.deviceId && input.deviceId!==identity.deviceId)throw new Error('资料空间已切换，记录仍保存在本机');
   const binary = input.bytes !== undefined;
   const body = binary ? Buffer.from(input.bytes,'base64') : input.json === undefined ? undefined : JSON.stringify(input.json);
   const response = await owner.fetcher(identity.server+input.route,{method:input.method || 'GET',headers:{Authorization:`Bearer ${identity.token}`,...(body === undefined ? {} : {'Content-Type':binary ? input.mime : 'application/json'})},body,redirect:'error',signal:AbortSignal.timeout(120000)});

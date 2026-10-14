@@ -27,10 +27,10 @@ export function LibraryReader({ selectedIndex, onAction, failed = false, retry }
   const entry = library[selectedIndex] ?? library[0];
   return <>
     <ContentHeader title={entry.title} reader actions={<IconAction icon={Bookmark} label="收藏资料" aria-pressed={bookmarked} onClick={toggleBookmark} />} />
-    <SourceActions source="文章 · 10 月 12 日"><Action icon={ExternalLink} kind="ghost" compact>打开来源</Action><MoreMenu icon={Ellipsis} compact onAction={onAction} /></SourceActions>
+    <SourceActions source="文章 · 10 月 12 日"><Action icon={ExternalLink} kind="ghost" compact>来源</Action><MoreMenu icon={Ellipsis} compact onAction={onAction} /></SourceActions>
     <ChoiceBar label="资料阅读内容" options={['摘要', '分析', '原文', '附件']} value={tab} onChange={setTab} tabs idPrefix={tabId} />
     <div className={styles.readerViewport} data-region="阅读滚动区" role="tabpanel" id="reader-panel" aria-labelledby={tabId + '-' + tab} tabIndex={0} onKeyDown={event => scrollReader(event, scrollRef.current)}>
-      {failed ? <StatePanel kind="error" title="内容加载失败" action="重新加载" onAction={retry} region="阅读状态" /> : <><div className={styles.readerScroll} ref={scrollRef} onScroll={event => { const el = event.currentTarget; setScrollFraction(el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)); setState(current => ({...current,readers:{...current.readers,[selectedIndex]:{...reader,scroll:el.scrollTop}}})); }}>
+      {failed ? <StatePanel kind="error" title="内容加载失败" action="重试" onAction={retry} region="阅读状态" /> : <><div className={styles.readerScroll} ref={scrollRef} onScroll={event => { const el = event.currentTarget; setScrollFraction(el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)); setState(current => ({...current,readers:{...current.readers,[selectedIndex]:{...reader,scroll:el.scrollTop}}})); }}>
       {markdownFixture ? <LibraryMarkdown content={libraryBody} /> : <article className={styles.reader} data-region="阅读正文">
         <p><span>有效的阅读不止于收藏。用自己的语言留下要点，把新内容与已有笔记联系起来，并定期回顾，让资料成为可用的知识。</span></p>
         <h3>核心要点</h3>
