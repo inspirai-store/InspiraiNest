@@ -1,6 +1,10 @@
 node_modules/
 .runtime/
 data/
+!/desktop/frontend/src/records/data/
+!/desktop/frontend/src/records/data/**
+!/desktop/frontend/src/library/data/
+!/desktop/frontend/src/library/data/**
 worker-data/
 worker.local.json
 .env
