@@ -1,0 +1,16 @@
+.actions > div {height:36px;}
+.timeline {display:flex;flex-direction:column;gap:16px;padding:4px 0;}
+.timeline section {display:flex;flex-direction:column;gap:8px;}
+.timeline time {font-size:12px;line-height:17px;color:var(--muted);}
+.timeline p {font-family:"PingFang SC","Segoe UI",sans-serif;font-size:14px;line-height:23px;}
+
+.confirmPrimary {width:90px;}
+.actionFailed {height:220px;}
+.error {color:var(--danger);}
+.failedRow > span:last-child > span:last-child {color:var(--danger);}
+
+.timeline time {font-family:"PingFang SC","Segoe UI",sans-serif;}
+
+.confirmation p {font-family:"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;}
+
+.questionMark {position:relative;left:4px;}

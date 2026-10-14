@@ -1,0 +1,36 @@
+.rows { padding:4px 0; display:flex; flex-direction:column; gap:12px; }
+.row { height:88px; flex-shrink:0; display:flex; align-items:center; gap:12px; padding:16px; border:0; box-shadow:inset 0 0 0 1px var(--line); background:var(--raised); border-radius:8px; }
+.row > svg { flex-shrink:0; color:var(--muted); }
+.info { font-family:'PingFang SC','Segoe UI','Microsoft YaHei UI',sans-serif; flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.info strong { font-size:14px; line-height:20px; font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.info span { font-size:12px; line-height:18px; color:var(--muted); }
+.trash { width:640px; height:480px; border-radius:12px; }
+.trash > footer { display:none; }
+.trashBody { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:12px; }
+.restore { width:80px; height:36px; padding:0; }
+.preview { width:64px; height:36px; padding:0; }
+.filePreview { width:880px; height:640px; }
+.filePreview > footer { display:none; }
+.image { min-height:0; flex:1; width:100%; object-fit:contain; }
+.text { min-height:0; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:14px/24px system-ui; }
+
+.trash .info { gap:4px; }
+.trash .info span { line-height:17px; }
+.trash .info strong { font-weight:600; }
+
+.attachments { min-height:100%; display:flex; flex-direction:column; }
+.attachments > [data-state] > p, .trashBody > [data-state] > p { font-weight:400; }
+.attachments > [data-state] > button, .trashBody > [data-state] > button { width:96px; height:36px; padding:0; }
+
+/* Match Pencil text ink while preserving the approved 41px information box. */
+.trash .info strong { position:relative; top:0.5px; }
+.trash .info span { position:relative; top:1px; }
+
+.attachments .info strong { position:relative; top:1px; }
+.attachments .info span { font-family:Arial,'PingFang SC','Segoe UI','Microsoft YaHei UI',sans-serif; }
+
+.attachments .info span { word-spacing:-0.5px; }
+
+.restore { font-family:'PingFang SC','Segoe UI','Microsoft YaHei UI',sans-serif; }
+
+.restore > span { width:27px; letter-spacing:-1px; text-align:left; }

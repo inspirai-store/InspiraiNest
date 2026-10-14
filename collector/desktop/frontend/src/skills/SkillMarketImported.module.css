@@ -1,0 +1,2 @@
+.markdown{height:160px;min-height:160px;overflow:auto;flex-shrink:0;padding:12px;border-radius:6px;background:var(--soft);color:var(--fg);font:14px/1.6 'PingFang SC',system-ui,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;}
+.markdown:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}

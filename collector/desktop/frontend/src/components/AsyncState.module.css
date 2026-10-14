@@ -1,0 +1,14 @@
+.state { flex: 1; min-height: 0; padding: 24px; gap: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--panel); }
+.state > p { font-size: 16px; font-weight: 500; line-height: 23px; position: relative; top: 1px; }
+.icon { color: var(--muted); }
+.error { color: var(--danger); }
+.listSkeleton { flex: 1; min-height: 0; padding: 0 12px; display: flex; flex-direction: column; gap: 4px; }
+.skeletonRow { flex-shrink: 0; height: 100px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.bone { flex-shrink: 0; display: block; width: 100%; max-width: 100%; background: var(--raised); border-radius: 4px; }
+.contentSkeleton { display: flex; flex-direction: column; gap: 20px; flex: 1; min-height: 0; }
+.skeletonTitle { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+.skeletonMeta { flex-shrink: 0; display: flex; align-items: center; }
+.skeletonActions { flex-shrink: 0; display: flex; gap: 8px; }
+.skeletonBody { flex-shrink: 0; height: 232px; padding: 8px 0; display: flex; flex-direction: column; gap: 16px; }
+.readerBody { flex: 1; min-height: 0; height: auto; padding: 4px 0; }
+@media (prefers-reduced-motion: no-preference) { .listSkeleton, .contentSkeleton { animation: none; } }

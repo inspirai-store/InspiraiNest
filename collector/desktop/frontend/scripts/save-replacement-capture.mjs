@@ -1,0 +1,5 @@
+import fs from 'node:fs';import path from 'node:path';
+const name=process.argv[2],version=process.argv[3]??'2';if(!['2','3'].includes(version))throw Error('Review version invalid');const root=path.resolve('../../../design-review/desktop-refactor/ui-replacement-v'+version+'/evidence');if(!/^[a-z0-9-]+$/.test(name??''))throw Error('Capture name required');
+let {prefix}=JSON.parse(fs.readFileSync(path.join(root,'latest-client-capture.json')));if(process.argv[4]){const candidates=fs.readdirSync(root).filter(f=>/^client-\d+\.json$/.test(f)).sort().reverse();const found=candidates.find(f=>JSON.parse(fs.readFileSync(path.join(root,f))).route.startsWith(process.argv[4]));if(!found)throw Error('Requested capture route missing');prefix=found.slice(0,-5);}const audit=JSON.parse(fs.readFileSync(path.join(root,prefix+'.json')));
+if(!name.endsWith(`-${audit.viewport.width}-${audit.theme}`))throw Error('Capture viewport/theme does not match filename');
+for(const ext of ['png','json'])fs.copyFileSync(path.join(root,prefix+'.'+ext),path.join(root,name+'.'+ext));console.log(name,audit.build);

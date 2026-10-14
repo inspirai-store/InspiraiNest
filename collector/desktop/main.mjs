@@ -1,11 +1,15 @@
+import {desktopFrontend,documentURL,desktopPermission} from './frontend-entry.mjs';
+import {appVersion} from '../src/device-identity.mjs';
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { createWorkerStatePublisher } from './runtime-events.mjs';
 import { WorkerManager } from './manager.mjs';
 import { OwnerClient } from './owner-client.mjs';
+import { logoutOwnerSession, pairOwnerSession } from './account-session.mjs';
 import { captureRequest } from './capture-client.mjs';
 import electronUpdater from 'electron-updater';
 import { DesktopUpdater } from './updater.mjs';
@@ -71,7 +75,8 @@ const macQuit = isMac ? createDrainQuitController({ snapshot: () => manager.snap
   // prevented quit finish before starting the real quit, avoiding reentrancy.
   setImmediate(() => app.quit());
 } }) : null;
-const pageURL = pathToFileURL(path.join(here, 'index.html')).href;
+const frontend=desktopFrontend({directory:here,test:process.env.COLLECTOR_DESKTOP_TEST==='1',qaFile:process.env.COLLECTOR_DESKTOP_FRONTEND_QA_FILE,qaRoute:process.env.COLLECTOR_DESKTOP_FRONTEND_QA_ROUTE});
+const managerPageFile=frontend.file,pageURL=frontend.url,compactPageURL=frontend.url;
 const liveWindow = window => Boolean(window && !window.isDestroyed());
 const exiting = () => quitting || endingSession || updates?.snapshot().phase === 'installing';
 function makeWindow(compact = false) {
@@ -87,17 +92,13 @@ function makeWindow(compact = false) {
   window.webContents.on('will-navigate', event => event.preventDefault());
   // Clipboard writes support explicit copy buttons in the trusted local UI.
   // Clipboard reads and requests from embedded or external pages remain denied.
-  const canWriteClipboard = (contents, permission, details) => permission === 'clipboard-sanitized-write'
-    && contents === main?.webContents && details.isMainFrame === true
-    && details.requestingUrl?.split('?')[0] === pageURL;
-  const canCapture = (contents, permission, details) => permission === 'media' && contents === main?.webContents
-    && details.requestingUrl?.split('?')[0] === pathToFileURL(path.join(here,'../public/capture/index.html')).href;
-  window.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => canWriteClipboard(contents, permission, details) || canCapture(contents,permission,details));
-  window.webContents.session.setPermissionRequestHandler(async (contents, permission, callback, details) => {
-    if (!canCapture(contents,permission,details)) { callback(canWriteClipboard(contents,permission,details)); return; }
-    try { if (isMac) for (const type of details.mediaTypes || []) if (['audio','video'].includes(type) && !await systemPreferences.askForMediaAccess(type==='audio'?'microphone':'camera')) { callback(false); return; } callback(true); } catch { callback(false); }
+  const permissionAllowed=(contents,permission,details)=>desktopPermission({permission,url:details.requestingUrl,isMainFrame:details.isMainFrame,main:contents===main?.webContents,urlAllowed:pageURL});
+  window.webContents.session.setPermissionCheckHandler((contents,permission,_origin,details)=>permissionAllowed(contents,permission,details));
+  window.webContents.session.setPermissionRequestHandler(async(contents,permission,callback,details)=>{
+    if(!permissionAllowed(contents,permission,details)){callback(false);return;}
+    try{if(permission==='media'&&isMac)for(const type of details.mediaTypes||[])if(['audio','video'].includes(type)&&!await systemPreferences.askForMediaAccess(type==='audio'?'microphone':'camera')){callback(false);return;}callback(true);}catch{callback(false);}
   });
-  window.loadFile(path.join(here, 'index.html'), { query: { ...(compact ? { compact: '1' } : {}), ...(isMac ? { platform: 'darwin' } : {}) } });
+  void window.loadFile(managerPageFile,{query:{...(compact?{compact:'1'}:{}),...(isMac?{platform:'darwin'}:{})},hash:compact?frontend.compactRoute:frontend.route});
   return window;
 }
 function hideStatus() { if (panelController) panelController.hide(); else if (!exiting() && liveWindow(popover)) popover.hide(); }
@@ -159,6 +160,7 @@ async function perform(action) {
   if (['pause', 'resume'].includes(action)) return workerSession.control(action);
   if (action === 'drain') return workerSession.stop();
   if (action === 'show') { await openManager(); return; }
+  if (action === 'hide-status') { hideStatus(); return; }
   if (action === 'hide') { hideManager(); return; }
   if (action === 'remote') { const url = manager.snapshot().server; if (url) await shell.openExternal(url); return; }
   if (action === 'data') { fs.mkdirSync(manager.dataDir, { recursive: true }); const error = await shell.openPath(manager.dataDir); if (error) throw new Error(error); return; }
@@ -172,7 +174,8 @@ async function perform(action) {
 }
 function trusted(event) {
   const sender = event.senderFrame?.url;
-  if (![main?.webContents, popover?.webContents].includes(event.sender) || !sender || sender.split('?')[0] !== pageURL) throw new Error('不允许的页面');
+  const expected = event.sender === popover?.webContents ? compactPageURL : pageURL;
+  if (![main?.webContents, popover?.webContents].includes(event.sender) || !sender || documentURL(sender) !== expected || event.senderFrame !== event.sender.mainFrame) throw new Error('不允许的页面');
 }
 function trustedMain(event) {
   trusted(event);
@@ -184,11 +187,9 @@ async function pairDesktop(input) {
   if (!owner.encryption.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法保存设备授权');
   const controller = new AbortController(); loginController = controller;
   try {
-    const result = await manager.pair(input, { clientType: 'desktop', signal: controller.signal,
+    return await pairOwnerSession({ input, owner, manager, controller,
       current: () => loginController === controller && !controller.signal.aborted,
-      onPaired: ({ server, installationId, result }) => owner.saveCredential({ server, installationId, deviceId: result.device.id, token: result.ownerToken }, { allowServerChange: true }) });
-    main.webContents.send('library:changed', owner.status());
-    return result;
+      publish: state => main.webContents.send('library:changed', state) });
   } catch (error) {
     return { loginError: { code: error.code || '', status: error.status || 0,
       message: controller.signal.aborted ? '登录已取消' : error.message } };
@@ -212,7 +213,7 @@ function registerIPC() {
     capture: input => captureRequest(owner,input),
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
     'cancel-login': () => { loginController?.abort(); return true; },
-    logout: () => { loginController?.abort(); return owner.logout(); },
+    logout: () => logoutOwnerSession({ owner, cancelLogin: () => loginController?.abort(), publish: state => main.webContents.send('library:changed', state) }),
     state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
     clientUpdates: input => owner.clientUpdates(input),
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
@@ -226,6 +227,11 @@ function registerIPC() {
       if (saved.canceled || !saved.filePath) return { saved: false };
       fs.writeFileSync(saved.filePath, file.bytes);
       return { saved: true, path: saved.filePath };
+    },
+    openUrl: async raw => {
+      const url = new URL(raw);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('链接无效');
+      await shell.openExternal(url.href);
     },
     source: async id => {
       const entry = await owner.entry(id);
@@ -249,10 +255,12 @@ async function menuAction(action) {
     await dialog.showMessageBox(main, { type: 'info', message: error.message });
   }
 }
+const publishWorkerState=createWorkerStatePublisher(()=>[main,popover]);
 function refreshTray() {
   if (!tray || quitting) return;
   if (!snapshotForTest) workerSession?.observe();
   const s = desktopSnapshot();
+  publishWorkerState(s);
   const itemState = (action, label, enabled) => isMac ? {
     label: s.actions[action].reason ? `${label} — ${s.actions[action].reason}` : label,
     enabled: s.actions[action].enabled, toolTip: s.actions[action].reason,
@@ -307,9 +315,9 @@ else {
     workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', workerConfiguration: () => manager.configuration(), encryption: credentialEncryption, identityDir: manager.dataDir });
-    updates = new DesktopUpdater({ app, manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
+    updates = new DesktopUpdater({ app, version:app.isPackaged?app.getVersion():appVersion(), manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
       beforeInstall:()=>remoteUpdates?.beforeInstall() });
-    remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:app.getVersion(),updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),
+    remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:updates.snapshot().version,updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),
       request:async(route,method='GET',value)=>{
         if(!/^\/api\/client-updates\/(runtime|inbox|operations\/[a-f0-9]{64}\/result)$/.test(route))throw new Error('更新请求无效');
         const config=manager.configuration();

@@ -6,6 +6,10 @@ directories:
 files:
   - package.json
   - LICENSE
+  - desktop/frontend/dist/**
+  - desktop/frontend-entry.mjs
+  - desktop/account-session.mjs
+  - desktop/runtime-events.mjs
   - desktop/main.mjs
   - desktop/manager.mjs
   - desktop/execution-environment.mjs

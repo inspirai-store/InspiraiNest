@@ -1,0 +1,2 @@
+import {useEffect,useState} from 'react';import {subscribeWorker} from './worker-subscription';import type {WorkerSnapshot} from './worker-subscription';
+export function useWorkerState(){const [snapshot,setSnapshot]=useState<WorkerSnapshot|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);useEffect(()=>{setError('');if(!window.worker){setError('状态接口不可用');return;}return subscribeWorker(window.worker,value=>{setSnapshot(value);setError('');},()=>setError('状态读取失败'));},[attempt]);return {snapshot,error,reload:()=>setAttempt(value=>value+1)};}

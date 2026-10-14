@@ -1,0 +1,7 @@
+// Disposable process using the production Worker control protocol, with no Agent/network work.
+import fs from 'node:fs';import path from 'node:path';import {createWorkerControl} from '../../../src/worker-control.mjs';
+const directory=path.resolve(process.argv[2]);if(!path.basename(path.dirname(directory)).startsWith('inspirainest-formal-settings-'))throw Error('Isolated profile required');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'worker.lock'),String(process.pid));let closing=false,drainTimer;
+const observations=[];const control=createWorkerControl(directory,{onMode:mode=>{observations.push({mode,at:new Date().toISOString()});if(mode==='draining')drainTimer=setTimeout(close,8000);}});control.update({phase:'agent',connection:'online',current:{id:'qa-local-task',title:'资料归档检查',state:'running',agent:'codex'}});
+const timer=setInterval(()=>{control.update({lastHeartbeat:new Date().toISOString()});fs.writeFileSync(path.join(directory,'qa-control-observations.json'),JSON.stringify({pid:process.pid,runId:control.state.runId,commandId:control.state.commandId,mode:control.state.mode,observations},null,2));},400);
+function close(){if(closing)return;closing=true;clearInterval(timer);clearTimeout(drainTimer);control.close();if(fs.existsSync(path.join(directory,'worker.lock'))&&fs.readFileSync(path.join(directory,'worker.lock'),'utf8')===String(process.pid))fs.unlinkSync(path.join(directory,'worker.lock'));process.exit(0);}
+process.on('SIGTERM',close);process.on('SIGINT',close);

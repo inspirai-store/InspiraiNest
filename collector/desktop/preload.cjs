@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktopSettings', {
 });
 contextBridge.exposeInMainWorld('worker', {
   snapshot: () => ipcRenderer.invoke('worker:snapshot'),
+  onChanged: callback => { const listener = (_event,state) => callback(state); ipcRenderer.on('worker:changed',listener); return () => ipcRenderer.removeListener('worker:changed',listener); },
   action: action => ipcRenderer.invoke('worker:action', action),
   logs: task => ipcRenderer.invoke('worker:logs', task),
   activity: task => ipcRenderer.invoke('worker:activity', task),
@@ -15,7 +16,7 @@ contextBridge.exposeInMainWorld('worker', {
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
   'status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','task','task-action',
-  'draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','skills','agents','market',
+  'draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
 ].map(name => [name === 'task-action' ? 'taskAction' : name === 'cancel-login' ? 'cancelLogin' : name, input => ipcRenderer.invoke(`library:${name}`, input)])),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('library:changed', listener); return () => ipcRenderer.removeListener('library:changed', listener); },
 });

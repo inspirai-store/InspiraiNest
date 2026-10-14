@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {DevicesClient} from '../src/account/devices-client.ts';
+const connection={paired:true,server:'https://space-a',deviceId:'a'};
+test('account switching while status waits cannot revoke from the new account',async()=>{let resolve,calls=0;const client=new DevicesClient({status:()=>new Promise(r=>resolve=r),revoke:async()=>{calls++;}});const pending=client.revoke('device');client.invalidateSession();resolve(connection);await assert.rejects(pending,/已切换/);assert.equal(calls,0);});
+test('late pairing response is rejected after account switching',async()=>{let current=connection;const client=new DevicesClient({status:async()=>current,pairing:async()=>{current={...current,deviceId:'b'};return {key:'test',expiresAt:'2026-10-15T00:00:00Z'};}});await assert.rejects(client.pairing(),/已切换/);});

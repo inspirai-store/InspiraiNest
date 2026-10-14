@@ -1,0 +1,1 @@
+.dialog{width:440px;max-height:calc(100dvh - 48px);height:fit-content;overflow:auto;gap:24px;}.dialog[open]{gap:24px;}.dialog header h2{top:0;}.qr{align-self:center;flex-shrink:0;background:white;}.expiry{font-size:13px;line-height:19px;color:var(--muted);}.error{font-size:14px;line-height:20px;color:var(--danger);}

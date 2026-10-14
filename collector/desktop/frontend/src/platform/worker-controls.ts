@@ -1,0 +1,3 @@
+import type {WorkerSnapshot} from './worker-subscription.ts';
+export type WorkerAction='start'|'pause'|'resume'|'drain';
+export function workerControlEnabled(state:WorkerSnapshot|null,action:WorkerAction){if(!state)return false;const policy=(state.actions as Partial<Record<WorkerAction,{enabled?:boolean}>>|undefined)?.[action];if(policy)return policy.enabled===true;if(action==='start')return !state.running&&!state.starting&&!!state.paired&&!state.quitAfterTask;return !!state.running&&state.managed===true&&!state.stale&&!state.legacy&&state.mode!=='draining'&&!state.quitAfterTask&&(action==='pause'?state.mode!=='paused':action==='resume'?state.mode==='paused':true);}

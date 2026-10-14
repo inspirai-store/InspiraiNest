@@ -4,11 +4,13 @@ import { hash, readJson, safePath, contained, requireValue, text, types, sourceU
 import { unreadableText } from './text-encoding.mjs';
 
 const extensions = new Set(['.md', '.markdown', '.txt', '.srt', '.vtt', '.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.pdf']);
+const mediaDocuments = new Set(['.mp4', '.webm', '.mov', '.mp3', '.wav', '.m4a', '.ogg']);
 const roles = new Set(['summary', 'analysis', 'source', 'original', 'source_excerpt', 'source_snapshot', 'transcript', 'transcript_raw', 'image', 'scenario', 'reference', 'document']);
 const secretName = /(?:^|[\/_.-])(cookies?|credentials?|tokens?|secrets?|passwords?|\.env)(?:[\/_.-]|$)/i;
 export const MAX_ARCHIVE = 40 * 1024 * 1024;
 export function permitted(file) {
-  return roles.has(file.role) && extensions.has(path.posix.extname(file.path).toLowerCase()) && !secretName.test(file.path);
+  const extension = path.posix.extname(file.path).toLowerCase();
+  return roles.has(file.role) && (extensions.has(extension) || file.role === 'document' && mediaDocuments.has(extension)) && !secretName.test(file.path);
 }
 export function validateArchive(bundle) {
   requireValue(bundle && bundle.version === 1 && Array.isArray(bundle.files), 'Invalid archive');

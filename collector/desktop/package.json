@@ -1,11 +1,11 @@
 {
   "name": "inspirainest-worker-desktop",
-  "version": "0.1.28",
+  "version": "0.1.30",
   "private": true,
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "start": "electron ."
+    "start": "npm --prefix frontend run build && electron ."
   },
   "devDependencies": {
     "electron": "44.4.5"

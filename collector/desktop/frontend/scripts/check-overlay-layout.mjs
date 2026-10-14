@@ -1,0 +1,9 @@
+import fs from 'node:fs/promises';import path from 'node:path';import{fileURLToPath}from'node:url';
+const out=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../../design-review/desktop-refactor/stage-03-controls-v1');
+const refs=JSON.parse(await fs.readFile(path.join(out,'overlay-layout.json'),'utf8'));
+const checks=JSON.parse(await fs.readFile(path.join(out,'overlay-checks.json'),'utf8'));
+const mappings={type:{TK4xE:'全部类型',FsyKC:'文章',NyZ2o:'笔记',pUkY2:'文档','2wmYz':'音频'},more:{X3jNY:'管理标签','3jjpR':'复制标题',rzHDf:'下载附件',tfDMw:'移至回收站'},tags:{BQKfh:'对话框标题栏',Aan99:'关闭对话框',dHzqP:'标签搜索区',jtdmQ:'搜索框',VHaEp:'标签选项',DXFL9:'阅读',MInzK:'知识管理',LsEqq:'写作',czzC9:'生活',z71rL:'对话框操作',Gj4Rh:'重置',nCBAa:'应用'},delete:{'62vCw':'对话框标题栏',YF83L:'关闭对话框',qL7sH:'确认问题',PVDXW:'对话框操作',pdE5h:'取消',RMf6D:'移至回收站'}};
+for(const frame of checks.frames){const reference=refs.frames.find(r=>r.kind===frame.kind).layout;const comparisons=[];
+function visit(node,x=0,y=0){const nx=x+node.x,ny=y+node.y,name=mappings[frame.kind][node.id];if(name){const expected={x:nx,y:ny,width:node.width,height:node.height};const actual=frame.regions.find(r=>r.name===name);const keys=node.id==='qL7sH'?['x','y','height']:['x','y','width','height'];const delta=actual?Math.max(...keys.map(k=>Math.abs(expected[k]-actual[k]))):null;comparisons.push({name,expected,actual,maxDelta:delta,passed:delta!==null&&delta<=1,compared:keys});}for(const child of Array.isArray(node.children)?node.children:[])visit(child,nx,ny);}
+visit(reference);frame.internalComparisons=comparisons;frame.passed=frame.maxDelta<=1&&comparisons.every(c=>c.passed);}
+checks.passed=checks.frames.every(f=>f.passed);await fs.writeFile(path.join(out,'overlay-checks.json'),JSON.stringify(checks,null,2)+'\n');console.log(checks.frames.map(f=>({name:f.name,passed:f.passed,internal:f.internalComparisons.length,failed:f.internalComparisons.filter(c=>!c.passed)})));if(!checks.passed)process.exitCode=1;

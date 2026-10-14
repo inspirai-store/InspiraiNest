@@ -1,0 +1,3 @@
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),electron=require('electron'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'inspirainest-restart-'));let passed=true;
+try{for(const phase of ['write','read']){const result=spawnSync(electron,[path.resolve('scripts/records-restart.cjs'),phase,profile],{stdio:'inherit'});if(result.status!==0){passed=false;break;}}}finally{fs.rmSync(profile,{recursive:true,force:true});}if(!passed)process.exitCode=1;

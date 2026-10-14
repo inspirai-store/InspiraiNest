@@ -1,0 +1,5 @@
+import {X} from 'lucide-react';
+import styles from './TagField.module.css';
+export function TagField({id,label,placeholder,tags,input,onInput,onCommit,onRemove,onRemoveLast}:{id:string;label:string;placeholder:string;tags:string[];input:string;onInput:(text:string)=>void;onCommit:(text:string)=>void;onRemove:(name:string)=>void;onRemoveLast:()=>void}){
+ return <div className={styles.field}><label htmlFor={id}>{label}</label><div className={styles.inputBox}>{tags.map(name=><span className={styles.tag} key={name}>{name}<button type="button" aria-label={'移除 '+name} onClick={()=>onRemove(name)}><X size={12}/></button></span>)}<input id={id} value={input} placeholder={placeholder} onChange={event=>onInput(event.currentTarget.value)} onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==='Enter'||event.key===','||event.key==='，'){event.preventDefault();onCommit(event.currentTarget.value);}if(event.key==='Backspace'&&!event.currentTarget.value)onRemoveLast();}} onBlur={event=>{if(event.currentTarget.value.trim())onCommit(event.currentTarget.value);}}/></div></div>;
+}

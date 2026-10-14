@@ -20,7 +20,7 @@ export async function prepareRecordInput(config,task,workspace,signal) {
     }
     attachments.push({...media,path:`.record-input/${filename}`});
   }
-  atomicJson(path.join(root,'manifest.json'),{recordId:task.recordId,version:task.recordVersion,createdAt:snapshot.createdAt,attachments});
+  atomicJson(path.join(root,'manifest.json'),{recordId:task.recordId,version:task.recordVersion,createdAt:snapshot.createdAt,...(snapshot.document?{document:snapshot.document}:{}),attachments});
 }
 export function recordPrompt(task) {
   if (!task.recordSnapshot) return '';

@@ -1,0 +1,48 @@
+{
+  "name": "inspirainest-desktop-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "review": "node scripts/review-server.mjs",
+    "desktop": "npm run build && electron ..",
+    "capture": "npm run build && electron scripts/capture.cjs",
+    "capture:controls": "npm run build && electron scripts/capture-controls.cjs",
+    "compare": "node scripts/compare.mjs",
+    "capture:overlays": "npm run build && electron scripts/capture-overlays.cjs && node scripts/check-overlay-layout.mjs",
+    "compare:controls": "node scripts/compare-controls.mjs",
+    "check:overlays": "node scripts/check-overlay-layout.mjs",
+    "capture:states": "npm run build && electron scripts/capture-states.cjs && node scripts/check-states.mjs",
+    "compare:states": "node scripts/compare-states.mjs",
+    "check:states": "node scripts/check-states.mjs",
+    "test:records": "node --experimental-strip-types --test scripts/records-service.test.mjs",
+    "records:qa": "npm run build && electron scripts/records-qa.cjs",
+    "test:record-media": "node --experimental-strip-types --test scripts/recording.test.mjs",
+    "check:record-restart": "npm run build && node scripts/check-records-restart.mjs",
+    "capture:record-media": "npm run build && electron scripts/capture-record-media.cjs && node scripts/check-record-media.mjs && node scripts/compare-record-media.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.104.2",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "lucide-react": "1.55.0",
+    "pdfjs-dist": "6.4.299",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "7.18.4",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "fake-indexeddb": "^6.2.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

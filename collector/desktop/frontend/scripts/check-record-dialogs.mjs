@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';import path from 'node:path';import{fileURLToPath}from'node:url';
+const out=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../../design-review/desktop-refactor/stage-05-records-v1');
+const reference=JSON.parse(await fs.readFile(path.join(out,'pencil-layout.json'),'utf8'));const actual=JSON.parse(await fs.readFile(path.join(out,'render-checks.json'),'utf8'));
+function flatten(n){return[n,...(Array.isArray(n.children)?n.children.flatMap(flatten):[])];}
+function bounds(n,x=0,y=0,root=true){const nx=root?0:x+n.x,ny=root?0:y+n.y;return[{id:n.id,x:nx,y:ny,width:n.width,height:n.height},...(Array.isArray(n.children)?n.children.flatMap(c=>bounds(c,nx,ny,false)):[])];}
+const aliases={'搜索':/^(搜索|搜索记录|搜索资料|搜索标签)$/,'状态图标':/图标$/,'标签对话框':/^dialog$/};const results=[];
+for(const frame of actual.frames){const ref=reference.frames.find(r=>r.name===frame.name),nodes=flatten(ref.nodes),layout=new Map(bounds(ref.layout).map(b=>[b.id,b]));
+const checks=frame.regions.flatMap(region=>{if(['内容状态','阅读状态'].includes(region.name))return[];const candidates=nodes.filter(n=>(n.name===region.name||n.content===region.name||aliases[region.name]?.test(n.name||''))&&n.enabled!==false&&layout.has(n.id));if(!candidates.length)return[{name:region.name,missing:true,passed:false}];const best=candidates.map(n=>({reference:layout.get(n.id),nodeId:n.id})).map(r=>({...r,maxDelta:Math.max(...['x','y','width','height'].map(k=>Math.abs(region[k]-r.reference[k])))})).sort((a,b)=>a.maxDelta-b.maxDelta)[0];return[{name:region.name,actual:region,...best,passed:best.maxDelta<=1}];});
+results.push({name:frame.name,checks,passed:checks.every(c=>c.passed)});}
+await fs.writeFile(path.join(out,'layout-checks.json'),JSON.stringify({passed:results.every(r=>r.passed),total:results.reduce((s,r)=>s+r.checks.length,0),frames:results},null,2)+'\n');console.log(results.map(r=>({name:r.name,passed:r.passed,failed:r.checks.filter(c=>!c.passed)})));if(!results.every(r=>r.passed))process.exitCode=1;

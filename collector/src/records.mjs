@@ -1,11 +1,12 @@
 import { hash, id, now, requireValue } from './common.mjs';
 import { workerAuthorized } from './device-metadata.mjs';
 import { documentExtensions, validDocument } from './input-attachments.mjs';
+import { validateDocument } from './record-document.mjs';
 
 export const MEDIA_LIMIT = 32 * 1024 * 1024;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const digest = /^[a-f0-9]{64}$/;
-export const mediaExtensions = { ...documentExtensions,'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','audio/mp4':'m4a','audio/aac':'aac','audio/mpeg':'mp3','audio/wav':'wav','audio/x-wav':'wav','audio/webm':'webm','audio/ogg':'ogg','audio/flac':'flac' };
+export const mediaExtensions = { ...documentExtensions, 'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','audio/mp4':'m4a','audio/aac':'aac','audio/mpeg':'mp3','audio/wav':'wav','audio/x-wav':'wav','audio/webm':'webm','audio/ogg':'ogg','audio/flac':'flac','video/mp4':'mp4','video/webm':'webm','video/ogg':'ogv','application/pdf':'pdf','text/plain':'txt','text/markdown':'md','text/csv':'csv','application/json':'json','application/octet-stream':'bin' };
 export const recordPresets = { summary:'整理摘要', extract:'转写 / 识字', actions:'提炼行动项', custom:'自定义' };
 const identify = value => { requireValue(typeof value === 'string' && uuid.test(value), 'Invalid record/request ID'); return value.toLowerCase(); };
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
@@ -16,13 +17,16 @@ function validMedia(buffer, mime) {
     case 'image/jpeg': return buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255;
     case 'image/webp': return ascii(0,4) === 'RIFF' && ascii(8,12) === 'WEBP';
     case 'image/gif': return /^GIF8[79]a$/.test(ascii(0,6));
-    case 'audio/mp4': return ascii(4,8) === 'ftyp';
-    case 'audio/webm': return buffer.subarray(0,4).equals(Buffer.from('1a45dfa3','hex'));
-    case 'audio/ogg': return ascii(0,4) === 'OggS';
+    case 'video/mp4': case 'audio/mp4': return ascii(4,8) === 'ftyp';
+    case 'video/webm': case 'audio/webm': return buffer.subarray(0,4).equals(Buffer.from('1a45dfa3','hex'));
+    case 'video/ogg': case 'audio/ogg': return ascii(0,4) === 'OggS';
     case 'audio/flac': return ascii(0,4) === 'fLaC';
     case 'audio/wav': case 'audio/x-wav': return ascii(0,4) === 'RIFF' && ascii(8,12) === 'WAVE';
     case 'audio/mpeg': return ascii(0,3) === 'ID3' || buffer[0] === 255 && (buffer[1] & 224) === 224;
     case 'audio/aac': return buffer[0] === 255 && (buffer[1] & 246) === 240;
+    case 'application/pdf': return ascii(0,5)==='%PDF-';
+    case 'text/plain': case 'text/markdown': case 'text/csv': case 'application/json': {try{new TextDecoder('utf-8',{fatal:true}).decode(buffer);return !buffer.includes(0);}catch{return false;}}
+    case 'application/octet-stream': return buffer.length>0;
     default: return false;
   }
 }
@@ -31,7 +35,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     const media = await store.get('record-media', sha); requireValue(media,'Media not found',404);
     const bytes = await storage.get(media.key); await authenticate(req);
     requireValue(hash(bytes) === sha && bytes.length === media.bytes,'Media checksum mismatch',500);
-    res.writeHead(200,{'Content-Type':media.mime,'Content-Length':bytes.length,'Content-Disposition':`inline; filename="${sha}.${mediaExtensions[media.mime]}"`,'X-Content-SHA256':sha}); res.end(bytes);
+    res.writeHead(200,{'Content-Type':media.mime,'Content-Length':bytes.length,'X-Content-Type-Options':'nosniff','Content-Disposition':`${media.mime.startsWith('text/')||['application/json','application/octet-stream'].includes(media.mime)?'attachment':'inline'}; filename="${sha}.${mediaExtensions[media.mime]}"`,'X-Content-SHA256':sha}); res.end(bytes);
   }
   async function handle(req,res,route,device) {
     const inputFile=route.match(/^\/api\/tasks\/([^/]+)\/input-files\/([a-f0-9]{64})$/);
@@ -122,14 +126,15 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         for (const attachment of input.attachments) {
           requireValue(attachment && digest.test(attachment.sha256) && typeof attachment.name === 'string' && attachment.name.length > 0 && attachment.name.length <= 200,'Invalid attachment');
           const media = await tx.get('record-media',attachment.sha256); requireValue(media,'Attachment has not been uploaded',409);
-          let thumbnailSha256;if(attachment.thumbnailSha256){requireValue(media.mime.startsWith('image/')&&digest.test(attachment.thumbnailSha256),'Invalid thumbnail');const preview=await tx.get('record-media',attachment.thumbnailSha256);requireValue(preview?.mime.startsWith('image/')&&preview.bytes<=256*1024,'Thumbnail has not been uploaded or exceeds 256 KiB',409);thumbnailSha256=preview.id;}attachments.push({id:identify(attachment.id),sha256:media.id,name:attachment.name,mime:media.mime,bytes:media.bytes,...(thumbnailSha256?{thumbnailSha256}:{})}); total += media.bytes;
+          let thumbnailSha256;if(attachment.thumbnailSha256){requireValue((media.mime.startsWith('image/')||media.mime.startsWith('video/'))&&digest.test(attachment.thumbnailSha256),'Invalid thumbnail');const preview=await tx.get('record-media',attachment.thumbnailSha256);requireValue(preview?.mime.startsWith('image/')&&preview.bytes<=256*1024,'Thumbnail has not been uploaded or exceeds 256 KiB',409);thumbnailSha256=preview.id;}attachments.push({id:identify(attachment.id),sha256:media.id,name:attachment.name,mime:media.mime,bytes:media.bytes,...(thumbnailSha256?{thumbnailSha256}:{})}); total += media.bytes;
         }
         requireValue(new Set(attachments.map(a=>a.id)).size === attachments.length,'Duplicate attachment ID');
         requireValue(total <= 128 * 1024 * 1024,'Record media exceeds 128 MiB',413);
         requireValue(input.text.trim() || attachments.length,'Record is empty');
         const createdAt = current?.createdAt || input.createdAt || now();
         requireValue(typeof createdAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(createdAt) && /(Z|[+-]\d{2}:\d{2})$/.test(createdAt) && Number.isFinite(Date.parse(createdAt)),'Invalid creation time');
-        result = {id:recordId,text:input.text,attachments,version:input.baseVersion+1,createdAt,updatedAt:now()};
+        if(input.document!==undefined)validateDocument(input.document,attachments);
+        result = {id:recordId,text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,createdAt,updatedAt:now()};
         await tx.put('capture-version',{...result,id:`${recordId}:${result.version}`,recordId}); await tx.put('capture',result);
       }
       await tx.put('capture-operation',{id:operationId,hash:payloadHash,result}); return result;

@@ -9,6 +9,10 @@ on:
         description: Build signed and notarized macOS packages
         type: boolean
         default: true
+      publish_macos:
+        description: Publish macOS update files to OSS; disable for local installation only
+        type: boolean
+        default: true
       include_android:
         description: Build Android using the existing release signing identity
         type: boolean
@@ -100,6 +104,11 @@ jobs:
           test -f public-source/collector/electron-builder.yml
       - run: npm ci --ignore-scripts
         working-directory: public-source/collector
+      - run: npm ci --ignore-scripts
+        working-directory: public-source/collector/desktop/frontend
+      - name: Test React desktop adapters and state
+        working-directory: public-source/collector/desktop/frontend
+        run: node --experimental-strip-types --test scripts/*.test.mjs
       # Keep the self-hosted runner's timing-sensitive Worker fixtures within
       # their deadlines while still executing the complete test suite.
       - run: node --test --test-concurrency=4 test/*.test.mjs
@@ -153,6 +162,7 @@ jobs:
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
       - name: Test signed macOS login and device pairing
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         shell: bash
         run: |
@@ -169,6 +179,7 @@ jobs:
           node scripts/test-desktop-pairing.cjs "$executable"
           node scripts/test-worker-logs-ui.cjs "$executable"
       - name: Test signed Apple Silicon update download
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         shell: bash
         run: |
@@ -178,12 +189,15 @@ jobs:
             desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
             "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
       - name: Test signed macOS quick capture
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         run: node scripts/test-desktop-capture.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test signed macOS update window shutdown
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         run: node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test packaged macOS menu bar and safe Worker lifecycle
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         shell: bash
         env:
@@ -192,7 +206,20 @@ jobs:
           # Keep that OS interaction in manual acceptance and record it as skipped.
           COLLECTOR_DESKTOP_SKIP_NATIVE_MINIMIZE: '1'
         run: node scripts/test-desktop.cjs
+      - name: Retain signed packages for local installation
+        if: ${{ !inputs.publish_macos }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: InspiraiNest-macOS-local-${{ github.run_id }}
+          path: |
+            public-source/collector/desktop/dist/InspiraiNest-v*-macOS-*.zip
+            public-source/collector/desktop/dist/InspiraiNest-v*-macOS-*.dmg
+            public-source/collector/desktop/dist/InspiraiNest-v*-macOS-*.zip.blockmap
+            public-source/collector/desktop/dist/latest-mac.yml
+            public-source/collector/desktop/dist/SHASUMS256.txt
+          if-no-files-found: error
       - name: Upload verified packages and update files to private OSS
+        if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         shell: bash
         env:

@@ -118,6 +118,7 @@ export class OwnerClient {
       return this.api(`/api/skills/devices/${taskId(input.deviceId)}/environment?${query}`);
     }
     if (input.kind === 'versions') return this.api('/api/skills/versions');
+    if (input.kind === 'version') return this.api('/api/skills/versions/'+archiveId(input.versionId));
     if (input.kind === 'operation') return this.api('/api/skills/operations/'+archiveId(input.operationId));
     if (input.kind === 'history') return this.api('/api/skills/operations?deviceId='+taskId(input.deviceId));
     if (input.kind === 'create' && ['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.operation?.action)) return this.api('/api/skills/operations','POST',input.operation);
@@ -181,9 +182,10 @@ export class OwnerClient {
     return { bytes: result.bytes, name: path.posix.basename(file), type: path.extname(file).toLowerCase() };
   }
   async preview(input) {
-    if (!/\.(png|jpe?g|webp|gif|avif)$/i.test(input.file || '')) throw new Error('当前仅支持图片预览');
+    const mimeByExtension = { '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.gif':'image/gif', '.avif':'image/avif', '.pdf':'application/pdf', '.mp4':'video/mp4', '.webm':'video/webm', '.mov':'video/quicktime', '.mp3':'audio/mpeg', '.wav':'audio/wav', '.m4a':'audio/mp4', '.ogg':'audio/ogg', '.txt':'text/plain', '.md':'text/plain', '.markdown':'text/plain', '.csv':'text/plain', '.json':'application/json', '.srt':'text/plain', '.vtt':'text/plain' };
+    const mime = mimeByExtension[path.extname(input?.file || '').toLowerCase()];
+    if (!mime) throw new Error('此格式暂无预览');
     const result = await this.fileBytes(input);
-    const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.avif': 'image/avif' }[result.type];
     return { dataUrl: `data:${mime};base64,${result.bytes.toString('base64')}`, name: result.name };
   }
   createTask(input) {

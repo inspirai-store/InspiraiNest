@@ -1,0 +1,33 @@
+import {createContext,useContext,useEffect,useMemo,useRef,useState} from 'react';
+import type {ReactNode} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {IndexedRecordStore} from './data/store';
+import {RecordsService} from './data/service';
+import {desktopTransport} from './data/transport';
+import type {CaptureBridge} from './data/transport';
+import type {LocalDraft} from './data/types';
+type LibraryBridge = Partial<Pick<import("../account/client").AccountBridge,"pair"|"cancelLogin"|"logout">> & CaptureBridge & Partial<import('../library/data/client').LibraryBridge> & {remove?:(id:string)=>Promise<{deleted:boolean}>;restore?:(id:string)=>Promise<{deleted:boolean}>;download?:(input:{id:string;file:string})=>Promise<{saved:boolean;path?:string}>;openUrl?:(url:string)=>Promise<unknown>;onChanged?(callback:()=>void):()=>void};
+declare global {interface Window {library?:LibraryBridge}}
+type RecordUi={selected:string|null;query:string;filter:string};
+const Context=createContext<{taskCount:number;ui:RecordUi;updateUi:(patch:Partial<RecordUi>)=>void;mediaStatus:'idle'|'recording'|'finishing';setMediaStatus:React.Dispatch<React.SetStateAction<'idle'|'recording'|'finishing'>>;draftStatus:'saved'|'saving'|'error';saveDraft:(draft:LocalDraft)=>Promise<void>;saveRecord:RecordsService['saveRecord'];service:RecordsService;reload:()=>Promise<void>;session:number;draft:LocalDraft|undefined;records:Awaited<ReturnType<RecordsService['load']>>['records'];loading:boolean;error:string;setError:(message:string)=>void}|null>(null);
+export function RecordsProvider({children}:{children:ReactNode}) {
+ const [mediaStatus,setMediaStatus]=useState<'idle'|'recording'|'finishing'>('idle');
+ const [draftStatus,setDraftStatus]=useState<'saved'|'saving'|'error'>('saved');
+ const [ui,setUi]=useState<RecordUi>({selected:null,query:'',filter:'全部'});const updateUi=(patch:Partial<RecordUi>)=>setUi(current=>({...current,...patch}));
+ const client=useQueryClient();const [session,setSession]=useState(0),[error,setError]=useState('');
+ const service=useMemo(()=>new RecordsService(new IndexedRecordStore(),window.library?desktopTransport(window.library):{status:async()=>({paired:false,server:''}),request:async()=>{throw new Error('资料空间未连接');}}),[]);
+ const optimisticDraft=useRef<LocalDraft|null>(null);
+ const query=useQuery({queryKey:['local-records',session],queryFn:async()=>{const data=await service.load();return optimisticDraft.current?{...data,draft:optimisticDraft.current}:data;},staleTime:Infinity});
+ const saveDraft=async(draft:LocalDraft)=>{const snapshot=structuredClone(draft);const current=client.getQueryData<Awaited<ReturnType<RecordsService['load']>>>(['local-records',session]);if(current?.draft.recordId&&current.draft.recordId!==snapshot.recordId)return;optimisticDraft.current=snapshot;client.setQueryData<Awaited<ReturnType<RecordsService['load']>>>(['local-records',session],current=>({records:current?.records??[],taskCount:current?.taskCount??0,draft:snapshot}));setDraftStatus('saving');try{await service.saveDraft(snapshot);if(optimisticDraft.current===snapshot){optimisticDraft.current=null;setDraftStatus('saved');}}catch(e){setDraftStatus('error');throw e;}};
+ const saveRecord:RecordsService['saveRecord']=async draft=>{const result=await service.saveRecord(draft);optimisticDraft.current=null;setDraftStatus('saved');return result;};
+ const reload=async()=>{await client.invalidateQueries({queryKey:['local-records']});};
+ useEffect(()=>{let active=true;let sessionRetry=false;const sync=async()=>{try{await service.flush();await service.refresh();if(active)await client.invalidateQueries({queryKey:['local-records']});}catch(e){if(active){if(e instanceof Error&&e.message.startsWith('登录状态已改变')&&!sessionRetry){sessionRetry=true;void sync();return;}setError(e instanceof Error?e.message:String(e));await client.invalidateQueries({queryKey:['local-records']});}}};
+ const changed=()=>{service.invalidateSession();client.removeQueries({queryKey:['local-records']});setSession(x=>x+1);void sync();};
+ const unsubscribe=window.library?.onChanged?.(changed);window.addEventListener('online',sync);void sync();
+ return()=>{active=false;service.invalidateSession();unsubscribe?.();window.removeEventListener('online',sync);};},[service,client]);
+ const taskCount=query.data?.taskCount??0;
+ return <Context.Provider value={{taskCount,mediaStatus,setMediaStatus,draftStatus,saveDraft,saveRecord,ui,updateUi,service,reload,session,draft:query.data?.draft,records:query.data?.records??[],loading:query.isPending,error:query.error instanceof Error?query.error.message:error,setError}}>{children}</Context.Provider>;
+}
+export function useRecords(){const value=useContext(Context);if(!value)throw Error('RecordsProvider required');return value;}
+
+export function useOptionalRecords(){return useContext(Context);}

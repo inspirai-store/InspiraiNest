@@ -1,0 +1,2 @@
+import type {ReactNode} from 'react';import {ArrowLeft} from 'lucide-react';import {ModuleContent,ModuleHeader} from './ModuleLayout';import {Action} from './Controls';
+export function ModuleState({title,region,back,children}:{title:string;region:string;back:()=>void;children:ReactNode}){return <ModuleContent data-region={region}><ModuleHeader title={title} actions={<Action icon={ArrowLeft} onClick={back}>返回</Action>}/>{children}</ModuleContent>;}

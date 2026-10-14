@@ -10,7 +10,7 @@ const updateError = error => {
 };
 
 export class DesktopUpdater extends EventEmitter {
-  constructor({ app, manager, updater, platform = process.platform, pollMs = 2000, beforeInstall = async () => {} }) {
+  constructor({ app, manager, updater, version=app.getVersion(), platform = process.platform, pollMs = 2000, beforeInstall = async () => {} }) {
     super();
     this.app = app;
     this.manager = manager;
@@ -18,7 +18,7 @@ export class DesktopUpdater extends EventEmitter {
     this.pollMs = pollMs;
     this.beforeInstall = beforeInstall;
     this.supported = Boolean(app.isPackaged && supportedPlatform(platform));
-    this.state = { version: app.getVersion(), phase: this.supported ? 'idle' : 'unsupported', availableVersion: null,
+    this.state = { version, phase: this.supported ? 'idle' : 'unsupported', availableVersion: null,
       progress: null, error: null, supported: this.supported };
     this.workerTimer = null;
     this.busy = false;

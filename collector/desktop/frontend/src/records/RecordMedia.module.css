@@ -1,0 +1,20 @@
+.attachments { padding:16px; display:flex; flex-direction:column; gap:8px; flex-shrink:0; max-height:240px; overflow-y:auto; }
+.row { height:60px; display:flex; align-items:center; gap:12px; padding:12px; flex-shrink:0; background:var(--raised); border-radius:6px; box-shadow:inset 0 0 0 1px var(--line); }
+.row>svg,.play { color:var(--muted); flex-shrink:0; }
+.row>span { flex:1; min-width:0; font-size:14px; line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.play { width:32px; height:32px; display:flex; padding:0; background:transparent; }
+.play:focus-visible { outline:2px solid var(--accent); border-radius:6px; }
+.recording { height:44px; padding:0 16px; display:flex; align-items:center; gap:8px; flex-shrink:0; background:var(--raised); font-size:14px; line-height:20px; }
+.recording>i { width:8px; height:8px; border-radius:50%; background:var(--danger); }
+.spacer { flex:1; }
+.camera { width:560px; height:448px; }
+.cameraPreview { width:100%; height:288px; background:#252525; color:#a3a3a3; border-radius:6px; display:flex; justify-content:center; align-items:center; overflow:hidden; flex-shrink:0; }
+.cameraPreview video { height:100%; width:100%; object-fit:contain; }
+.error { color:var(--danger); font-size:14px; line-height:20px; }
+.camera:has(.error) { height:auto; }
+
+.detailScroll { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
+
+.recordingSave:disabled { background:#000000; color:var(--disabledFg); box-shadow:none; border-radius:8px; }
+
+.play:hover:not(:disabled) { color:var(--accent); }
