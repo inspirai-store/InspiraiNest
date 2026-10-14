@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createService } from '../src/server.mjs';
 import { api, runWorker } from '../src/worker.mjs';
 import { atomicJson, secret } from '../src/common.mjs';
@@ -117,6 +117,34 @@ test('manager starts a detached synthetic worker, survives a new manager, and dr
   await until(() => !second.snapshot().running);
   await second.stop(); // Stopping an already stopped Worker never sends a new command.
   assert.deepEqual(fs.readFileSync(file), original);
+});
+
+test('manager waits for the status handshake after the detached process acquires its lock', async t => {
+  const { config, file } = await fixture(t);
+  const preload = path.join(path.dirname(file), 'delayed-lock.mjs');
+  fs.writeFileSync(preload, `import fs from 'node:fs';import path from 'node:path';
+const config=JSON.parse(fs.readFileSync(process.env.COLLECTOR_CONFIG));
+fs.mkdirSync(config.dataDir,{recursive:true});const lock=path.join(config.dataDir,'worker.lock');
+fs.writeFileSync(lock,String(process.pid));await new Promise(r=>setTimeout(r,500));fs.unlinkSync(lock);`);
+  const previous = process.env.NODE_OPTIONS;
+  const manager = new WorkerManager(file, process.execPath);
+  t.after(async () => {
+    await until(() => workerSnapshot(config.dataDir).managed || !workerSnapshot(config.dataDir).running);
+    if (workerSnapshot(config.dataDir).managed) {
+      sendControl(config.dataDir, 'drain');
+      await until(() => !workerSnapshot(config.dataDir).running);
+    }
+  });
+  process.env.NODE_OPTIONS = `${previous || ''} --import=${pathToFileURL(preload).href}`.trim();
+  try {
+    const state = await manager.start({ paused: true });
+    assert.equal(state.managed, true, 'a PID lock alone must not report a controllable startup');
+    await manager.stop();
+    await until(() => !manager.snapshot().running);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = previous;
+  }
 });
 
 test('log view is bounded, credential-redacted and rejects traversal', () => {

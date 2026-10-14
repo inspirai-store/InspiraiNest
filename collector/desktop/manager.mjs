@@ -88,7 +88,8 @@ export class WorkerManager {
       // Wait for the lock/status handshake; another launch can win the worker's atomic lock.
       const deadline = Date.now() + 10000;
       while (Date.now() < deadline) {
-        if (workerSnapshot(this.dataDir).running) return this.snapshot();
+        const state = workerSnapshot(this.dataDir);
+        if (state.running && state.managed && !state.stale) return this.snapshot();
         if (child.exitCode !== null) break;
         await new Promise(resolve => setTimeout(resolve, 100));
       }

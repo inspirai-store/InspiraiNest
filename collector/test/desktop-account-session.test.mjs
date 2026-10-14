@@ -20,7 +20,7 @@ test('unified desktop pairing uses real WorkerManager and retains installation a
  assert.equal(events.length,6);assert.deepEqual(events.map(x=>x.paired),[true,false,true,false,true,false]);assert.equal(manager.snapshot().running,false);
 });
 
-test('running worker blocks account pairing without changing either authorization',async t=>{
+test('running worker blocks account pairing without changing either authorization',{timeout:20000},async t=>{
  const {pairOwnerSession}=await import('../desktop/account-session.mjs');
  const {WorkerManager}=await import('../desktop/manager.mjs');
  const {createService}=await import('../src/server.mjs');
@@ -34,10 +34,15 @@ test('running worker blocks account pairing without changing either authorizatio
  const config=path.join(dir,'worker.json');atomicJson(config,{dataDir:path.join(dir,'worker')});
  const manager=new WorkerManager(config,process.execPath);
  t.after(async()=>{
-  if(manager.snapshot().running){await manager.stop();const deadline=Date.now()+10000;while(manager.snapshot().running&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));}
-  assert.equal(manager.snapshot().running,false,'isolated worker must stop before cleanup');
-  await service.close();fs.rmSync(dir,{recursive:true,force:true});
-  if(previous===undefined)delete process.env.COLLECTOR_DESKTOP_TEST;else process.env.COLLECTOR_DESKTOP_TEST=previous;
+  try {
+   if(manager.snapshot().running){await manager.stop();const deadline=Date.now()+10000;while(manager.snapshot().running&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));}
+   assert.equal(manager.snapshot().running,false,'isolated worker must stop before cleanup');
+  } finally {
+   const state=manager.snapshot();
+   if(state.running)process.kill(state.pid,'SIGTERM');
+   await service.close();fs.rmSync(dir,{recursive:true,force:true});
+   if(previous===undefined)delete process.env.COLLECTOR_DESKTOP_TEST;else process.env.COLLECTOR_DESKTOP_TEST=previous;
+  }
  });
  const ownerFile=path.join(dir,'owner.json');
  const owner=new OwnerClient({file:ownerFile,workerServer:()=>manager.configuration().server,encryption:{isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}});
