@@ -262,7 +262,7 @@ function refreshTray() {
   const s = desktopSnapshot();
   publishWorkerState(s);
   const itemState = (action, label, enabled) => isMac ? {
-    label: s.actions[action].reason ? `${label} — ${s.actions[action].reason}` : label,
+    label,
     enabled: s.actions[action].enabled, toolTip: s.actions[action].reason,
   } : { label, enabled };
   const label = s.quitAfterTask ? '完成后停止并退出' : !s.running ? '已停止' : s.legacy ? '旧版运行中' : s.mode === 'draining' ? '完成后停止' : s.mode === 'paused' ? '暂停领取' : s.online ? '在线' : '连接中断';
@@ -270,14 +270,14 @@ function refreshTray() {
   // On macOS, keep the click handler independent from the supplemental right-click menu.
   const menu = Menu.buildFromTemplate([
     { label: `灵藏 · ${label}`, enabled: false },
-    { label: '打开管理窗口', click: () => openManager() }, { type: 'separator' },
-    { label: '检查客户端更新', click: async () => { await openManager(); if (!exiting() && liveWindow(main)) main.webContents.send('updates:open'); } },
-    { id: 'worker-start', ...itemState('start', '启动工作节点', !s.running && !s.starting && s.paired && !macQuit?.pending), click: () => menuAction('start') },
-    { id: 'worker-pause-resume', ...itemState(s.mode === 'paused' ? 'resume' : 'pause', s.mode === 'paused' ? '继续领取' : '暂停领取（当前任务继续）', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction(s.mode === 'paused' ? 'resume' : 'pause') },
-    { id: 'worker-drain', ...itemState('drain', isMac ? '停止工作节点（完成当前任务后）' : '完成当前任务后停止', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction('drain') },
+    { label: '打开灵藏', click: () => openManager() }, { type: 'separator' },
+    { label: '检查更新', click: async () => { await openManager(); if (!exiting() && liveWindow(main)) main.webContents.send('updates:open'); } },
+    { id: 'worker-start', ...itemState('start', '启动', !s.running && !s.starting && s.paired && !macQuit?.pending), click: () => menuAction('start') },
+    { id: 'worker-pause-resume', ...itemState(s.mode === 'paused' ? 'resume' : 'pause', s.mode === 'paused' ? '恢复' : '暂停', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction(s.mode === 'paused' ? 'resume' : 'pause') },
+    { id: 'worker-drain', ...itemState('drain', '停止', s.managed && !s.stale && s.mode !== 'draining'), click: () => menuAction('drain') },
     { type: 'separator' },
     ...(!isMac ? [{ label: '退出管理器，工作节点继续', click: () => menuAction('quit') }] : []),
-    { id: 'quit-after', ...itemState('quit-after', isMac ? '完成当前任务后停止并退出应用' : '完成任务后停止并退出', !s.running || s.managed), click: () => menuAction('quit-after') },
+    { id: 'quit-after', ...itemState('quit-after', '停止并退出', !s.running || s.managed), click: () => menuAction('quit-after') },
   ]);
   tray.menu = menu;
   if (isMac) macQuit.check();
@@ -288,9 +288,9 @@ function applicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: '灵藏', submenu: [
       { role: 'about', label: '关于灵藏' }, { type: 'separator' },
-      { label: '打开管理窗口', click: () => openManager() },
+      { label: '打开灵藏', click: () => openManager() },
       { role: 'hide', label: '隐藏灵藏' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
-      { id: 'safe-quit', label: '完成当前任务后停止并退出灵藏', accelerator: 'Command+Q', click: () => menuAction('quit-after') },
+      { id: 'safe-quit', label: '退出灵藏', accelerator: 'Command+Q', click: () => menuAction('quit-after') },
     ] },
     { role: 'editMenu' }, { role: 'windowMenu' },
   ]));
