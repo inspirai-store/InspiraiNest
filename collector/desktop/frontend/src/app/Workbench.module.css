@@ -60,7 +60,9 @@
 .accentText { color: var(--accent); }
 .listCount { height: 40px; display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; color: var(--muted); font-size: 12px; line-height: 17px; box-shadow: inset 0 1px var(--line); }
 .content { background: var(--panel); flex: 1; min-width: 0; min-height: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
-.contentTitle { height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+.contentTitle { height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.contentTitle h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contentTitle > :not(h2) { flex-shrink: 0; }
 .libraryTitle { height: 36px; }
 .back { display: none; }
 .editor { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-radius: 8px; overflow: hidden; }

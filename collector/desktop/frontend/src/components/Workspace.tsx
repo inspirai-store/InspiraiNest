@@ -26,7 +26,7 @@ export function ContentPane({ label, backLabel, onBack, children }: Children & {
 }
 
 export function ContentHeader({ title, actions, reader = false }: { title: string; actions: ReactNode; reader?: boolean }) {
-  return <header className={`${styles.contentTitle} ${reader ? styles.libraryTitle : ''}`} data-region="内容标题"><h2>{title}</h2>{actions}</header>;
+  return <header className={`${styles.contentTitle} ${reader ? styles.libraryTitle : ''}`} data-region="内容标题"><h2 title={title}>{title}</h2>{actions}</header>;
 }
 
 export function SourceActions({ source, children }: Children & { source: string }) {
