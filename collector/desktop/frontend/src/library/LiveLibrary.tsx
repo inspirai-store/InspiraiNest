@@ -21,11 +21,11 @@ import { useLibraryData } from './useLibraryData';
 import { useRecords } from '../records/RecordsProvider';
 import styles from '../app/Workbench.module.css';
 
-const types: Record<string, string> = { 文章: 'article', 笔记: 'note', 文档: 'document', 音频: 'audio' };
-const states: Record<string, string> = { 已归档: 'archived', 待补齐: 'partial' };
+const types: Record<string, string> = { 文章: 'article', 笔记: 'note', 文档: 'document', 音频: 'audio', 视频: 'video', 网页: 'webpage', 图片: 'image', 代码项目: 'repository', 其他: 'other' };
+const states: Record<string, string> = { 已归档: 'archived', 待补齐: 'partial', 待处理: 'pending' };
 export function LiveLibrary() {
   const location = useLocation(), navigate = useNavigate(), params=useParams();
-  const dark=new URLSearchParams(location.search).get("theme")==="dark";
+  const theme=useAppTheme(),dark=theme==='dark';
   const { taskCount } = useRecords();
   const [trashInvoker,setTrashInvoker]=useState<HTMLElement|null>(null);
   const [tagsInvoker,setTagsInvoker]=useState<HTMLElement|null>(null);
@@ -75,7 +75,7 @@ export function LiveLibrary() {
   const remove=async(archiveId:string)=>{const startedSession=librarySession;setRemoving(true);setOperationError(false);try{if(!window.library?.remove)throw Error('回收站接口不可用');await window.library.remove(archiveId);await cache.invalidateQueries({queryKey:['live-library',librarySession]});}catch{if(currentSession.current===startedSession)setOperationError(true);}finally{if(currentSession.current===startedSession)setRemoving(false);}};
   useEffect(()=>{setTrashInvoker(null);setTagsInvoker(null);setDeletion(null);setOperationError(false);setRemoving(false);},[librarySession]);
   const clear = () => { setQuery(''); setType('全部类型'); setStatus('全部状态'); setSelected(null); update({favoritesOnly:false,tags:[]}); };
-  return <div ref={root} onFocusCapture={remember} className={styles.app} data-list-first-error={data.list.isError && !data.id || undefined} data-theme={useAppTheme()}>
+  return <div ref={root} onFocusCapture={remember} className={styles.app} data-list-first-error={data.list.isError && !data.id || undefined} data-theme={theme}>
     <AppShell area="library" go={go} taskCount={taskCount} libraryControlsDisabled libraryMenu={<MenuButton label="更多" icon={Ellipsis} iconOnly={false} compact={false} offset={dark?6:8} kind="ghost" width={160} align="end" options={[{label:"回收站",icon:Trash2,opensDialog:true,select:setTrashInvoker}]} />} favoritesDisabled={!bookmarksReady} favoritesOnly={ui.favoritesOnly} onFavorites={() => update({favoritesOnly:!ui.favoritesOnly,selected:null})} onAction={() => {}}>
       <SplitPane view={location.pathname!== '/library' ? 'detail' : 'list'}>
         <ListPane label="资料列表">
