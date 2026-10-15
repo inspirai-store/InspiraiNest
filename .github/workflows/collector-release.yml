@@ -71,7 +71,9 @@ jobs:
           test "$(git -C public-source rev-parse HEAD)" = "$EXPECTED_SOURCE"
           git -C public-source status --short --untracked-files=no
           if [[ "$VERIFY_PACKAGES" == true ]]; then
-            test -z "$(git -C public-source status --porcelain --untracked-files=no)"
+            # Desktop packaging regenerates these mobile icons from the shared brand asset.
+            # All executable source, tests and release configuration must remain unchanged.
+            test -z "$(git -C public-source status --porcelain --untracked-files=no -- . ':!collector/mobile/android/app/src/main/res/drawable-nodpi/ic_inspiration_nook.png' ':!collector/mobile/ios/Assets.xcassets/AppIcon.appiconset/icon-1024.png')"
           fi
           test -f public-source/collector/test-output/react-desktop/progress.json
       - name: Inspect keychain availability without reading credentials
