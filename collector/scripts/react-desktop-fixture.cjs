@@ -63,7 +63,7 @@ exports.create=async(executable)=>{
   async function setupMfa(){
    const target=targets.A,key='  Windows CI MFA password  ';await api(target.owner,'/api/security/credential','POST',{key:target.key,newKey:key,confirmKey:key});
    const setup=await api(target.owner,'/api/security/totp/setup','POST',{key});const {TOTP}=await import('otpauth');const totp=new TOTP({issuer:'InspiraiNest',label:'Windows CI',secret:setup.secret,algorithm:'SHA1',digits:6,period:30});
-   const confirmed=await api(target.owner,'/api/security/totp/confirm','POST',{key,otp:totp.generate()});return {key,totp,recoveryCode:confirmed.recoveryCodes[0]};
+   const usedOtp=totp.generate(),confirmed=await api(target.owner,'/api/security/totp/confirm','POST',{key,otp:usedOtp});return {key,totp,usedOtp,recoveryCode:confirmed.recoveryCodes[0]};
   }
   async function shot(name){await page.screenshot({path:path.join(output,name+'.png')});}
   async function check(name,fn){console.log('React desktop:',name);try{await fn();checks.push(name);}catch(error){const entry={name,error:String(error.stack)};failures.push(entry);console.error('React desktop group failed:',name,error);await shot('group-failure-'+failures.length).catch(()=>{});}finally{fs.writeFileSync(path.join(output,'progress.json'),JSON.stringify({checks,failures,errors},null,2));}}
