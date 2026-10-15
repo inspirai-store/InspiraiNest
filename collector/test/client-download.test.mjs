@@ -89,6 +89,25 @@ for (const brand of ['InspiraiNest', 'LingNest']) test(`${brand} releases preser
   assert.equal(download.status, 200);
   assert.match(download.headers.get('content-disposition'), /attachment/);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+  // Native desktop differential downloads must receive only the requested bytes.
+  for (const [range, start, end] of [['bytes=2-7', 2, 7], ['bytes=4-', 4, bytes.length-1], ['bytes=-5', bytes.length-5, bytes.length-1], ['bytes=0-9999', 0, bytes.length-1]]) {
+    const partial = await fetch(base + info.android.url, { headers: { Range: range } });
+    assert.equal(partial.status, 206);
+    assert.equal(partial.headers.get('content-range'), `bytes ${start}-${end}/${bytes.length}`);
+    assert.equal(Number(partial.headers.get('content-length')), end-start+1);
+    assert.deepEqual(Buffer.from(await partial.arrayBuffer()), bytes.subarray(start, end+1));
+  }
+  for (const range of ['bytes=9999-', 'bytes=9-2', 'bytes=-0', 'bytes=-', 'bytes=0-1,4-5', 'bytes=9007199254740993-']) {
+    const partial = await fetch(base + info.android.url, { headers: { Range: range } });
+    assert.equal(partial.status, 416);assert.equal(partial.headers.get('content-range'), `bytes */${bytes.length}`);
+    assert.equal((await partial.arrayBuffer()).byteLength, 0);
+  }
+  const headRange = await fetch(base + info.android.url, { method: 'HEAD', headers: { Range: 'bytes=2-7' } });
+  assert.equal(headRange.status, 200);assert.equal(Number(headRange.headers.get('content-length')), bytes.length);
+  const etag = download.headers.get('etag');
+  assert.equal((await fetch(base + info.android.url, { headers: { Range: 'bytes=0-1', 'If-Range': etag } })).status, 206);
+  const changed = await fetch(base + info.android.url, { headers: { Range: 'bytes=0-1', 'If-Range': '"another-release"' } });
+  assert.equal(changed.status, 200);assert.deepEqual(Buffer.from(await changed.arrayBuffer()), bytes);
   const browserDownload = await fetch(base + info.android.browserUrl);
   assert.equal(browserDownload.headers.get('content-disposition'), `attachment; filename="${filename}"`);
   assert.deepEqual(Buffer.from(await browserDownload.arrayBuffer()), bytes);

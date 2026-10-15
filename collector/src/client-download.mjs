@@ -98,8 +98,28 @@ export function clientDownload({ releaseDir, publicUrl }) {
     if (route.startsWith('/updates/macos/')) res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', selected.filename.endsWith('.apk') ? 'application/vnd.android.package-archive' : selected.filename.endsWith('.yml') ? 'text/yaml; charset=utf-8' : 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${selected.filename}"`);
-    res.setHeader('Content-Length', selected.size);
-    if (req.method === 'HEAD') res.end(); else fs.createReadStream(file).pipe(res);
+    res.setHeader('Accept-Ranges', 'bytes');
+    const etag = `"sha256-${selected.sha256}"`;
+    res.setHeader('ETag', etag);
+    let start = 0, end = selected.size - 1;
+    if (req.method === 'GET' && req.headers.range && (!req.headers['if-range'] || req.headers['if-range'] === etag)) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      const first = match?.[1] ? Number(match[1]) : null, last = match?.[2] ? Number(match[2]) : null;
+      const valid = match && (first !== null || last !== null) && [first, last].every(value => value === null || Number.isSafeInteger(value))
+        && (first === null ? last > 0 : first < selected.size && (last === null || last >= first));
+      if (!valid) { res.statusCode = 416; res.setHeader('Content-Range', `bytes */${selected.size}`); res.setHeader('Content-Length', 0); res.end(); return true; }
+      start = first === null ? Math.max(0, selected.size - last) : first;
+      end = first === null || last === null ? selected.size - 1 : Math.min(last, selected.size - 1);
+      res.statusCode = 206;
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${selected.size}`);
+    }
+    res.setHeader('Content-Length', end - start + 1);
+    if (req.method === 'HEAD') res.end(); else {
+      const stream = fs.createReadStream(file, { start, end });
+      res.on('close', () => stream.destroy());
+      stream.on('error', error => res.destroy(error));
+      stream.pipe(res);
+    }
     return true;
   };
   handler.workerReleases = workerReleases;
