@@ -78,9 +78,45 @@ jobs:
           test -f public-source/collector/test-output/react-desktop/progress.json
       - name: Inspect keychain availability without reading credentials
         run: |
+          id
+          stat -f 'Console user: %Su' /dev/console
+          launchctl print "gui/$(id -u)" >/dev/null && echo 'GUI bootstrap available' || true
+          parent=$$
+          for depth in 1 2 3 4; do
+            ps -p "$parent" -o pid=,ppid=,uid=,comm=
+            parent=$(ps -p "$parent" -o ppid= | tr -d ' ')
+          done
           security default-keychain -d user || true
           security list-keychains -d user
           security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" || true
+      - name: Probe native safeStorage in the runner and GUI bootstrap
+        if: ${{ inputs.inspect_macos_workspace }}
+        working-directory: public-source/collector
+        run: |
+          probe="$RUNNER_TEMP/inspirainest-native-keychain-probe.cjs"
+          cat > "$probe" <<'JS'
+          const { _electron } = require(process.env.SOURCE_COLLECTOR + '/node_modules/playwright');
+          const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+          (async () => {
+            const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inspirainest-keychain-probe-'));
+            const config = path.join(root, 'worker.json');
+            fs.writeFileSync(config, JSON.stringify({dataDir:path.join(root,'data')}));
+            const env = {...process.env, COLLECTOR_CONFIG:config, COLLECTOR_DESKTOP_TEST:'1'};
+            delete env.ELECTRON_RUN_AS_NODE; delete env.COLLECTOR_DESKTOP_STORAGE_FIXTURE;
+            const app = await _electron.launch({executablePath:path.resolve('desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏'),env});
+            try {
+              await app.firstWindow();
+              const result = await app.evaluate(({safeStorage}) => {
+                const available = safeStorage.isEncryptionAvailable();
+                return {available, roundTrip:available && safeStorage.decryptString(safeStorage.encryptString('disposable-ci-check')) === 'disposable-ci-check'};
+              });
+              console.log(JSON.stringify({context:process.env.PROBE_CONTEXT,...result}));
+            } finally { await app.close(); fs.rmSync(root,{recursive:true,force:true}); }
+          })().catch(error => {console.error(error.message);process.exitCode=1;});
+          JS
+          export SOURCE_COLLECTOR="$PWD"
+          PROBE_CONTEXT=runner node "$probe"
+          PROBE_CONTEXT=gui launchctl asuser "$(id -u)" "$(command -v node)" "$probe"
       - name: Verify original source run and unchanged signed packages
         if: ${{ inputs.verify_macos_workspace }}
         working-directory: public-source/collector
