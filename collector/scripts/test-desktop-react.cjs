@@ -69,7 +69,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
   });
   await f.check('archive search, pagination, reading tabs and bookmarks',async()=>{
    await f.nav('资料库');await until(async()=>await f.page.locator('[data-row]').count()>=30,'first archive page');
-   await region('条目列表').hover();await f.page.mouse.wheel(0,2500);await until(async()=>await f.page.locator('[data-row]').count()>30,'archive pagination');
+   await region('条目列表').hover();await f.page.mouse.wheel(0,100000);await until(async()=>await f.page.locator('[data-row]').count()>30,'archive pagination');
    await f.page.getByRole('searchbox',{name:'搜索资料'}).fill('如何建立自己的知识体系');await until(async()=>await f.page.locator('[data-row]').count()===1,'archive search');await f.page.locator('[data-row]').click();await f.page.getByRole('tab',{name:'原文',exact:true}).click();await waitText(region('阅读正文'),'原文第 1 行');await f.page.getByRole('tab',{name:'摘要',exact:true}).click();
    await button('收藏资料').click();await button('只看收藏').click();assert.equal(await button('只看收藏').getAttribute('aria-pressed'),'true');await shot('library-favorite');await button('只看收藏').click();
   });
