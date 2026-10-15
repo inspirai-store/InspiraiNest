@@ -1,6 +1,6 @@
 import OSS from 'ali-oss';
 import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -36,7 +36,7 @@ async function main() {
   if (expected.size !== 4 || names.some(name => !expected.has(name))) throw new Error('Unexpected package list');
   const assets = [];
   // Validate every local file before making any remote changes.
-  const updateFiles = brand === 'InspiraiNest' ? [...names.map(name => name + '.blockmap'), 'latest-mac.yml'] : [];
+  const updateFiles = brand === 'InspiraiNest' ? [...names.filter(name => name.endsWith('.zip') || existsSync(path.join(dir, name + '.blockmap'))).map(name => name + '.blockmap'), 'latest-mac.yml'] : [];
   for (const name of [...names, ...updateFiles, 'SHASUMS256.txt']) {
     const file = path.join(dir, name);
     const sha256 = await digest(createReadStream(file));

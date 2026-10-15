@@ -1,0 +1,65 @@
+name: Publish verified macOS client artifact
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful macOS signing run
+        type: string
+        required: true
+      source_commit:
+        description: Exact signed source commit
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  publish-macos:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true'
+    environment: signed-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify the retained signing run before exposing upload credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MACOS_CI_RUN: ${{ inputs.source_run }}
+          MACOS_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: node collector/scripts/verify-macos-release-ci.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run }}
+          name: InspiraiNest-macOS-local-${{ inputs.source_run }}
+          path: collector/desktop/dist
+      - run: npm ci --omit=dev --ignore-scripts
+        working-directory: collector
+      - name: Verify exact ZIP and DMG update hashes
+        working-directory: collector
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import crypto from 'node:crypto';import assert from 'node:assert/strict';import yaml from 'js-yaml';
+          const version=JSON.parse(fs.readFileSync('package.json')).version,meta=yaml.load(fs.readFileSync('desktop/dist/latest-mac.yml','utf8'));assert.equal(meta.version,version);
+          for(const arch of ['arm64','x64'])for(const ext of ['zip','dmg']){const name=`InspiraiNest-v${version}-macOS-${arch}.${ext}`,bytes=fs.readFileSync('desktop/dist/'+name),entry=meta.files.find(item=>item.url===name);assert.ok(entry);assert.equal(entry.size,bytes.length);assert.equal(entry.sha512,crypto.createHash('sha512').update(bytes).digest('base64'));}
+          JS
+      - name: Upload unchanged signed packages and verify private OSS readback
+        working-directory: collector
+        env:
+          OSS_RELEASE_REGION: ${{ secrets.OSS_RELEASE_REGION }}
+          OSS_RELEASE_BUCKET: ${{ secrets.OSS_RELEASE_BUCKET }}
+          OSS_RELEASE_ACCESS_KEY_ID: ${{ secrets.OSS_RELEASE_ACCESS_KEY_ID }}
+          OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
+          OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          OSS_RELEASE_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: node scripts/upload-macos-oss.mjs desktop/dist InspiraiNest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-publication-source
+          path: macos-ci-source.json
