@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {IDBFactory} from 'fake-indexeddb';
+import {IndexedRecordStore} from '../src/records/data/store.ts';
+import {RecordsService,newDraft} from '../src/records/data/service.ts';
+import {canonical} from '../src/records/data/sync.ts';
+
+const document=text=>({version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text,marks:[{type:'bold'}]}]}]}});
+function fixture(){
+ const base=new IndexedRecordStore(new IDBFactory()),records=new Map(),operations=new Map(),calls=[];
+ const state={rich:true,drop:false,omit:false};
+ const transport={status:async()=>({paired:true,server:'https://isolated.invalid',deviceId:'account-A'}),request:async input=>{
+  calls.push(structuredClone(input));
+  if(input.route==='/api/records/capabilities')return {status:state.rich?200:404,json:state.rich?{protocol:1,documentVersions:[1]}:{error:'Not found'}};
+  if(input.route==='/api/records')return {status:200,json:{records:structuredClone([...records.values()])}};
+  const id=input.route.split('/').at(-1),old=records.get(id);
+  if(input.method!=='PUT')return old?{status:200,json:structuredClone(old)}:{status:404,json:{error:'Not found'}};
+  const p=input.json,key=id+':'+p.requestId,hash=JSON.stringify(canonical(p));let result;
+  if(operations.has(key)){const op=operations.get(key);if(op.hash!==hash)return {status:409,json:{code:'record_request_reused',error:'request reused'}};result=op.result;}
+  else {if(p.baseVersion!==(old?.version??0))return {status:409,json:{code:'record_version_conflict',error:'version changed'}};result={id,text:p.text,...(p.document&&!state.omit?{document:p.document}:{}),attachments:p.attachments,createdAt:p.createdAt,updatedAt:new Date().toISOString(),version:p.baseVersion+1};records.set(id,result);operations.set(key,{hash,result:structuredClone(result)});}
+  if(state.drop){state.drop=false;throw Error('response lost');}return {status:200,json:structuredClone(result)};
+ }};
+ const service=new RecordsService(base,transport);
+ return {base,service,transport,records,operations,calls,state,async save(text='原内容',rich=false){const {item}=await service.saveRecord({...newDraft(),text,...(rich?{document:document(text)}:{})});await service.flush();return item.id;},remote(id,text){const old=records.get(id);records.set(id,{...old,text,...(old.document?{document:document(text)}:{}),version:old.version+1});}};
+}
+async function conflict(f){const id=await f.save();const draft=await f.service.edit(id);await f.service.saveRecord({...draft,text:'本机修改'});f.remote(id,'云端修改');await f.service.flush();assert.equal((await f.service.store.get(id)).sync,'conflict');return id;}
+
+test('成功回执丢失后重启使用原请求，不新增版本',async()=>{const f=fixture();f.state.drop=true;const id=await f.save();const failed=await f.service.store.get(id);assert.equal(failed.sync,'failed');const restarted=new RecordsService(f.base,f.transport);await restarted.flush();assert.equal((await restarted.store.get(id)).sync,'synced');assert.equal(f.records.get(id).version,1);assert.equal(f.operations.size,1);});
+test('相同内容版本不同可自动确认，不重复写入',async()=>{const f=fixture(),id=await f.save();const draft=await f.service.edit(id);await f.service.saveRecord(draft);f.remote(id,'原内容');await f.service.flush();assert.equal((await f.service.store.get(id)).remoteVersion,2);assert.equal(f.records.get(id).version,2);assert.equal(f.operations.size,1);});
+test('只有云端变化时自动采用并保存本机恢复副本',async()=>{const f=fixture(),id=await f.save();await f.service.saveRecord(await f.service.edit(id));f.remote(id,'远端更新');await f.service.flush();const item=await f.service.store.get(id);assert.equal(item.sync,'synced');assert.equal(item.text,'远端更新');assert.equal(item.backups[0].local.text,'原内容');});
+test('只有本机内容变化，云端仅推进相同内容版本时安全重提交',async()=>{const f=fixture(),id=await f.save();await f.service.saveRecord({...await f.service.edit(id),text:'仅本机修改'});f.remote(id,'原内容');await f.service.flush();assert.equal(f.records.get(id).version,3);assert.equal(f.records.get(id).text,'仅本机修改');});
+test('双方均变化时保留两份，重复刷新不自动覆盖',async()=>{const f=fixture(),id=await conflict(f);await f.service.flush();assert.equal(f.records.get(id).text,'云端修改');assert.equal((await f.service.store.get(id)).text,'本机修改');const c=await f.service.loadConflict(id);assert.equal(c.base.text,'原内容');assert.equal(c.remote.version,2);});
+for(const choice of ['local','remote','copy'])test('用户选择 '+choice+' 前备份原请求和双方内容',async()=>{const f=fixture(),id=await conflict(f),c=await f.service.loadConflict(id);const result=await f.service.resolveConflict(id,choice,c.remote.version);await f.service.flush();const item=await f.service.store.get(id);assert.ok(item.backups.some(b=>b.local.text==='本机修改'&&b.remote.text==='云端修改'&&b.payload));assert.equal(f.records.get(id).text,choice==='local'?'本机修改':'云端修改');if(choice==='copy'){assert.notEqual(result.copyId,id);assert.equal(f.records.get(result.copyId).text,'本机修改');assert.equal(f.records.size,2);}});
+test('比较后云端再次改变，拒绝使用过期确认',async()=>{const f=fixture(),id=await conflict(f);f.remote(id,'再次修改');await assert.rejects(f.service.resolveConflict(id,'local',2),/再次更新/);assert.equal(f.records.get(id).text,'再次修改');});
+test('合并草稿保存后再次编辑仍受版本保护，原内容可恢复',async()=>{const f=fixture(),id=await conflict(f);const {draft}=await f.service.resolveConflict(id,'merge',2);assert.equal(draft.text,'本机修改');f.remote(id,'再次修改');await assert.rejects(f.service.saveRecord({...draft,text:'手工合并结果'}),/再次更新/);assert.equal((await f.service.load()).draft.text,'本机修改');assert.equal((await f.service.store.get(id)).backups.length,1);});
+test('合并不得覆盖另一条未保存草稿',async()=>{const f=fixture(),id=await conflict(f);await f.service.saveDraft({...await f.service.load().then(x=>x.draft),text:'其他草稿'});await assert.rejects(f.service.resolveConflict(id,'merge',2),/先保存现有草稿/);assert.equal((await f.service.load()).draft.text,'其他草稿');});
+test('旧服务端写入前被识别为兼容问题，完整内容留本机',async()=>{const f=fixture();f.state.rich=false;const id=await f.save('完整排版',true);const item=await f.service.store.get(id);assert.equal(item.sync,'failed');assert.equal(item.errorCode,'record_protocol_incompatible');assert.deepEqual(item.document,document('完整排版'));assert.equal(f.calls.filter(c=>c.method==='PUT').length,0);});
+async function legacy(f){const {item}=await f.service.saveRecord({...newDraft(),text:'旧回执',document:document('旧回执')});const local=await f.service.store.get(item.id);const payload={requestId:crypto.randomUUID(),baseVersion:0,text:item.text,document:item.document,createdAt:item.createdAt,attachments:[]};const result={id:item.id,text:item.text,attachments:[],createdAt:item.createdAt,version:1};f.records.set(item.id,result);f.operations.set(item.id+':'+payload.requestId,{hash:JSON.stringify(canonical(payload)),result});await f.service.store.put({...local,payload,sync:'conflict',error:'资料空间未确认完整排版'});return item.id;}
+test('旧回执恢复原 ID 排版，原操作不变且恢复只生成一个新版本',async()=>{const f=fixture(),id=await legacy(f);await f.service.flush();await f.service.flush();const item=await f.service.store.get(id);assert.equal(item.sync,'synced');assert.equal(f.records.get(id).version,2);assert.deepEqual(f.records.get(id).document,document('旧回执'));assert.equal(f.records.size,1);assert.equal(f.operations.size,2);assert.ok(item.backups[0].payload);});
+test('旧回执恢复时存在云端新修改，必须比较，不能覆盖',async()=>{const f=fixture(),id=await legacy(f);f.remote(id,'别人补充');await f.service.flush();assert.equal((await f.service.store.get(id)).sync,'conflict');assert.equal(f.records.get(id).text,'别人补充');});
+test('服务端错误宣称支持排版时不会无限增版或重发修复',async()=>{const f=fixture();f.state.omit=true;const id=await f.save('不能丢排版',true);await f.service.flush();await f.service.flush();assert.equal(f.records.get(id).version,2);assert.equal((await f.service.store.get(id)).errorCode,'record_ack_mismatch');assert.equal(f.operations.size,2);});
+test('富文本发生真正冲突时不按纯文本相同误判同步成功',async()=>{const f=fixture(),id=await f.save('同样文字',true);const draft=await f.service.edit(id);await f.service.saveRecord({...draft,document:{...document('同样文字'),doc:{type:'doc',content:[{type:'heading',attrs:{level:1},content:[{type:'text',text:'同样文字'}]}]}}});f.remote(id,'同样文字');const remote=f.records.get(id);remote.document.doc.content[0].content[0].marks=[{type:'italic'}];await f.service.flush();assert.equal((await f.service.store.get(id)).sync,'conflict');});

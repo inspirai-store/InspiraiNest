@@ -10,6 +10,9 @@ export const mediaExtensions = { ...documentExtensions, 'image/jpeg':'jpg','imag
 export const recordPresets = { summary:'整理摘要', extract:'转写 / 识字', actions:'提炼行动项', custom:'自定义' };
 const identify = value => { requireValue(typeof value === 'string' && uuid.test(value), 'Invalid record/request ID'); return value.toLowerCase(); };
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
+const recordCheck = (condition, code, message, status=409) => {
+  if (!condition) throw Object.assign(new Error(message), {status, code});
+};
 function validMedia(buffer, mime) {
   const ascii = (start, end) => buffer.toString('ascii',start,end);
   switch (mime) {
@@ -61,6 +64,9 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     }
     if (!route.startsWith('/api/records')) return false;
     owner(device);
+    if (route === '/api/records/capabilities' && req.method === 'GET') {
+      send(res,200,{protocol:1,documentVersions:[1],structuredErrors:true}); return true;
+    }
     const mediaRoute = route.match(/^\/api\/records\/media\/([a-f0-9]{64})$/);
     if (mediaRoute) {
       const sha = mediaRoute[1];
@@ -77,7 +83,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
       requireValue(documentExtensions[mime]?await validDocument(buffer,mime):validMedia(buffer,mime),'File does not match its media type',415);
       const result = await serialized(`record-media:${sha}`,async () => {
         const old = await store.get('record-media',sha);
-        if (old) { requireValue(old.mime === mime,'Media type mismatch',409); return old; }
+        if (old) { recordCheck(old.mime === mime,'record_media_type_mismatch','附件类型与已保存的文件不一致'); return old; }
         const key = `record-media/${sha}`; await storage.put(key,buffer); await authenticate(req);
         return store.put('record-media',{id:sha,mime,bytes:size,key,createdAt:now()});
       }); send(res,200,{sha256:result.id,mime:result.mime,bytes:result.bytes}); return true;
@@ -102,14 +108,14 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
       const live = await tx.get('device',device.id);
       requireValue(credential && live && !credential.revokedAt && !live.revokedAt && [credential.tokenHash,credential.ownerTokenHash].includes(device.credentialTokenHash || hash(req.authToken)), 'Device authorization required',401);
       const previous = await tx.getForUpdate('capture-operation',operationId);
-      if (previous) { requireValue(previous.hash === payloadHash,'Request ID reused with different content',409); return previous.result; }
+      if (previous) { recordCheck(previous.hash === payloadHash,'record_request_reused','请求编号对应的内容已改变；原请求已保留，请重新保存修改'); return previous.result; }
       const current = await tx.getForUpdate('capture',recordId);
       let result;
       if (recordRoute[2]) {
         requireValue(req.method === 'POST','Method not allowed',405);
         requireValue(current,'Record not found',404);
         const snapshot=current.version===input.baseVersion?current:await tx.get('capture-version',`${recordId}:${input.baseVersion}`);
-        requireValue(snapshot,'记录版本不存在，请刷新后再加工',409);
+        recordCheck(snapshot,'record_version_missing','记录版本不存在，请刷新后再加工');
         requireValue(recordPresets[input.preset],'Invalid processing preset');
         const instructions = input.instructions || ''; requireValue(typeof instructions === 'string' && instructions.length <= 10000,'Invalid instructions');
         requireValue(input.preset !== 'custom' || instructions.trim(),'请填写自定义加工要求');
@@ -119,14 +125,15 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         result = await saveTask(task,'queued','等待可用电脑加工记录',tx);
       } else {
         requireValue(req.method === 'PUT','Method not allowed',405);
-        requireValue((current?.version || 0) === input.baseVersion,'记录已被其他设备修改，本机内容已保留，请刷新后重新提交',409);
+        recordCheck((current?.version || 0) === input.baseVersion,'record_version_conflict','云端记录已更新，本机内容已保留，请比较内容后同步');
+        recordCheck(!current?.document || input.document !== undefined,'record_document_required','此记录包含完整排版，请使用支持排版的新版客户端编辑',422);
         requireValue(typeof input.text === 'string' && input.text.length <= 50000,'Record text exceeds 50000 characters');
         requireValue(Array.isArray(input.attachments) && input.attachments.length <= 20,'At most 20 attachments per record');
         const attachments = []; let total = 0;
         for (const attachment of input.attachments) {
           requireValue(attachment && digest.test(attachment.sha256) && typeof attachment.name === 'string' && attachment.name.length > 0 && attachment.name.length <= 200,'Invalid attachment');
-          const media = await tx.get('record-media',attachment.sha256); requireValue(media,'Attachment has not been uploaded',409);
-          let thumbnailSha256;if(attachment.thumbnailSha256){requireValue((media.mime.startsWith('image/')||media.mime.startsWith('video/'))&&digest.test(attachment.thumbnailSha256),'Invalid thumbnail');const preview=await tx.get('record-media',attachment.thumbnailSha256);requireValue(preview?.mime.startsWith('image/')&&preview.bytes<=256*1024,'Thumbnail has not been uploaded or exceeds 256 KiB',409);thumbnailSha256=preview.id;}attachments.push({id:identify(attachment.id),sha256:media.id,name:attachment.name,mime:media.mime,bytes:media.bytes,...(thumbnailSha256?{thumbnailSha256}:{})}); total += media.bytes;
+          const media = await tx.get('record-media',attachment.sha256); recordCheck(media,'record_media_missing','附件尚未完整上传，请重试同步');
+          let thumbnailSha256;if(attachment.thumbnailSha256){requireValue((media.mime.startsWith('image/')||media.mime.startsWith('video/'))&&digest.test(attachment.thumbnailSha256),'Invalid thumbnail');const preview=await tx.get('record-media',attachment.thumbnailSha256);recordCheck(preview?.mime.startsWith('image/')&&preview.bytes<=256*1024,'record_media_missing','附件预览尚未上传或超过大小限制，请重试同步');thumbnailSha256=preview.id;}attachments.push({id:identify(attachment.id),sha256:media.id,name:attachment.name,mime:media.mime,bytes:media.bytes,...(thumbnailSha256?{thumbnailSha256}:{})}); total += media.bytes;
         }
         requireValue(new Set(attachments.map(a=>a.id)).size === attachments.length,'Duplicate attachment ID');
         requireValue(total <= 128 * 1024 * 1024,'Record media exceeds 128 MiB',413);

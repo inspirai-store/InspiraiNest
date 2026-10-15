@@ -1,9 +1,10 @@
 import {errorMessage} from '../shared/errors.ts';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import {Action} from '../components/Controls';
 import {Modal,MenuButton} from '../components/Overlays';
-import type {ProcessRequest} from './data/types';
+import type {Attachment,ConflictChoice,ProcessRequest,RecordConflict} from './data/types';
+import {RichEditor} from './RichEditor';
 import styles from './RecordDialogs.module.css';
 export function ProcessDialog({invoker,close,submit,devices=[]}:{invoker:HTMLElement;close:()=>void;submit:(value:Omit<ProcessRequest,'requestId'|'baseVersion'>)=>Promise<void>;devices?:{id:string;name:string}[]}){
  const [preset,setPreset]=useState('summary'),[instructions,setInstructions]=useState(''),[deviceId,setDevice]=useState<string|null>(null),[agent,setAgent]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -15,7 +16,16 @@ export function ProcessDialog({invoker,close,submit,devices=[]}:{invoker:HTMLEle
  {error&&<p role="alert" className={styles.error}>{error}</p>}
  </Modal>;
 }
-export function ConflictDialog({invoker,close,submit}:{invoker:HTMLElement;close:()=>void;submit:()=>Promise<void>}){
- const [busy,setBusy]=useState(false),[error,setError]=useState('');
- return <Modal title="版本冲突" region="冲突对话框" invoker={invoker} close={()=>{if(!busy)close();}} className={styles.conflict} footer={<><Action disabled={busy} onClick={close}>取消</Action><Action kind="primary" disabled={busy} onClick={async()=>{setBusy(true);try{await submit();close();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>保留本机并重发</Action></>}><p className={styles.conflictText} data-overlay-region="冲突说明">远端记录已更新。<br/>本机内容已保留；重新提交将生成新版本。</p>{error&&<p role="alert" className={styles.error}>{error}</p>}</Modal>;
+export function ConflictDialog({invoker,close,submit,load,read}:{invoker:HTMLElement;close:()=>void;submit:(choice:ConflictChoice,version:number)=>Promise<void>;load?:()=>Promise<RecordConflict>;read?:(side:'local'|'remote',attachment:Attachment)=>Promise<Blob>}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[value,setValue]=useState<RecordConflict|null>(null),[loading,setLoading]=useState(true);
+ const refresh=async()=>{setLoading(true);setError('');try{if(!load)throw Error('请在实际记录中打开内容比较');setValue(await load());}catch(e){setError(errorMessage(e));}finally{setLoading(false);}};
+ useEffect(()=>{let active=true;if(load)void load().then(v=>{if(active)setValue(v);}).catch(e=>{if(active)setError(errorMessage(e));}).finally(()=>{if(active)setLoading(false);});else setLoading(false);return()=>{active=false;};},[]);
+ const choose=async(choice:ConflictChoice)=>{if(!value)return;setBusy(true);setError('');try{await submit(choice,value.remote.version);close();}catch(e){setError(errorMessage(e));setValue(null);}finally{setBusy(false);}};
+ const disabled=busy||loading||!value;
+ const date=(v:string|undefined)=>v?new Date(v).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'时间未上报';
+ return <Modal title="比较冲突内容" region="冲突对话框" invoker={invoker} close={()=>{if(!busy)close();}} className={styles.conflict} footer={<div className={styles.conflictActions}><Action disabled={busy} onClick={close}>稍后处理</Action><Action disabled={disabled} onClick={()=>void choose('copy')}>另存副本</Action><Action disabled={disabled} onClick={()=>void choose('remote')}>使用云端</Action><Action disabled={disabled} onClick={()=>void choose('local')}>使用本机</Action><Action kind="primary" disabled={disabled} onClick={()=>void choose('merge')}>合并编辑</Action></div>}>
+ <p className={styles.conflictText} data-overlay-region="冲突说明">本机与云端均有修改。先比较内容，再选择保留方式。替换前会保存恢复副本；合并编辑从本机内容开始。</p>
+ {loading?<p role="status">正在读取云端最新内容…</p>:value?<div className={styles.comparison}>{(['local','remote'] as const).map(side=>{const record=value[side];return <section key={side} aria-label={side==='local'?'本机内容':'云端内容'} className={styles.version}><header><strong>{side==='local'?'本机保留':'云端最新'}</strong><span>{side==='local'?'基于':'版本'} v{record.version}</span></header><time>{date(record.updatedAt??record.createdAt)} · 北京时间</time><div className={styles.versionBody}><RichEditor key={side+record.version} value={record.document} text={record.text} attachments={record.attachments} load={a=>read?read(side,a):Promise.reject(Error('附件预览不可用'))} readOnly/>{record.attachments.length>0&&<ul>{record.attachments.map(a=><li key={a.id}>{a.name} · {a.bytes.toLocaleString()} 字节</li>)}</ul>}</div></section>;})}</div>:null}
+ {error&&<p role="alert" className={styles.error}>{error}</p>}{!loading&&!value&&<Action disabled={busy} onClick={()=>void refresh()}>重新加载比较</Action>}
+ </Modal>;
 }

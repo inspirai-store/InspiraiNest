@@ -17,6 +17,7 @@ export class AccountRecordStore implements RecordStore {
   async all(){return (await this.base.all()).filter(item=>item.accountScope===this.scope&&typeof item.localId==='string'&&!item.transferredTo).map(item=>this.unpack(item));}
   async get(id:string){const item=await this.base.get(key(this.scope,id));return item&&!item.transferredTo?this.unpack(item):undefined;}
   put(item:StoredItem){return this.base.put(this.pack(item));}
+  async putMany(items:StoredItem[]){if(!this.base.putMany)throw Error('本机存储不支持安全批量保存');await this.base.putMany(items.map(item=>this.pack(item)));}
   async commit(item:LocalRecord,draft:LocalDraft){if(item.accountScope!==this.scope||draft.accountScope!==this.scope)throw Error('资料空间已切换，记录仍保存在本机');await this.base.commit(this.pack(item) as LocalRecord,this.pack(draft) as LocalDraft);}
   private async batch(items:StoredItem[],assertSession:()=>void){assertSession();if(this.base.putMany)await this.base.putMany(items);else for(const item of items){assertSession();await this.base.put(item);}assertSession();}
   async migrate(connection:Connection,assertSession:()=>void){

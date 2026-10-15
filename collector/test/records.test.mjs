@@ -34,6 +34,32 @@ test('concurrent edits keep immutable snapshots and one winner; workers cannot m
   const responses=await Promise.all([request('/api/records/'+id,'PUT',input({baseVersion:1,text:'version two'})),request('/api/records/'+id,'PUT',input({baseVersion:1,text:'competing edit'}))]);assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
   const node=await worker();assert.equal((await request('/api/records','GET',undefined,node)).status,403);
 });
+
+test('record protocol announces rich documents and rejects destructive legacy writes without changing history',async t=>{
+ const {request,input,app,worker}=await fixture(t),id=crypto.randomUUID();
+ const capabilities=await request('/api/records/capabilities');assert.deepEqual(capabilities.value,{protocol:1,documentVersions:[1],structuredErrors:true});
+ const document={version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'保留排版',marks:[{type:'bold'}]}]}]}};
+ const original=input({text:'保留排版',document});const created=await request('/api/records/'+id,'PUT',original);assert.deepEqual(created.value.document,document);
+ const legacy=await request('/api/records/'+id,'PUT',input({baseVersion:1,text:'旧客户端修改'}));assert.equal(legacy.status,422);assert.equal(legacy.value.code,'record_document_required');
+ assert.deepEqual((await request('/api/records/'+id)).value.document,document);assert.equal((await request('/api/records/'+id)).value.version,1);
+ const node=await worker();assert.equal((await request('/api/records/capabilities','GET',undefined,node)).status,403);
+ const old=await request('/api/records/'+id,'PUT',input({baseVersion:0,text:'过期内容',document}));assert.equal(old.value.code,'record_version_conflict');
+ const reused=await request('/api/records/'+id,'PUT',{...original,text:'不同请求'});assert.equal(reused.value.code,'record_request_reused');
+ assert.equal((await app.store?.list?.('capture-version'))?.length??1,1);
+});
+
+test('a committed old receipt stays immutable after protocol upgrade; one new request restores document and retries exactly',async t=>{
+ const {request,input,app}=await fixture(t),id=crypto.randomUUID(),requestId=crypto.randomUUID();
+ const document={version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'恢复正文'}]}]}},payload=input({requestId,text:'恢复正文',document});
+ const {canonicalJson:canonicalJSON}=await import('../src/common.mjs');
+ const store=app.store;
+ assert.ok(store,'test service exposes isolated store');
+ const old={id,text:payload.text,attachments:[],createdAt:payload.createdAt,updatedAt:new Date().toISOString(),version:1};
+ await store.put('capture',old);await store.put('capture-version',{...old,id:id+':1',recordId:id});await store.put('capture-operation',{id:id+':'+requestId,hash:hash(canonicalJSON({method:'PUT',input:payload})),result:old});
+ const replay=await request('/api/records/'+id,'PUT',payload);assert.equal(replay.value.version,1);assert.equal(replay.value.document,undefined);
+ const repair={...payload,requestId:crypto.randomUUID(),baseVersion:1};const fixed=await request('/api/records/'+id,'PUT',repair);assert.equal(fixed.value.version,2);assert.deepEqual(fixed.value.document,document);assert.deepEqual((await request('/api/records/'+id,'PUT',repair)).value,fixed.value);
+ assert.equal((await store.get('capture-version',id+':1')).document,undefined);
+});
 test('media requires correct checksum and signature and all uploaded files before commit',async t=>{
   const {request,input}=await fixture(t),bytes=Buffer.from('89504e470d0a1a0a00000000','hex'),sha=hash(bytes),recordId=crypto.randomUUID(),attachment={id:crypto.randomUUID(),sha256:sha,name:'photo.png'};
   assert.equal((await request('/api/records/'+recordId,'PUT',input({attachments:[attachment]}))).status,409);

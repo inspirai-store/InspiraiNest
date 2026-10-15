@@ -3,10 +3,10 @@ export type CaptureBridge = { status(): Promise<Connection>; capture(input: Capt
 export function desktopTransport(bridge: CaptureBridge): RecordTransport {
   return { status: () => bridge.status(), request: input => bridge.capture(input) };
 }
-export class RequestError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }
+export class RequestError extends Error { status: number; code?:string; constructor(message: string, status: number, code?:string) { super(message); this.status = status; this.code=code; } }
 export async function requestJson<T>(transport: RecordTransport, input: CaptureInput): Promise<T> {
   const reply = await transport.request(input);
-  if (reply.status < 200 || reply.status >= 300) throw new RequestError((reply.json as {error?:string})?.error ?? `服务请求失败（${reply.status}）`, reply.status);
+  if (reply.status < 200 || reply.status >= 300) throw new RequestError((reply.json as {error?:string})?.error ?? `服务请求失败（${reply.status}）`, reply.status,(reply.json as {code?:string})?.code);
   return reply.json as T;
 }
 export async function blobBase64(blob: Blob) {

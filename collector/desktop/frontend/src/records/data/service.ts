@@ -3,10 +3,12 @@ import {AccountRecordStore,recordScope} from './account-store.ts';
 import type { Attachment, Connection, LocalDraft, LocalRecord, ProcessRequest, RecordStore, RecordTask } from './types.ts';
 import type { RecordTransport } from './types.ts';
 import { blobBase64, RequestError, requestJson, sha256 } from './transport.ts';
-const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical((value as Record<string,unknown>)[key])])):value;
+import type {ConflictChoice,RecordConflict,RecordSnapshot} from './types.ts';
+import {sameContent,sameProjection,snapshot} from './sync.ts';
 export const newDraft = (): LocalDraft => ({id:'draft',recordId:crypto.randomUUID(),text:'',attachments:[]});
 export const recordState = (item: LocalRecord) => {
-  if (item.sync === 'conflict') return '版本冲突';
+  if (item.sync === 'conflict') return '内容冲突';
+  if (item.sync === 'failed' && item.errorCode === 'record_protocol_incompatible') return '服务端待升级';
   if (item.sync === 'failed') return '同步失败';
   if (item.sync === 'syncing') return '同步中';
   if (item.sync === 'pending') return '待同步';
@@ -39,57 +41,131 @@ export class RecordsService {
     return this.serial(async () => {
       this.assertSession(session.epoch);if (!snapshot.text.trim() && !snapshot.attachments.length) throw new Error('记录内容为空');
       const previous = snapshot.editingId ? await this.store.get(snapshot.editingId) as LocalRecord | undefined : undefined;
-      if (previous && ['syncing','conflict'].includes(previous.sync)) throw new Error(previous.sync === 'conflict' ? '请先处理版本冲突' : '正在同步，请稍后补充');
+      if (previous && (previous.sync==='syncing'||previous.sync==='conflict'&&snapshot.resolvingVersion===undefined)) throw new Error(previous.sync === 'conflict' ? '请先比较冲突内容' : '正在同步，请稍后补充');
+      if(snapshot.resolvingVersion!==undefined){const remote=await this.remoteRecord(snapshot.editingId!,session);this.assertSession(session.epoch);if(remote.version!==snapshot.resolvingVersion)throw new Error('云端再次更新，合并草稿已保存在本机，请重新比较');}
       const item: LocalRecord = {...previous,accountScope:recordScope(session),id:snapshot.editingId ?? snapshot.recordId,text:snapshot.text,document:snapshot.document,attachments:snapshot.attachments,createdAt:previous?.createdAt ?? new Date().toISOString(),version:previous?.version ?? 1,remoteVersion:snapshot.baseVersion ?? previous?.remoteVersion ?? 0,server:previous?.server ?? (this.connection.server || null),sync:'pending',error:''};
       delete item.payload;
+      delete item.repair;
+      item.baseSnapshot=snapshot.baseSnapshot??previous?.baseSnapshot;item.errorCode=undefined;
       const next={...newDraft(),accountScope:recordScope(session)}; await this.store.commit(item,next); return {item,draft:next};
     });
   }
+  private async remoteRecord(id:string,session:Connection&{epoch:number}) {
+    const remote=await requestJson<LocalRecord>(this.transport,{route:'/api/records/'+id,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
+    if(remote.id!==id||!Number.isInteger(remote.version)||remote.version<1||typeof remote.text!=='string'||!Array.isArray(remote.attachments))throw new RequestError('服务端返回了无效的记录，请稍后重试',502,'record_ack_mismatch');
+    return remote;
+  }
+  private backup(item:LocalRecord,reason:string,remote?:RecordSnapshot) {item.backups=[...(item.backups??[]),{at:new Date().toISOString(),reason,local:snapshot(item),payload:structuredClone(item.payload),remote:remote?structuredClone(remote):undefined}];}
+  private accept(item:LocalRecord,remote:LocalRecord) {
+    const attachments=remote.attachments.map(a=>({...a,blob:item.attachments.find(old=>old.sha256===a.sha256)?.blob,thumbnail:item.attachments.find(old=>old.sha256===a.sha256)?.thumbnail??a.thumbnail}));
+    Object.assign(item,{text:remote.text,document:remote.document,attachments,version:remote.version,remoteVersion:remote.version,updatedAt:remote.updatedAt,sync:'synced',error:'',errorCode:undefined});delete item.payload;delete item.repair;item.baseSnapshot=snapshot(item);
+  }
+  private reconcile(item:LocalRecord,remote:LocalRecord):boolean {
+    if(sameContent(item,remote)){this.accept(item,remote);return true;}
+    if(item.baseSnapshot&&sameContent(item,item.baseSnapshot)){this.backup(item,'采用云端唯一修改',remote);this.accept(item,remote);return true;}
+    if(item.baseSnapshot&&sameContent(remote,item.baseSnapshot)){this.backup(item,'仅本机修改，更新同步基线',remote);item.remoteVersion=remote.version;item.baseSnapshot={...snapshot(remote),version:remote.version};delete item.payload;item.sync='pending';return true;}
+    return false;
+  }
   flush() {
     if (this.flushing) return this.flushing;
-    this.flushing = (async () => {
-      const session = await this.status(); if (!session.paired) return;
-      const api = <T>(route: string, method: 'GET' | 'PUT' | 'POST', json?: unknown) => requestJson<T>(this.transport,{route,method,json,server:session.server,deviceId:session.deviceId});
-      for (const stored of await this.store.all()) {
-        if (stored.id === 'draft') continue; const item = stored as LocalRecord;
-        if(item.accountScope!==recordScope(session))continue;
-        if (['pending','failed','syncing'].includes(item.sync)) {
-          const latest=await this.serial(async()=>{const current=await this.store.get(item.id) as LocalRecord|undefined;if(!current||!['pending','failed','syncing'].includes(current.sync))return null;current.server=session.server;current.sync='syncing';await this.store.put(current);return current;});if(!latest)continue;Object.assign(item,latest);
-          try {
-            for (const a of item.attachments) {
-              const uploads = [...(a.thumbnail?.blob ? [a.thumbnail] : []), ...(a.blob ? [a] : [])];
-              for (const media of uploads) {
-                this.assertSession(session.epoch); const blob = media.blob!;
-                if (blob.size !== media.bytes || await sha256(blob) !== media.sha256) throw new Error('本机附件校验失败');
-                const reply = await requestJson<{sha256:string;bytes:number}>(this.transport,{route:'/api/records/media/'+media.sha256,method:'PUT',server:session.server,deviceId:session.deviceId,bytes:await blobBase64(blob),mime:media.mime});
-                this.assertSession(session.epoch); if (reply.sha256 !== media.sha256 || reply.bytes !== media.bytes) throw new Error('服务端未确认附件完整性');
-              }
+    this.flushing=(async()=>{
+      const session=await this.status();if(!session.paired)return;const store=this.store;
+      const api=<T>(route:string,method:'GET'|'PUT'|'POST'='GET',json?:unknown)=>requestJson<T>(this.transport,{route,method,json,server:session.server,deviceId:session.deviceId});
+      let capabilities:Promise<void>|undefined;
+      const requireRich=()=>capabilities??=(async()=>{try{const value=await api<{protocol:number;documentVersions:number[]}>('/api/records/capabilities');this.assertSession(session.epoch);if(value.protocol!==1||!value.documentVersions?.includes(1))throw Error('unsupported');}catch(error){if(error instanceof RequestError&&[401,403].includes(error.status))throw error;throw new RequestError('资料空间尚不支持完整排版，请升级服务端；本机内容已保留',422,'record_protocol_incompatible');}})();
+      for(const stored of await store.all()){
+        if(stored.id==='draft')continue;const item=stored as LocalRecord;
+        if(item.accountScope!==recordScope(session)||!['pending','failed','syncing','conflict'].includes(item.sync))continue;
+        try{
+          if(item.document)await requireRich();this.assertSession(session.epoch);
+          if(item.sync==='conflict'){
+            const remote=await this.remoteRecord(item.id,session);
+            if(this.reconcile(item,remote)){await store.put(item);if(String(item.sync)==='synced')continue;}
+            // Legacy clients used this state for a committed, incomplete rich-text receipt.
+            else if(!(item.document&&!remote.document&&item.payload&&sameProjection(item.payload,remote)))continue;
+          }
+          item.server=session.server;item.sync='syncing';await store.put(item);
+          for(const a of item.attachments){
+            const uploads=[...(a.thumbnail?.blob?[a.thumbnail]:[]),...(a.blob?[a]:[])];
+            for(const media of uploads){this.assertSession(session.epoch);const blob=media.blob!;if(blob.size!==media.bytes||await sha256(blob)!==media.sha256)throw new RequestError('本机附件校验失败，原件已保留',422,'record_media_invalid');
+              const reply=await requestJson<{sha256:string;bytes:number}>(this.transport,{route:'/api/records/media/'+media.sha256,method:'PUT',server:session.server,deviceId:session.deviceId,bytes:await blobBase64(blob),mime:media.mime});this.assertSession(session.epoch);if(reply.sha256!==media.sha256||reply.bytes!==media.bytes)throw new RequestError('服务端未确认附件完整性',502,'record_media_invalid');}
+          }
+          for(let attempt=0;attempt<2;attempt++){
+            item.payload??={requestId:crypto.randomUUID(),baseVersion:item.remoteVersion||0,text:item.text,...(item.document?{document:item.document}:{}),createdAt:item.createdAt,attachments:item.attachments.map(a=>({id:a.id,name:a.name,sha256:a.sha256,...(a.thumbnail?.sha256||a.thumbnailSha256?{thumbnailSha256:a.thumbnail?.sha256??a.thumbnailSha256}:{})}))};
+            await store.put(item);this.assertSession(session.epoch);
+            let remote:LocalRecord;
+            try{remote=await api<LocalRecord>('/api/records/'+item.id,'PUT',item.payload);}
+            catch(error){
+              if(error instanceof RequestError&&error.status===409&&(error.code==='record_version_conflict'||!error.code)){
+                const latest=await this.remoteRecord(item.id,session);
+                if(latest.version!==item.payload.baseVersion){
+                  if(this.reconcile(item,latest)){if(String(item.sync)==='synced')break;if(attempt===0)continue;}
+                  throw new RequestError('本机与云端内容均有修改，请比较后同步',409,'record_version_conflict');
+                }
+              }throw error;
             }
-            item.payload ??= {requestId:crypto.randomUUID(),baseVersion:item.remoteVersion || 0,text:item.text,...(item.document?{document:item.document}:{}),createdAt:item.createdAt,attachments:item.attachments.map(a => ({id:a.id,name:a.name,sha256:a.sha256,...(a.thumbnail?.sha256 || a.thumbnailSha256 ? {thumbnailSha256:a.thumbnail?.sha256 ?? a.thumbnailSha256} : {})}))};
-            await this.store.put(item); this.assertSession(session.epoch);
-            const remote = await api<{id:string;version:number;document?:import('./types.ts').RichDocument}>('/api/records/'+item.id,'PUT',item.payload);
-            this.assertSession(session.epoch); if (remote.id !== item.id || remote.version !== item.payload.baseVersion+1) throw new Error('服务端未确认记录版本');
-            if(item.document&&JSON.stringify(canonical(remote.document))!==JSON.stringify(canonical(item.document)))throw new RequestError('资料空间未确认完整排版，请更新服务端后处理冲突',409);
-            item.sync='synced'; item.remoteVersion=remote.version; item.version=remote.version; item.error=''; delete item.payload;
-          } catch (error) { item.sync=error instanceof RequestError && error.status===409 ? 'conflict':'failed';item.error=errorMessage(error); }
-          await this.store.put(item); this.assertSession(session.epoch);
-        }
+            this.assertSession(session.epoch);
+            if(remote.id!==item.id||remote.version!==item.payload.baseVersion+1||typeof remote.text!=='string'||!Array.isArray(remote.attachments))throw new RequestError('服务端未确认完整记录，请重试；本机内容已保留',502,'record_ack_mismatch');
+            item.acknowledged={...snapshot(remote),version:remote.version};
+            if(!sameContent(item.payload,remote)){
+              if(item.document&&!remote.document&&sameProjection(item.payload,remote)){
+                const latest=await this.remoteRecord(item.id,session);
+                if(sameContent(item,latest)){this.accept(item,latest);break;}
+                if(latest.version!==remote.version||latest.document||!sameProjection(item.payload,latest))throw new RequestError('云端内容已有其他修改，请比较后恢复排版',409,'record_version_conflict');
+                if(attempt===0&&!item.repair&&latest.version===remote.version&&!latest.document&&sameProjection(item.payload,latest)){
+                  this.backup(item,'修复旧成功回执缺失的排版',latest);item.repair={fromVersion:latest.version};item.remoteVersion=latest.version;item.baseSnapshot={...snapshot(latest),version:latest.version};delete item.payload;continue;
+                }
+                throw new RequestError('云端排版尚未完整保存，请重试或比较内容',502,'record_ack_mismatch');
+              }
+              throw new RequestError('云端保存内容与本机不一致，请重试；原内容已保留',502,'record_ack_mismatch');
+            }
+            this.accept(item,remote);break;
+          }
+        }catch(error){item.sync=error instanceof RequestError&&error.code==='record_version_conflict'?'conflict':'failed';item.errorCode=error instanceof RequestError?error.code:'record_network_error';item.error=errorMessage(error);}
+        await store.put(item);this.assertSession(session.epoch);
       }
-      for(const stored of await this.store.all()){
+      for(const stored of await store.all()){
         if(stored.id==='draft')continue;const item=stored as LocalRecord;if(!item.pendingProcess||item.sync!=='synced'||item.server!==session.server)continue;const request=item.pendingProcess;
-        try{const task=await api<RecordTask>('/api/records/'+item.id+'/process','POST',request);this.assertSession(session.epoch);await this.serial(async()=>{const latest=await this.store.get(item.id) as LocalRecord|undefined;this.assertSession(session.epoch);if(!latest||latest.pendingProcess?.requestId!==request.requestId)return;latest.tasks=[task,...(latest.tasks??[]).filter(t=>t.id!==task.id)];delete latest.pendingProcess;if(latest.sync==='synced')latest.error='';await this.store.put(latest);});}
-        catch(error){await this.serial(async()=>{const latest=await this.store.get(item.id) as LocalRecord|undefined;if(latest?.pendingProcess?.requestId===request.requestId){latest.error=errorMessage(error);await this.store.put(latest);}});}this.assertSession(session.epoch);
+        try{const task=await api<RecordTask>('/api/records/'+item.id+'/process','POST',request);this.assertSession(session.epoch);await this.serial(async()=>{const latest=await store.get(item.id) as LocalRecord|undefined;this.assertSession(session.epoch);if(!latest||latest.pendingProcess?.requestId!==request.requestId)return;latest.tasks=[task,...(latest.tasks??[]).filter(t=>t.id!==task.id)];delete latest.pendingProcess;if(latest.sync==='synced')latest.error='';await store.put(latest);});}
+        catch(error){await this.serial(async()=>{const latest=await store.get(item.id) as LocalRecord|undefined;if(latest?.pendingProcess?.requestId===request.requestId){latest.error=errorMessage(error);await store.put(latest);}});}this.assertSession(session.epoch);
       }
-    })().finally(() => {this.flushing=null;}); return this.flushing;
+    })().finally(()=>{this.flushing=null;});return this.flushing;
   }
   async refresh() {
     const session=await this.status();if(!session.paired)return;
     const data=await requestJson<{records:LocalRecord[]}>(this.transport,{route:'/api/records',server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
     this.activeTaskCount=data.records.flatMap(record=>record.tasks??[]).filter(task=>!['completed','cancelled','failed'].includes(task.state)).length;
-    for(const remote of data.records)await this.serial(async()=>{this.assertSession(session.epoch);const existing=await this.store.get(remote.id) as LocalRecord|undefined;if(existing && (existing.sync!=='synced' || existing.server && existing.server!==session.server))return;this.assertSession(session.epoch);await this.store.put({...existing,...remote,accountScope:recordScope(session),server:session.server,sync:'synced',remoteVersion:remote.version,error:'',attachments:remote.attachments.map(a=>({...a,blob:existing?.attachments.find(old=>old.sha256===a.sha256)?.blob,thumbnail:existing?.attachments.find(old=>old.sha256===a.sha256)?.thumbnail ?? a.thumbnail}))});});
+    for(const remote of data.records)await this.serial(async()=>{this.assertSession(session.epoch);const existing=await this.store.get(remote.id) as LocalRecord|undefined;if(existing && (existing.sync!=='synced' || existing.server && existing.server!==session.server))return;if(existing?.document&&!remote.document){existing.sync='failed';existing.error='云端返回的记录缺少完整排版；本机版本已保留，请检查服务端兼容性';existing.errorCode='record_protocol_incompatible';await this.store.put(existing);return;}this.assertSession(session.epoch);await this.store.put({...existing,...remote,accountScope:recordScope(session),server:session.server,sync:'synced',remoteVersion:remote.version,error:'',errorCode:undefined,document:remote.document,baseSnapshot:{...snapshot(remote),version:remote.version},attachments:remote.attachments.map(a=>({...a,blob:existing?.attachments.find(old=>old.sha256===a.sha256)?.blob,thumbnail:existing?.attachments.find(old=>old.sha256===a.sha256)?.thumbnail ?? a.thumbnail}))});});
   }
-  async edit(id:string) {const session=await this.status();return this.serial(async()=>{this.assertSession(session.epoch);const item=await this.store.get(id) as LocalRecord|undefined;if(!item)throw new Error('记录不存在');if(item.sync==='syncing'||item.sync==='conflict')throw new Error('请先完成同步或处理版本冲突');const attachments=[];for(const a of item.attachments)attachments.push({...a,blob:await this.readAttachment(item,a,session)});const draft:LocalDraft={accountScope:recordScope(session),id:'draft',recordId:item.id,editingId:item.id,baseVersion:item.remoteVersion,text:item.text,document:item.document,attachments};await this.store.put(draft);return draft;});}
-  async resolveConflict(id:string) {const session=await this.status();return this.serial(async()=>{const item=await this.store.get(id) as LocalRecord|undefined;if(!item||item.server!==session.server||!session.paired)throw new Error('请恢复原资料空间连接');const remote=await requestJson<{version:number}>(this.transport,{route:'/api/records/'+id,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);item.remoteVersion=remote.version;item.payload=null;item.sync='pending';await this.store.put(item);});}
+  async edit(id:string) {const session=await this.status();return this.serial(async()=>{this.assertSession(session.epoch);const item=await this.store.get(id) as LocalRecord|undefined;if(!item)throw new Error('记录不存在');if(item.sync==='syncing'||item.sync==='conflict')throw new Error('请先完成同步或比较冲突内容');const attachments=[];for(const a of item.attachments)attachments.push({...a,blob:await this.readAttachment(item,a,session)});const draft:LocalDraft={accountScope:recordScope(session),id:'draft',recordId:item.id,editingId:item.id,baseVersion:item.remoteVersion,baseSnapshot:item.baseSnapshot??snapshot(item),text:item.text,document:item.document,attachments};await this.store.put(draft);return draft;});}
+  async loadConflict(id:string):Promise<RecordConflict> {
+    const session=await this.status(),item=await this.store.get(id) as LocalRecord|undefined;
+    if(!item||item.server!==session.server||!session.paired)throw new Error('请恢复原资料空间连接');
+    const remote=await this.remoteRecord(id,session);return {id,local:snapshot(item),remote:{...snapshot(remote),version:remote.version},base:item.baseSnapshot};
+  }
+  async resolveConflict(id:string,choice:ConflictChoice,remoteVersion:number) {
+    const session=await this.status(),store=this.store;return this.serial(async()=>{
+      const item=await store.get(id) as LocalRecord|undefined;
+      if(!item||item.server!==session.server||!session.paired)throw new Error('请恢复原资料空间连接');
+      const remote=await this.remoteRecord(id,session);this.assertSession(session.epoch);
+      if(remote.version!==remoteVersion)throw new Error('云端再次更新，请重新加载比较；本机内容已保留');
+      if(!['local','remote','copy','merge'].includes(choice))throw new Error('请选择处理方式');
+      this.backup(item,'用户选择：'+choice,{...snapshot(remote),version:remote.version});
+      if(choice==='copy'){
+        const copy:LocalRecord={accountScope:recordScope(session),id:crypto.randomUUID(),text:item.text,document:item.document,attachments:structuredClone(item.attachments),version:1,remoteVersion:0,server:session.server,sync:'pending',error:'',createdAt:new Date().toISOString(),copiedFrom:item.id};
+        this.accept(item,remote);await store.putMany!([item,copy]);return {copyId:copy.id};
+      }
+      if(choice==='merge'){
+        const current=await store.get('draft') as LocalDraft|undefined;
+        if(current&&(current.text.trim()||current.attachments.length)&&current.editingId!==item.id)throw new Error('请先保存现有草稿，再合并这条记录');
+        const draft:LocalDraft={accountScope:recordScope(session),id:'draft',recordId:item.id,editingId:item.id,baseVersion:remote.version,resolvingVersion:remote.version,baseSnapshot:{...snapshot(remote),version:remote.version},text:item.text,document:item.document,attachments:structuredClone(item.attachments)};
+        await store.commit(item,draft);return {draft};
+      }
+      if(choice==='remote')this.accept(item,remote);
+      else {item.remoteVersion=remote.version;item.baseSnapshot={...snapshot(remote),version:remote.version};delete item.payload;item.sync='pending';item.error='';item.errorCode=undefined;}
+      await store.put(item);return {};
+    });
+  }
   async queueProcess(id: string, options: Omit<ProcessRequest,'requestId'|'baseVersion'>) {
     const session=await this.status();
     await this.serial(async () => {const item=await this.store.get(id) as LocalRecord | undefined;this.assertSession(session.epoch);if(!item || item.sync!=='synced')throw new Error('请先完成记录同步');if(!session.paired || item.server!==session.server)throw new Error('请恢复原资料空间连接');if(options.preset==='custom'&&!options.instructions.trim())throw new Error('请填写自定义加工要求');item.pendingProcess ??= {...options,requestId:crypto.randomUUID(),baseVersion:item.remoteVersion};await this.store.put(item);});
