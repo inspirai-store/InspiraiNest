@@ -3,8 +3,15 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cryp
 const assert=require('node:assert/strict');
 const {_electron}=require('playwright');
 exports.until=async(fn,label,timeout=45000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await fn())return;await new Promise(r=>setTimeout(r,150));}throw Error('Timed out: '+label);};
+// Distinct page content makes the raster-change assertion meaningful.
+function pageFixture(){
+ const objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Count 3 /Kids [3 0 R 5 0 R 7 0 R] >>'];
+ for(let page=1;page<=3;page++){const content=`0.15 0.15 0.15 rg 30 40 ${70*page} 50 re f BT /F1 22 Tf 30 400 Td (Windows CI PDF - Page ${page}) Tj ET`;objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 380 468] /Resources << /Font << /F1 9 0 R >> >> /Contents ${objects.length+2} 0 R >>`,`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`);}
+ objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');let pdf='%PDF-1.4\n';const offsets=[0];for(let i=0;i<objects.length;i++){offsets.push(Buffer.byteLength(pdf));pdf+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;}const xref=Buffer.byteLength(pdf);pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;return Buffer.from(pdf);
+}
 exports.create=async(executable)=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'inspirainest-formal-settings-ci-'));
+ const pdfFile=path.join(root,'itinerary.pdf');fs.writeFileSync(pdfFile,pageFixture());
  const output=path.resolve(__dirname,'../test-output/react-desktop');fs.mkdirSync(output,{recursive:true});
  const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{WorkerManager}=await import('../desktop/manager.mjs');
  const {AGENT_CATALOG}=await import('../src/agent-catalog.mjs');const {zip,files}=await import('../test/fixtures/skill-market.mjs');
@@ -33,7 +40,7 @@ exports.create=async(executable)=>{
   }
   // A dedicated archive exercises registered links through production preview IPC.
   const assets=path.resolve(__dirname,'../desktop/frontend/src/records/fixtures');
-  const archiveFiles=[['notes/summary.md','summary',Buffer.from('# 正文链接验证\n\n图片前的描述\n\n![引用图片](../images/引用%20图片.jpg)\n\n图片后的描述\n\n[阅读 PDF](../files/路线.pdf) · [查看文本](../files/笔记.txt) · [播放视频](../media/路线.mp4)\n\n[未登记文件](../missing.txt)')],['images/引用 图片.jpg','image',fs.readFileSync(path.join(assets,'lake-original.jpg'))],['files/路线.pdf','document',fs.readFileSync(path.join(assets,'itinerary.pdf'))],['files/笔记.txt','document',Buffer.from('正文链接中的 UTF-8 附件内容')],['media/路线.mp4','document',fs.readFileSync(path.join(assets,'route.mp4'))]].map(([name,role,bytes])=>({path:name,role,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),body:bytes.toString('base64')}));
+  const archiveFiles=[['notes/summary.md','summary',Buffer.from('# 正文链接验证\n\n图片前的描述\n\n![引用图片](../images/引用%20图片.jpg)\n\n图片后的描述\n\n[阅读 PDF](../files/路线.pdf) · [查看文本](../files/笔记.txt) · [播放视频](../media/路线.mp4)\n\n[未登记文件](../missing.txt)')],['images/引用 图片.jpg','image',fs.readFileSync(path.join(assets,'lake-original.jpg'))],['files/路线.pdf','document',fs.readFileSync(pdfFile)],['files/笔记.txt','document',Buffer.from('正文链接中的 UTF-8 附件内容')],['media/路线.mp4','document',fs.readFileSync(path.join(assets,'route.mp4'))]].map(([name,role,bytes])=>({path:name,role,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),body:bytes.toString('base64')}));
   const meta={schema_version:1,id:'ci-body-links',title:'正文链接验证',summary:'真实归档附件预览',type:'article',status:'archived',verification_status:'source_only',coverage_note:'Disposable CI archive',mode:'general',scenario:null,tags:['CI'],aliases:[],related:[],published_at:null,collected_at:new Date().toISOString(),organized_at:new Date().toISOString(),verified_at:null,source_url:'https://example.com',canonical_url:null,files:archiveFiles.map(({path,role})=>({path,role}))};
   await api(targets.A.owner,'/api/archives','POST',{version:1,meta,files:archiveFiles,omitted:[]});
   const config=path.join(root,'worker.json');fs.writeFileSync(config,JSON.stringify({dataDir:path.join(root,'worker'),pollMs:200,capabilities:['article'],agents:{codex:{command:process.execPath,args:[path.resolve(__dirname,'../test/fixtures/fake-agent.mjs')],versionArgs:[path.resolve(__dirname,'../test/fixtures/fake-agent.mjs'),'--version']}}}));
@@ -60,6 +67,6 @@ exports.create=async(executable)=>{
   }
   async function shot(name){await page.screenshot({path:path.join(output,name+'.png')});}
   async function check(name,fn){console.log('React desktop:',name);await fn();checks.push(name);fs.writeFileSync(path.join(output,'progress.json'),JSON.stringify({checks,errors},null,2));}
-  return {root,output,config,manager,targets,checks,errors,api,launch,close,nav,settings,login,logout,setupMfa,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
+  return {root,output,config,pdfFile,manager,targets,checks,errors,api,launch,close,nav,settings,login,logout,setupMfa,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
  }catch(error){clearInterval(timer);for(const r of runners)r.close();if(app)await app.close().catch(()=>{});for(const s of services)await s.close();throw error;}
 };
