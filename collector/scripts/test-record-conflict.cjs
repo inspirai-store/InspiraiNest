@@ -28,7 +28,7 @@ async function main(){
   await dialog.getByRole('button',{name:'合并编辑',exact:true}).click();await page.locator('[aria-label="记录正文"]').waitFor();assert.match(await page.locator('[aria-label="记录正文"]').textContent(),/本机补充/);
   await page.locator('[aria-label="记录正文"]').fill('人工合并后的最终内容');await page.keyboard.press(process.platform==='darwin'?'Meta+s':'Control+s');await page.waitForFunction(()=>location.hash.includes('/records/demo'));
   await page.waitForFunction(async id=>{const r=await window.library.capture({route:'/api/records/'+id});return r.json.text==='人工合并后的最终内容'&&r.json.version===4;},id);
-  await page.reload();await page.locator('[data-row="'+id+'"]').click();await page.getByText('人工合并后的最终内容',{exact:true}).last().waitFor();
+  await page.setViewportSize({width:1240,height:820});await page.reload();await page.locator('[data-row="'+id+'"]').click();await page.getByText('人工合并后的最终内容',{exact:true}).last().waitFor();
   const result={passed:true,screenshots,checks:['native Electron and isolated REST','dark/light standard/minimum','late remote changes do not overwrite','manual merge preserves draft','conditional save creates v4 once','reload retains confirmed content']};fs.writeFileSync(path.join(out,'verified.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }finally{await app.close();}
 }
