@@ -1,3 +1,6 @@
+import {useRef} from 'react';
+import {useCommandSurface} from '../interactions/InteractionProvider';
+import type {Command} from '../interactions/commands';
 import { useId } from 'react';
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -48,10 +51,11 @@ export function NavigationButton({ children, icon: Icon, selected = false, previ
 }
 
 export type Entry = { title: string; excerpt: string; date: string; state: string };
-export function EntityRow({ entry, selected = false, warning = false, previewState, className = '', ...props }: ButtonProps & {
-  entry: Entry; selected?: boolean; warning?: boolean;
+export function EntityRow({ entry, selected = false, warning = false, previewState, className = '', commands, ...props }: ButtonProps & {
+  entry: Entry; selected?: boolean; warning?: boolean; commands?:Command[];
 }) {
-  return <button type="button" className={`${styles.row} ${selected ? styles.rowSelected : ''} ${className}`} aria-pressed={selected} data-preview-state={previewState} {...props}>
+  const row=useRef<HTMLButtonElement>(null);useCommandSurface(row,{commands:()=>commands??[]});
+  return <button ref={row} type="button" className={`${styles.row} ${selected ? styles.rowSelected : ''} ${className}`} aria-pressed={selected} data-preview-state={previewState} {...props}>
     <span className={styles.rowTitle}>{entry.title}</span><span className={styles.rowExcerpt}>{entry.excerpt}</span>
     <span className={styles.rowMeta}><span>{entry.date}</span><span className={warning ? styles.warningText : selected ? styles.accentText : ''}>{entry.state}</span></span>
   </button>;

@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Check, Copy, Download, Tag, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, Copy, Download, Tag, Trash2, X } from 'lucide-react';
 import { Action, IconAction, SearchField } from './Controls';
 import styles from './Overlays.module.css';
 
@@ -49,12 +49,7 @@ export function MenuButton({ label, icon, options, width = 240, iconOnly = false
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
       if (event.key === 'Tab') { setOpen(false); trigger.current?.focus({ preventScroll: true }); }
     }}>
-      {options.map(({ icon: Icon, ...item }) => <div key={item.label}>
-        {item.separator && <div className={styles.separator} role="separator" />}
-        <button type="button" role={item.selected !== undefined ? 'menuitemradio' : 'menuitem'} aria-checked={item.selected} disabled={item.disabled} tabIndex={-1} className={`${styles.menuItem} ${item.selected ? styles.selected : ''} ${item.danger ? styles.danger : ''}`} onClick={() => { item.select(trigger.current!); close(!item.opensDialog); }}>
-          {Icon && <Icon size={16} />}<span>{item.label}</span>{item.selected && <Check size={16} />}
-        </button>
-      </div>)}
+      <MenuRows options={options} choose={item => { item.select(trigger.current!); close(!item.opensDialog); }} />
     </div>}
   </div>;
 }
@@ -124,4 +119,14 @@ export function DeleteDialog({ title, invoker, close, confirm }: { title: string
   return <Modal title="移至回收站" invoker={invoker} close={close} narrow focusCancel footer={<><Action className={styles.cancel} data-initial-cancel onClick={close}>取消</Action><Action kind="primary" onClick={() => { confirm(); close(); }}>移至回收站</Action></>}>
     <p className={styles.question} data-overlay-region="确认问题"><span>将「{title}」移至回收站？</span></p>
   </Modal>;
+}
+
+export type MenuRow = {label:string; icon?:LucideIcon; selected?:boolean; disabled?:boolean; danger?:boolean; separator?:boolean; shortcut?:string; children?:unknown[]};
+export function MenuRows<T extends MenuRow>({options,choose}:{options:T[];choose:(item:T)=>void}){
+ return <>{options.map(({icon:Icon,...item},index)=><div key={item.label}>
+  {item.separator&&<div className={styles.separator} role="separator"/>}
+  <button type="button" role={item.selected!==undefined?'menuitemradio':'menuitem'} aria-checked={item.selected} aria-haspopup={item.children?.length?'menu':undefined} disabled={item.disabled} tabIndex={-1} className={`${styles.menuItem} ${item.selected?styles.selected:''} ${item.danger?styles.danger:''}`} onClick={()=>choose(options[index]!)}>
+   {Icon&&<Icon size={16}/>}<span>{item.label}</span>{item.shortcut&&<kbd style={{font:'inherit',fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{item.shortcut}</kbd>}{item.selected&&<Check size={16}/>} {!!item.children?.length&&<ChevronRight size={14}/>}
+  </button>
+ </div>)}</>;
 }

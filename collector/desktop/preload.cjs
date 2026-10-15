@@ -6,6 +6,7 @@ const invoke = async (channel, ...args) => {
     throw new Error(/^(?:fetch failed|Failed to fetch|net::ERR_CONNECTION_REFUSED)$/i.test(message) ? '连接失败，请重试' : message || '操作失败');
   }
 };
+contextBridge.exposeInMainWorld('desktopEditing', {perform: action => invoke('desktop-editing:perform', action)});
 contextBridge.exposeInMainWorld('desktopSettings', {
   get: () => invoke('desktop-settings:get'),
   update: input => invoke('desktop-settings:update', input),
