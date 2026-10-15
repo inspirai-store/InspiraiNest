@@ -62,6 +62,14 @@ jobs:
       group: inspirainest-macos-release
       cancel-in-progress: false
     steps:
+      - name: Check out only the reviewed QA launcher separately
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: qa-tools
+          persist-credentials: false
+          sparse-checkout: collector/scripts/run-macos-gui-qa.cjs
+          sparse-checkout-cone-mode: false
       - name: Validate retained workspace source
         env:
           EXPECTED_SOURCE: ${{ inputs.macos_source_commit }}
@@ -116,7 +124,7 @@ jobs:
           JS
           export SOURCE_COLLECTOR="$PWD"
           PROBE_CONTEXT=runner node "$probe"
-          PROBE_CONTEXT=gui launchctl asuser "$(id -u)" "$(command -v node)" "$probe"
+          PROBE_CONTEXT=gui node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" "$probe"
       - name: Verify original source run and unchanged signed packages
         if: ${{ inputs.verify_macos_workspace }}
         working-directory: public-source/collector
@@ -146,10 +154,10 @@ jobs:
         if: ${{ inputs.verify_macos_workspace }}
         working-directory: public-source/collector
         run: |
-          node scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+          node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
           version=$(node -p "require('./package.json').version")
-          node scripts/test-packaged-update.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
-          node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+          node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-packaged-update.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+          node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Publish unchanged retained macOS packages after native QA
         if: ${{ inputs.verify_macos_workspace }}
         working-directory: public-source/collector
