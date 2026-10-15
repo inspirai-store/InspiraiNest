@@ -37,16 +37,27 @@ on:
         description: Exact source of the retained macOS workspace
         type: string
         default: ''
+      macos_source_run:
+        description: Original run that built and verified the retained signed packages
+        type: string
+        default: ''
+      verify_macos_workspace:
+        description: Recheck retained signed packages, run native QA and publish unchanged bytes
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   macos-diagnostics:
-    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.inspect_macos_workspace
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && (inputs.inspect_macos_workspace || inputs.verify_macos_workspace)
     environment: signed-release
     runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
-    timeout-minutes: 5
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
     concurrency:
       group: inspirainest-macos-release
       cancel-in-progress: false
@@ -57,8 +68,61 @@ jobs:
         run: |
           [[ "$EXPECTED_SOURCE" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C public-source rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          test -z "$(git -C public-source status --porcelain --untracked-files=no)"
           test -f public-source/collector/test-output/react-desktop/progress.json
+      - name: Inspect keychain availability without reading credentials
+        run: |
+          security default-keychain -d user || true
+          security list-keychains -d user
+          security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" || true
+      - name: Verify original source run and unchanged signed packages
+        if: ${{ inputs.verify_macos_workspace }}
+        working-directory: public-source/collector
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.macos_source_run }}
+          EXPECTED_SOURCE: ${{ inputs.macos_source_commit }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';
+          assert.match(process.env.SOURCE_RUN,/^[0-9]+$/);
+          const api=route=>{const r=spawnSync('gh',['api',route],{encoding:'utf8'});assert.equal(r.status,0);return JSON.parse(r.stdout);};
+          const base=`repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.SOURCE_RUN}`,run=api(base);
+          assert.equal(run.head_sha,process.env.EXPECTED_SOURCE);assert.equal(run.head_branch,'main');assert.equal(run.path,'.github/workflows/collector-release.yml');assert.equal(run.head_repository.full_name,process.env.GITHUB_REPOSITORY);
+          const job=api(base+'/jobs').jobs.find(job=>job.name==='signed-macos');assert.ok(job);
+          for(const name of ['Test React desktop adapters and state','Run node --test --test-concurrency=4 test/*.test.mjs','Build Developer ID signed and notarized macOS packages','Verify signatures, both architectures and update metadata'])assert.equal(job.steps.find(step=>step.name===name)?.conclusion,'success',name);
+          JS
+          (cd desktop/dist && shasum -a 256 -c SHASUMS256.txt)
+          for arch in arm64 x64; do
+            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
+            codesign --verify --deep --strict "$app"
+            test "$(lipo -archs "$app/Contents/MacOS/灵藏")" = "$([[ "$arch" == arm64 ]] && echo arm64 || echo x86_64)"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute "$app"
+          done
+      - name: Retest retained macOS native login, records and conflicts
+        if: ${{ inputs.verify_macos_workspace }}
+        working-directory: public-source/collector
+        run: |
+          node scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+          version=$(node -p "require('./package.json').version")
+          node scripts/test-packaged-update.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+          node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+      - name: Publish unchanged retained macOS packages after native QA
+        if: ${{ inputs.verify_macos_workspace }}
+        working-directory: public-source/collector
+        env:
+          OSS_RELEASE_REGION: ${{ secrets.OSS_RELEASE_REGION }}
+          OSS_RELEASE_BUCKET: ${{ secrets.OSS_RELEASE_BUCKET }}
+          OSS_RELEASE_ACCESS_KEY_ID: ${{ secrets.OSS_RELEASE_ACCESS_KEY_ID }}
+          OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
+          OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          OSS_RELEASE_SOURCE_COMMIT: ${{ inputs.macos_source_commit }}
+        run: |
+          (cd desktop/dist && shasum -a 256 -c SHASUMS256.txt)
+          node scripts/upload-macos-oss.mjs desktop/dist InspiraiNest
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: InspiraiNest-macOS-retained-QA
           path: public-source/collector/test-output/react-desktop/
