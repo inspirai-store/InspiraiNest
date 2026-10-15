@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {create,until}=require('./react-desktop-fixture.cjs');
 (async()=>{
  const f=await create(process.argv[2]),version=require('../package.json').version;
- const button=name=>f.page.getByRole('button',{name,exact:true}),dialog=()=>f.page.getByRole('dialog');
+ const button=name=>(name==='新建记录'?f.page.locator('[data-region=页面操作]'):f.page).getByRole('button',{name,exact:true}),dialog=()=>f.page.getByRole('dialog');
  const doc=text=>({version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text,marks:[{type:'bold'}]}]}]}});
  try{
   await f.launch();

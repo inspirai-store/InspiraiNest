@@ -6,7 +6,7 @@ async function main(){
  const env={...process.env,SETTINGS_QA:'1',RECORDS_QA_ROUTE:'/records?data=local'};delete env.ELECTRON_RUN_AS_NODE;
  const app=await electron.launch({args:[path.resolve('desktop/frontend/scripts/records-qa.cjs'),...(process.platform==='linux'?['--no-sandbox']:[])],env});
  try{
-  const page=await app.firstWindow();await page.waitForFunction(()=>!!window.library?.capture);
+  const page=await app.firstWindow();await page.waitForURL(url=>url.searchParams.has('qaBuild'));await page.getByRole('navigation',{name:'主导航'}).waitFor();await page.waitForFunction(()=>!!window.library?.capture);
   const id=await page.evaluate(async()=>{
    const status=await window.library.status(),id=crypto.randomUUID(),scope=JSON.stringify([status.server,status.deviceId??'']);
    const doc=text=>({version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text,marks:[{type:'bold'}]}]}]}});
