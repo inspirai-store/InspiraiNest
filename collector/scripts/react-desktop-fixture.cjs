@@ -15,7 +15,7 @@ exports.create=async(executable)=>{
  const output=path.resolve(__dirname,'../test-output/react-desktop');fs.mkdirSync(output,{recursive:true});
  const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{WorkerManager}=await import('../desktop/manager.mjs');
  const {AGENT_CATALOG}=await import('../src/agent-catalog.mjs');const {zip,files}=await import('../test/fixtures/skill-market.mjs');
- const services=[],targets={},runners=[],checks=[],errors=[];let app,page,compact,timer;let ticking=false;
+ const services=[],targets={},runners=[],checks=[],errors=[],failures=[];let app,page,compact,timer;let ticking=false;
  const market={slug:'fixture-market',name:'市场示例',description:'隔离服务中的完整技能包',version:'1.0.0',source:'community',owner:'Fixture'};
  const skillHub={request:async input=>input.kind==='categories'?{items:[{key:'research',name:'资料整理'}]}:input.kind==='detail'?{item:market}:{page:1,pageSize:20,total:1,items:[market]}};
  try{
@@ -66,7 +66,7 @@ exports.create=async(executable)=>{
    const confirmed=await api(target.owner,'/api/security/totp/confirm','POST',{key,otp:totp.generate()});return {key,totp,recoveryCode:confirmed.recoveryCodes[0]};
   }
   async function shot(name){await page.screenshot({path:path.join(output,name+'.png')});}
-  async function check(name,fn){console.log('React desktop:',name);await fn();checks.push(name);fs.writeFileSync(path.join(output,'progress.json'),JSON.stringify({checks,errors},null,2));}
-  return {root,output,config,pdfFile,manager,targets,checks,errors,api,launch,close,nav,settings,login,logout,setupMfa,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
+  async function check(name,fn){console.log('React desktop:',name);try{await fn();checks.push(name);}catch(error){const entry={name,error:String(error.stack)};failures.push(entry);console.error('React desktop group failed:',name,error);await shot('group-failure-'+failures.length).catch(()=>{});}finally{fs.writeFileSync(path.join(output,'progress.json'),JSON.stringify({checks,failures,errors},null,2));}}
+  return {root,output,config,pdfFile,manager,targets,checks,errors,failures,api,launch,close,nav,settings,login,logout,setupMfa,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
  }catch(error){clearInterval(timer);for(const r of runners)r.close();if(app)await app.close().catch(()=>{});for(const s of services)await s.close();throw error;}
 };
