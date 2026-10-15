@@ -1,4 +1,4 @@
-import { validateCaptureRequest } from '../src/capture-request.mjs';
+import { validateCaptureRequest,captureBinaryRead } from '../src/capture-request.mjs';
 export async function captureRequest(owner,input) {
   validateCaptureRequest(input);
   const identity = owner.identity;
@@ -11,6 +11,6 @@ export async function captureRequest(owner,input) {
   const data = Buffer.from(await response.arrayBuffer());
   if (owner.identity !== identity) throw new Error('登录状态已改变，记录仍保存在本机');
   const mime = response.headers.get('content-type') || '';
-  if (mime.startsWith('application/json') && !(response.ok && /^\/api\/records\/media\/[a-f0-9]{64}$/.test(input.route) && (!input.method||input.method==='GET'))) return {status:response.status,json:JSON.parse(data.toString('utf8'))};
+  if (mime.startsWith('application/json') && !(response.ok && captureBinaryRead(input))) return {status:response.status,json:JSON.parse(data.toString('utf8'))};
   return {status:response.status,bytes:data.toString('base64'),mime};
 }

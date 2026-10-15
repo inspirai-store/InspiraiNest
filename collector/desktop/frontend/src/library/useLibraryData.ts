@@ -16,7 +16,7 @@ export function useLibraryData(filters: LibraryFilters, selected: string | null,
   const items = (list.data?.pages.flatMap(page => page.items) ?? []).filter(item => favorites === null || favorites.includes(item.id)).filter(item=>tags.every(tag=>item.tags?.includes(tag)));
   const id = directId ?? (items.some(item => item.id === selected) ? selected! : items[0]?.id);
   const entry = useQuery({ queryKey: ['live-library', session, 'entry', id], queryFn: () => client.entry(id!), enabled: !!id, retry: false });
-  const tab = id ? tabs[id] ?? '摘要' : '摘要';
+  const tab = id ? tabs[id] ?? (entry.data?.files.some(f=>f.role==='publication')?'正文':'摘要') : '摘要';
   const file = readingFile(entry.data?.files ?? [], tab);
   const content = useQuery({ queryKey: ['live-library', session, 'content', id, entry.data?.archive_id, file?.path], queryFn: () => client.content(id!, file!.path), enabled: !!id && !!file && tab !== '附件', retry: false });
   return { list, items, id, entry, content, file, session };

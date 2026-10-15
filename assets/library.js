@@ -150,6 +150,7 @@
   const docsFor = (entry,roles) => entry.files.filter(file => roles.includes(file.role) && Object.hasOwn(documents,file.path));
   function tabsFor(entry) {
     return [
+      ['publication','正文',docsFor(entry,['publication'])],
       ['analysis','分析报告',docsFor(entry,['analysis','summary'])],
       ['source','原文',docsFor(entry,['source','source_excerpt','original','source_snapshot'])],
       ['transcript','转录',docsFor(entry,['transcript','transcript_raw'])],

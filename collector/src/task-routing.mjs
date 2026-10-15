@@ -7,6 +7,7 @@ export const nodeFailureCodes = new Set(['AGENT_START', 'AGENT_PERMISSION', 'AGE
 export function canRunTask(task, device) {
   return workerAuthorized(device) && Boolean(device.agents?.length)
     && (!task.recordId || device.recordProtocol === 1)
+    && (!task.writingSessionId || device.writingProtocol === 1)
     && (!task.inputAttachments?.length || device.inputAttachmentProtocol === 1)
     && (task.type === 'auto' ? Boolean(device.capabilities?.length) : device.capabilities?.includes(task.type))
     && (!task.preferredAgent || device.agents.includes(task.preferredAgent))

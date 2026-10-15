@@ -125,6 +125,12 @@ jobs:
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+        working-directory: collector/desktop/frontend
+      - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: bash ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
         working-directory: collector/mobile/android

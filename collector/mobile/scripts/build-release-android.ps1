@@ -3,6 +3,8 @@ param(
     [string]$CollectorServer
 )
 $ErrorActionPreference = 'Stop'
+& node (Join-Path $PSScriptRoot '../../scripts/stage-writing.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Writing assets could not be staged.' }
 & node (Join-Path $PSScriptRoot '../../scripts/stage-capture.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Capture asset staging failed.' }
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../android'))

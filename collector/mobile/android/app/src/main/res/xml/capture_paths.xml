@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths><files-path name="capture" path="capture-media/" /></paths>
+<paths><files-path name="capture" path="capture-media/" /><cache-path name="writing-export" path="writing-export/" /></paths>

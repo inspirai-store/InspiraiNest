@@ -46,3 +46,11 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.17'
 }
+tasks.register('verifyWritingAssets') {
+    doLast {
+        if (!file('src/main/assets/capture/writing/index.html').exists()) {
+            throw new GradleException('Writing UI is missing. Run node collector/scripts/stage-writing.mjs from the repository root before building.')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyWritingAssets' }

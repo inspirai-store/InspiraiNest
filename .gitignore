@@ -32,3 +32,6 @@ Thumbs.db
 
 # Disposable simulator build output.
 collector/mobile/ios/DerivedData*/
+collector/desktop/frontend/dist-writing/
+collector/mobile/android/app/src/main/assets/capture/writing/
+collector/mobile/ios/CaptureAssets/writing/

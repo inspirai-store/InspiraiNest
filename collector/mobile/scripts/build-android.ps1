@@ -1,5 +1,7 @@
 param([switch]$SkipChecks)
 $ErrorActionPreference = 'Stop'
+& node (Join-Path $PSScriptRoot '../../scripts/stage-writing.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Writing assets could not be staged.' }
 & node (Join-Path $PSScriptRoot '../../scripts/stage-capture.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Capture assets could not be staged.' }
 $androidProject = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../android'))

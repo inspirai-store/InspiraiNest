@@ -42,6 +42,7 @@ private final class CaptureNoRedirects: NSObject, URLSessionTaskDelegate {
     override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); stopRecording() }
     @objc private func background() { stopRecording() }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url, ["https", "http"].contains(url.scheme ?? "") { UIApplication.shared.open(url); decisionHandler(.cancel); return }
         let root = Bundle.main.url(forResource: "CaptureAssets", withExtension: nil)
         decisionHandler(navigationAction.request.url?.isFileURL == true && navigationAction.request.url!.path.hasPrefix((root?.path ?? "invalid") + "/") ? .allow : .cancel)
     }
@@ -51,9 +52,14 @@ private final class CaptureNoRedirects: NSObject, URLSessionTaskDelegate {
         Task { do {
             var result: Any = [:]
             switch action {
-            case "status": let credential = try credentialStore.load(); result = ["paired": credential != nil, "server": credential?.origin ?? UserDefaults.standard.string(forKey: "lastSuccessfulOrigin") ?? "", "nativeMedia": true,"theme": traitCollection.userInterfaceStyle == .dark ? "dark" : "light"]
-            case "navigate": guard let target = request["input"] as? String, ["library","tasks","settings"].contains(target) else { throw CollectorError.message("页面无效") }; onNavigate(target)
+            case "status": let credential = try credentialStore.load(); result = ["paired": credential != nil, "server": credential?.origin ?? UserDefaults.standard.string(forKey: "lastSuccessfulOrigin") ?? "", "deviceId": credential?.deviceID ?? "", "nativeMedia": true,"theme": traitCollection.userInterfaceStyle == .dark ? "dark" : "light"]
+            case "navigate": if let target = request["input"] as? String, ["writing", "record"].contains(target), let root = Bundle.main.url(forResource: "CaptureAssets", withExtension: nil) { web.loadFileURL(root.appendingPathComponent(target == "writing" ? "writing/index.html" : "index.html"), allowingReadAccessTo: root); reply(request); return }; guard let target = request["input"] as? String, ["library","tasks","settings"].contains(target) else { throw CollectorError.message("页面无效") }; onNavigate(target)
             case "request": guard let input = request["input"] as? [String: Any] else { throw CollectorError.message("请求无效") }; result = try await network(input)
+            case "export":
+                guard let input = request["input"] as? [String: String], let name = input["name"], !name.contains("/"), !name.contains("\\"), name.count <= 105, name.hasSuffix(".html") || name.hasSuffix(".zip"), let encoded = input["bytes"], let data = Data(base64Encoded: encoded), data.count <= 64 * 1024 * 1024 else { throw CollectorError.message("导出文件无效") }
+                let folder = FileManager.default.temporaryDirectory.appendingPathComponent("writing-export", isDirectory: true); try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let file = folder.appendingPathComponent(name); try data.write(to: file, options: .atomic)
+                let share = UIActivityViewController(activityItems: [file], applicationActivities: nil); share.popoverPresentationController?.sourceView = view; present(share, animated: true)
             case "recover": result = ["files": try recovered()]
             case "mediaAck": guard let id = request["input"] as? String, UUID(uuidString: id) != nil else { throw CollectorError.message("媒体编号无效") }; for url in try FileManager.default.contentsOfDirectory(at: mediaRoot, includingPropertiesForKeys: nil) where url.deletingPathExtension().lastPathComponent == id { try FileManager.default.removeItem(at: url) }
             case "recordStart": let allowed = await withCheckedContinuation { continuation in AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) } }; guard allowed else { throw CollectorError.message("未允许录音，可以继续输入文字或导入音频") }; try startRecording()
@@ -70,17 +76,22 @@ private final class CaptureNoRedirects: NSObject, URLSessionTaskDelegate {
         guard let data = try? JSONSerialization.data(withJSONObject: response), let json = String(data: data, encoding: .utf8) else { return }
         web.evaluateJavaScript("window.captureReply(\(json))", completionHandler: nil)
     }
-    private func allowed(_ route: String, _ method: String) -> Bool {
+    func allowed(_ route: String, _ method: String) -> Bool {
         func match(_ pattern: String) -> Bool { route.range(of: pattern, options: .regularExpression) != nil }
-        return method == "GET" && (route == "/api/state" || route == "/api/records" || match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$") || match("^/api/tasks/[a-zA-Z0-9-]+/draft$"))
+        let writing = method == "GET" && (match("^/api/writing/(sessions|styles|entries)$") || match("^/api/writing/sessions/[a-f0-9-]{36}(/drafts/[a-f0-9-]{36}(/files/[a-f0-9]{64})?|/files/[a-f0-9-]{36}|/history)?$")) || method == "POST" && (route == "/api/writing/sessions" || match("^/api/writing/sessions/[a-f0-9-]{36}/(answers|materials|discuss|start|style|revise)$"))
+        return writing || method == "GET" && (route == "/api/state" || route == "/api/records" || match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$") || match("^/api/tasks/[a-zA-Z0-9-]+/draft$"))
             || method == "PUT" && (match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$"))
             || method == "POST" && (match("^/api/records/[a-zA-Z0-9-]+/process$") || match("^/api/tasks/[a-zA-Z0-9-]+/(approve|retry|cancel)$"))
+    }
+    func binaryRead(_ route: String, _ method: String) -> Bool {
+        method == "GET" && (route.range(of: "^/api/records/media/[a-f0-9]{64}$", options: .regularExpression) != nil || route.range(of: "^/api/writing/sessions/[a-f0-9-]{36}(/files/[a-f0-9-]{36}|/drafts/[a-f0-9-]{36}/files/[a-f0-9]{64})$", options: .regularExpression) != nil)
     }
     private func network(_ input: [String: Any]) async throws -> [String: Any] {
         guard let credential = try credentialStore.load() else { throw CollectorError.message("请先连接资料空间，记录已保存在本机") }
         guard let route = input["route"] as? String else { throw CollectorError.message("接口无效") }
         let method = input["method"] as? String ?? "GET"
         guard allowed(route, method), input["server"] as? String == nil || input["server"] as? String == "" || input["server"] as? String == credential.origin else { throw CollectorError.message("接口或资料空间不匹配") }
+        if let expectedDevice = input["deviceId"] as? String, !expectedDevice.isEmpty, expectedDevice != credential.deviceID { throw CollectorError.message("资料空间已切换，本机输入仍保留") }
         var request = URLRequest(url: try ServerOrigin(credential.origin).url(route)); request.httpMethod = method; request.timeoutInterval = 120
         request.setValue("Bearer " + credential.token, forHTTPHeaderField: "Authorization")
         if let bytes = input["bytes"] as? String { guard let data = Data(base64Encoded: bytes), data.count <= 32 * 1024 * 1024 else { throw CollectorError.message("附件超过32 MiB") }; request.httpBody = data; request.setValue(input["mime"] as? String, forHTTPHeaderField: "Content-Type") }
@@ -89,7 +100,7 @@ private final class CaptureNoRedirects: NSObject, URLSessionTaskDelegate {
         let session = URLSession(configuration: config, delegate: CaptureNoRedirects(), delegateQueue: nil); defer { session.finishTasksAndInvalidate() }
         let (data,response) = try await session.data(for: request)
         guard data.count <= 64 * 1024 * 1024, let http = response as? HTTPURLResponse, let current = try credentialStore.load(), current.token == credential.token, current.origin == credential.origin else { throw CollectorError.message("登录状态已改变或响应过大，本机内容保留") }
-        if (http.mimeType ?? "").hasPrefix("application/json") { return ["status": http.statusCode, "json": try JSONSerialization.jsonObject(with: data)] }
+        if (http.mimeType ?? "").hasPrefix("application/json"), !(200..<300 ~= http.statusCode && binaryRead(route, method)) { return ["status": http.statusCode, "json": try JSONSerialization.jsonObject(with: data)] }
         return ["status": http.statusCode, "bytes": data.base64EncodedString(), "mime": http.mimeType ?? "application/octet-stream"]
     }
     private func startRecording() throws {

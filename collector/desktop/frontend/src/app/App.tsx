@@ -1,4 +1,5 @@
 import {StatusPanel} from '../status/StatusPanel';
+import {WritingPage} from '../writing/WritingPage';
 import {updateBridge} from '../updates/client';
 import {SettingsProvider,useAppTheme} from '../settings/SettingsProvider';
 import {SettingsPage} from '../settings/SettingsPage';
@@ -119,7 +120,7 @@ function RecordsRoute({view}:{view:'list'|'new'|'detail'}) {
  const location=useLocation();const live=new URLSearchParams(location.search).get('data')==='local';return live?<LiveRecords/>:<Workbench area="records" view={view}/>;
 }
 function LibraryRoute({view}:{view:'list'|'detail'}) {const location=useLocation();return new URLSearchParams(location.search).get('data')==='local'?<LiveLibrary/>:<Workbench area="library" view={view}/>;}
-function SessionRoutes({children}:{children:import('react').ReactNode}) {const location=useLocation();return (new URLSearchParams(location.search).get('data')==='local'||location.pathname.startsWith('/tasks')||location.pathname.startsWith('/settings'))?<RecordsProvider><LibraryProvider><DesktopRuntimeProvider>{children}</DesktopRuntimeProvider></LibraryProvider></RecordsProvider>:children;}
+function SessionRoutes({children}:{children:import('react').ReactNode}) {const location=useLocation();return (new URLSearchParams(location.search).get('data')==='local'||location.pathname.startsWith('/tasks')||location.pathname.startsWith('/writing')||location.pathname.startsWith('/settings'))?<RecordsProvider><LibraryProvider><DesktopRuntimeProvider>{children}</DesktopRuntimeProvider></LibraryProvider></RecordsProvider>:children;}
 export function App() {
   const updateNavigate=useNavigate(),updateLocation=useLocation(),updateSearch=useRef(updateLocation.search);updateSearch.current=updateLocation.search;
   useEffect(()=>updateBridge()?.onOpen?.(()=>updateNavigate('/settings/updates'+updateSearch.current,{state:{settingsFocus:'content',updateCheckRequest:Date.now()}})),[updateNavigate]);
@@ -140,6 +141,9 @@ export function App() {
     <Route path="/settings/skills" element={<SettingsPage/>} />
     <Route path="/tasks" element={<TasksPage/>} />
     <Route path="/tasks/:id" element={<TasksPage/>} />
+    <Route path="/writing" element={<WritingPage/>} />
+    <Route path="/writing/new" element={<WritingPage/>} />
+    <Route path="/writing/:id" element={<WritingPage/>} />
     <Route path="/components" element={<ComponentsShowcase />} />
     <Route path="/controls" element={<ControlsShowcase />} />
     <Route path="/records" element={<RecordsRoute view="list" />} />

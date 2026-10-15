@@ -24,6 +24,7 @@ export function environmentItem(input) {
 }
 
 export function taskCapabilities(task) {
+  if (task.writingSessionId) return [];
   const candidates = String(task.content || task.url || '').match(/https?:\/\/[^\s<>"'，。]+/g) || [];
   return candidates.some(value => { try { return new URL(value).hostname.toLowerCase() === 'mp.weixin.qq.com'; } catch { return false; } }) ? ['wechat.article.extract'] : [];
 }

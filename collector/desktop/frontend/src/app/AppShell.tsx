@@ -2,7 +2,7 @@ import {useOptionalDesktopRuntime} from '../platform/DesktopRuntime';
 import { WorkspaceHeader } from '../components/Workspace';
 import { MoreMenu, MenuButton } from '../components/Overlays';
 import type { ReactNode } from 'react';
-import { Bookmark, ChevronDown, Ellipsis, Library, ListChecks, Pencil, Plus, Settings2, UserRound } from 'lucide-react';
+import { Bookmark, ChevronDown, Ellipsis, Library, ListChecks, Pencil, Feather, Plus, Settings2, UserRound } from 'lucide-react';
 import brand from '../assets/brand.png';
 import { Action, Badge, NavigationButton } from '../components/Controls';
 import styles from './Workbench.module.css';
@@ -14,7 +14,7 @@ export function AppShell({ area, go, children, onAction, favoritesOnly, onFavori
   libraryControlsDisabled?: boolean;
   taskCount?: number; favoritesOnly: boolean; onFavorites: () => void;
   onAction: (action: 'tags' | 'copy' | 'delete', invoker: HTMLButtonElement) => void;
-  area: 'records' | 'library' | 'tasks' | 'settings'; go: (path: string) => void; children: ReactNode;
+  area: 'records' | 'library' | 'tasks' | 'settings' | 'writing'; go: (path: string) => void; children: ReactNode;
 }) {
   const records = area === 'records';
   const runtime=useOptionalDesktopRuntime();
@@ -31,6 +31,7 @@ export function AppShell({ area, go, children, onAction, favoritesOnly, onFavori
       <nav className={styles.nav} data-region="一级导航" aria-label="主导航">
         <NavigationButton icon={Pencil} selected={records} data-region="导航 / 记录" onClick={() => go('/records')} aria-label="记录">记录</NavigationButton>
         <NavigationButton icon={Library} selected={area==='library'} data-region="导航 / 资料库" onClick={() => go('/library')} aria-label="资料库">资料库</NavigationButton>
+        <NavigationButton icon={Feather} selected={area==='writing'} data-region="导航 / 写作" onClick={() => go('/writing')} aria-label="写作">写作</NavigationButton>
         <div className={styles.spacer} />
         <NavigationButton icon={Settings2} selected={area==='settings'} data-region="导航 / 设置" onClick={()=>go('/settings/general')} aria-label="设置">设置</NavigationButton>
       </nav>

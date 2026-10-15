@@ -78,6 +78,7 @@ export function TasksPage(){
     </ListPane>
     <ContentPane label="任务详情" backLabel="任务列表" onBack={()=>go('/tasks')}>
      {task?<><ContentHeader title={taskTitle(task)} reader actions={null}/><div className={taskStyles.actions}><SourceActions source={[taskLabels[task.state],node,taskAgentLabel(task.preferredAgent)].filter(Boolean).join(' · ')}>
+      {task.writingSessionId&&<Action onClick={()=>go("/writing/"+task.writingSessionId)}>继续写作</Action>}
       {primary&&<Action kind="primary" icon={primary==='阅读资料'?BookOpen:primary==='确认归档'?Check:primary==='继续任务'?Play:RotateCcw} disabled={busy} onClick={e=>primary==='阅读资料'?openLibrary():confirmAction(primary==='确认归档'?'approve':'retry',e.currentTarget)}>{primary}</Action>}
       <MenuButton label="任务操作" icon={Ellipsis} iconOnly compact kind="ghost" width={160} align="end" disabled={busy||!allowed.some(a=>a==='reassign'||a==='cancel')} options={allowed.filter(a=>a==='reassign'||a==='cancel').map(action=>({label:action==='reassign'?'更换节点':'取消任务',icon:action==='reassign'?RotateCcw:X,danger:action==='cancel',opensDialog:true,select:invoker=>confirmAction(action,invoker)}))}/>
      </SourceActions></div><ChoiceBar label="任务内容" options={['结果预览','过程记录']} disabledOptions={hasPreview?[]:['结果预览']} value={currentTab} onChange={setTab} tabs idPrefix="task-reader"/>

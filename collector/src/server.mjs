@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { createRecords } from './records.mjs';
+import { createWriting } from './writing.mjs';
 import { resolveInputAttachments, inputReferences } from './input-attachments.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,6 +44,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
   const records = createRecords({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask});
+  const writing = createWriting({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
   const locks = new Map();
   async function serialized(key, work) {
     const previous = locks.get(key) || Promise.resolve();
@@ -560,6 +562,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
       if (await records.handle(req,res,route,device)) return;
+      if (await writing.handle(req,res,route,device)) return;
       if (route.startsWith('/api/security')) {
         owner(device);
         if (route === '/api/security' && req.method === 'GET') return send(res, 200, await security.status());
@@ -672,13 +675,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
+        requireValue(input.writingProtocol === undefined || input.writingProtocol === 1, 'Invalid writing protocol');
         requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
         const agentRuntime = input.agentRuntime;
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { writingProtocol:input.writingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {

@@ -24,6 +24,10 @@ targets:
   PersonalLibrary:
     type: application
     platform: iOS
+    preBuildScripts:
+      - name: Verify bundled writing UI
+        script: |
+          test -s "$SRCROOT/CaptureAssets/writing/index.html" || { echo 'error: Run node collector/scripts/stage-writing.mjs before building iOS.'; exit 1; }
     sources:
       - App
       - Shared

@@ -5,7 +5,7 @@ import { unreadableText } from './text-encoding.mjs';
 
 const extensions = new Set(['.md', '.markdown', '.txt', '.srt', '.vtt', '.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.pdf']);
 const mediaDocuments = new Set(['.mp4', '.webm', '.mov', '.mp3', '.wav', '.m4a', '.ogg']);
-const roles = new Set(['summary', 'analysis', 'source', 'original', 'source_excerpt', 'source_snapshot', 'transcript', 'transcript_raw', 'image', 'scenario', 'reference', 'document']);
+const roles = new Set(['publication', 'summary', 'analysis', 'source', 'original', 'source_excerpt', 'source_snapshot', 'transcript', 'transcript_raw', 'image', 'scenario', 'reference', 'document']);
 const secretName = /(?:^|[\/_.-])(cookies?|credentials?|tokens?|secrets?|passwords?|\.env)(?:[\/_.-]|$)/i;
 export const MAX_ARCHIVE = 40 * 1024 * 1024;
 export function permitted(file) {
