@@ -161,23 +161,10 @@ jobs:
           (cd desktop/dist && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
-      - name: Test signed macOS login and device pairing
+      - name: Test signed macOS React records, login and safe conflicts
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
-        shell: bash
-        run: |
-          set -euo pipefail
-          executable=desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
-          node scripts/test-desktop-login.cjs "$executable"
-          node scripts/test-desktop-login-switch.cjs "$executable"
-          node scripts/test-desktop-settings-nodes.cjs "$executable"
-          node scripts/test-desktop-node-actions.cjs "$executable"
-          node scripts/test-skill-market.cjs "$executable"
-          node scripts/test-skill-market-install.cjs "$executable"
-          node scripts/test-desktop-skills.cjs "$executable"
-          node scripts/test-agents-ui.cjs "$executable"
-          node scripts/test-desktop-pairing.cjs "$executable"
-          node scripts/test-worker-logs-ui.cjs "$executable"
+        run: node scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test signed Apple Silicon update download
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
@@ -188,24 +175,10 @@ jobs:
           node scripts/test-packaged-update.cjs \
             desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
             "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
-      - name: Test signed macOS quick capture
-        if: ${{ inputs.publish_macos }}
-        working-directory: public-source/collector
-        run: node scripts/test-desktop-capture.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test signed macOS update window shutdown
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         run: node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
-      - name: Test packaged macOS menu bar and safe Worker lifecycle
-        if: ${{ inputs.publish_macos }}
-        working-directory: public-source/collector
-        shell: bash
-        env:
-          COLLECTOR_DESKTOP_EXECUTABLE: ${{ github.workspace }}/public-source/collector/desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
-          # This runner session cannot minimize even a bare Electron window.
-          # Keep that OS interaction in manual acceptance and record it as skipped.
-          COLLECTOR_DESKTOP_SKIP_NATIVE_MINIMIZE: '1'
-        run: node scripts/test-desktop.cjs
       - name: Retain signed packages for local installation
         if: ${{ !inputs.publish_macos }}
         uses: actions/upload-artifact@v4

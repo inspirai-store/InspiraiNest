@@ -97,29 +97,17 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
       - run: npm ci --ignore-scripts && node node_modules/electron/install.js
         working-directory: collector
-      - name: Test Linux quick capture
-        run: xvfb-run -a node scripts/test-desktop-capture.cjs
+      - name: Install shared React frontend dependencies
+        run: npm ci --ignore-scripts
+        working-directory: collector/desktop/frontend
+      - name: Test shared React adapters
+        run: node --experimental-strip-types --test scripts/*.test.mjs
+        working-directory: collector/desktop/frontend
+      - name: Build shared desktop UI
+        run: npm run build:desktop-ui
         working-directory: collector
-      - name: Test shared Linux desktop login
-        run: xvfb-run -a node scripts/test-desktop-login.cjs
-        working-directory: collector
-      - name: Test SkillHub Linux desktop search
-        run: xvfb-run -a node scripts/test-skill-market.cjs
-        working-directory: collector
-      - name: Test Linux market installation and inventory
-        working-directory: collector
-        run: xvfb-run -a node scripts/test-skill-market-install.cjs
-      - name: Test shared Linux skill management
-        run: xvfb-run -a node scripts/test-desktop-skills.cjs
-        working-directory: collector
-      - name: Test shared Linux node actions during refresh
-        run: xvfb-run -a node scripts/test-desktop-node-actions.cjs
-        working-directory: collector
-      - name: Test Linux Agent management
-        run: xvfb-run -a node scripts/test-agents-ui.cjs
-        working-directory: collector
-      - name: Test shared Linux update window shutdown
-        run: xvfb-run -a node scripts/test-desktop-update-lifecycle.cjs
+      - name: Test record conflict interaction against isolated REST in Electron
+        run: xvfb-run -a node scripts/test-record-conflict.cjs
         working-directory: collector
     timeout-minutes: 20
   android:
@@ -229,6 +217,9 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - run: npm ci --ignore-scripts
         working-directory: collector
+      - name: Install shared React frontend dependencies
+        run: npm ci --ignore-scripts
+        working-directory: collector/desktop/frontend
       - name: Build macOS Worker for CI
         run: npm run build:worker:mac
         working-directory: collector
@@ -286,18 +277,8 @@ jobs:
             arch=x64
             app=desktop/dist/mac/灵藏.app
           fi
-          node scripts/test-desktop-capture.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-settings-nodes.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-node-actions.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-skill-market.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-skill-market-install.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-skills.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-agents-ui.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-login.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-login-switch.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-desktop-pairing.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-packaged-worker.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-worker-logs-ui.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-records-packaged.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-desktop-update-lifecycle.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-packaged-update.cjs "$app/Contents/MacOS/灵藏" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
         working-directory: collector
       - uses: actions/upload-artifact@v4

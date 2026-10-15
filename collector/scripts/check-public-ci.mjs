@@ -7,7 +7,7 @@ const directory = fileURLToPath(new URL('../../.github/workflows/', import.meta.
 for (const file of fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name))) {
   const source = fs.readFileSync(path.join(directory, file), 'utf8');
   const workflow = yaml.load(source);
-  if (file === 'collector-release.yml') {
+  if (['collector-release.yml','collector-publish-macos.yml'].includes(file)) {
     if (Object.keys(workflow.on).join() !== 'workflow_dispatch') throw new Error('Release must be manual only');
     for (const job of Object.values(workflow.jobs)) {
       if (job.environment !== 'signed-release' || !job.if?.includes("github.ref == 'refs/heads/main'") || !job.if?.includes("vars.ENABLE_SIGNED_RELEASE == 'true'")) throw new Error('Release job lacks explicit enablement, branch or environment guard');

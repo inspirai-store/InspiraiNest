@@ -123,9 +123,10 @@ test('manager waits for the status handshake after the detached process acquires
   const { config, file } = await fixture(t);
   const preload = path.join(path.dirname(file), 'delayed-lock.mjs');
   fs.writeFileSync(preload, `import fs from 'node:fs';import path from 'node:path';
+if(process.argv[1]?.replaceAll('\\\\','/').endsWith('/src/worker.mjs')){
 const config=JSON.parse(fs.readFileSync(process.env.COLLECTOR_CONFIG));
 fs.mkdirSync(config.dataDir,{recursive:true});const lock=path.join(config.dataDir,'worker.lock');
-fs.writeFileSync(lock,String(process.pid));await new Promise(r=>setTimeout(r,500));fs.unlinkSync(lock);`);
+fs.writeFileSync(lock,String(process.pid));await new Promise(r=>setTimeout(r,500));fs.unlinkSync(lock);}`);
   const previous = process.env.NODE_OPTIONS;
   const manager = new WorkerManager(file, process.execPath);
   t.after(async () => {
