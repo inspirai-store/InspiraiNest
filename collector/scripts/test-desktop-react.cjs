@@ -37,12 +37,12 @@ const {create,until}=require('./react-desktop-fixture.cjs');
    await f.login('A');assert.equal((await account()).server,f.targets.A.server);
    const userData=await f.app.evaluate(({app})=>app.getPath('userData'));const credential=JSON.parse(fs.readFileSync(path.join(userData,'owner-auth.json')));assert.ok(credential.encryptedToken&&!Buffer.from(credential.encryptedToken,'base64').toString().startsWith('fixture:'));assert.ok(!('token' in credential));
    await f.close();await f.launch();assert.equal((await account()).paired,true,'native encrypted authorization survives restart');
-   await f.nav('记录');await f.page.getByRole('button').filter({hasText:'登录前的本机记录'}).click();if(await button('重试同步').count())await button('重试同步').click();await waitText(region('内容标题'),'已同步');
+   await f.nav('记录');await f.page.getByRole('button').filter({hasText:'登录前的本机记录'}).click();await waitText(region('内容标题'),'已同步');
    assert.equal((await f.api(f.targets.A.owner,'/api/records')).records.length,1);assert.equal((await stateA()).tasks.length,0,'save does not create a task');
   });
   await f.check('rich clipboard, file import, PDF page and attachment persistence',async()=>{
    await button('新建记录').click();await f.page.getByRole('textbox',{name:'记录正文',exact:true}).fill('混合记录 CI\n图片前的描述');
-   await f.app.evaluate(({clipboard})=>clipboard.writeHTML('<p><strong>加粗内容</strong> 与粘贴正文</p>'));await f.page.getByRole('textbox',{name:'记录正文',exact:true}).press('End');await f.page.keyboard.press('Control+v');
+   await f.app.evaluate(({clipboard,ClipboardItem})=>clipboard.write([new ClipboardItem({'text/plain':'加粗内容 与粘贴正文','text/html':'<p><strong>加粗内容</strong> 与粘贴正文</p>'})]));await f.page.getByRole('textbox',{name:'记录正文',exact:true}).press('End');await f.page.keyboard.press('Control+v');
    await f.page.locator('input[type=file]').setInputFiles([path.join(docs,'lake-original.jpg'),path.join(docs,'itinerary.pdf'),path.join(docs,'route.mp4')]);
    await f.page.getByRole('button',{name:'预览 itinerary.pdf',exact:true}).waitFor();
    await button('录音').click();await waitText(region('录音状态'),'00:01');await button('结束录音').click();await until(()=>button('录音').isEnabled(),'recording finalized');await button('拍照').click();await until(()=>button('拍照',dialog()).isEnabled(),'fake camera ready');await button('拍照',dialog()).click();await dialog().waitFor({state:'hidden'});await button('保存记录').click();await waitText(region('内容标题'),'已同步');
