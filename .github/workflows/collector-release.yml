@@ -29,11 +29,40 @@ on:
         description: Exact Windows CI source commit
         type: string
         default: ''
+      inspect_macos_workspace:
+        description: Retain isolated macOS QA diagnostics without rebuilding or publishing
+        type: boolean
+        default: false
+      macos_source_commit:
+        description: Exact source of the retained macOS workspace
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  macos-diagnostics:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.inspect_macos_workspace
+    environment: signed-release
+    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    timeout-minutes: 5
+    concurrency:
+      group: inspirainest-macos-release
+      cancel-in-progress: false
+    steps:
+      - name: Validate retained workspace source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.macos_source_commit }}
+        run: |
+          [[ "$EXPECTED_SOURCE" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C public-source rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          test -f public-source/collector/test-output/react-desktop/progress.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InspiraiNest-macOS-retained-QA
+          path: public-source/collector/test-output/react-desktop/
+          if-no-files-found: error
   windows-ci-oss:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_windows_ci
     environment: signed-release
