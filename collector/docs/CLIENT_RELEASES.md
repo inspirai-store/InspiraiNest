@@ -12,8 +12,13 @@
 
 - Windows 复用公开仓库 `collector-build.yml` 的已验证产物；macOS 使用同一提交的 `collector-release.yml` 签名发布流程，开启 `include_macos`，完成 Developer ID 签名、Apple 公证及两种架构验证。普通 CI 的未签名 Mac 包不能作为正式交付。
 - 所有平台产物验证完成后，再更新 GitHub Release、官网发布清单、下载页及各平台自动更新文件（包括 blockmap）。核对源码提交、版本、文件大小、SHA-256、更新清单校验值与包内资源；完整下载每个平台的正式链接验证。
+- macOS 必须同时更新 `worker-release.json` 与私有 `macos-update.json`，两者版本一致。候选镜像预检实际请求 `/updates/macos/latest-mac.yml`、两种架构的 ZIP 与 blockmap，并核对其大小及哈希；仅测试模拟清单不能证明新镜像的更新入口可用。
 - 发布记录逐项列出 Windows、Mac arm64、Mac x64 的构建与验收结果。任一必交付平台未完成时，整批发布标记为未完成，不能仅以 Windows 上线宣告客户端发布完成；保留上一批可用产物作为回滚目标。
 - Android、iOS 沿用各自的版本号、签名身份与现有分发渠道；涉及移动端改动时也须列入对应发布及验收记录，明确尚未交付的平台。
+
+## 桌面客户端 0.2.2（2026-10-16）
+
+Windows x64 的 NSIS 安装包与 macOS Apple Silicon、Intel 的签名公证 ZIP/DMG 已同批发布。修复完整排版同步、错误分类、三方比较和旧成功回执恢复；真实原记录已保留 ID 恢复同步，本机已安全升级。安装包、CI、钥匙串会话修复、生产回滚和验收边界见 [完整发布记录](../../docs/releases/2026-10-16-desktop-0.2.2-record-sync.md)。
 
 ## 桌面客户端 0.1.27（2026-10-09）
 
