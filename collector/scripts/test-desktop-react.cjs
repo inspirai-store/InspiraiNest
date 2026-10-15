@@ -3,7 +3,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
 (async()=>{
  const f=await create(process.argv[2]);let recordId;
  const region=name=>f.page.locator(`[data-region="${name}"]`);
- const button=(name,scope=f.page)=>scope.getByRole('button',{name,exact:true});
+ const button=(name,scope=f.page)=>(name==='新建记录'&&scope===f.page?scope.locator('[data-region=页面操作]'):scope).getByRole('button',{name,exact:true});
  const menuItem=(name,scope=f.page)=>scope.getByRole('menuitem',{name,exact:true});
  const radio=name=>f.page.getByRole('radio',{name,exact:true});
  const account=()=>f.page.evaluate(()=>window.library.status());
