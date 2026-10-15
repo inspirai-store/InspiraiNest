@@ -57,7 +57,7 @@ exports.create=async(executable)=>{
   }
   async function close(){if(app){try{await app.evaluate(({app})=>app.quit());}catch{}await app.close().catch(()=>{});app=null;}}
   async function nav(label){await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:label,exact:true}).click();}
-  async function settings(label){await nav('设置');await page.locator('[data-region="列表区"]').getByRole('button',{name:label,exact:true}).click();}
+  async function settings(label){await nav('设置');await page.locator('[data-region="列表区"]').getByRole('button',{name:label,exact:true}).click();if(label==='账号'){await page.locator('[data-region=账号内容] [aria-busy=true]').waitFor({state:'hidden'});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}}
   async function login(label,key=targets[label].key){await settings('账号');await page.getByLabel('资料库地址',{exact:true}).fill(targets[label].server);await page.getByLabel('设备名称',{exact:true}).fill('CI 桌面 '+label);await page.getByLabel('登录密码或配对码',{exact:true}).fill(key);await page.getByRole('button',{name:'登录',exact:true}).click();if(key===targets[label].key)await page.getByRole('button',{name:'退出登录',exact:true}).waitFor();}
   async function logout(){await settings('账号');await page.getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('dialog',{name:'退出登录',exact:true}).getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('button',{name:'登录',exact:true}).waitFor();}
   async function setupMfa(){
