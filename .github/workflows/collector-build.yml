@@ -174,9 +174,8 @@ jobs:
         run: node collector/scripts/check-windows-package.mjs
       - name: Test packaged Windows React client against isolated REST services
         run: node collector/scripts/test-desktop-react.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
-      - name: Test record conflicts and manual merge in Electron
-        run: node scripts/test-record-conflict.cjs
-        working-directory: collector
+      - name: Test packaged record conflicts and manual merge
+        run: node collector/scripts/test-records-packaged.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows update download
         shell: pwsh
         run: |
