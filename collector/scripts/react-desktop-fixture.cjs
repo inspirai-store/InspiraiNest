@@ -53,8 +53,13 @@ exports.create=async(executable)=>{
   async function settings(label){await nav('设置');await page.locator('[data-region="列表区"]').getByRole('button',{name:label,exact:true}).click();}
   async function login(label,key=targets[label].key){await settings('账号');await page.getByLabel('资料库地址',{exact:true}).fill(targets[label].server);await page.getByLabel('设备名称',{exact:true}).fill('CI 桌面 '+label);await page.getByLabel('登录密码或配对码',{exact:true}).fill(key);await page.getByRole('button',{name:'登录',exact:true}).click();if(key===targets[label].key)await page.getByRole('button',{name:'退出登录',exact:true}).waitFor();}
   async function logout(){await settings('账号');await page.getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('dialog',{name:'退出登录',exact:true}).getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('button',{name:'登录',exact:true}).waitFor();}
+  async function setupMfa(){
+   const target=targets.A,key='  Windows CI MFA password  ';await api(target.owner,'/api/security/credential','POST',{key:target.key,newKey:key,confirmKey:key});
+   const setup=await api(target.owner,'/api/security/totp/setup','POST',{key});const {TOTP}=await import('otpauth');const totp=new TOTP({issuer:'InspiraiNest',label:'Windows CI',secret:setup.secret,algorithm:'SHA1',digits:6,period:30});
+   const confirmed=await api(target.owner,'/api/security/totp/confirm','POST',{key,otp:totp.generate()});return {key,totp,recoveryCode:confirmed.recoveryCodes[0]};
+  }
   async function shot(name){await page.screenshot({path:path.join(output,name+'.png')});}
   async function check(name,fn){console.log('React desktop:',name);await fn();checks.push(name);fs.writeFileSync(path.join(output,'progress.json'),JSON.stringify({checks,errors},null,2));}
-  return {root,output,config,manager,targets,checks,errors,api,launch,close,nav,settings,login,logout,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
+  return {root,output,config,manager,targets,checks,errors,api,launch,close,nav,settings,login,logout,setupMfa,shot,check,get app(){return app;},get page(){return page;},get compact(){return compact;},async dispose(){clearInterval(timer);for(const r of runners)r.close();if(manager.snapshot().managed){await manager.control('drain');await exports.until(()=>!manager.snapshot().running,'fixture Worker shutdown');}await close();for(const s of services)await s.close();fs.rmSync(root,{recursive:true,force:true});}};
  }catch(error){clearInterval(timer);for(const r of runners)r.close();if(app)await app.close().catch(()=>{});for(const s of services)await s.close();throw error;}
 };
