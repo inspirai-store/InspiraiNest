@@ -307,7 +307,7 @@ jobs:
       - name: Test signed macOS React records, login and safe conflicts
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
-        run: node scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+        run: node scripts/run-macos-gui-qa.cjs scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test signed Apple Silicon update download
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
@@ -315,13 +315,13 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
-          node scripts/test-packaged-update.cjs \
+          node scripts/run-macos-gui-qa.cjs scripts/test-packaged-update.cjs \
             desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
             "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
       - name: Test signed macOS update window shutdown
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
-        run: node scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+        run: node scripts/run-macos-gui-qa.cjs scripts/test-desktop-update-lifecycle.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Retain signed packages for local installation
         if: ${{ !inputs.publish_macos }}
         uses: actions/upload-artifact@v4
