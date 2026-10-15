@@ -48,13 +48,14 @@ const { _electron } = require('playwright');
     await app.firstWindow();
     let page;
     for (let i = 0; i < 100 && !page; i++) {
-      page = app.windows().find(window => window.url().startsWith('file:') && !window.url().includes('compact=1'));
+      page = app.windows().find(window => window.url().startsWith('file:') && !window.url().includes('compact=1') && !window.url().includes('#/status'));
       if (!page) await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!page) throw new Error('Main application window did not load');
     await showSettings(page,'updates');
-    const react = await page.locator('[data-region="更新内容"]').count() > 0;
+    const react = await page.locator('[data-region=一级导航]').count() > 0;
     const content = react ? page.locator('[data-region="更新内容"]') : page.locator('body');
+    await content.waitFor();
     await (react ? content.getByRole('button',{name:'检查更新',exact:true}) : page.locator('#update-check')).click();
     try { await page.waitForFunction(({next,react}) => (react ? document.querySelector('[data-region="更新内容"]') : document.querySelector('#update-headline'))?.textContent.includes(next), {next,react}, {timeout:30000}); }
     catch (error) { console.error('Update requests:', requests); throw error; }
@@ -67,6 +68,7 @@ const { _electron } = require('playwright');
       .filter(route => /^\/InspiraiNest-v\d+\.\d+\.\d+-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(route));
     assert.ok(packageRequests.includes('/' + path.basename(installer)), `Updater selected the wrong package: ${packageRequests.join(', ')}`);
     assert.ok(packageRequests.every(route => route === '/' + path.basename(installer)), `Updater requested another architecture: ${packageRequests.join(', ')}`);
+    const output=path.resolve(__dirname,'../test-output/packaged-update');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'update-downloaded.png')});fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,platform:process.platform,version:current,availableVersionFixture:next,package:path.basename(installer),checks:['real update metadata check','actual package download and updater checksum','correct platform and architecture'],scope:'Local update feed with real installer bytes; installation/replacement remains manual'},null,2));
     console.log(`Packaged updater checked and downloaded ${path.basename(installer)} for ${process.platform}`);
   } finally {
     if (app) { try { await app.evaluate(({ app }) => app.quit()); } catch {} await app.close().catch(() => {}); }
