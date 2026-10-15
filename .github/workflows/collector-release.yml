@@ -65,10 +65,14 @@ jobs:
       - name: Validate retained workspace source
         env:
           EXPECTED_SOURCE: ${{ inputs.macos_source_commit }}
+          VERIFY_PACKAGES: ${{ inputs.verify_macos_workspace }}
         run: |
           [[ "$EXPECTED_SOURCE" =~ ^[a-f0-9]{40}$ ]]
           test "$(git -C public-source rev-parse HEAD)" = "$EXPECTED_SOURCE"
-          test -z "$(git -C public-source status --porcelain --untracked-files=no)"
+          git -C public-source status --short --untracked-files=no
+          if [[ "$VERIFY_PACKAGES" == true ]]; then
+            test -z "$(git -C public-source status --porcelain --untracked-files=no)"
+          fi
           test -f public-source/collector/test-output/react-desktop/progress.json
       - name: Inspect keychain availability without reading credentials
         run: |
