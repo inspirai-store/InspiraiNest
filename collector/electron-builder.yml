@@ -66,6 +66,7 @@ win:
 nsis:
   oneClick: true
   perMachine: false
+  deleteAppDataOnUninstall: false
 mac:
   extendInfo:
     NSMicrophoneUsageDescription: 用于保存你主动录制的语音记录。

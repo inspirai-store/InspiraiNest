@@ -182,16 +182,8 @@ jobs:
         working-directory: collector
       - name: Test download page
         run: node collector/scripts/test-download-ui.cjs
-      - name: Check Worker package
-        shell: pwsh
-        run: |
-          $file = Get-Item collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe
-          if ($file.Length -lt 1000000) { throw 'Worker package is unexpectedly small' }
-          $metadata = Get-Content collector/desktop/dist/latest.yml -Raw
-          if ($metadata -notmatch [regex]::Escape($file.Name) -or $metadata -notmatch 'sha512:') { throw 'Windows update metadata is missing the installer or checksum' }
-          $feed = Get-Content collector/desktop/dist/win-unpacked/resources/app-update.yml -Raw
-          if ($feed -notmatch 'provider: github' -or $feed -notmatch 'repo: InspiraiNest') { throw 'Windows update feed is missing' }
-          (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -LiteralPath "$($file.FullName).sha256" -Encoding ascii
+      - name: Verify Windows package, update hashes and preserved installer identity
+        run: node collector/scripts/check-windows-package.mjs
       - name: Test packaged Windows React client against isolated REST services
         run: node collector/scripts/test-desktop-react.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows update download
@@ -215,6 +207,7 @@ jobs:
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.blockmap
             collector/desktop/dist/InspiraiNest-v*-Windows-x64.exe.sha256
             collector/desktop/dist/latest.yml
+            collector/desktop/dist/package-verification.json
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
