@@ -7,3 +7,10 @@ export function diagnosticActivity(value:unknown):DiagnosticActivity{
  return {events:input.events as DiagnosticEvent[],activeIssues:typeof input.activeIssues==='number'?input.activeIssues:0,truncated:input.truncated===true};
 }
 export function diagnosticText(event:DiagnosticEvent){return [`描述: ${event.message}`,`时间: ${new Date(event.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}`,...Object.entries({事件:event.code,任务:event.taskId,Agent:event.agent,...event.details}).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>`${k}: ${typeof v==='object'?JSON.stringify(v):v}`)].join('\n');}
+export function diagnosticStatus(event:DiagnosticEvent){
+ if(event.domain==='system'){
+  if(event.status==='resolved')return '已恢复';
+  return event.status==='active'||['error','warn','warning'].includes(event.level??'')?'待处理':'正常';
+ }
+ return ({received:'接收',started:'开始处理',extracting:'提取正文',processing:'加工',archiving:'归档',completed:'完成',awaiting_review:'待确认',failed:'失败'}[event.stage??'']??'采集过程');
+}

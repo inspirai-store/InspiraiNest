@@ -1,5 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {create,until}=require('./react-desktop-fixture.cjs');
+const expectedVersion=require('../package.json').version;
 (async()=>{
  const f=await create(process.argv[2]);let recordId;
  const region=name=>f.page.locator(`[data-region="${name}"]`);
@@ -17,7 +18,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
   await f.check('packaged React entry, resources, restricted IPC and compact window',async()=>{
    assert.deepEqual(await f.page.getByRole('navigation',{name:'主导航'}).getByRole('button').allTextContents(),['记录','资料库','设置']);
    assert.equal(await f.page.locator('iframe').count(),0,'record iframe removed');
-   const appPath=await f.app.evaluate(({app})=>app.getAppPath());assert.equal(JSON.parse(fs.readFileSync(path.join(appPath,'package.json'))).version,'0.2.0');
+   const appPath=await f.app.evaluate(({app})=>app.getAppPath());assert.equal(JSON.parse(fs.readFileSync(path.join(appPath,'package.json'))).version,expectedVersion);
    for(const file of ['desktop/frontend/dist/index.html','desktop/preload.cjs','src/record-document.mjs','src/task-routing.mjs'])assert.ok(fs.existsSync(path.join(appPath,file)),file);
    assert.ok(fs.existsSync(path.join(appPath,'../library/scripts/write-collection-json.mjs')));
    await assert.rejects(f.page.evaluate(()=>window.desktopSettings.update({url:'https://example.com'})),/设置内容无效/);
@@ -107,7 +108,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
   await f.check('diagnostics, raw-log redaction and narrow light/dark layouts',async()=>{
    await f.settings('诊断');await f.page.getByText('原始日志',{exact:true}).click();await f.page.locator('details[open] pre').waitFor();const raw=await f.page.locator('details[open] pre').innerText();assert.ok(!raw.includes(JSON.parse(fs.readFileSync(f.config)).token));
    for(const theme of ['浅色','深色']){await f.settings('通用');await radio(theme).click();for(const width of [900,740]){await f.app.evaluate((_,width)=>globalThis.workerDesktop().main.setContentSize(width,820),width);await f.nav('记录');assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await shot('records-'+width+'-'+(theme==='深色'?'dark':'light'));}await f.app.evaluate(()=>globalThis.workerDesktop().main.setContentSize(1240,820));}
-   await f.settings('更新');await waitText(region('更新内容'),'0.2.0');await shot('version-0.2.0');
+   await f.settings('更新');await waitText(region('更新内容'),expectedVersion);await shot('version-'+expectedVersion);
   });
   await f.check('cancelled delayed login, raw password, TOTP and recovery-code retry',async()=>{
    await f.logout();const before=crypto.createHash('sha256').update(fs.readFileSync(f.config)).digest('hex');let release,heldResponse;
@@ -118,7 +119,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
    const security=await f.setupMfa();await f.login('A',security.key);await f.page.getByLabel('验证码',{exact:true}).waitFor();await shot('mfa-challenge');await until(()=>security.totp.generate()!==security.usedOtp,'fresh TOTP after enrollment',35000);await f.page.getByLabel('验证码',{exact:true}).fill(security.totp.generate());await button('登录').click();await button('退出登录').waitFor();
    await f.logout();await f.login('A',security.key);await f.page.getByLabel('验证码',{exact:true}).fill('bad');await button('登录').click();await f.page.getByRole('alert').waitFor();await button('使用恢复码').click();await f.page.getByLabel('恢复码',{exact:true}).fill(security.recoveryCode);await button('登录').click();await button('退出登录').waitFor();assert.equal((await account()).server,f.targets.A.server);
   });
-  assert.deepEqual(f.failures,[],'All packaged React groups must pass');assert.equal(f.checks.length,15);assert.deepEqual(f.errors,[]);fs.writeFileSync(path.join(f.output,'result.json'),JSON.stringify({passed:true,platform:process.platform,version:'0.2.0',checks:f.checks,errors:f.errors,credentialStorage:'Native safeStorage on disposable CI profile; no storage fixture replacement',externalFixtures:'SkillHub public metadata provider and held CLI installer; preload and import REST unchanged',scope:'Unpacked packaged executable on Windows CI; default React entry, real preload and synthetic REST. User installation/upgrade and physical hardware remain manual.'},null,2));
+  assert.deepEqual(f.failures,[],'All packaged React groups must pass');assert.equal(f.checks.length,15);assert.deepEqual(f.errors,[]);fs.writeFileSync(path.join(f.output,'result.json'),JSON.stringify({passed:true,platform:process.platform,version:expectedVersion,checks:f.checks,errors:f.errors,credentialStorage:'Native safeStorage on disposable CI profile; no storage fixture replacement',externalFixtures:'SkillHub public metadata provider and held CLI installer; preload and import REST unchanged',scope:'Unpacked packaged executable on Windows CI; default React entry, real preload and synthetic REST. User installation/upgrade and physical hardware remain manual.'},null,2));
   console.log('Packaged React desktop:',f.checks.length,'groups passed');
  }catch(error){if(f.page&&!f.page.isClosed()){await f.shot('failure').catch(()=>{});fs.writeFileSync(path.join(f.output,'failure.txt'),String(error.stack));}throw error;}finally{await f.dispose();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
