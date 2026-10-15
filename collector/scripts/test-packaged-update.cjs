@@ -53,17 +53,16 @@ const { _electron } = require('playwright');
     }
     if (!page) throw new Error('Main application window did not load');
     await showSettings(page,'updates');
-    await page.locator('#update-check').click();
-    try { await page.waitForFunction(version => document.querySelector('#update-headline').textContent.includes(`v${version}`), next, { timeout: 30000 }); }
-    catch (error) {
-      console.error('Update status:', await page.evaluate(() => window.updates.status()));
-      console.error('Update requests:', requests);
-      throw error;
-    }
-    assert.equal(await page.locator('#update-download').isVisible(), true);
-    await page.locator('#update-download').click();
-    await page.locator('#update-install').waitFor({ state: 'visible', timeout: 120000 });
-    assert.match(await page.locator('#update-description').innerText(), /已下载并校验/);
+    const react = await page.locator('[data-region="更新内容"]').count() > 0;
+    const content = react ? page.locator('[data-region="更新内容"]') : page.locator('body');
+    await (react ? content.getByRole('button',{name:'检查更新',exact:true}) : page.locator('#update-check')).click();
+    try { await page.waitForFunction(({next,react}) => (react ? document.querySelector('[data-region="更新内容"]') : document.querySelector('#update-headline'))?.textContent.includes(next), {next,react}, {timeout:30000}); }
+    catch (error) { console.error('Update requests:', requests); throw error; }
+    const download = react ? content.getByRole('button',{name:'下载更新',exact:true}) : page.locator('#update-download');
+    await download.waitFor();await download.click();
+    await (react ? content.getByRole('button',{name:'安装并重启',exact:true}) : page.locator('#update-install')).waitFor({state:'visible',timeout:120000});
+    if (react) assert.match(await content.innerText(), /下载完成/);
+    else assert.match(await page.locator('#update-description').innerText(), /已下载并校验/);
     const packageRequests = requests.map(url => new URL(url, 'http://localhost').pathname)
       .filter(route => /^\/InspiraiNest-v\d+\.\d+\.\d+-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(route));
     assert.ok(packageRequests.includes('/' + path.basename(installer)), `Updater selected the wrong package: ${packageRequests.join(', ')}`);
