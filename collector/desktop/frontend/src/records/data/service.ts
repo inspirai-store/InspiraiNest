@@ -72,7 +72,16 @@ export class RecordsService {
       const session=await this.status();if(!session.paired)return;const store=this.store;
       const api=<T>(route:string,method:'GET'|'PUT'|'POST'='GET',json?:unknown)=>requestJson<T>(this.transport,{route,method,json,server:session.server,deviceId:session.deviceId});
       let capabilities:Promise<void>|undefined;
-      const requireRich=()=>capabilities??=(async()=>{try{const value=await api<{protocol:number;documentVersions:number[]}>('/api/records/capabilities');this.assertSession(session.epoch);if(value.protocol!==1||!value.documentVersions?.includes(1))throw Error('unsupported');}catch(error){if(error instanceof RequestError&&[401,403].includes(error.status))throw error;throw new RequestError('资料空间尚不支持完整排版，请升级服务端；本机内容已保留',422,'record_protocol_incompatible');}})();
+      const requireRich=()=>capabilities??=(async()=>{
+        let value:{protocol:number;documentVersions:number[]};
+        const incompatible=()=>new RequestError('资料空间尚不支持完整排版，请升级服务端；本机内容已保留',422,'record_protocol_incompatible');
+        try{value=await api('/api/records/capabilities');}
+        catch(error){
+          if(error instanceof RequestError){if([404,405].includes(error.status))throw incompatible();if(error.status>=500)throw new RequestError('资料空间服务暂不可用，请稍后重试；本机内容已保留',error.status,'record_service_unavailable');throw error;}
+          throw new RequestError('暂时无法连接资料空间，请恢复网络后重试；本机内容已保留',0,'record_network_error');
+        }
+        this.assertSession(session.epoch);if(value?.protocol!==1||!value.documentVersions?.includes(1))throw incompatible();
+      })();
       for(const stored of await store.all()){
         if(stored.id==='draft')continue;const item=stored as LocalRecord;
         if(item.accountScope!==recordScope(session)||!['pending','failed','syncing','conflict'].includes(item.sync))continue;
