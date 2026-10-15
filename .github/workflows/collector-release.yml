@@ -380,6 +380,13 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: npm ci --ignore-scripts
         working-directory: public-source/collector
+      - run: npm ci --ignore-scripts
+        working-directory: public-source/collector/desktop/frontend
+      - name: Stage the shared writing and capture pages
+        working-directory: public-source/collector
+        run: |
+          node scripts/stage-writing.mjs
+          node scripts/stage-capture.mjs
       - name: Build and verify the existing Android signing identity
         working-directory: public-source/collector/mobile/android
         shell: bash
