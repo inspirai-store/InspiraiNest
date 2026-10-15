@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { hash, requireValue } from './common.mjs';
 
 export const writingSkillRoot = fileURLToPath(new URL('../skills/writing-workshop/', import.meta.url));
-export function writingSkill() {
+export function writingSkill(root = writingSkillRoot) {
   const files = ['SKILL.md', 'references/interview.md', 'references/style.md', 'references/protocol.md'];
-  const contents = files.map(name => ({ path:name, text:fs.readFileSync(path.join(writingSkillRoot,name),'utf8') }));
+  const contents = files.map(name => ({ path:name, text:fs.readFileSync(path.join(root,name),'utf8').replace(/\r\n?/g,'\n') }));
   return { version:1, hash:hash(JSON.stringify(contents)), files:contents };
 }
 const string = (value, label, max=20000) => requireValue(typeof value === 'string' && value.trim() && value.length <= max, `写作结果缺少有效的${label}`);
