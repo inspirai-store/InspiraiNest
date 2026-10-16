@@ -1,3 +1,5 @@
+import {scanAgents} from '../src/agent-install.mjs';
+import {createInventoryScanner} from '../src/skill-scan.mjs';
 import {performEditing} from './editing.mjs';
 import {desktopFrontend,documentURL,desktopPermission} from './frontend-entry.mjs';
 import {appVersion} from '../src/device-identity.mjs';
@@ -205,18 +207,29 @@ function registerIPC() {
     logs: task => manager.logs(task), activity: task => manager.activity(task),
     pair: input => pairDesktop(input),
     'task-folder': async task => { const error = await shell.openPath(manager.taskDirectory(task)); if (error) throw new Error(error); },
+    'resource-location': async input => {
+      if(input?.kind==='agent'){
+        if(!['codex','codebuddy','claude','gemini','opencode'].includes(input.agent))throw Error('Agent 无效');
+        const entry=(await scanAgents(manager.configuration())).agents.find(a=>a.id===input.agent);
+        if(!entry?.command)throw Error('程序位置不可用');shell.showItemInFolder(entry.command);return;
+      }
+      if(input?.kind==='skill'&&/^[a-f0-9]{64}$/.test(input.skillId||'')){
+        const scan=createInventoryScanner();try{const inventory=await scan(manager.configuration(),{cwd:manager.dataDir,home:os.homedir()});const item=inventory.local.get(input.skillId);if(!item)throw Error('技能已变化，请刷新');const error=await shell.openPath(item.directory);if(error)throw Error(error);}finally{scan.close();}return;
+      }
+      throw Error('定位对象无效');
+    },
     'skill-config': async agent => {
       if(!['codex','codebuddy','claude'].includes(agent))throw new Error('Agent 无效');
       const directory=path.join(os.homedir(),agent==='codex'?'.codex':'.'+agent);
       fs.mkdirSync(directory,{recursive:true});const error=await shell.openPath(directory);if(error)throw new Error(error);
     },
-  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
+  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config','resource-location'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
   const library = {
     capture: input => captureRequest(owner,input),
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
     'cancel-login': () => { loginController?.abort(); return true; },
     logout: () => logoutOwnerSession({ owner, cancelLogin: () => loginController?.abort(), publish: state => main.webContents.send('library:changed', state) }),
-    state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
+    taskFile: input=>owner.taskFile(input),state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
     clientUpdates: input => owner.clientUpdates(input),
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
     content: input => owner.content(input), preview: input => owner.preview(input),

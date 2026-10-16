@@ -3,10 +3,10 @@ export type AgentId=keyof typeof agentNames;
 export type AgentRelease={package:string;version:string;tarball:string;integrity:string};
 export type AgentCatalog={schemaVersion:1;agents:{id:AgentId;name:string;release:AgentRelease|null;error?:string}[]};
 export type AgentProbe={id:AgentId;installed:boolean;version:string|null;probeState:'available'|'not_found'|'failed'|'timeout';source:string;originalSupported:boolean;custom:boolean;fingerprint:string};
-export type AgentEnvironment={schemaVersion:1;agents:AgentProbe[];scannedAt:string|null;digest?:string};
+export type AgentEnvironment={managementProtocol?:number;schemaVersion:1;agents:AgentProbe[];scannedAt:string|null;digest?:string};
 export type AgentOperationState='queued'|'running'|'cancel_requested'|'cancelled'|'expired'|'succeeded'|'failed';
-export type AgentOperation={id:string;deviceId:string;action:'refresh'|'install'|'update';agent:AgentId|null;state:AgentOperationState;createdAt:string;updatedAt:string;result?:{error:string|null;version:string|null}};
-export type AgentOperationInput={deviceId:string;requestId:string;action:'refresh'|'install'|'update';agent?:AgentId;method?:'managed'|'original';expectedFingerprint?:string;targetVersion?:string};
+export type AgentOperation={id:string;deviceId:string;action:'refresh'|'install'|'update'|'uninstall';agent:AgentId|null;state:AgentOperationState;createdAt:string;updatedAt:string;result?:{error:string|null;version:string|null}};
+export type AgentOperationInput={cancelTaskIds?:string[];deviceId:string;requestId:string;action:'refresh'|'install'|'update'|'uninstall';agent?:AgentId;method?:'managed'|'original';expectedFingerprint?:string;targetVersion?:string};
 export const operationLabels:Record<AgentOperationState,string>={queued:'等待节点',running:'执行中',cancel_requested:'取消中',cancelled:'已取消',expired:'已过期',succeeded:'已完成',failed:'失败'};
 export function pendingAgentOperation(operation:AgentOperation|undefined){return !!operation&&['queued','running','cancel_requested'].includes(operation.state);}
 export function agentStatus(supported:boolean,probe:AgentProbe|undefined,operation:AgentOperation|undefined){

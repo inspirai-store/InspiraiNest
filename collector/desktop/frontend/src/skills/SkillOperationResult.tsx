@@ -7,7 +7,7 @@ import {versionLabel} from './versions';
 import {agentNames} from '../agents/model';
 import {skillOperationLabels} from './operations';
 import detail from './SkillsDetail.module.css';
-const actionNames={refresh:'刷新', 'configure-projects':'项目配置','prepare-publish':'发布预览',publish:'发布',compare:'比较',sync:'同步',verify:'验证',rollback:'回滚'};
+const actionNames={uninstall:'卸载',refresh:'刷新', 'configure-projects':'项目配置','prepare-publish':'发布预览',publish:'发布',compare:'比较',sync:'同步',verify:'验证',rollback:'回滚'};
 export function SkillOperationResult({operation,nodeName,version,comparison,recompare,back,rollback,confirmRollback,requestRollback,busy=false}:{operation:SkillOperation;nodeName:string;version?:SkillVersion;comparison?:SkillOperation;recompare:()=>void;back:()=>void;rollback:()=>void;confirmRollback:boolean;requestRollback:()=>void;busy?:boolean}){
  const pending=['queued','running'].includes(operation.state);
  const status=operation.action==='sync'?({queued:'等待节点',running:'同步中',succeeded:'同步完成',failed:'同步失败'})[operation.state]:operation.action==='rollback'?({queued:'等待节点',running:'回滚中',succeeded:'回滚完成',failed:'回滚失败'})[operation.state]:`${actionNames[operation.action]}　${skillOperationLabels[operation.state]}`;

@@ -2,6 +2,7 @@ import type {SkillAgent,SkillPolicy} from './policy.ts';
 export type SkillOperationState='queued'|'running'|'succeeded'|'failed';
 export type SkillOperationInput={deviceId:string;requestId:string}&(
  {action:'refresh'}|
+ {action:'uninstall';cancelTaskIds:string[];skillId:string;expectedHash:string;agents:SkillAgent[];confirmShared:boolean}|
  {action:'configure-projects';projects:string[]}|
  {action:'prepare-publish';skillId:string;expectedHash:string}|
  {action:'publish';skillId:string;expectedHash:string;previewId:string;policy:SkillPolicy}|

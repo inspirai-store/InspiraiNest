@@ -20,10 +20,11 @@ contextBridge.exposeInMainWorld('worker', {
   activity: task => invoke('worker:activity', task),
   taskFolder: task => invoke('worker:task-folder', task),
   pair: input => invoke('worker:pair', input),
+  resourceLocation: input => invoke('worker:resource-location',input),
   skillConfig: agent => invoke('worker:skill-config', agent),
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
-  'status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','task','task-action',
+  'status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','taskFile','task','task-action',
   'draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
 ].map(name => [name === 'task-action' ? 'taskAction' : name === 'cancel-login' ? 'cancelLogin' : name, input => invoke(`library:${name}`, input)])),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('library:changed', listener); return () => ipcRenderer.removeListener('library:changed', listener); },

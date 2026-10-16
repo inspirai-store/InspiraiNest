@@ -19,7 +19,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
         source.text=input.text;source.label ||= input.role==='exemplar'?'指定范文':'补充材料';
       } else if(input.kind==='record') {
         const record=input.version?await store.get('capture-version',`${input.id}:${input.version}`):await store.get('capture',input.id);
-        requireValue(record,'记录不存在或版本已丢失',404);
+        requireValue(record&&!(await store.get('capture',input.id))?.deletedAt,'记录不存在或已删除',404);
         Object.assign(source,{ref:input.id,version:record.version,text:record.text,document:record.document,label:source.label||record.text?.split('\n')[0]?.slice(0,100)||'媒体记录'});
         for(const file of record.attachments){const media=await store.get('record-media',file.sha256);requireValue(media,'原件不存在',404);source.files.push({id:id(),attachmentId:file.id,path:file.name,mime:media.mime,sha256:file.sha256,bytes:media.bytes,storageKey:media.key});}
       } else if(input.kind==='entry') {
@@ -75,7 +75,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
         session={id:id(),version:1,title:String(input.title||material[0].label||'新文章').slice(0,200),createdAt:now(),updatedAt:now(),context:{audience:'技术实践者',language:'zh-CN',outputs:['illustrated-article','offline-html','markdown','assets']},sources:material,answers:[],rounds:[],runs:[],plan:null,planVersion:0,style:null,styleCandidates:[],ready:false,deviceId:input.deviceId||null,agent:input.agent||null};
         await queue(session,'round',tx);
       } else {
-        session=await tx.getForUpdate('writing-session',sessionId);requireValue(session,'写作会话不存在',404);
+        session=await tx.getForUpdate('writing-session',sessionId);requireValue(session&&!session.deletedAt,'写作会话不存在',404);
         requireValue(session.version===input.baseVersion,'文章已在其他设备更新，本机输入保留，请刷新后继续',409);
         const latest=session.runs.at(-1),task=latest?await tx.getForUpdate('task',latest.taskId):null;
         const changing=['materials','discuss','revise'].includes(action);
@@ -161,12 +161,12 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     if(route==='/api/writing/entries'&&req.method==='GET'){const deleted=new Set((await store.list('trash')).filter(t=>t.deletedAt).map(t=>t.id));const entries=new Map();for(const a of (await store.list('archive')).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)))if(!deleted.has(a.entryId)&&!entries.has(a.entryId))entries.set(a.entryId,{id:a.entryId,title:a.meta.title});send(res,200,{items:[...entries.values()],total:entries.size});return true;}
     if(route==='/api/writing/styles'&&req.method==='GET'){send(res,200,{items:await store.list('writing-style')});return true;}
     if(route==='/api/writing/sessions') {
-      if(req.method==='GET'){send(res,200,{items:await Promise.all((await store.list('writing-session')).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(view))});return true;}
+      if(req.method==='GET'){send(res,200,{items:await Promise.all((await store.list('writing-session')).filter(s=>!s.deletedAt).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(view))});return true;}
       requireValue(req.method==='POST','Method not allowed',405);send(res,201,await mutation(req,null,'create',device));return true;
     }
     const match=route.match(/^\/api\/writing\/sessions\/([^/]+)(?:\/(answers|materials|discuss|start|style|revise|drafts|files|history)(?:\/([^/]+)(?:\/files\/([^/]+))?)?)?$/);
     requireValue(match,'Writing route not found',404);const [,sessionId,action,taskId,fileId]=match;
-    const session=await store.get('writing-session',sessionId);requireValue(session,'写作会话不存在',404);
+    const session=await store.get('writing-session',sessionId);requireValue(session&&!session.deletedAt,'写作会话不存在',404);
     if(!action){requireValue(req.method==='GET','Method not allowed',405);send(res,200,await view(session));return true;}
     if(action==='history'){requireValue(req.method==='GET','Method not allowed',405);send(res,200,{items:(await store.list('writing-history')).filter(h=>h.sessionId===sessionId).map(h=>({...h,sources:h.sources.map(publicSource)}))});return true;}
     if(action==='files'){requireValue(req.method==='GET','Method not allowed',405);const file=session.sources.flatMap(s=>s.files).find(f=>f.id===taskId);requireValue(file,'材料文件不存在',404);const bytes=await fileBytes(file);await authenticate(req);res.writeHead(200,{'Content-Type':file.mime,'Content-Length':bytes.length});res.end(bytes);return true;}

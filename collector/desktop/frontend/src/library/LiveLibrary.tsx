@@ -1,3 +1,5 @@
+import {useTaskCreation} from '../content/TaskCreate';
+import {useContentActions} from '../content/ContentActions';
 import {useCommandSurface} from '../interactions/InteractionProvider';
 import type {Command} from '../interactions/commands';
 import {Copy} from 'lucide-react';
@@ -8,15 +10,14 @@ import { rememberPage, restorePage } from '../workspace/PageMemory';
 import { useLocation, useNavigate,useParams } from 'react-router-dom';
 import { libraryDateLabel } from './data/date-label';
 import { LibraryAttachments } from './LibraryAttachments';
-import { LibraryTrash } from './LibraryTrash';
+
 import { LibraryMarkdown } from './LibraryMarkdown';
 import { FileText, Bookmark, ChevronDown, ExternalLink, Tag, Ellipsis, Trash2 } from 'lucide-react';
 import { AppShell } from '../app/AppShell';
 import { ContentHeader, ContentPane, ListPane, SourceActions, SplitPane } from '../components/Workspace';
 import { Action, ChoiceBar, EntityRow, IconAction, SearchField } from '../components/Controls';
 import { ContentSkeleton, ListSkeleton, StatePanel } from '../components/AsyncState';
-import { useQueryClient } from '@tanstack/react-query';
-import { DeleteDialog, MoreMenu, MenuButton, TagsDialog } from '../components/Overlays';
+import { MenuButton, TagsDialog } from '../components/Overlays';
 import { scrollReader } from '../components/ReaderKeyboard';
 import { focusListItem } from '../components/ListKeyboard';
 import { useLibrarySession } from './LibraryProvider';
@@ -30,12 +31,11 @@ export function LiveLibrary() {
   const location = useLocation(), navigate = useNavigate(), params=useParams();
   const theme=useAppTheme(),dark=theme==='dark';
   const { taskCount } = useRecords();
-  const [trashInvoker,setTrashInvoker]=useState<HTMLElement|null>(null);
+  const contentActions=useContentActions(),taskCreation=useTaskCreation();
   const [tagsInvoker,setTagsInvoker]=useState<HTMLElement|null>(null);
   const [scrollFraction,setScrollFraction]=useState(0);
-  const cache=useQueryClient();
-  const [deletion,setDeletion]=useState<{title:string;archiveId:string;invoker:HTMLElement}|null>(null);
-  const [operationError,setOperationError]=useState(false),[removing,setRemoving]=useState(false);
+
+  const [operationError,setOperationError]=useState(false);
   const root = useRef<HTMLDivElement>(null), readerScroll = useRef<HTMLDivElement>(null);
   const { state, setState, pages } = useUiState();
   const ui = state.liveLibrary;
@@ -62,15 +62,15 @@ export function LiveLibrary() {
   const source = entry?.canonical_url || entry?.source_url;
   const collectedLabel=libraryDateLabel(entry?.collected_at);
   const sourceLabel = entry ? [Object.keys(types).find(key => types[key] === entry.type) || entry.type, collectedLabel].filter(Boolean).join(' · ') : '';
-  const remove=async(archiveId:string)=>{const startedSession=librarySession;setRemoving(true);setOperationError(false);try{if(!window.library?.remove)throw Error('回收站接口不可用');await window.library.remove(archiveId);await cache.invalidateQueries({queryKey:['live-library',librarySession]});}catch{if(currentSession.current===startedSession)setOperationError(true);}finally{if(currentSession.current===startedSession)setRemoving(false);}};
-  useEffect(()=>{setTrashInvoker(null);setTagsInvoker(null);setDeletion(null);setOperationError(false);setRemoving(false);},[librarySession]);
+
+  useEffect(()=>{setTagsInvoker(null);setOperationError(false);},[librarySession]);
   const clear = () => { setQuery(''); setType('全部类型'); setStatus('全部状态'); setSelected(null); update({favoritesOnly:false,tags:[]}); };
   const openEntry=(id:string)=>{setSelected(id);go('/library/demo');};
-  const itemCommands=(item:import('./data/client').LibraryEntry):Command[]=>[{id:'library.open',label:'打开',run:()=>openEntry(item.id)},{id:'library.bookmark',label:bookmarks.includes(item.id)?'取消收藏':'收藏',icon:Bookmark,disabled:!bookmarksReady,run:()=>toggleBookmark(item.id)},{id:'library.copy',label:'复制标题',icon:Copy,run:()=>navigator.clipboard.writeText(item.title)},{id:'library.tags',label:'标签',icon:Tag,disabled:!item.tags?.length,children:item.tags?.map(tag=>({id:'library.tag.'+tag,label:tag,run:()=>update({tags:[tag],selected:null})}))},{id:'library.source',label:'来源',icon:ExternalLink,disabled:!item.canonical_url&&!item.source_url,run:()=>window.library?.openUrl?.(item.canonical_url||item.source_url||'')},{id:'library.delete',label:'移至回收站',icon:Trash2,danger:true,separator:true,disabled:removing,run:()=>setDeletion({title:item.title,archiveId:item.archive_id,invoker:document.activeElement as HTMLElement})}];
+  const itemCommands=(item:import('./data/client').LibraryEntry):Command[]=>[{id:'library.task',label:'创建任务',opensDialog:true,run:async()=>{const full=await libraryClient.entry(item.id);const file=(item.id===data.id&&currentTab!=='附件'?full.files.find(f=>f.path===data.file?.path):undefined)??full.files.find(f=>f.role==='publication')??full.files.find(f=>f.role==='summary');const body=file?(await libraryClient.content(item.id,file.path)).content:full.summary??full.title;const url=full.canonical_url||full.source_url||'';taskCreation.open({key:'library:'+full.id,text:body+(url?'\n\n来源：'+url:''),url,files:full.files.map(f=>({name:f.path.split('/').at(-1)!,load:async()=>{if(!window.library?.taskFile)throw Error('需更新客户端');const result=await window.library.taskFile({id:full.id,file:f.path});const bytes=Uint8Array.from(atob(result.bytes),c=>c.charCodeAt(0));return new File([bytes],result.name);}}))});}},{id:'library.open',label:'打开',run:()=>openEntry(item.id)},{id:'library.bookmark',label:bookmarks.includes(item.id)?'取消收藏':'收藏',icon:Bookmark,disabled:!bookmarksReady,run:()=>toggleBookmark(item.id)},{id:'library.copy',label:'复制标题',icon:Copy,run:()=>navigator.clipboard.writeText(item.title)},{id:'library.tags',label:'标签',icon:Tag,disabled:!item.tags?.length,children:item.tags?.map(tag=>({id:'library.tag.'+tag,label:tag,run:()=>update({tags:[tag],selected:null})}))},{id:'library.source',label:'来源',icon:ExternalLink,disabled:!item.canonical_url&&!item.source_url,run:()=>window.library?.openUrl?.(item.canonical_url||item.source_url||'')},{id:'library.delete',label:'删除',icon:Trash2,danger:true,separator:true,run:()=>contentActions.remove({type:'library',id:item.archive_id,title:item.title,version:0,trashVersion:0},[],()=>{if(data.id===item.id){const index=data.items.findIndex(i=>i.id===item.id),next=data.items[index+1]??data.items[index-1];setSelected(next?.id??null);go(next?'/library/demo':'/library');}})}];
   const libraryClient=useLibrarySession().client;
   useCommandSurface(root,{commands:()=>entry?itemCommands(entry):[],quick:async query=>{const result=await libraryClient.entries({q:query,limit:50});return result.items.map(item=>({id:item.id,label:item.title,run:()=>openEntry(item.id)}));},newRecord:()=>go('/records/new'),search:()=>{const input=root.current?.querySelector<HTMLInputElement>('[aria-label="搜索资料"]');if(input?.getClientRects().length)input.focus();else navigate('/library'+location.search,{state:{focus:'search'}});}});
   return <div ref={root} onFocusCapture={remember} className={styles.app} data-list-first-error={data.list.isError && !data.id || undefined} data-theme={theme}>
-    <AppShell area="library" go={go} taskCount={taskCount} libraryControlsDisabled libraryMenu={<MenuButton label="更多" icon={Ellipsis} iconOnly={false} compact={false} offset={dark?6:8} kind="ghost" width={160} align="end" options={[{label:"回收站",icon:Trash2,opensDialog:true,select:setTrashInvoker}]} />} favoritesDisabled={!bookmarksReady} favoritesOnly={ui.favoritesOnly} onFavorites={() => update({favoritesOnly:!ui.favoritesOnly,selected:null})} onAction={() => {}}>
+    <AppShell area="library" go={go} taskCount={taskCount} libraryControlsDisabled libraryMenu={<MenuButton label="更多" icon={Ellipsis} iconOnly={false} compact={false} offset={dark?6:8} kind="ghost" width={160} align="end" options={[{label:"回收站",icon:Trash2,opensDialog:true,select:contentActions.openTrash}]} />} favoritesDisabled={!bookmarksReady} favoritesOnly={ui.favoritesOnly} onFavorites={() => update({favoritesOnly:!ui.favoritesOnly,selected:null})} onAction={() => {}}>
       <SplitPane view={location.pathname!== '/library' ? 'detail' : 'list'}>
         <ListPane label="资料列表">
           <div className={styles.listFilters} data-region="列表搜索筛选">
@@ -89,7 +89,7 @@ export function LiveLibrary() {
         <ContentPane label="资料内容" backLabel="资料列表" onBack={() => go('/library')}>
           {listLoading ? <ContentSkeleton reader /> : data.list.isError && !data.id ? null : !data.id ? <StatePanel kind="library-empty" title="暂无资料" region="内容状态" /> : data.entry.isPending ? <ContentSkeleton reader /> : entry && <>
             <ContentHeader title={entry.title} reader actions={<IconAction icon={Bookmark} label="收藏资料" disabled={!bookmarksReady} aria-pressed={bookmarks.includes(entry.id)} onClick={() => toggleBookmark(entry.id)} />} />
-            <SourceActions source={sourceLabel}><Action icon={ExternalLink} kind="ghost" compact disabled={!source} onClick={() => { if (source) void window.library?.openUrl?.(source); }}>来源</Action><MoreMenu icon={Ellipsis} compact allowManage={false} allowDelete={!removing} onDownload={()=>setTab("附件")} onAction={(action,invoker)=>{if(action==="copy")void navigator.clipboard.writeText(entry.title).catch(()=>setOperationError(true));if(action==="delete")setDeletion({title:entry.title,archiveId:entry.archive_id,invoker});}}/></SourceActions>
+            <SourceActions source={sourceLabel}><Action icon={ExternalLink} kind="ghost" compact disabled={!source} onClick={() => { if (source) void window.library?.openUrl?.(source); }}>来源</Action><MenuButton label="更多" icon={Ellipsis} iconOnly compact kind="ghost" width={200} align="end" options={itemCommands(entry).filter(c=>c.id!=='library.open'&&!c.children).map(c=>({label:c.label,icon:c.icon,disabled:c.disabled,danger:c.danger,separator:c.separator,opensDialog:c.id==='library.delete'||c.id==='library.task',select:()=>{void c.run?.();}}))}/></SourceActions>
             <ChoiceBar label="资料阅读内容" options={entry.files.some(f=>f.role==='publication')?['正文','摘要','分析','原文','附件']:['摘要','分析','原文','附件']} value={currentTab} onChange={setTab} tabs idPrefix="live-library-reader" />
             <div className={styles.readerViewport} data-region="阅读滚动区" role="tabpanel" id="reader-panel" aria-labelledby={"live-library-reader-" + currentTab} tabIndex={0} onKeyDown={event => scrollReader(event, readerScroll.current)}>
               {operationError ? <StatePanel kind="error" title="操作失败" action="重试" region="阅读状态" onAction={()=>{setOperationError(false);void data.entry.refetch();}}/> : data.entry.isError && currentTab!=="附件" ? <StatePanel kind="error" title="内容加载失败" action="重试" region="阅读状态" onAction={()=>void data.entry.refetch()}/> : bookmarkError ? <StatePanel kind="error" title="内容加载失败" region="阅读状态" /> : data.content.isFetching && data.file ? <ContentSkeleton reader /> : data.content.isError ? <StatePanel kind="error" title="内容加载失败" action="重试" region="阅读状态" onAction={() => void data.content.refetch()} /> : <div className={styles.readerScroll} ref={readerScroll} data-region="阅读正文滚动" onScroll={event => { const element=event.currentTarget; setScrollFraction(element.scrollTop/Math.max(1,element.scrollHeight-element.clientHeight)); const memory = rememberPage(root.current); pages.set(pageKey, { ...memory, focus: memory.focus ?? pages.get(pageKey)?.focus ?? null }); }}>{currentTab === "附件" ? <LibraryAttachments key={entry.id+entry.archive_id} entry={entry} failed={data.entry.isError} retry={()=>void data.entry.refetch()}/> : !data.file && !(currentTab === '摘要' && entry.summary) ? <div className={styles.readerEmpty}><StatePanel kind="library-empty" icon={FileText} title={'暂无'+currentTab} region="阅读空态"/></div> : <LibraryMarkdown key={entry.id+':'+entry.archive_id+':'+currentTab} entry={entry} document={data.content.data?.file??data.file?.path??''} content={data.content.data?.content ?? (currentTab === "摘要" ? entry.summary ?? "" : "")} />}</div>}
@@ -100,7 +100,6 @@ export function LiveLibrary() {
       </SplitPane>
     </AppShell>
     {tagsInvoker&&<TagsDialog invoker={tagsInvoker} close={()=>setTagsInvoker(null)} value={ui.tags} availableTags={[...new Set(data.list.data?.pages.flatMap(page=>page.items.flatMap(item=>item.tags??[]))??[])]} apply={tags=>update({tags,selected:null})}/> }
-    {deletion&&<DeleteDialog title={deletion.title} invoker={deletion.invoker} close={()=>setDeletion(null)} confirm={()=>void remove(deletion.archiveId)}/> }
-    {trashInvoker && <LibraryTrash invoker={trashInvoker} close={()=>setTrashInvoker(null)}/> }
+    {contentActions.dialogs}{taskCreation.dialog}
   </div>;
 }

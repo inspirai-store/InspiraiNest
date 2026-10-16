@@ -1,6 +1,6 @@
 export type TaskState = 'queued'|'assigned'|'running'|'uploading'|'validating'|'waiting_action'|'awaiting_review'|'completed'|'cancelled'|'failed'|'interrupted';
 export type TaskAction = 'retry'|'cancel'|'approve'|'reassign';
-export type Task = {writingSessionId?:string;writingMode?:string;id:string;state:TaskState;content?:string|{text?:string;url?:string;title?:string};recordSnapshot?:{text?:string};deviceId?:string|null;preferredAgent?:string|null;createdAt:string;archiveId?:string|null;events?:{state:TaskState;message:string;at:string}[]};
+export type Task = {selectedSkills?:{versionId:string}[];agent?:string;trashVersion?:number;writingSessionId?:string;writingMode?:string;id:string;state:TaskState;content?:string|{text?:string;url?:string;title?:string};recordSnapshot?:{text?:string};deviceId?:string|null;preferredAgent?:string|null;createdAt:string;archiveId?:string|null;events?:{state:TaskState;message:string;at:string}[]};
 export type TaskSnapshot = {tasks:Task[];devices:import('../nodes/model.ts').NodeDevice[];archives?:{id:string;entryId?:string;meta?:{id:string}}[]};
 export type TaskDraft = {meta:{id:string;title:string};summary:string;files:{path:string;role:string;bytes:number}[]};
 export const taskLabels:Record<TaskState,string>={queued:'等待领取',assigned:'已分配',running:'处理中',uploading:'上传中',validating:'校验中',waiting_action:'待操作',awaiting_review:'待确认',completed:'已完成',cancelled:'已取消',failed:'失败',interrupted:'已中断'};

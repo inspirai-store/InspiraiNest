@@ -12,7 +12,7 @@ export function createAgentRuntime(config, { api, installer = createAgentInstall
   const redact = error => String(error.message || error).replaceAll(config.token, '[授权]').replaceAll(installer.root, '[安装目录]').slice(0,500);
   async function report() {
     environment = await installer.scan();
-    await api('/api/agents/environment', 'POST', { ...environment, agents:environment.agents.map(({command,original,...entry}) => entry) });
+    await api('/api/agents/environment', 'POST', { ...environment, managementProtocol:1, agents:environment.agents.map(({command,original,...entry}) => entry) });
     lastReport = Date.now(); return environment;
   }
   async function tick({ idle = false, operationIds = [] } = {}) {
@@ -45,6 +45,7 @@ export function createAgentRuntime(config, { api, installer = createAgentInstall
         let result;
         let state;try{state=JSON.parse(fs.readFileSync(path.join(installer.root,'current.json'),'utf8'));}catch{state={};}
         if (op.action === 'refresh') { await report(); result = {}; }
+        else if(op.action==='uninstall'){if(!installer.uninstall)throw Error('需更新客户端');result=await installer.uninstall(op,{signal:controller.signal,beforeCommit:check});}
         else if (state[op.agent]?.operationId === op.id) result = { version:state[op.agent].version };
         else result = await installer.install(op,{signal:controller.signal,beforeCommit:check});
         const receipt = { state:result.waiting ? 'waiting' : 'succeeded', result };

@@ -65,7 +65,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     if (!route.startsWith('/api/records')) return false;
     owner(device);
     if (route === '/api/records/capabilities' && req.method === 'GET') {
-      send(res,200,{protocol:1,documentVersions:[1],structuredErrors:true}); return true;
+      send(res,200,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1}); return true;
     }
     const mediaRoute = route.match(/^\/api\/records\/media\/([a-f0-9]{64})$/);
     if (mediaRoute) {
@@ -90,13 +90,13 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     }
     if (route === '/api/records' && req.method === 'GET') {
       const tasks=await store.list('task');
-      send(res,200,{records:(await store.list('capture')).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map(record=>({...record,tasks:tasks.filter(task=>task.recordId===record.id).map(({id,state,recordVersion,createdAt,events})=>({id,state,recordVersion,createdAt,events:events.slice(-1)}))}))}); return true;
+      send(res,200,{deleted:(await store.list('capture')).filter(r=>r.deletedAt).map(({id,version,deletedAt,trashVersion})=>({id,version,deletedAt,trashVersion})),records:(await store.list('capture')).filter(r=>!r.deletedAt).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map(record=>({...record,tasks:tasks.filter(task=>task.recordId===record.id).map(({id,state,recordVersion,createdAt,events})=>({id,state,recordVersion,createdAt,events:events.slice(-1)}))}))}); return true;
     }
     const recordRoute = route.match(/^\/api\/records\/([^/]+)(\/process)?$/);
     requireValue(recordRoute,'Not found',404);
     const recordId = identify(recordRoute[1]);
     if (req.method === 'GET' && !recordRoute[2]) {
-      const record = await store.get('capture',recordId); requireValue(record,'Record not found',404);
+      const record = await store.get('capture',recordId); requireValue(record&&!record.deletedAt,'Record not found',404);
       send(res,200,{...record,tasks:(await store.list('task')).filter(t => t.recordId === recordId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))}); return true;
     }
     const input = await body(req), requestId = identify(input.requestId);
@@ -110,6 +110,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
       const previous = await tx.getForUpdate('capture-operation',operationId);
       if (previous) { recordCheck(previous.hash === payloadHash,'record_request_reused','请求编号对应的内容已改变；原请求已保留，请重新保存修改'); return previous.result; }
       const current = await tx.getForUpdate('capture',recordId);
+      recordCheck(!current?.deletedAt,'record_deleted','记录已删除，请从回收站恢复');
       let result;
       if (recordRoute[2]) {
         requireValue(req.method === 'POST','Method not allowed',405);
@@ -141,7 +142,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         const createdAt = current?.createdAt || input.createdAt || now();
         requireValue(typeof createdAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(createdAt) && /(Z|[+-]\d{2}:\d{2})$/.test(createdAt) && Number.isFinite(Date.parse(createdAt)),'Invalid creation time');
         if(input.document!==undefined)validateDocument(input.document,attachments);
-        result = {id:recordId,text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,createdAt,updatedAt:now()};
+        result = {id:recordId,text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,trashVersion:current?.trashVersion??0,createdAt,updatedAt:now()};
         await tx.put('capture-version',{...result,id:`${recordId}:${result.version}`,recordId}); await tx.put('capture',result);
       }
       await tx.put('capture-operation',{id:operationId,hash:payloadHash,result}); return result;

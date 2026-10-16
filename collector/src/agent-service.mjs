@@ -1,4 +1,4 @@
-import { hash, canonicalJson, requireValue } from './common.mjs';
+import { id, hash, canonicalJson, requireValue } from './common.mjs';
 import { AGENT_CATALOG, agentDefinition, createAgentCatalog } from './agent-catalog.mjs';
 import { workerAuthorized } from './device-metadata.mjs';
 
@@ -44,7 +44,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
           probeState: a.probeState, source: ['managed', 'npm', 'homebrew', 'native', 'unknown'].includes(a.source) ? a.source : 'unknown',
           originalSupported: a.originalSupported === true, custom: a.custom === true, fingerprint: a.fingerprint };
       });
-      const value = { schemaVersion: 1, platform: input.platform, arch: input.arch, agents, scannedAt: at(), digest: hash(canonicalJson(agents)) };
+      const value = { schemaVersion: 1, managementProtocol:input.managementProtocol===1?1:null, platform: input.platform, arch: input.arch, agents, scannedAt: at(), digest: hash(canonicalJson(agents)) };
       await serialized('device:' + device.id, () => store.transaction(async tx => {
         const target = await tx.getForUpdate('device', device.id);
         requireValue(workerAuthorized(target || {}) && target.tokenHash === device.tokenHash, '设备授权已失效', 401);
@@ -67,15 +67,16 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
     }
     if (route === '/api/agents/operations' && req.method === 'POST') {
       owner(device); const input = await body(req);
-      requireValue(['install', 'update', 'refresh'].includes(input.action) && /^[\w-]{1,100}$/.test(input.requestId || ''), 'Agent 操作无效');
+      requireValue(['install', 'update', 'refresh','uninstall'].includes(input.action) && /^[\w-]{1,100}$/.test(input.requestId || ''), 'Agent 操作无效');
       const definition = input.action === 'refresh' ? null : agentDefinition(input.agent);
-      const request = { deviceId: input.deviceId, action: input.action, agent: definition?.id || null, method: definition ? input.method : null, expectedFingerprint: definition ? input.expectedFingerprint : null, targetVersion:definition?input.targetVersion || null:null };
+      if(input.action==='uninstall')requireValue(Array.isArray(input.cancelTaskIds)&&input.cancelTaskIds.every(x=>typeof x==='string'),'请确认关联任务');
+      const request = { ...(input.action==='uninstall'?{cancelTaskIds:[...input.cancelTaskIds].sort()}:{}),deviceId: input.deviceId, action: input.action, agent: definition?.id || null, method: definition ? input.method : null, expectedFingerprint: definition ? input.expectedFingerprint : null, targetVersion:definition?input.targetVersion || null:null };
       requireValue(!definition || ['managed', 'original'].includes(request.method) && identifier(request.expectedFingerprint), '安装方式或安装状态无效');
       const operationId = hash((device.credentialId || device.id) + ':' + input.requestId), requestHash = hash(canonicalJson(request));
       const previous = await store.get('agent-operation', operationId);
       if (previous) { requireValue(previous.requestHash === requestHash, '操作编号已使用', 409); send(res, 200, await settle(previous)); return true; }
-      const release = definition ? await catalog.release(definition.id) : null;
-      requireValue(!request.targetVersion || request.targetVersion===release.version,'Agent 正式版本已变化，请刷新',409);
+      const release = definition&&input.action!=='uninstall' ? await catalog.release(definition.id) : null;
+      requireValue(!request.targetVersion || request.targetVersion===release?.version,'Agent 正式版本已变化，请刷新',409);
       const namespace = await deploymentId();
       await operations(request.deviceId);
       const result = await serialized('device:' + request.deviceId, () => store.transaction(async tx => {
@@ -87,6 +88,12 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
         if (definition) {
           const environment = await tx.get('agent-environment', target.id), agent = environment?.agents.find(a => a.id === definition.id);
           requireValue(agent?.fingerprint === request.expectedFingerprint, 'Agent 安装状态已变化，请刷新', 409);
+          if(request.action==='uninstall'){
+            requireValue(environment.managementProtocol===1&&agent.source==='managed'&&request.method==='managed','仅支持新版节点的托管卸载',409);
+            const tasks=(await tx.list('task')).filter(t=>t.deviceId===target.id&&['assigned','running','uploading'].includes(t.state)&&(!t.agent||t.agent===definition.id));
+            requireValue(canonicalJson(tasks.map(t=>t.id).sort())===canonicalJson(request.cancelTaskIds),'关联任务已变化，请刷新后重新确认',409);
+            for(const task of tasks){const when=at();await tx.put('task',{...task,assignmentId:id(),state:'cancelled',updatedAt:when,events:[...(task.events||[]),{at:when,state:'cancelled',message:'卸载 Agent，执行已取消'}]});}
+          }
           requireValue(!agent.custom, '已配置自定义命令，请在目标电脑管理', 409);
           requireValue(request.method !== 'original' || agent.originalSupported, '原有安装来源不支持，请选择灵藏托管', 409);
           requireValue(!(await tx.list('agent-operation')).some(o => o.deviceId === target.id && o.agent === definition.id && pending.has(o.state)), '此 Agent 已有待执行操作', 409);

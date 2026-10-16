@@ -1,3 +1,4 @@
+import {createContentTrash} from './content-trash.mjs';
 import {createWriting as createSelectionWriting} from './selection-writing.mjs';
 import http from 'node:http';
 import { createRecords } from './records.mjs';
@@ -44,6 +45,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
+  const contentTrash=createContentTrash({store,serialized,owner,authenticate,body,send,saveTask,refreshLibrary:()=>readApi.refresh()});
   const records = createRecords({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask});
   const writing = createWriting({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
   const selectionWriting=createSelectionWriting({store,serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment});
@@ -197,6 +199,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     requireValue(req.headers.origin === origin, 'Origin not allowed', 403);
   }
   function checkAssignment(device, task, req) {
+    requireValue(!task?.deletedAt,'任务已删除',409);
     requireValue(task && task.deviceId === device.id, 'Task not assigned to this device', 403);
     requireValue(!task.assignmentId || req?.headers['x-task-assignment'] === task.assignmentId, 'Task assignment has changed', 409);
   }
@@ -564,6 +567,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if (await contentTrash.handle(req,res,route,device)) return;
       if (await records.handle(req,res,route,device)) return;
       if (await selectionWriting.handle(req,res,route,device)) return;
       if (await writing.handle(req,res,route,device)) return;
@@ -599,10 +603,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (route === '/api/state' && req.method === 'GET') {
         owner(device);
         await recoverUnavailableTasks();
+        const deletedWriting=new Set((await store.list('writing-session')).filter(s=>s.deletedAt).map(s=>s.id));
         const archives = [];
         for (const archive of await store.list('archive')) if (!(await deleted(archive))) archives.push(archive);
         const devices = await Promise.all((await store.list('device')).filter(d => !d.revokedAt).map(d => sessions.ensure(d)));
-        return send(res, 200, { writingProtocol:1, selectionWritingProtocol:1, me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).filter(t=>t.purpose!=='selection-writing').sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+        return send(res, 200, { writingProtocol:1, selectionWritingProtocol:1, contentTrashProtocol:1, me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).filter(t=>t.purpose!=='selection-writing'&&!t.deletedAt&&!deletedWriting.has(t.writingSessionId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
       }
       if (route === '/api/pairings' && req.method === 'POST') {
         owner(device);
@@ -721,7 +726,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           }
           const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now(), ...(inputAttachments.length ? { inputAttachments } : {}) };
           task.requiredCapabilities = taskCapabilities(task);
-          return send(res, 201, await saveTask(task, 'queued', inputAttachments.length ? '等待支持附件协议的新版采集电脑，请将 Worker 更新至 0.1.29 或更高版本' : '等待可用电脑'));
+          return send(res, 201, await saveTask(task, 'queued', inputAttachments.length ? '等待支持附件的节点' : '等待可用电脑'));
         });
       }
       if (route === '/api/claim' && req.method === 'POST') {
@@ -788,7 +793,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         if (action === 'approve') {
           owner(device);
           const task = await store.get('task', taskId);
-          requireValue(task, 'Task not found', 404);
+          requireValue(task&&!task.deletedAt, 'Task not found', 404);
           if (task.state === 'completed') return send(res, 200, task);
           requireValue(task.state === 'awaiting_review', 'Invalid task transition', 409);
           const draft = await store.get('draft', task.draftId);
@@ -804,7 +809,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           owner(device);
           const result = await serialized('claim', () => store.transaction(async tx => {
             const task = await tx.getForUpdate('task', taskId);
-            requireValue(task, 'Task not found', 404);
+            requireValue(task&&!task.deletedAt, 'Task not found', 404);
             requireValue(action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
             if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
             const next = action === 'retry' ? { ...task, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;

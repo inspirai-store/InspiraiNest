@@ -1,3 +1,6 @@
+import {useContentActions} from '../content/ContentActions';
+import {MenuButton} from '../components/Overlays';
+import {Trash2,Ellipsis} from 'lucide-react';
 import {useEffect,useRef,useState} from 'react';
 import {X} from 'lucide-react';
 import {Action,IconAction,Badge,ChoiceBar} from '../components/Controls';
@@ -6,6 +9,7 @@ import {diffText,terminal} from './model';
 import {errorMessage} from '../shared/errors';
 import styles from './Writing.module.css';
 export function WritingPanel({job,jobs,select,capabilities,paired,close,change,submit,refresh,cancel,canApply,apply,save,error}:{job:WritingJob;jobs:WritingJob[];select:(id:string)=>void;capabilities:WritingCapabilities;paired:boolean;close:()=>void;change:(form:WritingForm)=>void;submit:()=>void;refresh:()=>void;cancel:()=>void;canApply:boolean;apply:(mode:'replace'|'insert')=>void;save:()=>void;error:(message:string)=>void}){
+ const contentActions=useContentActions();
  const [settingsOpen,setSettingsOpen]=useState(!job.remote?.result);
  const [tab,setTab]=useState('结果'),[customLanguage,setCustomLanguage]=useState(!['中文','英文'].includes(job.form.language));const panel=useRef<HTMLElement>(null);
  const running=job.submitting||!!job.remote&&!terminal(job.remote.state),result=job.remote?.result?.text;
@@ -16,8 +20,8 @@ export function WritingPanel({job,jobs,select,capabilities,paired,close,change,s
  const set=(patch:Partial<WritingForm>)=>change({...job.form,...patch});
  useEffect(()=>{panel.current?.focus({preventScroll:true});},[]);
  useEffect(()=>{if(result)setSettingsOpen(false);},[result]);
- return <aside ref={panel} tabIndex={-1} className={styles.panel} aria-label="AI 写作" data-region="AI 面板" onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Escape'&&!document.querySelector('dialog[open], [role=menu]')){e.preventDefault();e.stopPropagation();close();}}}>
-  <header><h2>AI 写作</h2><Badge role="status" kind={job.error?'danger':'neutral'}>{status}</Badge><IconAction icon={X} label="收起 AI" onClick={close}/></header>
+ return <>{contentActions.dialogs}<aside ref={panel} tabIndex={-1} className={styles.panel} aria-label="AI 写作" data-region="AI 面板" onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Escape'&&!document.querySelector('dialog[open], [role=menu]')){e.preventDefault();e.stopPropagation();close();}}}>
+  <header><h2>AI 写作</h2><Badge role="status" kind={job.error?'danger':'neutral'}>{status}</Badge><MenuButton label="AI 操作" icon={Ellipsis} iconOnly kind="ghost" options={[{label:"删除",icon:Trash2,danger:true,opensDialog:true,disabled:!!job.submitting,select:()=>contentActions.remove({type:"selection-writing",id:job.remote?.id??job.id,title:job.selection.text.slice(0,60),version:0,trashVersion:job.remote?.trashVersion??0,local:true},running?["AI 写作"]:[])},{label:"回收站",icon:Trash2,opensDialog:true,select:contentActions.openTrash}]}/><IconAction icon={X} label="收起 AI" onClick={close}/></header>
   <div className={styles.scroll}>
    {jobs.length>1&&<label className={styles.field}>写作记录<select aria-label="写作记录" value={job.id} onChange={e=>select(e.target.value)}>{jobs.map((j,i)=><option key={j.id} value={j.id}>{i+1}. {j.selection.source.title} · {j.remote?statuses[j.remote.state]??j.remote.state:'待生成'}</option>)}</select></label>}
    <details className={styles.settings} open={settingsOpen} onToggle={e=>setSettingsOpen(e.currentTarget.open)}><summary>设置</summary>
@@ -40,5 +44,5 @@ export function WritingPanel({job,jobs,select,capabilities,paired,close,change,s
     <div className={styles.actions}>{job.selection.source.kind==='draft'&&<><Action disabled={!canApply} onClick={()=>apply('replace')}>替换</Action><Action disabled={!canApply} onClick={()=>apply('insert')}>插入</Action></>}<Action onClick={()=>void navigator.clipboard.writeText(result).catch(e=>error(errorMessage(e)))}>复制</Action><Action onClick={save}>存为记录</Action></div>
    </>}
   </div>
- </aside>;
+ </aside></>;
 }

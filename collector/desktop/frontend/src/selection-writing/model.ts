@@ -5,8 +5,8 @@ export type WritingSelection={source:WritingSource;text:string;fullText:string;t
 export type WritingForm={operation:'polish'|'shorten'|'expand'|'translate'|'custom';instructions:string;language:string;fullText:boolean;deviceId:string;agent:string};
 export const defaultForm=():WritingForm=>({operation:'polish',instructions:'',language:'中文',fullText:false,deviceId:'',agent:''});
 export type WritingRequest={requestId:string;operation:WritingForm['operation'];text:string;fullText?:string;instructions:string;language:string;deviceId:string|null;agent:string|null};
-export type WritingRemote={id:string;requestId:string;state:string;deviceId:string|null;agent?:string;updatedAt:string;result?:{protocol:1;text:string}|null;events?:{message:string}[]};
-export type WritingJob={id:string;scope:string;selection:WritingSelection;form:WritingForm;createdAt:string;request?:WritingRequest;remote?:WritingRemote;error?:string;submitting?:boolean;cancelIntent?:boolean;applied?:boolean};
+export type WritingRemote={trashVersion?:number;id:string;requestId:string;state:string;deviceId:string|null;agent?:string;updatedAt:string;result?:{protocol:1;text:string}|null;events?:{message:string}[]};
+export type WritingJob={deletedAt?:string|null;id:string;scope:string;selection:WritingSelection;form:WritingForm;createdAt:string;request?:WritingRequest;remote?:WritingRemote;error?:string;submitting?:boolean;cancelIntent?:boolean;applied?:boolean};
 export type WritingCapabilities={selectionWritingProtocol?:number;devices?:{id:string;name:string;selectionWritingProtocol?:number;agents?:string[];online?:boolean;workerAuthorized?:boolean}[]};
 export const terminal=(state?:string)=>!!state&&['completed','failed','cancelled','waiting_action'].includes(state);
 export function mergeRemote(job:WritingJob,remote:WritingRemote):WritingJob{

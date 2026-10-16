@@ -121,7 +121,7 @@ export class OwnerClient {
     if (input.kind === 'version') return this.api('/api/skills/versions/'+archiveId(input.versionId));
     if (input.kind === 'operation') return this.api('/api/skills/operations/'+archiveId(input.operationId));
     if (input.kind === 'history') return this.api('/api/skills/operations?deviceId='+taskId(input.deviceId));
-    if (input.kind === 'create' && ['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.operation?.action)) return this.api('/api/skills/operations','POST',input.operation);
+    if (input.kind === 'create' && ['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback','uninstall'].includes(input.operation?.action)) return this.api('/api/skills/operations','POST',input.operation);
     throw new Error('不支持的技能请求');
   }
   async syncIdentity() {
@@ -181,6 +181,7 @@ export class OwnerClient {
     if (result.bytes.length > 20 * 1024 * 1024 || digest(result.bytes) !== record.sha256 || (result.sha256 && result.sha256 !== record.sha256)) throw new Error('附件校验失败');
     return { bytes: result.bytes, name: path.posix.basename(file), type: path.extname(file).toLowerCase() };
   }
+  async taskFile(input){const file=await this.fileBytes(input);return {name:file.name,bytes:file.bytes.toString('base64')};}
   async preview(input) {
     const mimeByExtension = { '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.gif':'image/gif', '.avif':'image/avif', '.pdf':'application/pdf', '.mp4':'video/mp4', '.webm':'video/webm', '.mov':'video/quicktime', '.mp3':'audio/mpeg', '.wav':'audio/wav', '.m4a':'audio/mp4', '.ogg':'audio/ogg', '.txt':'text/plain', '.md':'text/plain', '.markdown':'text/plain', '.csv':'text/plain', '.json':'application/json', '.srt':'text/plain', '.vtt':'text/plain' };
     const mime = mimeByExtension[path.extname(input?.file || '').toLowerCase()];
@@ -189,8 +190,12 @@ export class OwnerClient {
     return { dataUrl: `data:${mime};base64,${result.bytes.toString('base64')}`, name: result.name };
   }
   createTask(input) {
-    if (!input || typeof input.content !== 'string' || !input.content.trim() || input.content.length > 10000 || typeof input.submissionId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.submissionId)) throw new Error('采集内容或提交编号无效');
-    const payload = { content: input.content, submissionId: input.submissionId, autoArchive: Boolean(input.autoArchive), tags: Array.isArray(input.tags) ? input.tags : [], deviceId: input.deviceId || '', agent: input.agent || '' };
+    if(input?.account&&(input.account.server!==this.identity?.server||input.account.deviceId!==this.identity?.deviceId))throw new Error('资料空间已切换');
+    if (!input || typeof input.submissionId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.submissionId)) throw new Error('提交编号无效');
+    if(input.content!==undefined&&(typeof input.content!=='string'||input.content.length>10000))throw new Error('任务内容最多 10000 字');
+    if(input.url!==undefined){const url=new URL(input.url);if(!['https:','http:'].includes(url.protocol))throw new Error('链接无效');}
+    if(!input.url&&!input.content?.trim()&&!input.attachments?.length)throw new Error('请输入内容或添加附件');
+    const payload = { ...(input.url?{url:input.url}:{content:input.content??''}), submissionId:input.submissionId,autoArchive:input.autoArchive??true,tags:Array.isArray(input.tags)?input.tags:[],deviceId:input.deviceId||'',agent:input.agent||'',type:input.type||'auto',scenario:input.scenario||'',attachments:Array.isArray(input.attachments)?input.attachments:[] };
     return this.api('/api/tasks', 'POST', payload);
   }
   taskAction({ id, action }) {

@@ -62,7 +62,7 @@ export function MoreMenu({ icon, iconOnly = true, compact = false, onAction, cla
     { label: '管理标签', icon: Tag, disabled: !allowManage, opensDialog: true, select: invoker => onAction('tags', invoker) },
     { label: '复制标题', icon: Copy, select: invoker => onAction('copy', invoker) },
     { label: '下载附件', icon: Download, disabled: !onDownload, select: () => onDownload?.() },
-    { label: '移至回收站', icon: Trash2, disabled: !allowDelete, danger: true, separator: true, opensDialog: true, select: invoker => onAction('delete', invoker) },
+    { label: '删除', icon: Trash2, disabled: !allowDelete, danger: true, separator: true, opensDialog: true, select: invoker => onAction('delete', invoker) },
   ]} />;
 }
 
@@ -115,9 +115,10 @@ export function TagsDialog({ invoker, close, value, apply, manage = false, avail
   </Modal>;
 }
 
-export function DeleteDialog({ title, invoker, close, confirm }: { title: string; invoker: HTMLElement; close: () => void; confirm: () => void }) {
-  return <Modal title="移至回收站" invoker={invoker} close={close} narrow focusCancel footer={<><Action className={styles.cancel} data-initial-cancel onClick={close}>取消</Action><Action kind="primary" onClick={() => { confirm(); close(); }}>移至回收站</Action></>}>
-    <p className={styles.question} data-overlay-region="确认问题"><span>将「{title}」移至回收站？</span></p>
+export function DeleteDialog({ title, invoker, close, confirm }: { title: string; invoker: HTMLElement; close: () => void; confirm: () => void|Promise<void> }) {
+  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  return <Modal title="删除" invoker={invoker} close={()=>{if(!busy)close();}} narrow focusCancel footer={<><Action className={styles.cancel} disabled={busy} data-initial-cancel onClick={close}>取消</Action><Action kind="primary" disabled={busy} onClick={()=>{setBusy(true);setError('');void Promise.resolve().then(confirm).then(close).catch(e=>setError(e instanceof Error?e.message:'删除失败')).finally(()=>setBusy(false));}}>删除</Action></>}>
+    <p className={styles.question} data-overlay-region="确认问题"><span>将「{title}」移至回收站？</span></p>{error&&<p role="alert">{error}</p>}
   </Modal>;
 }
 

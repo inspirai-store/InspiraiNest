@@ -33,6 +33,11 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
     watchers.clear();await Promise.all(closing);
   }
   function recover() {
+    const uninstalled=path.join(root,'uninstalled');if(fs.existsSync(uninstalled))for(const name of fs.readdirSync(uninstalled)){
+      const file=path.join(uninstalled,name,'restore.json'),plan=read(file,null);if(!plan||plan.completed)continue;
+      for(const move of [...plan.entries].reverse()){requireValue(contained(uninstalled,move.backup),'卸载恢复路径无效');if(pathExists(move.backup)&&!pathExists(move.entry))fs.renameSync(move.backup,move.entry);}
+      for(const [key,value] of plan.installations)ledger.installations[key]=value;atomicJson(ledgerFile,ledger);atomicJson(file,{...plan,completed:true,reverted:true});
+    }
     const transaction=read(transactionFile,null);if(!transaction)return;
     recoverSkillLinks(transaction);
     if(!transaction.committed) for(const target of [...transaction.targets].reverse()) {
@@ -71,6 +76,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
         }
       }
       next.inventory.digest=hash(JSON.stringify({agents:next.inventory.agents,items:next.inventory.items,projects:next.inventory.projects}));
+      next.inventory.managementProtocol=1;
       state=next;lastScan=Date.now();dirty=false;
       atomicJson(path.join(root,'inventory.json'),state.inventory);
       // Recursive watches traverse ignored virtual environments and plugin caches.
@@ -213,6 +219,7 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
   async function operation(op) {
     requireValue(op.schemaVersion===1 && /^[a-f0-9]{64}$/.test(op.id),'操作格式无效');
     if(receipts[op.id])return receipts[op.id];
+    if(op.action==='uninstall'){const removed=read(path.join(root,'uninstalled',op.id,'restore.json'),null);if(removed?.completed&&!removed.reverted)return {state:'succeeded',result:{removed:true,agents:removed.agents}};}
     await refresh(true);let result;
     if(op.action==='refresh'){await report();result={refreshed:true,digest:state.inventory.digest};}
     else if(op.action==='configure-projects'){
@@ -242,6 +249,23 @@ export function createSkillRuntime(config, { api, cwd, scan = createInventorySca
         result={verification:{...verification,versionId:op.versionId,hash:bundle.hash,profileHash:state.inventory.agents.find(a=>a.name===op.agent)?.profileHash,at:now(),sample:op.sample}};
         ledger.installations[op.agent+':'+real].verification=result.verification;atomicJson(ledgerFile,ledger);
       }
+    }else if(op.action==='uninstall'){
+      const item=state.inventory.items.find(s=>s.id===op.skillId),location=state.local.get(op.skillId);
+      requireValue(item&&location&&item.hash===op.expectedHash&&item.managedVersion,'仅支持卸载未改变的托管技能');
+      requireValue(!['system','admin','plugin'].includes(item.scope),'此技能不能卸载');
+      const affected=state.inventory.items.filter(s=>state.local.get(s.id)?.real===location.real);
+      const agents=[...new Set(affected.map(s=>s.agent))].sort();
+      requireValue(canonicalJson(agents)===canonicalJson([...op.agents].sort())&&(agents.length<2||op.confirmShared),'请确认全部共享 Agent');
+      const installed=Object.entries(ledger.installations).filter(([key,value])=>key.endsWith(':'+location.real)&&value.hash===item.hash);
+      requireValue(installed.length&&actualHash(location.real)===item.hash,'技能已修改，请刷新');
+      await pauseWatches();
+      const backupRoot=path.join(root,'uninstalled',op.id);fs.mkdirSync(backupRoot,{recursive:true});
+      const entries=[...new Set(affected.map(s=>entryPath(state.local.get(s.id).directory)))].filter(e=>e!==location.real&&pathExists(e));
+      const moves=[...entries,location.real].map((entry,i)=>({entry,backup:path.join(backupRoot,String(i))}));
+      const plan={id:op.id,entries:moves,installations:installed,agents,completed:false};atomicJson(path.join(backupRoot,'restore.json'),plan);
+      try{for(const move of moves){requireValue(pathExists(move.entry),'技能路径已变化');fs.renameSync(move.entry,move.backup);}for(const [key] of installed)delete ledger.installations[key];atomicJson(ledgerFile,ledger);atomicJson(path.join(backupRoot,'restore.json'),{...plan,completed:true});}
+      catch(error){for(const move of [...moves].reverse())if(pathExists(move.backup)&&!pathExists(move.entry))fs.renameSync(move.backup,move.entry);for(const [key,value] of installed)ledger.installations[key]=value;atomicJson(ledgerFile,ledger);throw error;}
+      result={removed:true,agents};
     }else if(op.action==='rollback'){await pauseWatches();result=rollback(op);}
     else throw new Error('不支持的技能操作');
     dirty=true;

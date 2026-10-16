@@ -241,5 +241,23 @@ export function createAgentInstaller(config, options = {}) {
       return { version:agentVersion(check.tail) };
     } finally { fs.rmSync(staging,{recursive:true,force:true,maxRetries:platform==='win32'?10:0,retryDelay:200}); }
   }
-  return { scan, install, root };
+  async function uninstall(op,{signal,beforeCommit=async()=>{}}={}){
+    const entry=agentDefinition(op.agent),journalFile=path.join(root,'operations',op.id+'.uninstall.json'),journal=read(journalFile);
+    requireValue(/^[a-f0-9]{64}$/.test(op.id||''),'操作编号无效');
+    if(journal.completed)return {removed:true};
+    if(journal.directory&&journal.backup&&contained(path.join(root,entry.id),journal.directory)&&contained(path.join(root,'.uninstalled'),journal.backup)&&!fs.existsSync(journal.directory)&&fs.existsSync(journal.backup)){const currentState=managedState(home,platform);requireValue(!currentState[entry.id]||currentState[entry.id].command===journal.managed?.command,'安装已变化，卸载备份已保留');delete currentState[entry.id];atomicJson(path.join(root,'current.json'),currentState);atomicJson(journalFile,{...journal,completed:true});return {removed:true};}
+    const current=(await scan()).agents.find(a=>a.id===entry.id),state=managedState(home,platform),managed=state[entry.id];
+    requireValue(current?.source==='managed'&&!current.custom&&current.fingerprint===op.expectedFingerprint&&managed,'仅支持卸载未改变的托管安装');
+    const base=path.join(root,entry.id),relative=path.relative(base,managed.command),version=relative.split(path.sep)[0],directory=path.join(base,version);
+    requireValue(version&&version!=='.'&&version!=='..'&&contained(base,managed.command)&&contained(fs.realpathSync(base),fs.realpathSync(directory))&&!fs.lstatSync(directory).isSymbolicLink(),'托管安装路径无效');
+    if(await (options.running||externalAgentRunning)(managed.command,{platform,run,env,aliases:[entry.command],displayCommand:entry.command}))return {waiting:true,error:'等待 Agent 会话结束'};
+    await beforeCommit();requireValue(!signal?.aborted&&(await scan()).agents.find(a=>a.id===entry.id)?.fingerprint===op.expectedFingerprint,'安装状态已变化，请刷新');
+    const backup=path.join(root,'.uninstalled',op.id);fs.mkdirSync(path.dirname(backup),{recursive:true});
+    atomicJson(journalFile,{agent:entry.id,directory,backup,managed,completed:false});
+    await moveInstalledPrefix(directory,backup,platform);
+    try{delete state[entry.id];atomicJson(path.join(root,'current.json'),state);atomicJson(journalFile,{agent:entry.id,directory,backup,managed,completed:true});}
+    catch(error){if(!fs.existsSync(directory)&&fs.existsSync(backup))fs.renameSync(backup,directory);throw error;}
+    return {removed:true};
+  }
+  return { scan, install, uninstall, root };
 }

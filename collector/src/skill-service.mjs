@@ -85,7 +85,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
         const currentDevice = await tx.getForUpdate('device', device.id);
         requireValue(currentDevice && !currentDevice.revokedAt && currentDevice.tokenHash === device.tokenHash, 'Device authorization required', 401);
         let stage = await tx.get('skill-stage', device.id);
-        if (input.page === 0) stage = { id: device.id, snapshotId: input.snapshotId, digest: input.digest, pages: [], scannedAt: input.scannedAt, agents, platform: string(input.platform,20), projects:Array.isArray(input.projects)?input.projects.slice(0,10).filter(p=>typeof p==='string' && p.length<=1000):[] };
+        if (input.page === 0) stage = { id: device.id, managementProtocol:input.managementProtocol===1?1:null,snapshotId: input.snapshotId, digest: input.digest, pages: [], scannedAt: input.scannedAt, agents, platform: string(input.platform,20), projects:Array.isArray(input.projects)?input.projects.slice(0,10).filter(p=>typeof p==='string' && p.length<=1000):[] };
         requireValue(stage?.snapshotId === input.snapshotId && stage.digest === input.digest && (input.page === stage.pages.length || input.page < stage.pages.length && canonicalJson(stage.pages[input.page]) === canonicalJson(items)), 'Inventory page conflict', 409);
         if (input.page === stage.pages.length) stage.pages.push(items);
         await tx.put('skill-stage', stage);
@@ -136,10 +136,21 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
     if (route === '/api/skills/operations' && req.method === 'POST') {
       owner(device);
       const input = await body(req);
-      requireValue(['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback'].includes(input.action) && typeof input.requestId === 'string' && /^[\w-]{1,100}$/.test(input.requestId), 'Invalid skill operation');
+      requireValue(['refresh','configure-projects','prepare-publish','publish','compare','sync','verify','rollback','uninstall'].includes(input.action) && typeof input.requestId === 'string' && /^[\w-]{1,100}$/.test(input.requestId), 'Invalid skill operation');
       const target = await store.get('device',input.deviceId); requireValue(target && workerAuthorized(target), 'Worker not found',404);
       const action = input.action, operationId = hash((device.credentialId || device.id) + ':' + input.requestId);
       const op = { id:operationId, schemaVersion:1, deviceId:target.id, action, createdAt:now(), state:'queued' };
+      if(action==='uninstall'){
+        const retry=await store.get('skill-operation',operationId),requestFingerprint=hash(canonicalJson({deviceId:input.deviceId,skillId:input.skillId,expectedHash:input.expectedHash,agents:input.agents,confirmShared:input.confirmShared,cancelTaskIds:input.cancelTaskIds}));
+        if(retry){requireValue(retry.action==='uninstall'&&retry.requestFingerprint===requestFingerprint,'操作编号已用于其他内容',409);send(res,200,retry);return true;}
+        op.requestFingerprint=requestFingerprint;
+        requireValue(Array.isArray(input.cancelTaskIds)&&input.cancelTaskIds.every(x=>typeof x==='string'),'请确认关联任务');
+        const environment=await store.get('skill-environment',target.id),item=environment?.items.find(s=>s.id===input.skillId);
+        requireValue(environment?.managementProtocol===1&&item?.managedVersion&&!['system','admin','plugin'].includes(item.scope),'仅支持新版节点的托管卸载',409);
+        requireValue(item.hash===input.expectedHash&&Array.isArray(input.agents)&&input.agents.length>0&&input.agents.every(a=>SKILL_AGENTS.includes(a)),'技能已变化，请刷新',409);
+        const agents=[...new Set([item.agent,...item.sharedWith.map(s=>s.agent)])].sort();requireValue(canonicalJson(agents)===canonicalJson([...input.agents].sort())&&(agents.length<2||input.confirmShared===true),'请确认全部共享 Agent',409);
+        Object.assign(op,{cancelTaskIds:[...input.cancelTaskIds].sort(),managedVersion:item.managedVersion,skillId:input.skillId,expectedHash:input.expectedHash,agents,confirmShared:input.confirmShared===true});
+      }
       if(action==='configure-projects'){requireValue(Array.isArray(input.projects) && input.projects.length<=10 && input.projects.every(p=>typeof p==='string' && p.length>1 && p.length<=1000 && !/[\u0000-\u001f]/.test(p)),'Invalid project directories');op.projects=[...new Set(input.projects)];}
       if (['prepare-publish','publish'].includes(action)) { requireValue(digest(input.skillId) && digest(input.expectedHash),'Invalid source skill'); op.skillId=input.skillId; op.expectedHash=input.expectedHash; }
       if (action === 'publish') {
@@ -178,6 +189,11 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
         const previous=await tx.get('skill-operation',operationId);
         if(previous){requireValue(canonical(previous)===canonical(op),'Operation ID already used',409);return previous;}
         requireValue((await tx.list('skill-operation')).filter(o=>o.deviceId===target.id && ['queued','running'].includes(o.state)).length<20,'Too many pending skill operations',429);
+        if(op.action==='uninstall'){
+          const tasks=(await tx.list('task')).filter(t=>t.deviceId===target.id&&['assigned','running','uploading'].includes(t.state)&&t.selectedSkills?.some(s=>s.versionId===op.managedVersion));
+          requireValue(canonicalJson(tasks.map(t=>t.id).sort())===canonicalJson(op.cancelTaskIds),'关联任务已变化，请重新确认',409);
+          for(const task of tasks){const when=now();await tx.put('task',{...task,state:'cancelled',assignmentId:hash(op.id+':'+task.id),updatedAt:when,events:[...(task.events||[]),{at:when,state:'cancelled',message:'卸载技能，执行已取消'}]});}
+        }
         return tx.put('skill-operation',{...op,fingerprint});
       })); send(res,201,result);return true;
     }

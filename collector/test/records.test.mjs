@@ -37,7 +37,7 @@ test('concurrent edits keep immutable snapshots and one winner; workers cannot m
 
 test('record protocol announces rich documents and rejects destructive legacy writes without changing history',async t=>{
  const {request,input,app,worker}=await fixture(t),id=crypto.randomUUID();
- const capabilities=await request('/api/records/capabilities');assert.deepEqual(capabilities.value,{protocol:1,documentVersions:[1],structuredErrors:true});
+ const capabilities=await request('/api/records/capabilities');assert.deepEqual(capabilities.value,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1});
  const document={version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'保留排版',marks:[{type:'bold'}]}]}]}};
  const original=input({text:'保留排版',document});const created=await request('/api/records/'+id,'PUT',original);assert.deepEqual(created.value.document,document);
  const legacy=await request('/api/records/'+id,'PUT',input({baseVersion:1,text:'旧客户端修改'}));assert.equal(legacy.status,422);assert.equal(legacy.value.code,'record_document_required');

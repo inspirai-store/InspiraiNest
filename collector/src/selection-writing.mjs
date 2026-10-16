@@ -17,7 +17,7 @@ export function writingResult(value){
   requireValue(value&&value.protocol===1&&Object.keys(value).every(k=>['protocol','text'].includes(k))&&typeof value.text==='string'&&value.text.trim()&&value.text.length<=200000&&!value.text.includes('\0'),'文字结果无效');
   return {protocol:1,text:value.text.replace(/\r\n?/g,'\n')};
 }
-export const publicWriting=t=>({id:t.id,requestId:t.writingRequestId,state:t.state,deviceId:t.deviceId,agent:t.agent||null,createdAt:t.createdAt,updatedAt:t.updatedAt,events:t.events,result:t.writingResult||null});
+export const publicWriting=t=>({id:t.id,trashVersion:t.trashVersion??0,requestId:t.writingRequestId,state:t.state,deviceId:t.deviceId,agent:t.agent||null,createdAt:t.createdAt,updatedAt:t.updatedAt,events:t.events,result:t.writingResult||null});
 export function createWriting({store,serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment}){
   return {async handle(req,res,route,device){
     if(!route.startsWith('/api/selection-writing/'))return false;
@@ -26,16 +26,16 @@ export function createWriting({store,serialized,owner,assigned,authenticate,body
       if(value.deviceId){const node=await store.get('device',value.deviceId);requireValue(node&&!node.revokedAt&&node.role==='worker'&&node.selectionWritingProtocol===1,'节点不支持写作',409);}
       await serialized('writing:'+requestId,async()=>{
         const existing=(await store.list('task')).find(t=>t.purpose==='selection-writing'&&t.writingRequestId===requestId);
-        if(existing){requireValue(canonicalJson(existing.writing)===canonicalJson(value),'请求 ID 已使用',409);return send(res,200,publicWriting(existing));}
+        if(existing){requireValue(!existing.deletedAt,'写作任务已删除，请新建操作',409);requireValue(canonicalJson(existing.writing)===canonicalJson(value),'请求 ID 已使用',409);return send(res,200,publicWriting(existing));}
         const task={id:id(),purpose:'selection-writing',selectionWritingProtocol:1,writingRequestId:requestId,writing:value,content:'AI 写作',url:null,type:'note',requiredCapabilities:[],preferredDeviceId:value.deviceId,preferredAgent:value.agent,deviceId:null,archiveId:null,autoArchive:false,createdAt:now()};
         send(res,201,publicWriting(await saveTask(task,'queued','等待写作节点')));
       });return true;
     }
     const match=route.match(/^\/api\/selection-writing\/tasks\/([a-zA-Z0-9-]+)(?:\/(result|cancel))?$/);
-    if(route==='/api/selection-writing/tasks'&&req.method==='GET'){owner(device);send(res,200,(await store.list('task')).filter(t=>t.purpose==='selection-writing').sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,100).map(publicWriting));return true;}
+    if(route==='/api/selection-writing/tasks'&&req.method==='GET'){owner(device);send(res,200,(await store.list('task')).filter(t=>t.purpose==='selection-writing'&&!t.deletedAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,100).map(publicWriting));return true;}
     if(!match)return false;
     const [,taskId,action]=match;
-    if(req.method==='GET'&&!action){owner(device);const task=await store.get('task',taskId);requireValue(task?.purpose==='selection-writing','写作任务不存在',404);send(res,200,publicWriting(task));return true;}
+    if(req.method==='GET'&&!action){owner(device);const task=await store.get('task',taskId);requireValue(task?.purpose==='selection-writing'&&!task.deletedAt,'写作任务不存在',404);send(res,200,publicWriting(task));return true;}
     if(req.method==='POST'&&action==='cancel'){
       owner(device);const task=await serialized('claim',()=>store.transaction(async tx=>{const live=await tx.getForUpdate('task',taskId);requireValue(live?.purpose==='selection-writing','写作任务不存在',404);requireValue(live.state!=='completed','写作已完成',409);return live.state==='cancelled'?live:saveTask({...live,assignmentId:id()},'cancelled','已取消',tx);}));send(res,200,publicWriting(task));return true;
     }
