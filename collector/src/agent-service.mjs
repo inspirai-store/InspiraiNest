@@ -19,7 +19,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
     const list = (await store.list('agent-operation')).filter(o => !deviceId || o.deviceId === deviceId);
     return Promise.all(list.map(settle));
   }
-  async function inbox(deviceId) { return (await operations(deviceId)).filter(o => pending.has(o.state)).map(o => o.id); }
+  async function inbox(deviceId) { const capable=(await store.get('agent-environment',deviceId))?.managementProtocol===1;return (await operations(deviceId)).filter(o => pending.has(o.state)&&(o.action!=='uninstall'||capable)).map(o => o.id); }
   async function cancelDevice(tx, deviceId) {
     for (const op of await tx.list('agent-operation')) if (op.deviceId === deviceId && pending.has(op.state)) await tx.put('agent-operation', { ...op, state: 'cancelled', updatedAt: at() });
   }
@@ -62,7 +62,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
       if (device.role !== 'owner') worker(device);
       const deviceId = device.role === 'owner' ? url.searchParams.get('deviceId') : device.id;
       let list = await operations(deviceId);
-      if (device.role !== 'owner') list = list.filter(o => pending.has(o.state));
+      if (device.role !== 'owner'){const capable=(await store.get('agent-environment',device.id))?.managementProtocol===1;list = list.filter(o => pending.has(o.state)&&(o.action!=='uninstall'||capable));}
       send(res, 200, { operations: list.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100) }); return true;
     }
     if (route === '/api/agents/operations' && req.method === 'POST') {

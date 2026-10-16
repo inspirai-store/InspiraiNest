@@ -40,7 +40,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
     while (reads.size > 16 || [...reads.values()].reduce((sum, value) => sum + value.bytes, 0) > 32 * 1024 * 1024) reads.delete(reads.keys().next().value);
   };
   const getVersion = async versionId => { requireValue(digest(versionId), 'Invalid skill version'); const version = await store.get('skill-version', versionId); requireValue(version, 'Skill version not found', 404); return version; };
-  const inbox = async deviceId => (await store.list('skill-operation')).filter(o => o.deviceId === deviceId && ['queued','running'].includes(o.state)).sort((a,b) => a.createdAt.localeCompare(b.createdAt)).slice(0,20).map(o => o.id);
+  const inbox = async deviceId => {const capable=(await store.get('skill-environment',deviceId))?.managementProtocol===1;return (await store.list('skill-operation')).filter(o => o.deviceId === deviceId && ['queued','running'].includes(o.state)&&(o.action!=='uninstall'||capable)).sort((a,b) => a.createdAt.localeCompare(b.createdAt)).slice(0,20).map(o => o.id);};
   async function verifiedItems(device) {
     if(device.skillRuntime?.schemaVersion!==1)return [];
     const env = await store.get('skill-environment', device.id);
