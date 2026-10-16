@@ -152,7 +152,13 @@ export function writingRoundArgs(name,args,reasoningEffort){
   const index=args.at(-1)==='-'?args.length-1:args.length;
   return [...args.slice(0,index),'-c',`model_reasoning_effort="${reasoningEffort}"`,...args.slice(index)];
 }
-export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs, onEvent, reasoningEffort }) {
+// Ordinary collection and trials share command resolution, environment and argument handling.
+export function agentExecution(name, profiles, {reasoningEffort, extraArgs=[]}={}) {
   const profile = agentProfile(name, profiles);
-  return execute(profile.command, writingRoundArgs(name,profile.args,reasoningEffort), { cwd, input: prompt, signal, timeoutMs, onEvent, env: commandEnvironment(profile, agentEnvironment()), logFile: path.join(cwd, '..', `${name}.log`) });
+  const args=writingRoundArgs(name,profile.args,reasoningEffort), index=args.at(-1)==='-'?args.length-1:args.length;
+  return {profile,command:profile.command,args:[...args.slice(0,index),...extraArgs,...args.slice(index)],env:commandEnvironment(profile,agentEnvironment())};
+}
+export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs, onEvent, reasoningEffort, extraArgs, logFile, run=execute }) {
+  const {command,args,env}=agentExecution(name,profiles,{reasoningEffort,extraArgs});
+  return run(command,args,{cwd,input:prompt,signal,timeoutMs,onEvent,env,logFile:logFile || path.join(cwd,'..',`${name}.log`)});
 }

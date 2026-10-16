@@ -1,64 +1,49 @@
-# 异步处理中心与 Codex 实测
+# 异步处理中心与本机 Codex 实测
 
-分享或新建采集时可以勾选「同时交给 Codex 实测」，选择电脑及可选项目。默认关闭。安卓先把完整不可变载荷和附件写入原有 Outbox，随即显示本机回执；服务器确认后才显示已交给后台。上传和采集不占用用户的当前页面。
+分享时勾选「同时交给 Codex 实测」，选择电脑和可选 Git 项目。客户端先保存完整分享与附件，后台继续采集和实测。处理中心的待处理、运行中、新结果、稍后及历史跨客户端同步。打开报告不会自动标记已读；连续处理不等待 Agent，新到待办留给下一批。
 
-## 处理流程
+## 执行环境
 
-- 安卓采集入口及主网站任务入口使用同一个处理中心：待处理、运行中、新结果、稍后。已读结果留在历史。
-- 资料库/记录入口只显示待办与新结果数量，不弹系统通知。
-- 连续处理固定开始时的待办清单。每次选择或归档成功后立即下一项，不等待 Agent。新到待办留给下一批；可随时结束。
-- 稍后与已读保存在服务端，安卓与网站共用。打开报告不会自动已读；任务变化后旧的稍后标记不会隐藏新问题。共享测试登录按电脑合并。
-- 采集完成或进入待审核后，幂等地产生独立的 `codex-trial` 子任务。唯一候选自动继续；多个候选或未识别到仓库时选择对象/补充仓库。原资料、子任务、报告、重测历史互相关联。
-- 测试账号未登录时暂停原任务。Worker 后续检测到测试账号就绪，自动恢复该电脑的全部登录待办。离线等待原电脑，不转移到其他节点。缺失依赖保留工作目录，修复后继续。
+0.2.10 起复用所选电脑当前配置的 Codex Agent。与普通采集共用程序解析、参数和环境过滤，保留当前账号、模型、Provider、用户 Skill、MCP 和自定义程序路径。每项任务启动独立后台会话，不复用当前桌面聊天的对话。设置「Codex 实测环境」展示状态并进入已有 Agent 管理。分享不增加账号选择。
 
-## 电脑准备
+不再创建测试账号、不复制 auth.json，不因授权文件不存在而判断不可用。ChatGPT 缓存、系统钥匙串、API Key 及自定义 Provider 继续由 Codex 自己处理。就绪表示程序与现有授权方式可启动，模型调用仍可能因过期授权、模型或工具问题暂停。只有模型执行返回授权错误才记录授权待办；该待办在本机授权/配置变化后恢复。程序缺失、模型不可用、插件格式或版本不支持归为环境待办。
 
-更新服务端和 Worker 后，在电脑客户端「设置 → 通用 → Codex 测试账号」打开专用登录终端。登录码只显示在该电脑的终端，不上传、不写入任务日志。也可在配置好 `COLLECTOR_CONFIG` 的本机终端运行：
+Agent 子进程继续过滤采集服务、云、数据库、签名与设备凭据。复用同一系统用户的 Agent 环境不是虚拟机或独立账号隔离；待测工具与已有工具都以该用户权限运行。模型只允许修改项目副本和任务目录，不更改原项目、全局插件配置或登录状态。
 
-```powershell
-node collector/src/worker.mjs trial-login
-```
+## 固定版本与任务内组件
 
-可选项目来自现有节点技能项目登记；仅显示 Git 项目。实测复制所选电脑当前已提交的 HEAD，记录完整提交号；原目录的未提交和未跟踪文件不进入副本。重试沿用已固定的版本；重新实测生成新任务。
+所选项目来自现有 Git 项目登记。实测复制已提交的 HEAD，未提交与未跟踪文件不进入副本。源码与项目提交固定到 pinned.json；中断后仍使用原版本。重新实测才创建新任务。
 
-## 临时环境与结果证据
+- Skill 复制到项目副本的 `.agents/skills/lingnest-trial-<task namespace>`。
+- 插件源码进入任务专属 marketplace。CLI 0.148 的安装命令会写配置，因此仅在无授权的 installer 临时目录运行原生 marketplace/add。安装回执必须返回匹配的 pluginId 和实际安装路径。原生安装缓存复制到现有 Codex 缓存的唯一任务命名空间。
+- CLI 0.148 的插件加载不完整支持 `-c plugins...`。因此使用临时 `lingnest-trial-<namespace>.config.toml` profile，只在该会话选择；原 profile 配置合并保留，普通 config.toml 和原 profile 不改。会话结束删除任务 profile；进程被强制结束时残留 profile 不会被普通会话自动选用。缓存与原生安装证据保留在任务命名空间。
+- MCP 使用唯一服务标识和进程级 `-c mcp_servers...`，不运行全局 `mcp add`。支持单个无凭据 stdio 服务的 mcp.json/.mcp.json，参数可用 `${MCP_SERVER_ROOT}`，工作目录指向固定源码。
 
-专用登录保存在 Worker 数据目录的 `codex-trials/<server-and-device>/login`。每次测试使用新的临时 CODEX_HOME，仅复制专用登录，不复制日常 Codex 配置、技能和凭据，也不继承 OPENAI_API_KEY、服务端密钥等环境变量。每次执行结束删除任务内的登录副本；保留固定源码、项目副本、安装回执、原生执行日志与报告。它是同一系统用户下的临时工作区和 Codex workspace-write 环境，不是虚拟机或容器级隔离；插件安装/依赖程序仍以该用户运行。
+候选对象支持 GitHub HTTPS 仓库、仓库内目录和 Git ref。来源提示与安装说明是待测内容，不能改变执行边界。缺依赖、密钥或不支持临时加载时保留成果并暂停。
 
-当前对象格式：GitHub HTTPS 仓库，类型 `skill` / `plugin` / `mcp`，可选仓库内目录与 Git ref。Worker 固定实际提交后再安装。Skill 要有 SKILL.md；原生插件要有 .codex-plugin/plugin.json，使用真实 Codex marketplace/add CLI；MCP 要有仅一个无凭据 stdio 服务的 mcp.json/.mcp.json，参数可使用 `${MCP_SERVER_ROOT}`。不执行来源网页中的安装命令。需要凭据、缺构建条件或格式不支持时暂停并指出原因。
+## 原生证据与报告
 
-安装成功不等于测试通过。报告分开记录安装、原生加载、实际调用证据。Skill 脚本命令须与 Codex 原生 command_execution 事件及输出吻合；MCP 须有真实 mcp_tool_call 返回。缺少任一阶段时只标为「部分验证」。纯提示词 Skill 的行为质量仍需人工阅读报告判断。Agent 自述或文件名不能作为调用证据。
+Skill/插件运行前通过同一 Codex 的 `debug prompt-input` 核对原生目录中实际加载的路径。安装回执记录实际组件标识与路径。加载证据还要求实际读取该路径的 SKILL.md；调用证据要求候选真实脚本的命令与原生成功事件、输出片段匹配，或者唯一候选 MCP 的真实成功调用。已有工具可辅助，但其调用不会计入候选对象的通过条件。Agent 自述不作为证据。纯提示词的行为质量仍需阅读报告判断。
 
-## 接口兼容
+报告包含安装、加载、调用三个阶段，缺任一阶段只能部分验证。记录 Agent 版本、模型和 Provider 标识；能够取得本次会话原生日志时优先使用实际会话的模型/Provider，不上传配置、会话全文或凭据。报告先写本机 checkpoint，再上传；确认丢失时只重传相同报告。原资料、实测子任务、报告和重新实测历史互相关联。
 
-- `POST /api/tasks` 新增可选 `codexTrial: {deviceId, projectId?}`，进入原 submissionId 幂等比较。
-- `GET /api/processing-center`、`POST /api/processing-center/items/:id` 共用稍后/已读状态，并以 revision 拒绝过期决定。
-- `trial-targets` 仅已领取父任务的 Worker 可写；`trial-choice` / `trial-rerun` 仅 owner 可写。
-- `trial-report` 写入校验 Worker、分配编号、任务状态及设备撤销，读取仅 owner。重复回执不新增报告。
-- Worker 心跳可选 `trialEnvironment: {protocol:1, login, projects}`。旧 Worker 保留文字/附件采集能力，不会领取实测任务。
-- 不迁移已有资料、草稿或凭据。不更改原资料正文或 source.json。
+## 接口与兼容
 
-## 验证命令与范围
+- 分享保留 `codexTrial: {deviceId, projectId?}`，参与原 submissionId 幂等比较。
+- 心跳兼容原 `trialEnvironment: {protocol:1, login, projects}`，增加可选 `executionMode: "local-agent"`。
+- 旧 `trial_login` 任务在所选电脑报告 ready 后恢复同一任务，不重新采集、不生成替代任务。离线仍等待原电脑。
+- 报告增加可选 `agent: {executionMode, version, model, provider}`，仅保存白名单字段。旧报告及摘要标识继续兼容。
+- 领取、报告、附件和授权检查保持原分配编号、任务状态与设备撤销校验。
+- 不迁移资料、草稿或凭据，不修改原资料正文。
+
+## 验证
 
 ```powershell
 node --test collector/test/*.test.mjs
-node collector/scripts/test-processing-center.cjs
+$env:COLLECTOR_NATIVE_TRIAL_SMOKE='1'
+node --test collector/test/processing-center.test.mjs
 node collector/scripts/stage-capture.mjs --check
-npm.cmd --prefix collector/desktop/frontend run build
-node collector/scripts/stage-writing.mjs
-# collector/mobile/android 下运行 testDebugUnitTest lintDebug assembleDebug
+npm.cmd --prefix collector run build:desktop-ui
 ```
 
-可选本机原生插件安装冒烟：设置 `COLLECTOR_NATIVE_TRIAL_SMOKE=1`，运行 `processing-center.test.mjs`。此检查使用临时本地 marketplace，实际调用 Codex 安装和列表命令；不会调用真实模型。Worker 的项目保护、文件复制、工具执行和报告重传测试使用明确标记的协议夹具。
-
-本轮本地验证（2026-10-16）：
-
-- 服务端/Worker 全量测试 316 项：297 通过、19 跳过、0 失败；另开启原生 Codex 安装冒烟后的专项测试 9 项全部通过。
-- 安卓 44 项单测通过，Lint 无错误，debug APK 构建成功。专门覆盖实测选项进入持久队列、离线恢复电脑/项目选择和夜间 HTML 首次呈现。
-- 桌面 TypeScript/Vite 构建与 6 项相关界面模型测试通过。
-- 使用真实隔离服务进行浏览器联调：固定批次、后台执行、输入保留、稍后/已读、跨客户端共享、可选项目提交，以及 320/360/393/412/736 宽度、日夜模式通过。打包页面另以模拟原生传输层连接真实服务检查导航、图标及大字号；这不等于 Android WebView 实机验收。
-- 独立 Android SDK 模拟器缺少 Windows 加速驱动，软件模拟启动未能就绪，已停止该实例；未操作其他已连接设备。
-
-正式交付（2026-10-16）：主站、Windows/macOS 0.2.7 及原签名 Android 1.3.13 / versionCode 20 已发布。完整公共 CI、Android 44 项 release 单测和 Lint、Mac 两种架构签名公证及签名包联调通过；生产文件、原有数据保留、公开下载与升级清单已回验。Android 包内资源与提交代码一致，签名与上一正式版一致。完整版本、文件哈希和回滚记录见 [发布记录](../../docs/releases/2026-10-16-codex-trials-0.2.7.md)。
-
-真实测试账号登录后的 Codex 模型运行、安卓模拟器/真机分享及覆盖升级、macOS 专用登录终端仍待相应环境验收。本轮没有操作用户手机或升级现有登记电脑。验证日志与页面截图保存在忽略目录 `collector/test-output/processing-center/`，私有发布证据保存在忽略目录 `.runtime/codex-trials-027-20261016/`。
+单测中的模型执行为明确标记的协议夹具。可选原生冒烟使用真实 Codex 安装及加载命令，模型调用仍为夹具。真实账号下的模型执行、正式客户端覆盖更新和生产资料关联须另行验收，不能由这些测试代替。历史 0.2.7 发布边界见 `docs/releases/2026-10-16-codex-trials-0.2.7.md`。

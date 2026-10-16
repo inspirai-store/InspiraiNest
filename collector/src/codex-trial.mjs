@@ -15,7 +15,8 @@ export function trialEnvironment(value) {
   if(value===undefined)return null;
   requireValue(value?.protocol===1 && ['ready','required','unavailable'].includes(value.login) && Array.isArray(value.projects) && value.projects.length<=10,'实测环境无效');
   const projects=value.projects.map(p=>{requireValue(/^[a-f0-9]{32}$/.test(p.id) && typeof p.name==='string' && p.name.length<=100,'项目无效');return {id:p.id,name:p.name};});
-  return {protocol:1,login:value.login,projects};
+  requireValue(value.executionMode===undefined || value.executionMode==='local-agent','实测执行模式无效');
+  return {protocol:1,login:value.login,projects,...(value.executionMode?{executionMode:value.executionMode}:{})};
 }
 export function createCodexTrials({store,serialized,saveTask,owner,assigned,body,send,authenticate}) {
   async function request(input,{validate=true}={}) {
@@ -36,7 +37,7 @@ export function createCodexTrials({store,serialized,saveTask,owner,assigned,body
       }
       for(const task of tasks.filter(t=>t.purpose==='codex-trial'&&!t.deletedAt && t.state==='waiting_action' && t.actionRequired?.kind==='trial_login')) {
         const device=await tx.get('device',task.trial.deviceId);
-        if(workerAuthorized(device || {}) && device.trialEnvironment?.login==='ready')await saveTask({...task,actionRequired:null},'queued','测试账号已就绪，等待原电脑继续',tx);
+        if(workerAuthorized(device || {}) && device.trialEnvironment?.login==='ready')await saveTask({...task,actionRequired:null},'queued','本机 Codex Agent 已就绪，等待原电脑继续',tx);
       }
     }));
   }
@@ -57,7 +58,9 @@ export function createCodexTrials({store,serialized,saveTask,owner,assigned,body
       requireValue(input.protocol===1 && ['passed','failed','partial'].includes(input.verdict) && typeof input.markdown==='string' && input.markdown.length>0 && input.markdown.length<=150000 && typeof input.commit==='string' && /^[a-f0-9]{40,64}$/.test(input.commit),'报告无效');
       requireValue(Array.isArray(input.evidence) && input.evidence.length<=50 && input.evidence.every(e=>e && ['install','load','invoke'].includes(e.stage) && typeof e.detail==='string' && e.detail.length<=4000),'证据无效');
       requireValue(input.verdict!=='passed' || ['install','load','invoke'].every(s=>input.evidence.some(e=>e.stage===s && e.verified===true)),'实测通过须具备安装、加载和调用证据');
-      const report={protocol:1,title:String(input.title || 'Codex 实测报告').slice(0,180),verdict:input.verdict,commit:input.commit,projectCommit:input.projectCommit || null,markdown:input.markdown,evidence:input.evidence,createdAt:now()};
+      let agent;
+      if(input.agent!==undefined){requireValue(input.agent?.executionMode==='local-agent' && ['version','model','provider'].every(k=>input.agent[k]===null || typeof input.agent[k]==='string' && /^[\w./:+-]{1,150}$/.test(input.agent[k])),'Agent 环境标识无效');agent={executionMode:'local-agent',...Object.fromEntries(['version','model','provider'].map(k=>[k,input.agent[k]]))};}
+      const report={protocol:1,...(agent?{agent}:{}),title:String(input.title || 'Codex 实测报告').slice(0,180),verdict:input.verdict,commit:input.commit,projectCommit:input.projectCommit || null,markdown:input.markdown,evidence:input.evidence,createdAt:now()};
       report.digest=hash(canonicalJson({...report,createdAt:undefined}));
       await authenticate(req);
       const result=await serialized('claim',()=>store.transaction(async tx=>{const liveDevice=await tx.get('device',actor.id);requireValue(workerAuthorized(liveDevice || {})&&liveDevice.tokenHash===actor.tokenHash,'设备授权已失效',401);const task=await tx.getForUpdate('task',taskId);requireValue(task?.purpose==='codex-trial' && task.deviceId===actor.id && task.assignmentId===req.headers['x-task-assignment'],'任务已改变',409);if(task.state==='completed' && task.report?.digest===report.digest)return task;requireValue(['assigned','running','uploading'].includes(task.state),'任务已结束',409);return saveTask({...task,report,actionRequired:null},'completed','实测报告已生成',tx);}));

@@ -701,7 +701,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (route === '/api/heartbeat' && req.method === 'POST') {
         worker(device);
         const input = await body(req);
-        const reportedTrial=trialEnvironment(input.trialEnvironment);if(reportedTrial)reportedTrial.generation=device.trialEnvironment?.login===reportedTrial.login?device.trialEnvironment.generation || id():id();
+        const reportedTrial=trialEnvironment(input.trialEnvironment);if(reportedTrial)reportedTrial.generation=device.trialEnvironment?.login===reportedTrial.login && device.trialEnvironment?.executionMode===reportedTrial.executionMode?device.trialEnvironment.generation || id():id();
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
@@ -858,7 +858,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           if(live.purpose==='codex-trial') {
             if(input.actionRequired!==undefined) {
               requireValue(input.actionRequired===null || ['trial_login','retry','dependency'].includes(input.actionRequired.kind),'实测操作无效');
-              updated.actionRequired=input.actionRequired && {kind:input.actionRequired.kind,label:input.actionRequired.kind==='trial_login'?'处理登录':'继续实测',...(input.actionRequired.kind==='dependency'?{title:'修复测试环境',conditionKey:'trial-dependency:'+live.trial.deviceId+':'+hash(message)}:{}),...(input.actionRequired.kind==='trial_login'?{title:'登录 Codex 测试账号',generation:(await tx.get('device',live.trial.deviceId))?.trialEnvironment?.generation || '1',conditionKey:'trial-login:'+live.trial.deviceId}:{} )};
+              updated.actionRequired=input.actionRequired && {kind:input.actionRequired.kind,label:input.actionRequired.kind==='trial_login'?'处理登录':'继续实测',...(input.actionRequired.kind==='dependency'?{title:'修复测试环境',conditionKey:'trial-dependency:'+live.trial.deviceId+':'+hash(message)}:{}),...(input.actionRequired.kind==='trial_login'?{title:'处理 Codex Agent 授权',generation:(await tx.get('device',live.trial.deviceId))?.trialEnvironment?.generation || '1',conditionKey:'trial-login:'+live.trial.deviceId}:{} )};
             }
             return saveTask(updated,input.state,message,tx);
           }
