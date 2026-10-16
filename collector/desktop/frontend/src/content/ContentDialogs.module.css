@@ -15,7 +15,7 @@
 .body>*{flex-shrink:0;}
 .trashDialog{width:640px;height:480px;overflow:hidden;}
 .trashDialog>footer{display:none;}
-.confirmDialog{height:auto;overflow:auto;}
+.confirmDialog{height:fit-content;overflow:auto;}
 .confirmDialog p,.confirmDialog ul{flex-shrink:0;}
 .body [aria-label="回收站类型"]{flex-wrap:wrap;height:auto;}
 .field input:focus-visible,.field textarea:focus-visible,.field select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
