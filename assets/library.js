@@ -251,6 +251,16 @@
     $('#reader-summary').textContent=entry.summary;
     $('#reader-meta').innerHTML=[entry.creator,entry.published_at ? `发布于 ${entry.published_at.slice(0,10)}` : null,entry.collected_at ? `采集于 ${collectionTime.format(entry.collected_at)}${collectionTime.parts(entry.collected_at).time ? '（北京时间）' : ''}` : null].filter(Boolean).map(text => `<span>${esc(text)}</span>`).join('');
     $('#reader-tags').innerHTML=entry.tags.map(tag => `<span>${esc(tag)}</span>`).join('');
+    $('#reader-trials')?.remove();
+    if (window.LIBRARY_REMOTE && entry.linkedTrials?.length) {
+      const trials=document.createElement('div'); trials.id='reader-trials'; trials.className='reader-trials';
+      for (const trial of entry.linkedTrials) {
+        const button=document.createElement('button'); button.type='button'; button.dataset.trial=trial.id;
+        button.textContent=trial.verdict ? `${trial.title} · 阅读报告` : `Codex 实测 · ${{queued:'等待执行',assigned:'执行中',running:'执行中',uploading:'上传中',waiting_action:'待处理',failed:'待处理'}[trial.state] || '查看任务'}`;
+        trials.append(button);
+      }
+      $('#reader-tags').after(trials);
+    }
     $('#coverage').textContent=entry.coverage_note;
     $('#related').innerHTML=entry.related.filter(id => byId.has(id)).map(id => `<button data-related="${esc(id)}">相关：${esc(byId.get(id).title)}</button>`).join('');
     $('#directory-link').href=window.LIBRARY_REMOTE ? `/library/bundle/${entry.archiveId}` : localURL(entry.directory+'/');
@@ -313,6 +323,11 @@
   document.addEventListener('change',event => { if (event.target.id==='document-select') showTab(currentTab,event.target.value); });
   document.addEventListener('click',event => {
     const target=event.target.closest('button,a'); if (!target) return;
+    if (target.dataset.trial && window.LIBRARY_REMOTE && currentEntry?.linkedTrials?.some(trial => trial.id === target.dataset.trial)) {
+      if (window.parent !== window) window.parent.postMessage({type:'lingnest:open-trial',taskId:target.dataset.trial,archiveId:currentEntry.archiveId},location.origin);
+      else location.assign('/?trial='+encodeURIComponent(target.dataset.trial));
+      return;
+    }
     if (target.dataset.type) { state.type=target.dataset.type; state.favorites=false; state.status='all'; render(); setMenu(false); }
     if (target.dataset.tag) { state.tag=state.tag===target.dataset.tag?'':target.dataset.tag; render(); setMenu(false); }
     if (target.dataset.status) { state.status=target.dataset.status; render(); }

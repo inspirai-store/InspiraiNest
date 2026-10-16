@@ -9,6 +9,7 @@
   let token = null;
   let infoSent = false;
   let requestedEntry = new URLSearchParams(location.search).get('entry');
+  let requestedTrial = new URLSearchParams(location.search).get('trial');
   let snapshot;
   let currentBundle;
   let selectedTask;
@@ -34,6 +35,16 @@
     const frame = document.createElement('iframe'); frame.id = 'library-frame'; frame.title = '资料库'; frame.src = '/library/';
     $('#archives-view').append(frame);
   }
+  async function openTrial(id) {
+    if (!snapshot?.tasks.some(task => task.id === id && task.purpose === 'codex-trial')) throw new Error('实测任务不存在，请刷新后重试');
+    await processing.refresh(); showView('tasks');
+    if (!processing.open(id)) throw new Error('实测任务已更新，请刷新后重试');
+  }
+  window.addEventListener('message',event => {
+    if (event.origin !== location.origin || event.source !== $('#library-frame')?.contentWindow || event.data?.type !== 'lingnest:open-trial') return;
+    if (!snapshot?.tasks.some(task => task.id === event.data.taskId && task.purpose === 'codex-trial' && task.trial?.sourceArchiveId === event.data.archiveId)) return;
+    void openTrial(event.data.taskId).catch(error => notice(error.message));
+  });
   function showView(view) {
     if (view === 'tasks') {
       if (!taskDialog.open) {
@@ -217,6 +228,10 @@
         $('#library-frame').src = '/library/#entry=' + encodeURIComponent(requestedEntry);
         requestedEntry = null;
       }
+      if (requestedTrial) {
+        const id=requestedTrial; requestedTrial=null;
+        await openTrial(id);
+      }
     }
     catch (error) { connected = false; $('#connection').textContent = '连接中断'; renderWorkerNodes(); icons(); notice(error.message); }
     finally { refreshing = false; }
@@ -265,7 +280,8 @@
     const archive = snapshot?.archives.find(item => item.id === id);
     if (archive) {
       document.querySelector('[data-view=archives]').click();
-      $('#library-frame').src = '/library/#entry=' + encodeURIComponent(archive.entryId);
+      const frame=$('#library-frame'),hash='#entry='+encodeURIComponent(archive.entryId);
+      if (frame.contentWindow.location.hash !== hash) frame.src = '/library/'+hash;
       $('#detail-dialog').close();
       return;
     }

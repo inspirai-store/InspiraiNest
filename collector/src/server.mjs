@@ -396,8 +396,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
               prepared[index] = await browser.prepare(archives[index]);
             }
           }));
+          const trials = (await store.list('task')).filter(task => task.purpose === 'codex-trial' && task.state !== 'cancelled');
           for (const item of prepared) {
-            data.entries.push(item.entry); Object.assign(data.documents, item.documents);
+            const linkedTrials = trials.filter(task => task.trial?.sourceArchiveId === item.entry.archiveId).map(task => ({ id:task.id, state:task.state, title:task.report?.title || 'Codex 实测', verdict:task.report?.verdict || null }));
+            data.entries.push({ ...item.entry, linkedTrials }); Object.assign(data.documents, item.documents);
           }
           await authenticate(req);
           data.entries = (await Promise.all(data.entries.map(async entry => ({ entry, hidden: Boolean((await store.get('trash', entry.id))?.deletedAt) })))).filter(item => !item.hidden).map(item => item.entry);

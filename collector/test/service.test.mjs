@@ -113,7 +113,7 @@ test('phone pairing QR is owner-only, short-lived, and consumes the existing one
 });
 
 test('library browser reuses authenticated archives, protects cached files and rejects revoked cookies', async t => {
-  const { owner, server, pairWorker, submit } = await setup(t);
+  const { app, root, owner, server, pairWorker, submit } = await setup(t);
   const worker = await pairWorker(); const task = await submit();
   await api(worker, '/api/claim', 'POST', {});
   await processTask({ ...worker, agents: profiles, dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'browser-probe-')) }, task, await detectAgents(profiles));
@@ -132,6 +132,18 @@ test('library browser reuses authenticated archives, protects cached files and r
   const index = await (await fetch(server + '/library/data', { headers })).json();
   assert.equal(index.entries[0].id, 'article:fixture');
   assert.ok(index.documents[`files/${digest}/summary.md`].includes('这是测试报告'));
+  assert.deepEqual(index.entries[0].linkedTrials, []);
+  const cache=path.join(root,'browser-cache',digest,'index.json'),cached=fs.readFileSync(cache);
+  const trial={id:crypto.randomUUID(),purpose:'codex-trial',state:'waiting_action',createdAt:new Date().toISOString(),trial:{sourceArchiveId:digest}};
+  await app.store.put('task',trial);
+  await app.store.put('task',{...trial,id:crypto.randomUUID(),trial:{sourceArchiveId:'another-archive'}});
+  await app.store.put('task',{...trial,id:crypto.randomUUID(),state:'cancelled'});
+  const linked=await (await fetch(server+'/library/data',{headers})).json();
+  assert.deepEqual(linked.entries[0].linkedTrials,[{id:trial.id,state:'waiting_action',title:'Codex 实测',verdict:null}]);
+  await app.store.put('task',{...trial,state:'completed',report:{title:'插件运行报告',verdict:'partial',digest:'fixture-report'}});
+  const completed=await (await fetch(server+'/library/data',{headers})).json();
+  assert.deepEqual(completed.entries[0].linkedTrials,[{id:trial.id,state:'completed',title:'插件运行报告',verdict:'partial'}]);
+  assert.deepEqual(fs.readFileSync(cache),cached,'Report state must not be frozen into the archive cache');
   const fileURL = server + `/library/files/${digest}/original.txt`;
   assert.equal((await fetch(fileURL)).status, 401);
   assert.equal(await (await fetch(fileURL, { headers })).text(), 'This is synthetic test content.');

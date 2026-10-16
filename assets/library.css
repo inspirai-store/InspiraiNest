@@ -19,3 +19,5 @@ dialog{position:fixed;inset:0;border:1px solid var(--line);padding:0;width:min(1
 .trash-row { display: flex; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #dce3e5; }
 .trash-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .trash-row button { flex-shrink: 0; }
+.reader-trials { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.reader-trials button { min-height: 48px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--accent); text-align: left; overflow-wrap: anywhere; }
