@@ -44,4 +44,3 @@
 | [InspiraiNest-v0.2.5-macOS-x64.dmg](https://library.inspirai.store/downloads/InspiraiNest-v0.2.5-macOS-x64.dmg) | 142493781 | `fc3abf2d119add9da1c7f09a3756171c0c7a451a9d67d29976bdcd8f76aedde8` |
 | [InspiraiNest-v0.2.5-macOS-arm64.dmg](https://library.inspirai.store/downloads/InspiraiNest-v0.2.5-macOS-arm64.dmg) | 135735682 | `ffdcba1fd86e5520f91205740aa2961f9fe07a25a78c8715432d44167095fb96` |
 | [InspiraiNest-v1.3.11-Android.apk](https://library.inspirai.store/downloads/InspiraiNest-v1.3.11-Android.apk) | 3291096 | `a56b8b890fcbe4be35766776bbec48e469b22328567b5f432cda50ede40b9930` |
-
