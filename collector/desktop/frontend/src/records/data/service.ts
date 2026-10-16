@@ -74,7 +74,7 @@ export class RecordsService {
         if(error instanceof RequestError&&error.status===409&&latest.deletionQueue?.at(-1)?.action==='restore'){
           try{const remote=await requestJson<{deletedAt?:string;trashVersion:number}>(this.transport,{route:'/api/content-trash/record/'+id,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);if(!remote.deletedAt){await this.serial(async()=>{const live=await store.get(id) as LocalRecord;if(live.deletionQueue?.at(-1)?.action==='restore'){live.deletionQueue=[];live.deletedAt=null;live.trashVersion=remote.trashVersion;live.deletionError='';await store.put(live);}});return;}}catch{/* Retain the queue and local contents until the account can be checked. */}
         }
-        await this.serial(async()=>{const live=await store.get(id) as LocalRecord;live.deletionError=errorMessage(error);await store.put(live);});return;}
+        await this.serial(async()=>{const live=await store.get(id) as LocalRecord;live.deletionError=error instanceof RequestError&&(error.status===405||error.status===404&&/not found/i.test(error.message))?'服务端待升级':errorMessage(error);await store.put(live);});return;}
     }
   }
   async saveDraft(draft: LocalDraft) { const snapshot=structuredClone(draft);const session=await this.status();if(snapshot.accountScope&&snapshot.accountScope!==recordScope(session))return; snapshot.accountScope=recordScope(session);return this.serial(async()=>{this.assertSession(session.epoch);const current=await this.store.get('draft') as LocalDraft|undefined;if(current?.recordId&&current.recordId!==snapshot.recordId)return;await this.store.put(snapshot);}); }
