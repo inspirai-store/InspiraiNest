@@ -5,7 +5,7 @@
   const verdicts={passed:'已通过',failed:'未通过',partial:'部分验证'};
   const reportHtml=value=>window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(value),{FORBID_TAGS:['style','form','input','button','iframe','video','audio','img'],FORBID_ATTR:['style']}) : esc(value).replaceAll('\n','<br>');
   window.createProcessingCenter=({root,request,onOpenTask=()=>{},onOpenSource=()=>{},onNew=()=>{},onCounts=()=>{},onDepth=()=>{}})=>{
-    let data={items:[],counts:{}},tab='attention',session=null,current=null,busy=false,refreshing=false,alive=true,generation=0;
+    let data={items:[],counts:{}},tab='attention',session=null,current=null,busy=false,refreshing=null,alive=true,generation=0;
     const selections=new Map(),forms=new Map(),reports=new Map();
     root.classList.add('processing-center');
     root.innerHTML='<div class="pc-error" role="alert" hidden></div><div class="pc-content"></div>';
@@ -42,10 +42,13 @@
       const login=i.action?.kind==='trial_login';
       paint(header+`<div class="pc-decision"><div class="pc-status">${login?'电脑待登录':i.action?.kind==='approve'?'待归档':'需要处理'}</div><h1>${esc(i.title)}</h1><p>${esc(i.message)}</p>${login?'<p>请在所选电脑的设置中登录 Codex 测试账号</p>':''}<div class="pc-actions">${button('task',i.action?.kind==='approve'?'查看归档内容':'查看任务')}</div></div><div class="pc-footer">${login?button('check','检查登录状态',true):button('resolve',i.action?.kind==='approve'?'确认归档并继续':'继续任务',true)}${button('skip','稍后')}</div>`);
     }
-    async function refresh({silent=false}={}){
-      if(refreshing || !alive)return;refreshing=true;const ticket=generation;
+    function refresh({silent=false}={}){
+      if(!alive)return Promise.resolve();if(refreshing)return refreshing;const ticket=generation;
+      const pending=Promise.resolve().then(async()=>{
       try{const response=await request('/api/processing-center');if(!alive || ticket!==generation)return;data=response;onCounts(data.counts);if(current){const fresh=item(current.id);if(fresh?.revision===current.revision)current={...fresh,report:current.report || fresh.report};else if(!busy && current.action?.kind==='trial_login' && fresh?.section==='running')await next();}if(!busy && !current)render();if(!silent)notice('');}
-      catch(e){if(!silent)notice(e.message);}finally{refreshing=false;}
+      catch(e){if(!silent)notice(e.message);}
+      }).finally(()=>{if(refreshing===pending)refreshing=null;});
+      refreshing=pending;return pending;
     }
     const preference=(i,action)=>request('/api/processing-center/items/'+i.id,'POST',{action,revision:i.revision});
     async function next(){

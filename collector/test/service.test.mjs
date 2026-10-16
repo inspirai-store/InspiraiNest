@@ -138,6 +138,7 @@ test('library browser reuses authenticated archives, protects cached files and r
   await app.store.put('task',trial);
   await app.store.put('task',{...trial,id:crypto.randomUUID(),trial:{sourceArchiveId:'another-archive'}});
   await app.store.put('task',{...trial,id:crypto.randomUUID(),state:'cancelled'});
+  await app.store.put('task',{...trial,id:crypto.randomUUID(),deletedAt:new Date().toISOString()});
   const linked=await (await fetch(server+'/library/data',{headers})).json();
   assert.deepEqual(linked.entries[0].linkedTrials,[{id:trial.id,state:'waiting_action',title:'Codex 实测',verdict:null}]);
   await app.store.put('task',{...trial,state:'completed',report:{title:'插件运行报告',verdict:'partial',digest:'fixture-report'}});
