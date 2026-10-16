@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile} from '../src/codex-local-agent.mjs';
+import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile,taskTrustCleanup} from '../src/codex-local-agent.mjs';
 import {runAgent} from '../src/agents.mjs';
 import {trialEnvironment} from '../src/codex-trial.mjs';
 import {probeTrialEnvironment,trialRoot} from '../src/codex-trial-worker.mjs';
@@ -41,6 +41,14 @@ test('task plugin profile retains configured profile and cleans only its own fil
 test('heartbeat mode is optional and rejects unknown modes',()=>{
  assert.deepEqual(trialEnvironment({protocol:1,login:'ready',projects:[]}),{protocol:1,login:'ready',projects:[]});
  assert.equal(trialEnvironment({protocol:1,login:'ready',executionMode:'local-agent',projects:[]}).executionMode,'local-agent');assert.throws(()=>trialEnvironment({protocol:1,login:'ready',executionMode:'remote',projects:[]}));
+});
+test('native task trust registration is removed without changing existing trust or concurrent settings',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'trial-trust-')),file=path.join(home,'config.toml'),project=path.join(home,'task-project');
+ const initial='model="existing"\n[projects."existing-project"]\ntrust_level="trusted"\n\n';fs.writeFileSync(file,initial);
+ const clean=taskTrustCleanup({home,selection:{}},project),header='[projects.'+JSON.stringify(project)+']\ntrust_level = "trusted"\n\n';
+ fs.appendFileSync(file,header+'[features]\nkeep=true\n');clean();assert.equal(fs.readFileSync(file,'utf8'),initial+'[features]\nkeep=true\n');
+ fs.writeFileSync(file,initial+header);const preserve=taskTrustCleanup({home,selection:{}},project);preserve();assert.equal(fs.readFileSync(file,'utf8'),initial+header);
+ fs.writeFileSync(file,initial);const changed=taskTrustCleanup({home,selection:{}},project);fs.appendFileSync(file,header.replace('trust_level = "trusted"','trust_level = "untrusted"'));changed();assert.ok(fs.readFileSync(file,'utf8').includes('untrusted'));
 });
 test('an explicit retry probes keyring-backed Agent again without letting heartbeats retry failed model calls',async()=>{
  const config={dataDir:fs.mkdtempSync(path.join(os.tmpdir(),'keyring-retry-')),server:'https://example.com',deviceId:'pc'},file=path.join(trialRoot(config),'authorization-failure.json');fs.mkdirSync(path.dirname(file),{recursive:true});rememberAuthFailure(localAgentContext(config),file);

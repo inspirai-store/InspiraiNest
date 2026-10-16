@@ -50,6 +50,24 @@ export async function probeLocalAgent(config,{run=execute,failureFile}={}){
   return {login:'ready',reason:'available',...context.metadata};
 }
 export function rememberAuthFailure(context,file){atomicJson(file,{signature:context.signature});}
+export function taskTrustCleanup(context,project){
+  const canonical=value=>{const normalized=path.resolve(value).replaceAll('\\','/').replace(/^\/\/\?\//,'');return process.platform==='win32'?normalized.toLowerCase():normalized;};
+  const owned=canonical(project),files=[path.join(context.home,'config.toml'),...(context.selection.selected?[path.join(context.home,context.selection.selected+'.config.toml')]:[])];
+  const existing=new Map(files.map(file=>[file,new Set(Object.keys(configFile(file).projects || {}).map(canonical))]));
+  return ()=>{for(const file of files){
+    if(existing.get(file).has(owned) || !fs.existsSync(file))continue;
+    const before=fs.readFileSync(file,'utf8'),lines=before.match(/[^\n]*\n|[^\n]+$/g)||[];let changed=false;
+    for(let i=0;i<lines.length;i++){
+      if(!/^\[projects\..+\]\s*$/.test(lines[i].trim()))continue;
+      let end=i+1;while(end<lines.length&&!/^\s*\[/.test(lines[end]))end++;
+      let projects;try{projects=parse(lines.slice(i,end).join('')).projects;}catch{continue;}
+      const entries=Object.entries(projects || {});
+      if(entries.length!==1 || canonical(entries[0][0])!==owned || JSON.stringify(entries[0][1])!==JSON.stringify({trust_level:'trusted'}))continue;
+      lines.splice(i,end-i);changed=true;i--;
+    }
+    if(changed && fs.readFileSync(file,'utf8')===before)fs.writeFileSync(file,lines.join(''));
+  }};
+}
 export function executedAgentMetadata(context,log){
   const metadata={...context.metadata};
   const thread=log.split('\n').flatMap(line=>{try{const e=JSON.parse(line);return e.type==='thread.started'&&/^[a-f0-9-]{36}$/.test(e.thread_id)?[e.thread_id]:[];}catch{return [];}})[0];
