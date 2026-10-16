@@ -9,3 +9,5 @@
 :root[data-theme="dark"] .primary,:root[data-theme="dark"] .send-button{color:#15281d;background:#80b79b}
 :root[data-theme="dark"] .composer{border-color:var(--line)}:root[data-theme="dark"] .attachment{background:var(--soft)}:root[data-theme="dark"] .row-icon{background:var(--soft)}:root[data-theme="dark"] .record-row:hover{background:var(--soft)}:root[data-theme="dark"] .mobile-nav{background:var(--paper)}
 .recent .row-meta{display:none}.status,.detail-heading .eyebrow,.note,.result-label{font-size:14px}
+
+.processing-shortcut{width:100%;min-height:48px;border-radius:18px;text-align:left;padding:12px 18px;margin-bottom:20px;background:var(--panel);color:var(--ink);border:1px solid var(--line);font:inherit}.processing-shortcut[hidden]{display:none}

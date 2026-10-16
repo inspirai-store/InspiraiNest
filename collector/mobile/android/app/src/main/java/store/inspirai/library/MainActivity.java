@@ -17,6 +17,7 @@ public class MainActivity extends Screen {
  private LibraryPane library;
  private String tab="资料库",collectionTab="任务",taskFilter="all",lastRender="",reportedDeviceId;
  private boolean refreshing,resumed,homeVisible;
+ private Button processingShortcut;
  private AppUpdate.Release pendingUpdate;
  private static boolean updateChecked;
  private EditText pairingServer,pairingKey,loginFactor;
@@ -40,12 +41,13 @@ public class MainActivity extends Screen {
  @Override protected void onAppearanceChanged(){if(library!=null)library.applyTheme();if(homeVisible)home();else login();}
  private void home(){
   if(!homeVisible)cancelLogin();homeVisible=true;if(library!=null&&library.web.getParent()!=null)((ViewGroup)library.web.getParent()).removeView(library.web);
-  page(tab,tab.equals("采集")?"把灵感交给电脑，进度在这里查看":"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
+  page(tab,"");heading.setVisibility(tab.equals("资料库")?View.GONE:View.VISIBLE);
   if(library==null&&credentials.isPaired())library=new LibraryPane(this,null,deep->{if(navigation!=null)navigation.setVisibility(deep?View.GONE:View.VISIBLE);});
+  if(tab.equals("资料库")){processingShortcut=button(root,"处理中心",()->startActivity(new Intent(this,CaptureActivity.class).putExtra("processing",true)));root.removeView(processingShortcut);root.addView(processingShortcut,root.indexOfChild(scroll));processingShortcut.setVisibility(View.GONE);updateProcessingShortcut();}
   if(library!=null){root.addView(library.web,root.indexOfChild(scroll),new LinearLayout.LayoutParams(-1,0,1));library.web.setVisibility(tab.equals("资料库")?View.VISIBLE:View.GONE);library.applyTheme();}
   scroll.setVisibility(tab.equals("资料库")&&library!=null?View.GONE:View.VISIBLE);
   navigation=new LinearLayout(this);navigation.setPadding(dp(16),dp(6),dp(16),dp(6));navigation.setBackgroundColor(Appearance.surface(this));rule(root);root.addView(navigation);
-  String[] tabs={"记录","资料库","采集","我的"},names={"collect","library","collect","person"};for(int i=0;i<tabs.length;i++){String t=tabs[i];Button b=button(navigation,t,()->{if(t.equals("记录")){finish();return;}if(!tab.equals(t)){tab=t;home();}});b.setTextSize(12);b.setBackgroundColor(android.graphics.Color.TRANSPARENT);b.setTextColor(t.equals(tab)?green:Appearance.muted(this));b.setCompoundDrawablesRelativeWithIntrinsicBounds(null,Icons.drawable(this,names[i],t.equals(tab)?green:Appearance.muted(this)),null,null);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);navigation.updateViewLayout(b,p);}
+  String[] tabs={"记录","资料库","采集","我的"},names={"collect","library","collect","person"};for(int i=0;i<tabs.length;i++){String t=tabs[i];Button b=button(navigation,t,()->{if(t.equals("记录")){finish();return;}if(t.equals("采集")){startActivity(new Intent(this,CaptureActivity.class).putExtra("processing",true));return;}if(!tab.equals(t)){tab=t;home();}});b.setTextSize(12);b.setBackgroundColor(android.graphics.Color.TRANSPARENT);b.setTextColor(t.equals(tab)?green:Appearance.muted(this));b.setCompoundDrawablesRelativeWithIntrinsicBounds(null,Icons.drawable(this,names[i],t.equals(tab)?green:Appearance.muted(this)),null,null);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);navigation.updateViewLayout(b,p);}
   if(library!=null&&tab.equals("资料库")&&library.isDeep())navigation.setVisibility(View.GONE);
   if(tab.equals("我的")){mine();return;}
   if(tab.equals("资料库")){if(library==null){body.addView(label("连接资料库，开始阅读收藏的内容。",18,true));primary(button(body,"连接资料库",()->{homeVisible=false;login();}));}return;}
@@ -54,6 +56,7 @@ public class MainActivity extends Screen {
   if(collectionTab.equals("任务")){Spinner filter=new Spinner(this);String[] ids={"all","running","awaiting_review","failed","completed"};filter.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"全部状态","处理中","待审核","需处理","已完成"}));filter.setMinimumHeight(dp(48));filter.setSelection(java.util.Arrays.asList(ids).indexOf(taskFilter));body.addView(filter);filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> a,View v,int p,long id){taskFilter=ids[p];renderData(false);}public void onNothingSelected(AdapterView<?> a){}});}
   listing=new LinearLayout(this);listing.setOrientation(LinearLayout.VERTICAL);body.addView(listing);lastRender="";renderData(true);refresh();
  }
+ private void updateProcessingShortcut(){if(processingShortcut==null||snapshot==null)return;JSONObject center=snapshot.optJSONObject("processingCenter");if(center==null)return;JSONObject counts=center.optJSONObject("counts");if(counts==null)return;int attention=counts.optInt("attention"),results=counts.optInt("results");processingShortcut.setText(attention+" 项待办 · "+results+" 项新结果  ›");processingShortcut.setVisibility(attention+results>0?View.VISIBLE:View.GONE);}
  private void mine(){
   LinearLayout info=card(body);info.addView(label("我的资料空间",21,true));info.addView(label(credentials.isPaired()?credentials.server():"尚未连接资料库",14,false));
   settingsRow("授权设备",()->startActivity(new Intent(this,DevicesActivity.class)));
@@ -63,7 +66,7 @@ public class MainActivity extends Screen {
   if(credentials.isPaired())settingsRow("退出本机登录",()->confirm("清除本机凭据？草稿与待提交记录会保留。",()->work(()->{credentials.clear();return true;},v->{if(library!=null){library.destroy();library=null;}CookieManager.getInstance().removeAllCookies(null);snapshot=null;homeVisible=false;login();})));
  }
  private void settingsRow(String title,Runnable action){Button b=button(body,title+"  ›",action);b.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);b.setMinHeight(dp(60));b.setTextColor(ink);b.setBackgroundColor(android.graphics.Color.TRANSPARENT);rule(body);}
- private void refresh(){if(refreshing||!credentials.isPaired())return;final String generation=credentials.deviceId();refreshing=true;io.execute(()->{try{Api api=new Api(credentials);String id=credentials.deviceId();String warning="";if(!id.equals(reportedDeviceId)){try{api.call("/api/devices/me/info","POST",Api.devicePayload(this,credentials.server(),false));reportedDeviceId=id;}catch(Exception ignored){warning="设备标识暂未补齐；若身份冲突，请检查授权后重新配对。";}}JSONObject fresh=api.call("/api/state","GET",null);String identityWarning=warning;ui(()->{refreshing=false;if(!generation.equals(credentials.deviceId()))return;snapshot=fresh;notice(identityWarning);if(homeVisible&&tab.equals("采集"))renderData(false);});}catch(Exception e){ui(()->{refreshing=false;if(!generation.equals(credentials.deviceId()))return;notice(e instanceof Api.Failure&&((Api.Failure)e).status==401?"授权已失效，请到“我的”重新连接。":"连接暂不可用，正在等待网络恢复。");});}});}
+ private void refresh(){if(refreshing||!credentials.isPaired())return;final String generation=credentials.deviceId();refreshing=true;io.execute(()->{try{Api api=new Api(credentials);String id=credentials.deviceId();String warning="";if(!id.equals(reportedDeviceId)){try{api.call("/api/devices/me/info","POST",Api.devicePayload(this,credentials.server(),false));reportedDeviceId=id;}catch(Exception ignored){warning="设备标识暂未补齐；若身份冲突，请检查授权后重新配对。";}}JSONObject fresh=api.call("/api/state","GET",null);String identityWarning=warning;ui(()->{refreshing=false;if(!generation.equals(credentials.deviceId()))return;snapshot=fresh;updateProcessingShortcut();notice(identityWarning);if(homeVisible&&tab.equals("采集"))renderData(false);});}catch(Exception e){ui(()->{refreshing=false;if(!generation.equals(credentials.deviceId()))return;notice(e instanceof Api.Failure&&((Api.Failure)e).status==401?"授权已失效，请到“我的”重新连接。":"连接暂不可用，正在等待网络恢复。");});}});}
  private void renderData(boolean force){if(!homeVisible||!tab.equals("采集")||listing==null)return;try{
   String key=collectionTab+taskFilter+(collectionTab.equals("待提交")?new Drafts(this).list().toString()+new Outbox(this).list():snapshot==null?"":snapshot.optJSONArray("tasks").toString());if(!force&&key.equals(lastRender))return;lastRender=key;int y=scroll.getScrollY();listing.removeAllViews();
   if(collectionTab.equals("待提交")){outbox();scroll.post(()->scroll.scrollTo(0,y));return;}

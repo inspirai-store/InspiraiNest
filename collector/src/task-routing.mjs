@@ -13,6 +13,7 @@ export function supportsWritingTask(task, device) {
 // A specified computer is preferred on the first attempt. Once it cannot finish,
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
+  if(task.purpose==='codex-trial')return workerAuthorized(device) && device.id===task.trial?.deviceId && device.trialEnvironment?.protocol===1 && device.agents?.includes('codex');
   return workerAuthorized(device) && Boolean(device.agents?.length)
     && (task.purpose!=='selection-writing'||device.selectionWritingProtocol===1)
     && (!task.recordId || device.recordProtocol === 1)

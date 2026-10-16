@@ -18,6 +18,9 @@
   let currentView = 'archives';
   let taskScrollTop = 0;
   const taskDialog = $('#tasks-dialog');
+  const processingRoot=document.createElement('div');$('#tasks-view').prepend(processingRoot);
+  $('#tasks-view .filter-bar').hidden=true;$('#tasks').hidden=true;$('#tasks-title').textContent='采集';$('#new-task').hidden=true;
+  const processing=window.createProcessingCenter({root:processingRoot,request:(route,method='GET',data)=>api(route.slice(4),method,data),onNew:()=>$('#new-task').click(),onOpenTask:id=>showTask(id),onOpenSource:id=>{const task=snapshot?.tasks.find(t=>t.id===id);if(task?.archiveId)openArchive(task.archiveId);else if(task?.draftId)api('/tasks/'+id+'/draft').then(showBundle).catch(e=>notice(e.message));},onCounts:counts=>{const count=counts.attention+counts.results;$('#task-count').textContent=count>99?'99+':count;$('#task-count').classList.toggle('is-empty',!count);$('#tasks-toggle').title=`处理中心 · ${counts.attention} 项待办 · ${counts.results} 项新结果`;}});
   function closeTasks() {
     if (!taskDialog.open) return;
     taskScrollTop = $('#tasks-view').scrollTop; taskDialog.close();
@@ -72,7 +75,7 @@
     }
     return value;
   }
-  async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null; nodeNames.close(); $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
+  async function logout() { try { await window.browserSession.logout(); } catch { notice('退出未完成，请检查网络后重试'); return; } document.querySelector('#library-frame')?.remove(); token = null; infoSent = false; snapshot = null;processing.reset(); nodeNames.close(); $('#app').hidden = true; $('#login-view').hidden = false; document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); showView('archives'); }
   const skillMarket = window.createSkillMarket({ root:$('#skill-market-view'), request:input=>input.kind==='import'?api('/skills/market/import','POST',input):api((input.kind==='installed'?'/skills/installed?':'/skills/market?')+new URLSearchParams(input)),skills:input=>{if(input.kind==='create')return api('/skills/operations','POST',input.operation);if(input.kind==='operation')return api('/skills/operations/'+encodeURIComponent(input.operationId));if(input.kind==='environment')return api('/skills/devices/'+encodeURIComponent(input.deviceId)+'/environment?offset='+Number(input.offset || 0));throw new Error('技能请求无效');},identity:()=>String(token || ''),onInventory:device=>skillManager.open(device) });
   const clientUpdates=window.createClientUpdateManager({identity:()=>String(token || ''),request:input=>{
     if(input.kind==='history')return api('/client-updates/operations?deviceId='+encodeURIComponent(input.deviceId));
@@ -169,6 +172,7 @@
   });
   $('#manage-worker-nodes').onclick = () => { nodeDialog.close(); showView('devices'); };
   function render() {
+    void processing.refresh({silent:true});
     const { devices, tasks, archives } = snapshot;
     const taskCount = tasks.filter(t => !['completed', 'cancelled'].includes(t.state)).length;
     $('#task-count').textContent = taskCount > 99 ? '99+' : taskCount;
@@ -222,6 +226,7 @@
     const task = snapshot.tasks.find(task => task.id === id);
     if (!task) return;
     $('#task-detail').innerHTML = `${badge(task.state)}${window.nodePresentation.render(task,snapshot.devices,true)}<p class="task-content">${esc(task.content ?? task.url)}</p><p>${esc(task.scenario || '通用摘要')}</p><p>${task.autoArchive === false ? '确认后归档' : '自动归档'}${task.tags?.length ? ' · ' + esc(task.tags.join(' / ')) : ''}</p><ol class="events">${task.events.map(e => `<li><time>${date(e.at)}</time><p>${esc(e.message)}</p></li>`).join('')}</ol><div class="actions">${task.state === 'awaiting_review' ? `<button data-preview="${task.id}">${icon('book-open')}查看结果</button><button class="primary" data-approve="${task.id}">确认归档</button>` : ''}${task.archiveId ? `<button data-archive="${task.archiveId}">${icon('book-open')}阅读资料</button>` : ''}${['failed', 'waiting_action'].includes(task.state) ? `<button data-retry="${task.id}" class="primary">${icon('play')}继续</button>` : ''}${task.deviceId && ['queued','assigned','running','uploading','waiting_action','failed'].includes(task.state) ? `<button data-reassign="${task.id}">${icon('refresh-cw')}切换其他节点</button>` : ''}${!['completed', 'cancelled'].includes(task.state) ? `<button data-cancel="${task.id}" class="danger">取消任务</button>` : ''}</div>`;
+    for(const trial of task.linkedTrials || []){const b=document.createElement('button');b.textContent=trial.title || 'Codex 实测';b.onclick=async()=>{$('#detail-dialog').close();showView('tasks');await processing.refresh();processing.open(trial.id);};$('#task-detail').append(b);}
     if (open) $('#detail-dialog').showModal(); icons();
   }
   function buffer(file) { return Uint8Array.from(atob(file.body), char => char.charCodeAt(0)); }
@@ -270,6 +275,7 @@
   function showBundle(bundle) {
     objectURLs.forEach(URL.revokeObjectURL); objectURLs = [];
     currentBundle = bundle;
+    document.querySelector('#reader-trials')?.remove();const related=document.createElement('div');related.id='reader-trials';related.className='actions';for(const trial of bundle.linkedTrials || []){const b=document.createElement('button');b.textContent=trial.title || 'Codex 实测';b.onclick=async()=>{$('#reader').close();showView('tasks');await processing.refresh();processing.open(trial.id);};related.append(b);}$('#reader-meta').after(related);
     $('#reader-title').textContent = bundle.meta.title;
     $('#reader-meta').textContent = `${bundle.meta.coverage_note} · ${bundle.files.length} 个轻量附件`;
     const docs = bundle.files.filter(f => /\.(md|markdown|txt|srt|vtt)$/i.test(f.path));
@@ -284,10 +290,12 @@
     try { const data = await window.webLogin.login(event.target); if (data.device.role !== 'owner') throw new Error('配对权限不匹配，请生成新的设备配对码'); window.browserSession.adopt(); token = 'cookie'; infoSent = true; await refresh(); }
     catch (error) { if (error.name !== 'AbortError') $('#login-error').textContent = error.status === 409 ? '设备身份冲突，请检查已有授权后重新配对。' : error.message; } finally { button.disabled = false; }
   });
-  $('#new-task').onclick = () => { $('#dispatch-device').innerHTML = '<option value="">自动</option>' + snapshot.devices.filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(window.nodePresentation.label(d))}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); $('#task-form').dataset.submission = crypto.randomUUID(); $('#task-dialog').showModal(); };
+  $('#new-task').onclick = () => { $('#dispatch-device').innerHTML = '<option value="">自动</option>' + snapshot.devices.filter(window.deviceView.dispatchable).map(d => `<option value="${esc(d.id)}">${esc(window.nodePresentation.label(d))}${d.online ? '' : '（工作节点离线）'}</option>`).join(''); $('#task-form').dataset.submission = crypto.randomUUID();const trialComputer=$('#trial-computer');trialComputer.innerHTML='<option value="">选择电脑</option>'+snapshot.devices.filter(d=>window.deviceView.dispatchable(d)&&d.trialEnvironment?.protocol===1).map(d=>`<option value="${esc(d.id)}">${esc(window.nodePresentation.label(d))}</option>`).join('');$('#trial-project').innerHTML='<option value="">不关联项目</option>';$('#trial-options').hidden=!$('#trial-enabled').checked;$('#task-dialog').showModal(); };
+  $('#trial-enabled').onchange=()=>{$('#trial-options').hidden=!$('#trial-enabled').checked;};
+  $('#trial-computer').onchange=()=>{const node=snapshot.devices.find(d=>d.id===$('#trial-computer').value);$('#trial-project').innerHTML='<option value="">不关联项目</option>'+(node?.trialEnvironment?.projects || []).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');};
   $('#task-form').addEventListener('submit', async event => {
     event.preventDefault(); event.submitter.disabled = true; $('#task-error').textContent = '';
-    try { await api('/tasks', 'POST', { ...Object.fromEntries(new FormData(event.target)), autoArchive: event.target.elements.autoArchive.checked, tags: [...new Set(event.target.elements.tags.value.split(/[,，\n]/).map(t => t.trim()).filter(Boolean))], submissionId: event.target.dataset.submission }); event.target.reset(); $('#task-dialog').close(); await refresh(); notice('任务已提交'); }
+    try { if($('#trial-enabled').checked&&!$('#trial-computer').value)throw new Error('请选择实测电脑');await api('/tasks', 'POST', { ...Object.fromEntries(new FormData(event.target)), ...($('#trial-enabled').checked?{codexTrial:{deviceId:$('#trial-computer').value,projectId:$('#trial-project').value || null}}:{}), autoArchive: event.target.elements.autoArchive.checked, tags: [...new Set(event.target.elements.tags.value.split(/[,，\n]/).map(t => t.trim()).filter(Boolean))], submissionId: event.target.dataset.submission }); event.target.reset(); $('#task-dialog').close(); await refresh(); notice('已交给后台'); }
     catch (error) { $('#task-error').textContent = error.message; } finally { event.submitter.disabled = false; }
   });
   let pairingExpiryTimer, pairingSeq = 0;

@@ -1,3 +1,4 @@
+import {trialLoginAction} from './trial-login.mjs';
 import {performEditing} from './editing.mjs';
 import {desktopFrontend,documentURL,desktopPermission} from './frontend-entry.mjs';
 import {appVersion} from '../src/device-identity.mjs';
@@ -201,6 +202,7 @@ function registerIPC() {
   ipcMain.handle('desktop-settings:get', event => { trusted(event); return settings.snapshot(); });
   ipcMain.handle('desktop-settings:update', (event, input) => { trustedMain(event); return settings.update(input); });
   for (const [name, fn] of Object.entries({
+    trial: action=>trialLoginAction({...manager.configuration(),dataDir:manager.dataDir},action),
     snapshot: desktopSnapshot, action: action => perform(action),
     logs: task => manager.logs(task), activity: task => manager.activity(task),
     pair: input => pairDesktop(input),
@@ -210,7 +212,7 @@ function registerIPC() {
       const directory=path.join(os.homedir(),agent==='codex'?'.codex':'.'+agent);
       fs.mkdirSync(directory,{recursive:true});const error=await shell.openPath(directory);if(error)throw new Error(error);
     },
-  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
+  })) ipcMain.handle(`worker:${name}`, async (event, argument) => { if (['pair','skill-config','trial'].includes(name)) trustedMain(event); else trusted(event); return fn(argument); });
   const library = {
     capture: input => captureRequest(owner,input),
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },

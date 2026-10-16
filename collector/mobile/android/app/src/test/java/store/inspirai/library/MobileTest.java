@@ -24,6 +24,30 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=35)
 public class MobileTest {
+    @Test @Config(shadows=SubmissionCredentials.class,instrumentedPackages={"store.inspirai.library.core"})
+    public void offlineDraftRestoreKeepsTrialComputerAndProject()throws Exception {
+        SubmissionCredentials.allowSubmission=false;Context context=RuntimeEnvironment.getApplication();String id=UUID.randomUUID().toString(),project="a".repeat(32);
+        new Drafts(context).save(new JSONObject().put("id",id).put("original","分享原文").put("content","分享原文").put("trialEnabled",true).put("trialDeviceId","offline-computer").put("trialProjectId",project));
+        var controller=Robolectric.buildActivity(ShareActivity.class,new Intent(context,ShareActivity.class).putExtra("draftId",id)).setup();
+        try{org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();var persist=ShareActivity.class.getDeclaredMethod("persist");persist.setAccessible(true);persist.invoke(controller.get());JSONObject restored=new Drafts(context).read(id);assertTrue(restored.getBoolean("trialEnabled"));assertEquals("offline-computer",restored.getString("trialDeviceId"));assertEquals(project,restored.getString("trialProjectId"));}
+        finally{closeShare(controller);new Drafts(context).remove(id);}
+    }
+    @Test @Config(shadows=SubmissionCredentials.class,instrumentedPackages={"store.inspirai.library.core"})
+    public void codexTrialIsOptInAndItsSelectionIsFrozenInDurableSubmission() throws Exception {
+        SubmissionCredentials.allowSubmission=false;
+        var controller=Robolectric.buildActivity(ShareActivity.class,shareIntent("分享原文保持完整")).setup();String id=savedDraftId(controller);Context context=RuntimeEnvironment.getApplication();
+        try {
+            android.widget.CheckBox enabled=org.robolectric.util.ReflectionHelpers.getField(controller.get(),"trialEnabled");assertFalse(enabled.isChecked());
+            android.widget.Spinner computer=org.robolectric.util.ReflectionHelpers.getField(controller.get(),"trialComputer");
+            java.util.List<String> computerIds=org.robolectric.util.ReflectionHelpers.getField(controller.get(),"trialComputerIds");computerIds.add("test-pc");
+            computer.setAdapter(new android.widget.ArrayAdapter<>(controller.get(),android.R.layout.simple_spinner_dropdown_item,new String[]{"选择电脑","测试电脑"}));computer.setSelection(1);enabled.setChecked(true);
+            var persist=ShareActivity.class.getDeclaredMethod("persist");persist.setAccessible(true);assertEquals(true,persist.invoke(controller.get()));
+            assertTrue(new Drafts(context).read(id).getBoolean("trialEnabled"));assertEquals("test-pc",new Drafts(context).read(id).getString("trialDeviceId"));
+            SubmissionCredentials.allowSubmission=true;requireText(controller.get().root,"提交采集任务").performClick();
+            JSONObject queued=queueRecord(context,id);assertNotNull(queued);assertEquals("test-pc",queued.getJSONObject("payload").getJSONObject("codexTrial").getString("deviceId"));assertEquals("分享原文保持完整",queued.getJSONObject("payload").getString("content"));
+            assertNotNull(requireText(controller.get().root,"已保存到手机"));
+        } finally {closeShare(controller);SubmissionCredentials.allowSubmission=false;new Drafts(context).remove(id);new Outbox(context).remove(id);}
+    }
     @Test public void preservesUnicodeWhitespaceMultipleLinksAndShareTitle() {
         String raw="  标题\nhttps://example.com/a?x=1  https://example.com/b\n场景：用于剧本 🐈\n ";
         Intent intent=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT,"原始标题").putExtra(Intent.EXTRA_TEXT,raw);

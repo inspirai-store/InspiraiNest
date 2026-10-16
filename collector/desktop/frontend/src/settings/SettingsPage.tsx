@@ -1,3 +1,4 @@
+import {TrialLogin} from './TrialLogin';
 import {ShortcutButton} from '../interactions/InteractionProvider';
 import {DevicesContent} from '../account/DevicesContent';
 import {CheckboxField,RadioChoices} from '../components/FormControls';
@@ -49,6 +50,7 @@ export function SettingsPage(){
       {choices('closeBehavior','关闭窗口',[['tray','保留托盘'],['quit','退出客户端']])}
       <fieldset className={styles.field} disabled={settings.saving||!value.loginItem.supported}><legend>启动</legend><CheckboxField className={styles.startup} checked={value.launchAtLogin&&value.loginItem.supported} onChange={e=>void save({launchAtLogin:e.target.checked},e.currentTarget)}>开机启动</CheckboxField></fieldset>
       <ShortcutButton/>
+      <TrialLogin/>
       {!value.loginItem.supported&&<p className={styles.status}>不支持开机启动</p>}
       {value.loginItem.supported&&value.launchAtLogin&&value.loginItem.status==='requires-approval'&&<p className={styles.status}>等待系统批准</p>}
       {value.loginItem.supported&&value.launchAtLogin&&value.loginItem.status==='disabled-by-system'&&<p className={styles.status}>已被系统停用</p>}

@@ -1,4 +1,6 @@
 import {createWriting as createSelectionWriting} from './selection-writing.mjs';
+import { createProcessingCenter } from './processing-center.mjs';
+import { createCodexTrials, trialEnvironment } from './codex-trial.mjs';
 import http from 'node:http';
 import { createRecords } from './records.mjs';
 import { createWriting } from './writing.mjs';
@@ -48,6 +50,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const records = createRecords({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask});
   const writing = createWriting({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
   const selectionWriting=createSelectionWriting({store,serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment});
+  const processingCenter=createProcessingCenter({store,serialized,owner,body,send});
+  const codexTrials=createCodexTrials({store,serialized,saveTask,owner,assigned,body,send,authenticate});
   const locks = new Map();
   async function serialized(key, work) {
     const previous = locks.get(key) || Promise.resolve();
@@ -208,6 +212,11 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     return task;
   }
   async function reroute(task, reason, message, target = store, { manual = false } = {}) {
+    if(task.purpose==='codex-trial') {
+      requireValue(!manual,'实测固定在所选电脑，请恢复该电脑或取消任务',409);
+      if(reason==='NODE_OFFLINE' && workerAuthorized(await target.get('device',task.trial.deviceId) || {}))return saveTask({...task,deviceId:null,assignmentId:id(),actionRequired:null},'queued','等待所选电脑恢复连接',target);
+      return saveTask({...task,assignmentId:id(),actionRequired:{kind:'retry',label:'继续实测'}},'waiting_action',message+'；等待原电脑恢复',target);
+    }
     const released = releaseTask(task, reason, message, new Date(clock()).toISOString());
     const alternatives = (await target.list('device')).filter(d => canRunTask(released, d));
     if (!alternatives.length) {
@@ -283,6 +292,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     try { return JSON.parse(raw); } catch { fail('Invalid JSON'); }
   }
   async function publish(bundle, device, req, taskId) {
+    if (Object.hasOwn(bundle,'linkedTrials')) { const {linkedTrials,...archiveBundle}=bundle;bundle=archiveBundle; }
     if (Object.hasOwn(bundle,'inputAttachments')) { const {inputAttachments,...archiveBundle} = bundle; bundle = archiveBundle; }
     const taskRecord = taskId ? await assigned(device, taskId, req) : null;
     requireValue(taskRecord?.purpose!=='selection-writing','文字任务不能归档',409);
@@ -429,6 +439,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           '/client-prompt.js': ['../assets/client-prompt.js', 'text/javascript; charset=utf-8'],
           '/client-prompt.css': ['../assets/client-prompt.css', 'text/css; charset=utf-8'],
           '/app.js': ['public/app.js', 'text/javascript; charset=utf-8'],
+          '/processing-center.js': ['public/processing-center.js','text/javascript; charset=utf-8'],
+          '/processing-center.css': ['public/processing-center.css','text/css; charset=utf-8'],
         '/node-presentation.js': ['public/node-presentation.js', 'text/javascript; charset=utf-8'],
         '/node-name-editor.js': ['public/node-name-editor.js', 'text/javascript; charset=utf-8'],
         '/node-presentation.css': ['public/node-presentation.css', 'text/css; charset=utf-8'],
@@ -527,6 +539,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (await skillMarket.handle(req, res, route, device)) return;
       if (await skills.handle(req, res, route, device)) return;
+      if (await processingCenter.handle(req,res,route,device)) return;
+      if (await codexTrials.handle(req,res,route,device)) return;
       if (await agents.handle(req, res, route, device)) return;
       if (await clientUpdates.handle(req, res, route, device)) return;
       if (route.startsWith('/api/browser-trust')) {
@@ -600,10 +614,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (route === '/api/state' && req.method === 'GET') {
         owner(device);
         await recoverUnavailableTasks();
+        await codexTrials.sync();
         const archives = [];
         for (const archive of await store.list('archive')) if (!(await deleted(archive))) archives.push(archive);
         const devices = await Promise.all((await store.list('device')).filter(d => !d.revokedAt).map(d => sessions.ensure(d)));
-        return send(res, 200, { writingProtocol:1, selectionWritingProtocol:1, me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).filter(t=>t.purpose!=='selection-writing').sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+        const taskRecords=(await store.list('task')).filter(t=>t.purpose!=='selection-writing').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+        const taskSnapshot=taskRecords.map(task=>({...task,...(task.report?{report:{digest:task.report.digest,title:task.report.title,verdict:task.report.verdict,commit:task.report.commit,projectCommit:task.report.projectCommit}}:{}),linkedTrials:taskRecords.filter(child=>child.trial?.parentTaskId===task.id).map(child=>({id:child.id,state:child.state,title:child.report?.title || child.title,verdict:child.report?.verdict || null}))}));
+        return send(res, 200, { processingCenter:await processingCenter.snapshot(), writingProtocol:1, selectionWritingProtocol:1, me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: taskSnapshot, archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
       }
       if (route === '/api/pairings' && req.method === 'POST') {
         owner(device);
@@ -677,6 +694,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (route === '/api/heartbeat' && req.method === 'POST') {
         worker(device);
         const input = await body(req);
+        const reportedTrial=trialEnvironment(input.trialEnvironment);if(reportedTrial)reportedTrial.generation=device.trialEnvironment?.login===reportedTrial.login?device.trialEnvironment.generation || id():id();
         requireValue(Array.isArray(input.capabilities) && input.capabilities.every(x => types.includes(x)), 'Invalid capabilities');
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
@@ -689,12 +707,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
         const input = await body(req);
+        const codexTrial=await codexTrials.request(input.codexTrial,{validate:false});
         const inputAttachments = await resolveInputAttachments(store, input.attachments);
         const rawSubmission = Object.hasOwn(input, 'content');
         if (rawSubmission) requireValue(typeof input.content === 'string' && input.content.length <= 10000 && (input.content.trim().length > 0 || inputAttachments.length > 0), 'Invalid collection content');
@@ -707,22 +726,22 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const tags = input.tags ?? [];
         requireValue(Array.isArray(tags) && tags.length <= 20 && tags.every(tag => typeof tag === 'string' && tag.trim().length > 0 && tag.length <= 60), 'Invalid tags');
         const preferredDeviceId = input.deviceId || null;
-        if (preferredDeviceId) {
-          const target = await store.get('device', preferredDeviceId);
-          requireValue(target && workerAuthorized(target), 'Invalid dispatch device');
-        }
         requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {
           const existing = (await store.list('task')).find(t => t.submissionId === submissionId);
           if (existing) {
+            requireValue(JSON.stringify(existing.codexTrial || null)===JSON.stringify(codexTrial),'Submission ID already used',409);
             requireValue(JSON.stringify(inputReferences(existing.inputAttachments || [])) === JSON.stringify(inputReferences(inputAttachments)), 'Submission ID already used', 409);
             requireValue((existing.content ?? null) === content && existing.url === (source?.href || null) && existing.scenario === (input.scenario?.trim() || null) && existing.type === taskType && existing.preferredAgent === (input.agent || null) && (existing.autoArchive ?? true) === autoArchive && JSON.stringify(existing.tags || []) === JSON.stringify(tags) && (existing.preferredDeviceId || null) === preferredDeviceId, 'Submission ID already used', 409);
             return send(res, 200, existing);
           }
+          await codexTrials.request(input.codexTrial);
+          if(preferredDeviceId)requireValue(workerAuthorized(await store.get('device',preferredDeviceId) || {}),'Invalid dispatch device');
           const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now(), ...(inputAttachments.length ? { inputAttachments } : {}) };
           task.requiredCapabilities = taskCapabilities(task);
+          if(codexTrial)task.codexTrial=codexTrial;
           return send(res, 201, await saveTask(task, 'queued', inputAttachments.length ? '等待支持附件协议的新版采集电脑，请将 Worker 更新至 0.1.29 或更高版本' : '等待可用电脑'));
         });
       }
@@ -733,9 +752,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         if (device.agentRuntime?.busy) return send(res, 200, { task: null });
         requireValue(workerOnline(device, clock()), 'Heartbeat required', 409);
         await recoverUnavailableTasks();
+        await codexTrials.sync();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -747,9 +767,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
-              const selected = candidate.purpose==='selection-writing'?{eligible:true,selectedSkills:[]}:await skills.selection(candidate,device,tasks);
+              const selected = ['selection-writing','codex-trial'].includes(candidate.purpose)?{eligible:true,selectedSkills:[]}:await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
               task = await store.transaction(async tx => {
                 const live = await tx.getForUpdate('device', device.id);
@@ -759,6 +779,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('client-update')).some(o=>o.deviceId===device.id && updateBlocksTasks(o))) return null;
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
+                if(pending?.purpose==='codex-trial'&&(live.trialEnvironment?.protocol!==1||input.assignmentProtocol!==1))return null;
                 if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
@@ -781,7 +802,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await authenticate(req);
         requireValue((await store.get('task', task.id))?.state === 'awaiting_review', 'No pending review', 409);
         requireValue(hash(buffer) === draft.id, 'Draft checksum mismatch', 500);
-        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [] });
+        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [], linkedTrials:(await store.list('task')).filter(t=>t.trial?.sourceArchiveId===draft.id).map(t=>({id:t.id,state:t.state,title:t.report?.title || t.title})) });
       }
       const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign)$/);
       if (taskRoute && req.method === 'POST') {
@@ -809,7 +830,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             requireValue(task, 'Task not found', 404);
             requireValue(action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
             if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
-            const next = action === 'retry' ? { ...task, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
+            if(action==='cancel' && task.codexTrial)for(const child of await tx.list('task'))if(child.trial?.parentTaskId===task.id && !['completed','cancelled'].includes(child.state))await saveTask({...child,assignmentId:id()},'cancelled','原采集任务已取消',tx);
+            if(action==='retry' && task.actionRequired?.conditionKey)await tx.delete('processing-preference','condition-'+hash(task.actionRequired.conditionKey).slice(0,32));
+            const next = action === 'retry' ? { ...task,actionRequired:null, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
             return saveTask(next, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑', tx);
           }));
           return send(res, 200, result);
@@ -825,6 +848,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           requireValue(active.includes(live.state), 'Task is not running', 409);
           const executionSkills = (live.selectedSkills || []).filter(s=>s.agent === (input.agent || live.agent));
           const updated = { ...live, agent: input.agent || live.agent || null, executionSkills };
+          if(live.purpose==='codex-trial') {
+            if(input.actionRequired!==undefined) {
+              requireValue(input.actionRequired===null || ['trial_login','retry','dependency'].includes(input.actionRequired.kind),'实测操作无效');
+              updated.actionRequired=input.actionRequired && {kind:input.actionRequired.kind,label:input.actionRequired.kind==='trial_login'?'处理登录':'继续实测',...(input.actionRequired.kind==='dependency'?{title:'修复测试环境',conditionKey:'trial-dependency:'+live.trial.deviceId+':'+hash(message)}:{}),...(input.actionRequired.kind==='trial_login'?{title:'登录 Codex 测试账号',generation:(await tx.get('device',live.trial.deviceId))?.trialEnvironment?.generation || '1',conditionKey:'trial-login:'+live.trial.deviceId}:{} )};
+            }
+            return saveTask(updated,input.state,message,tx);
+          }
           if(input.writingProgress!==undefined){requireValue(live.writingSessionId,'Not a writing task');updated.writingProgress=writingProgress(input.writingProgress,live.writingProgress);}
           if(live.purpose==='selection-writing'&&input.state==='failed')return saveTask(updated,'failed',message,tx);
           if (input.state === 'failed' || input.state === 'waiting_action' && nodeFailureCodes.has(input.failureCode)) {
@@ -847,7 +877,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await readable(archive);
         await authenticate(req);
         requireValue(hash(buffer) === archive.id, 'Stored archive checksum mismatch', 500);
-        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: archive.inputAttachments || [] });
+        return send(res, 200, { ...JSON.parse(buffer), inputAttachments: archive.inputAttachments || [], linkedTrials:(await store.list('task')).filter(t=>t.trial?.sourceArchiveId===archive.id).map(t=>({id:t.id,state:t.state,title:t.report?.title || t.title})) });
       }
       const originalRoute = route.match(/^\/api\/archives\/([a-f0-9]{64})\/input-files\/([a-f0-9]{64})$/);
       if (originalRoute && req.method === 'GET') {

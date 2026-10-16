@@ -58,6 +58,9 @@ jobs:
       - name: Test mixed capture in Chrome
         run: node scripts/test-capture.cjs
         working-directory: collector
+      - name: Test asynchronous processing center against isolated REST
+        run: node scripts/test-processing-center.cjs
+        working-directory: collector
       - name: Test isolated MySQL authorization and skills
         run: node scripts/test-auth-mysql.cjs
         working-directory: collector

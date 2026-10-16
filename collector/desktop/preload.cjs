@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('worker', {
   activity: task => invoke('worker:activity', task),
   taskFolder: task => invoke('worker:task-folder', task),
   pair: input => invoke('worker:pair', input),
+  trial: action => invoke('worker:trial', action),
   skillConfig: agent => invoke('worker:skill-config', agent),
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([

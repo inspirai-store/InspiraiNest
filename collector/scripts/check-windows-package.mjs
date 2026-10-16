@@ -14,6 +14,7 @@ const manifest=yaml.load(fs.readFileSync(path.join(dist,'latest.yml'),'utf8'));
 assert.equal(manifest.version,version);const item=manifest.files.find(item=>item.url===name);assert.ok(item);assert.equal(item.size,bytes.length);assert.equal(item.sha512,sha(bytes,'sha512'));
 assert.ok(fs.statSync(file+'.blockmap').size>0);
 const app=path.join(dist,'win-unpacked/resources/app');assert.equal(JSON.parse(fs.readFileSync(path.join(app,'package.json'))).version,version);
+for(const source of ['desktop/trial-login.mjs','src/codex-trial-worker.mjs','src/codex-trial.mjs'])assert.deepEqual(fs.readFileSync(path.join(app,source)),fs.readFileSync(path.join(root,source)),source+' must match the reviewed source');
 const executable=fs.readFileSync(path.join(dist,'win-unpacked/InspiraiNest.exe'));assert.equal(executable.readUInt16LE(executable.readUInt32LE(0x3c)+4),0x8664,'x64 PE executable');
 const feed=yaml.load(fs.readFileSync(path.join(dist,'win-unpacked/resources/app-update.yml'),'utf8'));assert.equal(feed.provider,'github');assert.equal(feed.owner,'inspirai-store');assert.equal(feed.repo,'InspiraiNest');
 const config=yaml.load(fs.readFileSync(path.join(root,'electron-builder.yml'),'utf8'));assert.equal(config.appId,'store.inspirai.library.worker');assert.equal(config.nsis.perMachine,false);assert.equal(config.nsis.deleteAppDataOnUninstall,false);
