@@ -2,6 +2,7 @@ import {createWriting as createSelectionWriting} from './selection-writing.mjs';
 import http from 'node:http';
 import { createRecords } from './records.mjs';
 import { createWriting } from './writing.mjs';
+import { writingProgress } from './writing-progress.mjs';
 import { resolveInputAttachments, inputReferences } from './input-attachments.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -680,7 +681,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
         requireValue(input.writingProtocol === undefined || input.writingProtocol === 1, 'Invalid writing protocol');
-        requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 2 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>s.version)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
+        requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 3 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>`${s.version}:${s.hash}`)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
         requireValue(input.selectionWritingProtocol === undefined || input.selectionWritingProtocol === 1, 'Invalid selection writing protocol');
         requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
@@ -824,6 +825,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           requireValue(active.includes(live.state), 'Task is not running', 409);
           const executionSkills = (live.selectedSkills || []).filter(s=>s.agent === (input.agent || live.agent));
           const updated = { ...live, agent: input.agent || live.agent || null, executionSkills };
+          if(input.writingProgress!==undefined){requireValue(live.writingSessionId,'Not a writing task');updated.writingProgress=writingProgress(input.writingProgress,live.writingProgress);}
           if(live.purpose==='selection-writing'&&input.state==='failed')return saveTask(updated,'failed',message,tx);
           if (input.state === 'failed' || input.state === 'waiting_action' && nodeFailureCodes.has(input.failureCode)) {
             await saveTask(updated, input.state, message, tx);

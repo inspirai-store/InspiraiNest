@@ -57,6 +57,7 @@ files:
   - src/**
   - skills/writing-workshop/**
   - skills/writing-workshop-v1/**
+  - skills/writing-workshop-v2-025/**
   - worker.production.example.json
   - node_modules/**
 extraResources:

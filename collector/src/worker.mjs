@@ -2,7 +2,7 @@ import {processWriting} from './selection-writing-worker.mjs';
 import fs from 'node:fs';
 import { prepareRecordInput, recordPrompt, preserveRecordOriginal } from './record-input.mjs';
 import { processWritingTask } from './writing-worker.mjs';
-import { writingCapabilities } from './writing-protocol.mjs';
+import { writingCapabilities,fastWritingRound } from './writing-protocol.mjs';
 import { prepareTaskInput, taskInputPrompt, verifyInputCoverage } from './task-input.mjs';
 import path from 'node:path';
 import os from 'node:os';
@@ -49,13 +49,13 @@ export async function api(config, route, method = 'GET', value, assignmentId) {
   return data;
 }
 
-export function prepareWorkspace(task, dataDir) {
+export function prepareWorkspace(task, dataDir, {planning=false}={}) {
   const workspace = path.join(dataDir, 'tasks', task.id, 'library');
   fs.mkdirSync(workspace, { recursive: true });
   // Keep UMD .js helpers CommonJS even beneath the collector's ESM package.
   const packageFile = path.join(workspace, 'package.json');
   if (!fs.existsSync(packageFile)) atomicJson(packageFile, { private: true, type: 'commonjs' });
-  for (const file of ['AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs', 'scripts/write-collection-json.mjs', 'assets/library-time.js', 'templates/source.template.json', 'templates/summary.md', 'templates/scenario.md']) {
+  for (const file of planning?[]:['AGENTS.md', 'README.md', 'scripts/catalog.mjs', 'scripts/browser-data.mjs', 'scripts/write-collection-json.mjs', 'assets/library-time.js', 'templates/source.template.json', 'templates/summary.md', 'templates/scenario.md']) {
     const target = path.join(workspace, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(path.join(library, file), target);
@@ -89,7 +89,7 @@ export function taskPrompt(task, localInstructions = '') {
 export async function processTask(config, task, available, signal, onProgress = () => {}) {
   if(task.purpose==='selection-writing')return processWriting({...config,dataDir:config.dataDir||path.join(project,'worker-data')},task,available,signal,onProgress,api);
   const dataDir = path.resolve(config.dataDir || path.join(project, 'worker-data'));
-  const workspace = prepareWorkspace(task, dataDir);
+  const workspace = prepareWorkspace(task, dataDir,{planning:Boolean(task.writingSessionId)&&fastWritingRound(task)});
   if(task.writingSessionId)return processWritingTask({config,task,available,signal,onProgress,workspace,api});
   await prepareRecordInput(config,task,workspace,signal);
   await prepareTaskInput(config,task,workspace,signal);

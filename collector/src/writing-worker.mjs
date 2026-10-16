@@ -4,14 +4,15 @@ import { atomicJson,readJson,hash,requireValue,safePath,contained,remoteURL } fr
 import { agentOrder,runAgent,unavailableBeforeWork,execute } from './agents.mjs';
 import { packageEntry } from './archive.mjs';
 import { validatePublicationImages } from './writing-images.mjs';
-import { skillForVersion,writingPrompt,validateRound,validateWritingCoverage } from './writing-protocol.mjs';
+import { skillForSnapshot,fastWritingRound,writingPrompt,validateRound,validateWritingCoverage } from './writing-protocol.mjs';
 
-export async function prepareWritingInput(config,task,workspace,signal) {
-  const skill=skillForVersion(task.writingSnapshot.protocolVersion||task.writingSnapshot.skill.version||1);requireValue(skill.hash===task.writingSnapshot.skill.hash,'请升级 Worker：写作技能版本与本次任务不一致');
+export async function prepareWritingInput(config,task,workspace,signal,prepared=()=>{}) {
+  const skill=skillForSnapshot(task.writingSnapshot);
   for(const file of skill.files){const target=path.join(workspace,'.agents','skills','writing-workshop',file.path);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.text,'utf8');}
   fs.writeFileSync(path.join(workspace,'AGENTS.md'),'# 本任务为问答驱动的写作\n以冻结的 writing-input.json、固定 writing-workshop 技能及本轮要求为准。round 仅策划提问，不进行采集归档。原始材料只读，正文、引用与过程分别保存；绝不自动发表。不得读取本任务之外的私有文件或凭据。\n','utf8');
   const input=structuredClone(task.writingSnapshot);input.mode=task.writingMode;input.taskId=task.id;
   const root=path.join(workspace,'.writing-input');fs.mkdirSync(root,{recursive:true});
+  let preparedFiles=0;
   for(const source of input.sources){
     source.localTextPath=`.writing-input/${source.id}.txt`;fs.writeFileSync(path.join(workspace,source.localTextPath),source.text,'utf8');
     for(const file of source.files){
@@ -21,23 +22,46 @@ export async function prepareWritingInput(config,task,workspace,signal) {
         requireValue(response.ok,`读取写作材料失败（HTTP ${response.status}）`);const bytes=Buffer.from(await response.arrayBuffer());requireValue(bytes.length===file.bytes&&hash(bytes)===file.sha256,'写作材料完整性校验失败');fs.writeFileSync(target+'.tmp',bytes,{mode:0o600});fs.renameSync(target+'.tmp',target);
       }
       delete file.storageKey;delete file.archiveKey;delete file.archivePath;
+      prepared(++preparedFiles);
     }
   }
   atomicJson(path.join(workspace,'writing-input.json'),input);return input;
 }
 export async function processWritingTask({config,task,available,signal,onProgress,workspace,api}) {
-  await prepareWritingInput(config,task,workspace,signal);
+  let toolCount=0,preparedFiles=0,phase='preparing',chosen=task.agent;
+  const sourceCount=task.writingSnapshot.sources.length,fileCount=task.writingSnapshot.sources.reduce((n,s)=>n+s.files.length,0);
+  let pending=Promise.resolve(),lastActivityReport=0,progressError;
+  const progress=(state,message,agent=chosen)=>{
+    const writingProgress={phase,sourceCount,fileCount,preparedFiles,toolCount};onProgress({state,message,agent});
+    const next=pending.then(()=>api(config,`/api/tasks/${task.id}/progress`,'POST',{state,message,agent,writingProgress},task.assignmentId));
+    pending=next.catch(error=>{progressError=error;});return next;
+  };
+  await progress('running','正在准备本轮材料');
+  const input=await prepareWritingInput(config,task,workspace,signal,count=>{preparedFiles=count;});
   const checkpoint=path.join(workspace,'writing-result.json');
-  const progress=async(state,message,agent)=>{onProgress({state,message,agent});await api(config,`/api/tasks/${task.id}/progress`,'POST',{state,message,agent},task.assignmentId);};
   if(fs.existsSync(checkpoint)&&readJson(checkpoint).kind==='blocked')fs.renameSync(checkpoint,checkpoint+'.'+Date.now());
-  let chosen=task.agent;
   if(!fs.existsSync(checkpoint))for(const name of agentOrder(config,task,available)){
-    chosen=name;await progress('running',task.writingMode==='round'?'正在理解材料与准备问题':'正在按确认的写作约定成文',name);
-    const result=await runAgent(name,config.agents||{},{cwd:workspace,prompt:writingPrompt(task),signal,timeoutMs:config.taskTimeoutMs||3600000});
+    chosen=name;phase='organizing';await progress('running',task.writingMode==='round'?'正在组织本轮方向与问题':'正在按确认的写作约定成文',name);
+    const fast=fastWritingRound(task);
+    const result=await runAgent(name,config.agents||{},{cwd:workspace,prompt:writingPrompt(task,input),signal,timeoutMs:config.taskTimeoutMs||3600000,
+      ...(fast?{reasoningEffort:config.writingRoundReasoningEffort||'low'}:{}),onEvent:event=>{
+        if(event.type==='tool_completed')toolCount++;
+        if(Date.now()-lastActivityReport<1500)return;lastActivityReport=Date.now();
+        void progress('running',toolCount?`已完成 ${toolCount} 次工具操作，正在组织本轮结果`:'AI 已启动，正在组织本轮结果',name).catch(()=>{});
+      }});
+    await pending;
     if(result.aborted)return;
     if(unavailableBeforeWork(result))continue;
-    if(result.code!==0||result.timedOut||result.permissionBlocked){await progress('waiting_action',result.permissionBlocked?'写作工具需要本机授权':result.timedOut?'本轮处理超时，材料与已有结果保留':'本轮处理失败，材料与已有结果保留',name);return;}break;
+    if(result.code!==0||result.timedOut||result.permissionBlocked){await progress('waiting_action',result.permissionBlocked?'写作工具需要本机授权':result.timedOut?'本轮处理超时，材料与已有结果保留':'本轮处理失败，材料与已有结果保留',name);return;}
+    if(fast&&!fs.existsSync(checkpoint)&&result.finalMessage){
+      const text=result.finalMessage.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,'$1');
+      let output;try{output=JSON.parse(text);}catch{throw Error('AI 未返回有效的讨论结果，已有材料保留，可重试这一轮');}
+      requireValue(output?.kind==='round'||output?.kind==='blocked','问答轮次不能生成正文');atomicJson(checkpoint,output);
+    }
+    break;
   }
+  if(progressError&&signal?.aborted)return;
+  phase='validating';await progress('running','本轮结果已返回，正在校验');
   requireValue(fs.existsSync(checkpoint),'写作工具未生成轮次结果，已有材料保留');const result=readJson(checkpoint);
   if(result.kind==='blocked'){await progress('waiting_action',String(result.message||'材料尚未完整读取').slice(0,1000),chosen);return;}
   requireValue(task.writingMode==='round'?result.kind==='round':result.kind==='draft'||task.writingMode==='revision'&&result.kind==='round'&&result.ready===false,'写作结果类型与本轮模式不符');
@@ -58,7 +82,7 @@ export async function processWritingTask({config,task,available,signal,onProgres
       payload={kind:'draft',bundle,coverage:result.coverage};
     }
   }catch(error){fs.renameSync(checkpoint,checkpoint+'.invalid.'+Date.now());throw error;}
-  await progress('uploading',result.kind==='round'?'正在保存问题与写作上下文':'正在保存稿件与图文素材',chosen);
+  phase='saving';await progress('uploading',result.kind==='round'?'正在保存问题与写作上下文':'正在保存稿件与图文素材',chosen);
   await api(config,`/api/writing/tasks/${task.id}/result`,'POST',{...payload,skillHash:task.writingSnapshot.skill.hash},task.assignmentId);
   atomicJson(path.join(workspace,'..','uploaded.json'),{writingSessionId:task.writingSessionId,kind:result.kind,digest:hash(JSON.stringify(payload))});
   onProgress({state:result.kind==='round'?'completed':'awaiting_review',message:result.kind==='round'?'本轮已保存，等待作者继续':'稿件已保存，等待作者审阅',agent:chosen});

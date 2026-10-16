@@ -42,7 +42,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     requireValue(bytes.length===file.bytes&&hash(bytes)===file.sha256,'原件校验失败',500);return bytes;
   }
   async function view(session) {
-    const runs=await Promise.all(session.runs.map(async run=>{const task=await store.get('task',run.taskId);return {...run,state:task?.state||'failed',draftId:task?.draftId||null,archiveId:task?.archiveId||null,message:task?.events?.at(-1)?.message||''};}));
+    const runs=await Promise.all(session.runs.map(async run=>{const task=await store.get('task',run.taskId),device=task?.deviceId?await store.get('device',task.deviceId):null;return {...run,state:task?.state||'failed',draftId:task?.draftId||null,archiveId:task?.archiveId||null,message:task?.events?.at(-1)?.message||'',progress:task?.writingProgress||null,deviceName:device?.name||null};}));
     const latest=runs.at(-1); let status=session.ready?(session.style?'ready':'awaiting_style'):'awaiting_answers';
     if(latest&&active.includes(latest.state))status='processing';
     else if(latest&&['failed','waiting_action','interrupted'].includes(latest.state))status='blocked';

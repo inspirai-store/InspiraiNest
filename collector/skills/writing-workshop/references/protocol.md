@@ -6,7 +6,7 @@ writing-input.json 包含 sessionId、version、protocolVersion=2、brief、sour
 每份 source 含 id,kind,role,label,text,files，可有 ref,version,document,metadata,omitted；localTextPath 与 files[].localPath 是本机只读副本。document 的媒体编号对应 attachmentId，授权读取及 coverage 使用 files[].id。区分正文、摘要、加工说明，保留原有缺失及核验边界。无法读取指定的关键材料输出 {schemaVersion:2,kind:"blocked",message:"实际缺失及已尝试办法"}，不能伪造已读。
 context 默认 {audience:"技术实践者",language:"zh-CN",outputs:["illustrated-article","offline-html","markdown","assets"]}，后续明确调整优先。
 
-旧请求与任务沿用协议 v1，新 Worker 同时支持冻结的 writing-workshop-v1 与当前 v2，不能用新规则替换旧快照。心跳 writingProtocol:1，另报 writingSkills:[{version:1,hash:旧版哈希},{version:2,hash:新版哈希}]，按版本与哈希匹配派发。
+旧请求与任务沿用协议 v1，新 Worker 支持冻结的 writing-workshop-v1、0.2.5 的 v2 及当前 v2，不能用新规则替换旧快照。心跳 writingProtocol:1，writingSkills 按版本与哈希的组合分别上报三个能力，按精确组合匹配派发。
 
 ## round
 
@@ -24,6 +24,8 @@ context 默认 {audience:"技术实践者",language:"zh-CN",outputs:["illustrate
 - styleCandidate：可选 {name,appliesTo,rules:[{id,instruction,sourceId,example}],sample:""}，仅从指定范文正文提炼规则与定位例证，候选仍需确认。问答不试写。
 
 自由回答及暂不确定由客户端提供，不重复写成选项。只组织方向与提纲，不输出文章段落，不将 ready 当作开始授权。复用已回答决定的 key 时必须有新条件影响、allowReopen=true，并以 reopenReason 说明原因；不能换 key 重问同一内容。
+界面文本与执行记录分开：understanding、changeSummary、suggestedTitle、directions、questions、workingPlan 和 plan 的文字只描述文章与写作取舍，不写本协议字段名、内部路径、阅读清单、状态英文、技能版本或哈希。coverage、decisions 的键与其他结构字段仍按协议填写。理解和变化各一两句，材料安排最多三项，只说明实际材料的用途；无需材料时说明采用通用情境即可。
+调用方已在提示内给出完整规则和输入时不重复读文件。调用方要求直接返回 JSON 时，最终回复为单个结果对象，Worker 原子保存文件；否则仍按文件方式保存。两种方式使用相同校验、历史和开始写作门槛。
 
 ## 轮次接口
 
