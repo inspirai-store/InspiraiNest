@@ -23,7 +23,7 @@ import QRCode from 'qrcode';
 import { createSkillHubClient } from './skillhub.mjs';
 import { createSkillMarketService } from './skill-market-service.mjs';
 import { createAgentService } from './agent-service.mjs';
-import { canRunTask, nodeFailureCodes, releaseTask } from './task-routing.mjs';
+import { canRunTask, supportsWritingTask, nodeFailureCodes, releaseTask } from './task-routing.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from './common.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -676,13 +676,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
         requireValue(input.writingProtocol === undefined || input.writingProtocol === 1, 'Invalid writing protocol');
+        requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 2 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>s.version)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
         requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
         const agentRuntime = input.agentRuntime;
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { writingProtocol:input.writingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
@@ -728,7 +729,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await recoverUnavailableTasks();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && supportsWritingTask(t, device) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -740,7 +741,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && supportsWritingTask(t, device) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
               const selected = await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
@@ -752,7 +753,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('client-update')).some(o=>o.deviceId===device.id && updateBlocksTasks(o))) return null;
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
-                if (pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
+                if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
                 return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });

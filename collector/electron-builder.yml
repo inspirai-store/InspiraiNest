@@ -55,6 +55,7 @@ files:
   - public/skill-market.css
   - src/**
   - skills/writing-workshop/**
+  - skills/writing-workshop-v1/**
   - worker.production.example.json
   - node_modules/**
 extraResources:

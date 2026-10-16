@@ -3,10 +3,11 @@ import path from 'node:path';
 import { atomicJson,readJson,hash,requireValue,safePath,contained,remoteURL } from './common.mjs';
 import { agentOrder,runAgent,unavailableBeforeWork,execute } from './agents.mjs';
 import { packageEntry } from './archive.mjs';
-import { writingSkill,writingPrompt,validateRound,validateWritingCoverage } from './writing-protocol.mjs';
+import { validatePublicationImages } from './writing-images.mjs';
+import { skillForVersion,writingPrompt,validateRound,validateWritingCoverage } from './writing-protocol.mjs';
 
 export async function prepareWritingInput(config,task,workspace,signal) {
-  const skill=writingSkill();requireValue(skill.hash===task.writingSnapshot.skill.hash,'请升级 Worker：写作技能版本与本次任务不一致');
+  const skill=skillForVersion(task.writingSnapshot.protocolVersion||task.writingSnapshot.skill.version||1);requireValue(skill.hash===task.writingSnapshot.skill.hash,'请升级 Worker：写作技能版本与本次任务不一致');
   for(const file of skill.files){const target=path.join(workspace,'.agents','skills','writing-workshop',file.path);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.text,'utf8');}
   fs.writeFileSync(path.join(workspace,'AGENTS.md'),'# 本任务为问答驱动的写作\n以冻结的 writing-input.json、固定 writing-workshop 技能及本轮要求为准。round 仅策划提问，不进行采集归档。原始材料只读，正文、引用与过程分别保存；绝不自动发表。不得读取本任务之外的私有文件或凭据。\n','utf8');
   const input=structuredClone(task.writingSnapshot);input.mode=task.writingMode;input.taskId=task.id;
@@ -48,12 +49,13 @@ export async function processWritingTask({config,task,available,signal,onProgres
       const metaPath=path.join(entryRoot,'source.json');requireValue(fs.lstatSync(metaPath).isFile()&&!fs.lstatSync(metaPath).isSymbolicLink(),'稿件元信息必须为普通文件');
       const meta=readJson(metaPath);const name='writing-provenance.txt';
       const provenance=path.join(entryRoot,name);if(fs.existsSync(provenance))requireValue(fs.lstatSync(provenance).isFile()&&!fs.lstatSync(provenance).isSymbolicLink(),'写作依据必须为普通文件');
-      fs.writeFileSync(path.join(entryRoot,name),JSON.stringify({sessionId:task.writingSessionId,taskId:task.id,planVersion:task.writingSnapshot.planVersion,styleVersion:task.writingSnapshot.styleVersion,skillHash:task.writingSnapshot.skill.hash,plan:task.writingSnapshot.plan,style:task.writingSnapshot.style,sources:task.writingSnapshot.sources.map(({files,...s})=>({...s,files:files.map(({storageKey,archiveKey,...f})=>f)}))},null,2),'utf8');
+      fs.writeFileSync(path.join(entryRoot,name),JSON.stringify({sessionId:task.writingSessionId,taskId:task.id,brief:task.writingSnapshot.brief||'',turns:task.writingSnapshot.turns||[],planVersion:task.writingSnapshot.planVersion,styleVersion:task.writingSnapshot.styleVersion,skillHash:task.writingSnapshot.skill.hash,plan:task.writingSnapshot.plan,style:task.writingSnapshot.style,sources:task.writingSnapshot.sources.map(({files,...s})=>({...s,files:files.map(({storageKey,archiveKey,...f})=>f)}))},null,2),'utf8');
       meta.files=meta.files.filter(f=>f.path!==name);meta.files.push({path:name,role:'source'});meta.collected_at=task.writingSnapshot.createdAt;
       const attribution=`写作会话 ${task.writingSessionId}；原始材料及范文保留在会话中，媒体原件同时保留于本机 .writing-input。计划 v${task.writingSnapshot.planVersion}，行文档案 ${task.writingSnapshot.styleVersion}。`;
       requireValue(typeof meta.coverage_note==='string','缺少材料覆盖说明');if(!meta.coverage_note.includes(attribution))meta.coverage_note+='\n'+attribution;atomicJson(metaPath,meta);
       for(const command of ['build','check']){const check=await execute(process.execPath,['scripts/catalog.mjs',command],{cwd:workspace,signal});requireValue(check.code===0,`稿件资料目录 ${command} 校验失败，请检查 source.json 与文件清单`);}
-      payload={kind:'draft',bundle:packageEntry(entryRoot),coverage:result.coverage};
+      const bundle=packageEntry(entryRoot);if(task.writingSnapshot.protocolVersion===2)validatePublicationImages(bundle);
+      payload={kind:'draft',bundle,coverage:result.coverage};
     }
   }catch(error){fs.renameSync(checkpoint,checkpoint+'.invalid.'+Date.now());throw error;}
   await progress('uploading',result.kind==='round'?'正在保存问题与写作上下文':'正在保存稿件与图文素材',chosen);

@@ -2,12 +2,20 @@ import { workerAuthorized } from './device-metadata.mjs';
 
 export const nodeFailureCodes = new Set(['AGENT_START', 'AGENT_PERMISSION', 'AGENT_TIMEOUT', 'AGENT_EXIT', 'AGENT_MODEL', 'AGENT_LOGIN', 'AGENT_RESULT', 'AGENT_ENVIRONMENT']);
 
+export function supportsWritingTask(task, device) {
+  if (!task.writingSessionId) return true;
+  const skill = task.writingSnapshot?.skill;
+  const version = task.writingSnapshot?.protocolVersion || skill?.version || 1;
+  if (Array.isArray(device.writingSkills)) return device.writingSkills.some(s => s.version === version && s.hash === skill?.hash);
+  return version === 1 && device.writingProtocol === 1;
+}
+
 // A specified computer is preferred on the first attempt. Once it cannot finish,
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
   return workerAuthorized(device) && Boolean(device.agents?.length)
     && (!task.recordId || device.recordProtocol === 1)
-    && (!task.writingSessionId || device.writingProtocol === 1)
+    && supportsWritingTask(task, device)
     && (!task.inputAttachments?.length || device.inputAttachmentProtocol === 1)
     && (task.type === 'auto' ? Boolean(device.capabilities?.length) : device.capabilities?.includes(task.type))
     && (!task.preferredAgent || device.agents.includes(task.preferredAgent))

@@ -9,7 +9,7 @@ export function validateCaptureRequest(input) {
     || method === 'PUT' && (/^\/api\/records\/[a-zA-Z0-9-]+$/.test(route) || /^\/api\/records\/media\/[a-f0-9]{64}$/.test(route))
     || method === 'POST' && (/^\/api\/records\/[a-zA-Z0-9-]+\/process$/.test(route) || /^\/api\/tasks\/[a-zA-Z0-9-]+\/(approve|retry|cancel)$/.test(route));
   const writingGet=method==='GET'&&(/^\/api\/writing\/(sessions|styles|entries)$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}(?:\/drafts\/[a-f0-9-]{36}(?:\/files\/[a-f0-9]{64})?|\/files\/[a-f0-9-]{36}|\/history)?$/.test(route));
-  const writingPost=method==='POST'&&(/^\/api\/writing\/sessions$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}\/(answers|materials|discuss|start|style|revise)$/.test(route));
+  const writingPost=method==='POST'&&(/^\/api\/writing\/sessions$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}\/(answers|turns|materials|discuss|start|style|revise)$/.test(route));
   requireValue(allowed||writingGet||writingPost,'Capture route not allowed',403);
   if (input.bytes !== undefined) requireValue(typeof input.bytes === 'string' && input.bytes.length <= 44739244 && method === 'PUT' && route.includes('/media/'),'Invalid media body');
   return input;

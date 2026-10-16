@@ -9,3 +9,16 @@ test('account change fences in-flight reads and attachment corruption is rejecte
 test('offline export escapes titles, blocks path traversal and preserves UTF-8 file names',()=>{assert.match(articleHTML('<script>','<p>body</p>','ref'),/&lt;script&gt;/);for(const name of ['../secret','C:/secret','\\secret','safe/../secret'])assert.throws(()=>zipFiles([{name,bytes:new Uint8Array()}]));assert.throws(()=>zipFiles([{name:'same.md',bytes:new Uint8Array()},{name:'SAME.md',bytes:new Uint8Array()}]));assert.ok(zipFiles([{name:'图片/流程.png',bytes:new Uint8Array([1,2])}]).length>100);});
 
 test('switching accounts between journaling and dispatch cannot send the old material to the new space',async()=>{let reads=0,sent=0;const disk=storage(),bridge={status:async()=>++reads===1?connection:{...connection,server:'https://other.invalid'},capture:async()=>{sent++;return {status:200,json:{id:'wrong'}};}};await assert.rejects(new WritingClient(bridge,disk).mutate('/api/writing/sessions',{sources:['private original']}),/切换/);assert.equal(sent,0);assert.ok(disk.getItem('writing:pending:'+connection.server+':'+connection.deviceId+':/api/writing/sessions'));});
+
+import {answerFor,emptyTurn,legacyTurn,turnInput} from '../src/writing/turn.ts';
+test('recommended choices are never submitted implicitly, and a free correction preserves partial answers',()=>{
+ const questions=[{id:'q1',recommendedOptionId:'recommended'},{id:'q2'}],draft=emptyTurn();
+ assert.deepEqual(turnInput(questions,draft,'r').answers,[]);assert.deepEqual(answerFor(draft,'q1').selected,[]);
+ draft.answers=[{questionId:'q1',selected:['my-choice'],text:'自己的补充',uncertain:false}];draft.message='调整主旨';draft.index=1;
+ const restored=JSON.parse(JSON.stringify(draft));assert.deepEqual(turnInput(questions,restored,'r'),{roundId:'r',answers:draft.answers,message:'调整主旨'});assert.equal(restored.index,1);
+});
+
+test('old local questionnaire input migrates without becoming an automatic submission',()=>{
+ const disk=storage(),answers=[{questionId:'old-q',selected:['kept'],text:'保留原话',uncertain:false}];disk.setItem('scope:answers:r',JSON.stringify(answers));disk.setItem('scope:message',JSON.stringify('原来的补充'));
+ const draft=legacyTurn(disk,'scope','r');assert.deepEqual(draft.answers,answers);assert.equal(draft.message,'原来的补充');assert.ok(disk.getItem('scope:answers:r'));disk.setItem('scope:message','broken JSON');assert.deepEqual(legacyTurn(disk,'scope','r'),emptyTurn());
+});

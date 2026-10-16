@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { prepareRecordInput, recordPrompt, preserveRecordOriginal } from './record-input.mjs';
 import { processWritingTask } from './writing-worker.mjs';
+import { writingCapabilities } from './writing-protocol.mjs';
 import { prepareTaskInput, taskInputPrompt, verifyInputCoverage } from './task-input.mjs';
 import path from 'node:path';
 import os from 'node:os';
@@ -258,7 +259,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, writingProtocol:1, inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, writingProtocol:1, writingSkills:writingCapabilities(), inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
       wakeUpdater(result.clientUpdates);
       clientUpdateBarrier=Array.isArray(result.clientUpdates) && result.clientUpdates.some(o=>['waiting_worker','installing'].includes(o.state));
       control.update({ workerVersion:runningClient().version });
