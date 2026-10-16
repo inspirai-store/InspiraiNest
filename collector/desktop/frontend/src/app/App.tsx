@@ -1,3 +1,4 @@
+import {WritingProvider} from '../selection-writing/WritingProvider';
 import {InteractionProvider} from '../interactions/InteractionProvider';
 import {StatusPanel} from '../status/StatusPanel';
 import {WritingPage} from '../writing/WritingPage';
@@ -112,7 +113,7 @@ function SessionRoutes({children}:{children:import('react').ReactNode}) {const l
 export function App() {
   const updateNavigate=useNavigate(),updateLocation=useLocation(),updateSearch=useRef(updateLocation.search);updateSearch.current=updateLocation.search;
   useEffect(()=>updateBridge()?.onOpen?.(()=>updateNavigate('/settings/updates'+updateSearch.current,{state:{settingsFocus:'content',updateCheckRequest:Date.now()}})),[updateNavigate]);
-  return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><InteractionProvider><Routes>
+  return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><WritingProvider><InteractionProvider><Routes>
     <Route path="/status" element={<StatusPanel/>} />
     <Route path="/settings" element={<SettingsPage/>} />
     <Route path="/settings/general" element={<SettingsPage/>} />
@@ -141,5 +142,5 @@ export function App() {
     <Route path="/library/demo" element={<LibraryRoute view="detail" />} />
     <Route path="/library/:id" element={<LibraryRoute view="detail" />} />
     <Route path="*" element={<Navigate to="/records/new" replace />} />
-  </Routes></InteractionProvider></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
+  </Routes></InteractionProvider></WritingProvider></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
 }

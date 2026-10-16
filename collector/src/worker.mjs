@@ -1,3 +1,4 @@
+import {processWriting} from './selection-writing-worker.mjs';
 import fs from 'node:fs';
 import { prepareRecordInput, recordPrompt, preserveRecordOriginal } from './record-input.mjs';
 import { processWritingTask } from './writing-worker.mjs';
@@ -85,6 +86,7 @@ export function taskPrompt(task, localInstructions = '') {
 }
 
 export async function processTask(config, task, available, signal, onProgress = () => {}) {
+  if(task.purpose==='selection-writing')return processWriting({...config,dataDir:config.dataDir||path.join(project,'worker-data')},task,available,signal,onProgress,api);
   const dataDir = path.resolve(config.dataDir || path.join(project, 'worker-data'));
   const workspace = prepareWorkspace(task, dataDir);
   if(task.writingSessionId)return processWritingTask({config,task,available,signal,onProgress,workspace,api});
@@ -258,7 +260,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
     lastHeartbeatAttempt = Date.now();
     try {
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, writingProtocol:1, inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, writingProtocol:1, selectionWritingProtocol:1, inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
       wakeUpdater(result.clientUpdates);
       clientUpdateBarrier=Array.isArray(result.clientUpdates) && result.clientUpdates.some(o=>['waiting_worker','installing'].includes(o.state));
       control.update({ workerVersion:runningClient().version });

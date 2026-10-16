@@ -1,3 +1,5 @@
+import {useWriting} from '../selection-writing/WritingProvider';
+import {aiCommand} from '../interactions/commands';
 import {useCommandSurface,useInteractions} from '../interactions/InteractionProvider';
 import {domSelection,selectedPoint} from '../interactions/selection';
 import {readingCommands,linkCommands} from '../interactions/reader';
@@ -40,14 +42,14 @@ function ArchiveImage({file,alt,entryId}:{file:LibraryFile;alt:string;entryId:st
   return source?<img data-archive-file={file.path} className={markdownStyles.image} src={source} alt={alt}/>:<span>{alt}</span>;
 }
 export const LibraryMarkdown=memo(function LibraryMarkdown({content,entry,document=''}:{content:string;entry?:LibraryEntry;document?:string}){
-  const root=useRef<HTMLElement>(null),interactions=useInteractions();
+  const root=useRef<HTMLElement>(null),interactions=useInteractions(),writing=useWriting();
   const library=useOptionalLibrarySession(),client=library?.client,session=library?.session??0;
   const [preview,setPreview]=useState<{file:LibraryFile;invoker:HTMLElement}|null>(null),[error,setError]=useState('');
   useEffect(()=>{setPreview(null);setError('');},[session,entry?.id,entry?.archive_id,document]);
   const load=useCallback(async(attachment:Attachment)=>{if(!entry||!client)throw Error('资料已切换');const value=await client.preview(entry.id,attachment.id);return (await fetch(value.dataUrl)).blob();},[client,entry?.id]);
   const download=async(file:LibraryFile)=>{try{if(!entry||!window.library?.download)throw Error('下载接口不可用');await window.library.download({id:entry.id,file:file.path});}catch(e){setError(errorMessage(e));}};
 
-  const selection=()=>root.current?domSelection(root.current,(text)=>readingCommands(text,value=>interactions!.quote(value,entry?.title,entry?.canonical_url||entry?.source_url||undefined))):null;
+  const selection=()=>root.current?domSelection(root.current,(text)=>{const range=window.getSelection()?.getRangeAt(0);const media=range?.cloneContents().querySelector('img,video,audio,[data-archive-file]');const fullText=root.current?.innerText??'',token=writing?.token()??-1;return readingCommands(text,value=>interactions!.quote(value,entry?.title,entry?.canonical_url||entry?.source_url||undefined),writing&&entry&&!media?{...aiCommand,disabled:false,run:()=>writing.open({source:{kind:'library',id:entry.id,title:entry.title,url:entry.canonical_url||entry.source_url||undefined},text,fullText},token)}:aiCommand);}):null;
   const fileCommands=(file:LibraryFile,target:HTMLElement):Command[]=>[{id:'attachment.preview',label:'预览',disabled:!canPreviewFile(file.path),run:()=>setPreview({file,invoker:target})},{id:'attachment.download',label:'下载',run:()=>download(file)},{id:'attachment.copyName',label:'复制名称',run:()=>navigator.clipboard.writeText(file.path.split('/').at(-1)!)}];
   useCommandSurface(root,{body:()=>root.current,selection,commands:(target,point)=>{if(point){const selection=window.getSelection();if(selection?.rangeCount&&!selectedPoint(selection.getRangeAt(0).getClientRects(),point))selection.removeAllRanges();}const attachment=target.closest<HTMLElement>('[data-archive-file]'),file=entry?.files.find(f=>f.path===attachment?.dataset.archiveFile);if(file)return fileCommands(file,attachment!);const link=target.closest<HTMLAnchorElement>('a[href]');if(link&&/^https?:/.test(link.href))return linkCommands(link.href);return selection()?.commands??[];}});
   const components=useMemo<Components>(()=> ({
