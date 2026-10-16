@@ -6,6 +6,7 @@ import os from 'node:os';
 import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile} from '../src/codex-local-agent.mjs';
 import {runAgent} from '../src/agents.mjs';
 import {trialEnvironment} from '../src/codex-trial.mjs';
+import {probeTrialEnvironment,trialRoot} from '../src/codex-trial-worker.mjs';
 
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'codex-local-agent-'));process.env.CODEX_HOME=home;
 const config={agents:{codex:{command:'custom-codex',args:['exec','--json','-m','configured-model','-c','model_provider="private"','-']}}};
@@ -40,4 +41,9 @@ test('task plugin profile retains configured profile and cleans only its own fil
 test('heartbeat mode is optional and rejects unknown modes',()=>{
  assert.deepEqual(trialEnvironment({protocol:1,login:'ready',projects:[]}),{protocol:1,login:'ready',projects:[]});
  assert.equal(trialEnvironment({protocol:1,login:'ready',executionMode:'local-agent',projects:[]}).executionMode,'local-agent');assert.throws(()=>trialEnvironment({protocol:1,login:'ready',executionMode:'remote',projects:[]}));
+});
+test('an explicit retry probes keyring-backed Agent again without letting heartbeats retry failed model calls',async()=>{
+ const config={dataDir:fs.mkdtempSync(path.join(os.tmpdir(),'keyring-retry-')),server:'https://example.com',deviceId:'pc'},file=path.join(trialRoot(config),'authorization-failure.json');fs.mkdirSync(path.dirname(file),{recursive:true});rememberAuthFailure(localAgentContext(config),file);
+ const run=async(c,args)=>({code:0,tail:args[0]==='--version'?'codex-cli 0.148.0':'Logged in using ChatGPT'});
+ assert.equal((await probeTrialEnvironment(config,{run})).login,'required');assert.equal((await probeTrialEnvironment(config,{run,ignoreFailure:true})).login,'ready');assert.equal((await probeTrialEnvironment(config,{run})).login,'required');
 });

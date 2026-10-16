@@ -14,8 +14,8 @@ export function trialProjects(config) {
 export function trialEnv(config) {
   return agentExecution('codex',config.agents || {}).env;
 }
-export async function probeTrialEnvironment(config,{run=execute}={}) {
-  return {protocol:1,...await probeLocalAgent(config,{run,failureFile:path.join(trialRoot(config),'authorization-failure.json')}),projects:trialProjects(config).map(({path,...p})=>p)};
+export async function probeTrialEnvironment(config,{run=execute,ignoreFailure=false}={}) {
+  return {protocol:1,...await probeLocalAgent(config,{run,failureFile:ignoreFailure?undefined:path.join(trialRoot(config),'authorization-failure.json')}),projects:trialProjects(config).map(({path,...p})=>p)};
 }
 export async function loginTrial(config) {
   const context=localAgentContext(config),{default:spawn}=await import('cross-spawn');
@@ -51,7 +51,9 @@ export async function processCodexTrial(config,task,signal,onProgress,api,{run=e
   const progress=async(state,message,kind)=>{onProgress({state,message,agent:'codex'});return api(config,`/api/tasks/${task.id}/progress`,'POST',{state,message,agent:'codex',actionRequired:kind?{kind}:null},task.assignmentId);};
   const checkpoint=path.join(workspace,'report.json');
   if(fs.existsSync(checkpoint)){const report=readJson(checkpoint);await api(config,`/api/tasks/${task.id}/trial-report`,'POST',report,task.assignmentId);onProgress({state:'completed',message:'实测报告已生成',agent:'codex'});return;}
-  const status=await probeTrialEnvironment(config,{run});
+  // A claimed/manual retry must test the actual Agent again. Keyring changes need not touch auth.json.
+  // Heartbeats retain the failure latch so an unchanged invalid login cannot repeatedly consume model calls.
+  const status=await probeTrialEnvironment(config,{run,ignoreFailure:true});
   if(status.login!=='ready'){await progress('waiting_action',status.login==='required'?'当前 Codex Agent 授权需要处理，请打开电脑的 Agent 管理':status.reason==='disabled'?'请在 Agent 管理中启用 Codex':'Codex 程序或配置不可用，请打开电脑的 Agent 管理',status.login==='required'?'trial_login':'dependency');return;}
   requireValue(task.trial?.target && task.trial.deviceId===config.deviceId,'实测任务与电脑不匹配');
   const context=localAgentContext(config),env=context.env,profile=context.profile;
@@ -132,6 +134,7 @@ export async function processCodexTrial(config,task,signal,onProgress,api,{run=e
     if(result.aborted || signal?.aborted)return;
     const output=knownJson(path.join(project,'trial-result.json'));
     if(result.code!==0){const failure=describeAgentFailure('codex',result);if(failure.code==='AGENT_LOGIN')rememberAuthFailure(context,path.join(root,'authorization-failure.json'));await progress('waiting_action',failure.message,failure.code==='AGENT_LOGIN'?'trial_login':'dependency');return;}
+    const authFailure=path.join(root,'authorization-failure.json');if(fs.existsSync(authFailure))fs.unlinkSync(authFailure);
     if(!output || output.blocked){await progress('waiting_action',String(output?.markdown || 'Codex 未生成报告，请检查当前 Agent 的工具与执行权限').slice(0,800),'dependency');return;}
     const log=fs.readFileSync(logFile,'utf8'),evidence=trialEvidence(log,receipt,output.steps || []);
     const report={protocol:1,agent:{...executedAgentMetadata(context,log),version:status.version},title:target.name+' · Codex 实测',verdict:output.verdict==='failed'?'failed':output.verdict==='passed'&&evidence.every(e=>e.verified)?'passed':'partial',commit,projectCommit:projectCommit || null,markdown:String(output.markdown || '未提供报告正文').slice(0,140000),evidence};
