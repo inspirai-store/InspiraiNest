@@ -2,7 +2,7 @@ import {canonicalJson,hash,id,now,requireValue} from './common.mjs';
 const kinds={record:'capture',writing:'writing-session',task:'task','selection-writing':'task'};
 const terminal=new Set(['completed','cancelled','failed','interrupted']);
 export function createContentTrash({store,serialized,owner,authenticate,body,send,saveTask,refreshLibrary=async()=>{}}){
- const view=(type,row)=>({type,id:row.id,title:row.title||row.writing?.text?.split('\n')[0]||row.text?.split('\n')[0]||row.content?.split?.('\n')[0]||row.writingInput?.text?.split('\n')[0]||'任务',version:row.version??0,trashVersion:row.trashVersion??0,deletedAt:row.deletedAt});
+ const view=(type,row)=>({type,id:row.id,title:row.title||row.writing?.text?.split('\n')[0]||row.text?.trim().split('\n')[0]||row.content?.split?.('\n')[0]||row.writingInput?.text?.split('\n')[0]||'任务',version:row.version??0,trashVersion:row.trashVersion??0,deletedAt:row.deletedAt});
  return {async handle(req,res,route,device){
   if(!route.startsWith('/api/content-trash'))return false;
   owner(device);
