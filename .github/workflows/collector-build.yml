@@ -170,7 +170,7 @@ jobs:
         run: node --experimental-strip-types --test scripts/*.test.mjs
         working-directory: collector/desktop/frontend
       - name: Test Windows skill package and directory contracts
-        run: node --test --test-reporter=tap test/skills.test.mjs
+        run: node --test --test-reporter=tap test/skills.test.mjs test/content-management.test.mjs
         working-directory: collector
       - name: Test Windows native UTF-8 collection and upload recovery
         run: node --test --test-reporter=tap test/worker-encoding.test.mjs
