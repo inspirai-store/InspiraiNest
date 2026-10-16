@@ -1,6 +1,6 @@
 # 写作问答速度与真实进度：0.2.6
 
-桌面 0.2.6；Android 1.3.12 / versionCode 19；iOS 1.0.6 / build 11 继续待签名。服务与客户端发布验证尚在进行。
+桌面 0.2.6；Android 1.3.12 / versionCode 19；iOS 1.0.6 / build 11 继续待签名。服务和正式客户端下载已上线；四个桌面客户端与两台连接的 Android 已原位更新。
 
 ## 行为
 
@@ -18,4 +18,32 @@
 
 ## 发布
 
-待补实际源码、CI、制品摘要、部署与设备安装证据。iOS 不尝试发行签名，不产出可安装 IPA；真机硬件验收范围不因这次问答修改扩大。
+- 实现源码：`85f463d9e9a76dc96048883ff7d66f10f71e1963`。
+- [完整 CI](https://github.com/inspirai-store/InspiraiNest/actions/runs/38881342002)、[macOS 签名与公证](https://github.com/inspirai-store/InspiraiNest/actions/runs/38881438244)、[Windows 制品发布](https://github.com/inspirai-store/InspiraiNest/actions/runs/38882157870) 均成功。
+- [0.2.6 正式发布](https://github.com/inspirai-store/InspiraiNest/releases/tag/v0.2.6) 共 17 个附件，摘要与 CI / 私有 OSS 制品一致。[下载页](https://library.inspirai.store/download) 三种尺寸无溢出、无页面异常。生产端实际下载校验 11 个文件及区间请求通过。
+- 最终服务镜像：`prod-writing-clients-026-20261016-r1@sha256:3006ed332e18d450d676a70a6034f10724d2e4e71edf71e3d2e9c4027b9f8cc6`。服务端 239 个受检文件及既有数据 ID 保留验证通过。
+- 三台 Windows 与一台 macOS 更新操作均成功；Windows 客户端和运行中的 Worker 均为 0.2.6。Mac 实际安装为 0.2.6，保持原来的 Worker 停止模式，因此服务器中旧的 Worker 运行版本是历史上报；安装内的新旧三套写作 Skill 已核实。
+- Windows 首轮检查发生在 GitHub 正式发布前，版本门槛拒绝替换；发布完成并传播后重试成功，失败记录保留，没有绕过制品校验。
+- 本机实际 EXE 为 0.2.6，22 条记录前后内容摘要全部一致，草稿保留；授权文件、Worker 配置及桌面设置摘要不变。
+- Windows 更新未刷新本机卸载列表显示值；核对实际 0.2.6 程序路径、备份对应注册表后，仅修正本机 DisplayName / DisplayVersion。本次没有改动 NSIS 实现。
+- 两台已连接的 Android 从 1.3.11 / 1.3.9 原位升级到 1.3.12（19），没有清除数据；原签名证书通过，发布构建、单元测试及 lint 通过。
+- iOS 1.0.6（11）代码与共享界面资源同步；Release 未签名设备归档成功并保存。模拟器测试卡在 CoreSimulator 启动应用，采样及高负载证据保留，随后只中止本次测试、关闭本次启动的模拟器；**本次模拟器测试不算通过，真机仍未验收**。没有尝试发行签名或发布 IPA。
+
+## 安装版生产复测
+
+沿用“连续学习、连续思考”的既有会话，通过实际安装 EXE、原有用户授权和生产服务，提交一次提纲调整，由另一台新版 Windows Worker 执行。
+
+- 本轮 110.537 秒，0 次工具调用；服务端依次保存材料准备、问题组织、结果校验、讨论保存四阶段。安装界面显示实际执行电脑、递增用时、当前阶段及上次活动，无虚构百分比。
+- 旧内部字段在提纲界面隐藏，原 API / 导出历史仍保留。前两轮和 3 项答案逐项不变，计划更新为第 2 版；会话 3 轮均为讨论，稿件和正文任务为 0，未点击开始写作。
+- 实际页面无异常。本轮较此前同主题 124 / 143 秒短，但运行电脑、历史长度与要求不同；本地 47 / 34 秒也不能作为每轮响应保证。模型返回仍是主要等待阶段。
+
+## 主要制品 SHA-256
+
+| 文件 | SHA-256 |
+|---|---|
+| InspiraiNest-v0.2.6-Windows-x64.exe | `522af2d84f3d665c21081d8eb6b5cc362d0a496e9c5c7f723809068819ce7db9` |
+| InspiraiNest-v0.2.6-macOS-arm64.dmg | `bf7e300f0c3edb8ef277f97c1abf4e86e12970d4a8d6e631dbe745dac331381c` |
+| InspiraiNest-v0.2.6-macOS-x64.dmg | `ded88aa7aebab05fd93e4fb18040e07647715ad818db5b098e4a677dbd61fa8a` |
+| InspiraiNest-v1.3.12-Android.apk | `090a0aa1fd821ca616661589ffe2909773c8712a9351dffaafb12e3111ca16da` |
+
+本次不扩大相机、麦克风、真实发布文章或真机硬件的验收结论。
