@@ -49,7 +49,7 @@ export function MenuButton({ label, icon, options, width = 240, iconOnly = false
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
       if (event.key === 'Tab') { setOpen(false); trigger.current?.focus({ preventScroll: true }); }
     }}>
-      <MenuRows options={options} choose={item => { item.select(trigger.current!); close(!item.opensDialog); }} />
+      <MenuRows options={options} choose={item => { if(item.opensDialog)trigger.current?.focus({preventScroll:true}); item.select(trigger.current!); close(!item.opensDialog); }} />
     </div>}
   </div>;
 }
