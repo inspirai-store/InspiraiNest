@@ -1,3 +1,4 @@
+import {performEditing} from './editing.mjs';
 import {desktopFrontend,documentURL,desktopPermission} from './frontend-entry.mjs';
 import {appVersion} from '../src/device-identity.mjs';
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
@@ -196,6 +197,7 @@ async function pairDesktop(input) {
   } finally { if (loginController === controller) loginController = null; }
 }
 function registerIPC() {
+  ipcMain.handle('desktop-editing:perform',(event,action)=>{trustedMain(event);performEditing(main.webContents,action);});
   ipcMain.handle('desktop-settings:get', event => { trusted(event); return settings.snapshot(); });
   ipcMain.handle('desktop-settings:update', (event, input) => { trustedMain(event); return settings.update(input); });
   for (const [name, fn] of Object.entries({

@@ -30,3 +30,9 @@ test('结构正文离线恢复、保存、同步、继续编辑与加工快照�
 });
 
 test('旧服务端忽略结构字段时不能误标同步成功，完整图文保留在本机',async()=>{const h=harness(input=>({status:200,json:{id:input.route.split('/').at(-1),version:1}}));const document={version:1,doc:{type:'doc',content:[{type:'heading',attrs:{level:1},content:[{type:'text',text:'完整排版'}]}]}};const {item}=await h.service.saveRecord({...newDraft(),text:'完整排版',document});await h.service.flush();const current=await h.store.get(item.id);assert.equal(current.sync,'failed');assert.equal(current.errorCode,'record_protocol_incompatible');assert.deepEqual(current.document,document);assert.match(current.error,/完整排版/);assert.equal(current.pendingProcess,undefined);});
+
+
+test('选区存为记录保留当前编辑草稿、Blob 和基准版本，引用单独落本机且不创建任务',async()=>{
+ const store=new IndexedRecordStore(new IDBFactory()),service=new RecordsService(store,offline);const {draft}=await service.load();const blob=new Blob(['unchanged'],{type:'image/png'});const current={...draft,editingId:'existing-record',baseVersion:7,text:'正在写作的草稿',attachments:[{id:'image-a',name:'图.png',blob,mime:blob.type,bytes:blob.size,sha256:await sha256(blob)}]};await service.saveDraft(current);
+ const item=await service.createFromSelection('第一段\n第二段','来源标题','https://example.com/source');const loaded=await service.load();assert.equal(loaded.draft.recordId,current.recordId);assert.equal(loaded.draft.text,current.text);assert.equal(loaded.draft.editingId,current.editingId);assert.equal(loaded.draft.baseVersion,7);assert.equal(await loaded.draft.attachments[0].blob.text(),'unchanged');assert.equal(loaded.records.length,1);assert.equal(item.sync,'pending');assert.equal(item.document.doc.content[0].type,'blockquote');assert.ok(item.text.includes('来源标题'));assert.equal(item.pendingProcess,undefined);
+});

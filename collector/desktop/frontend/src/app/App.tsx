@@ -1,3 +1,5 @@
+import {WritingProvider} from '../selection-writing/WritingProvider';
+import {InteractionProvider} from '../interactions/InteractionProvider';
 import {StatusPanel} from '../status/StatusPanel';
 import {WritingPage} from '../writing/WritingPage';
 import {updateBridge} from '../updates/client';
@@ -83,20 +85,7 @@ function Workbench({ area, view }: { area: 'records' | 'library'; view: 'list' |
     const focus = location.state?.focus;
     if (focus) requestAnimationFrame(() => document.querySelector<HTMLElement>(focus === 'editor' ? '[aria-label="记录正文"]' : `input[aria-label="${area === 'records' ? '搜索记录' : '搜索资料'}"]`)?.focus());
   }, [location.key, location.state, area]);
-  useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || document.querySelector('[aria-modal="true"]')) return;
-      if (event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        const input = document.querySelector<HTMLInputElement>(`input[aria-label="${area === 'records' ? '搜索记录' : '搜索资料'}"]`);
-        if (input?.getClientRects().length) input.focus();
-        else {remember(); navigate('/' + area + location.search, {state: {focus: 'search'}});}
-      }
-      if (event.key.toLowerCase() === 'n') { event.preventDefault(); remember(); navigate('/records/new' + location.search, {state: {focus: 'editor'}}); }
-    };
-    window.addEventListener('keydown', shortcut);
-    return () => window.removeEventListener('keydown', shortcut);
-  }, [area, navigate, location.search, remember]);
+
   return <div ref={root} className={styles.app} data-theme={theme} data-state-scene={preview ? 'true' : undefined}>
     <AppShell taskCount={realRecords?realRecords.records.flatMap(r=>r.tasks??[]).filter(t=>!['completed','cancelled','failed'].includes(t.state)).length:undefined} area={area} go={go} onAction={onAction} favoritesOnly={ui.favoritesOnly} onFavorites={() => updateArea({favoritesOnly: !ui.favoritesOnly})}>
       <SplitPane view={view}>
@@ -124,7 +113,7 @@ function SessionRoutes({children}:{children:import('react').ReactNode}) {const l
 export function App() {
   const updateNavigate=useNavigate(),updateLocation=useLocation(),updateSearch=useRef(updateLocation.search);updateSearch.current=updateLocation.search;
   useEffect(()=>updateBridge()?.onOpen?.(()=>updateNavigate('/settings/updates'+updateSearch.current,{state:{settingsFocus:'content',updateCheckRequest:Date.now()}})),[updateNavigate]);
-  return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><Routes>
+  return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><WritingProvider><InteractionProvider><Routes>
     <Route path="/status" element={<StatusPanel/>} />
     <Route path="/settings" element={<SettingsPage/>} />
     <Route path="/settings/general" element={<SettingsPage/>} />
@@ -153,5 +142,5 @@ export function App() {
     <Route path="/library/demo" element={<LibraryRoute view="detail" />} />
     <Route path="/library/:id" element={<LibraryRoute view="detail" />} />
     <Route path="*" element={<Navigate to="/records/new" replace />} />
-  </Routes></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
+  </Routes></InteractionProvider></WritingProvider></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
 }

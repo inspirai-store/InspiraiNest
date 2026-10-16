@@ -308,6 +308,10 @@ jobs:
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
         run: node scripts/run-macos-gui-qa.cjs scripts/test-records-packaged.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
+      - name: Test signed macOS planning conversation and owner bridge
+        if: ${{ inputs.publish_macos }}
+        working-directory: public-source/collector
+        run: node scripts/run-macos-gui-qa.cjs scripts/test-desktop-writing.cjs desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Test signed Apple Silicon update download
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector

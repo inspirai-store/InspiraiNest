@@ -14,6 +14,7 @@ export function supportsWritingTask(task, device) {
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
   return workerAuthorized(device) && Boolean(device.agents?.length)
+    && (task.purpose!=='selection-writing'||device.selectionWritingProtocol===1)
     && (!task.recordId || device.recordProtocol === 1)
     && supportsWritingTask(task, device)
     && (!task.inputAttachments?.length || device.inputAttachmentProtocol === 1)

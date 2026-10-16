@@ -1,3 +1,4 @@
+import {safeUrl} from './document.ts';
 import {errorMessage} from '../../shared/errors.ts';
 import {AccountRecordStore,recordScope} from './account-store.ts';
 import type { Attachment, Connection, LocalDraft, LocalRecord, ProcessRequest, RecordStore, RecordTask } from './types.ts';
@@ -65,6 +66,11 @@ export class RecordsService {
     if(item.baseSnapshot&&sameContent(item,item.baseSnapshot)){this.backup(item,'采用云端唯一修改',remote);this.accept(item,remote);return true;}
     if(item.baseSnapshot&&sameContent(remote,item.baseSnapshot)){this.backup(item,'仅本机修改，更新同步基线',remote);item.remoteVersion=remote.version;item.baseSnapshot={...snapshot(remote),version:remote.version};delete item.payload;item.sync='pending';return true;}
     return false;
+  }
+  async createFromSelection(text:string,title?:string,url?:string,quote=true,expectedScope?:string){
+    const session=await this.status();if(expectedScope&&expectedScope!==recordScope(session))throw Error('资料空间已切换');if(!text.trim())throw Error('请选择文字');url=safeUrl(url??'')??undefined;
+    const document:import('./types.ts').RichDocument={version:1,doc:{type:'doc',content:[...(quote?[{type:'blockquote',content:text.split('\n').map(line=>({type:'paragraph',content:line?[{type:'text',text:line}]:[]}))}]:text.split('\n').map(line=>({type:'paragraph',content:line?[{type:'text',text:line}]:[]}))),...(title?[{type:'paragraph',content:[{type:'text',text:'来源：'+title}]}]:[]),...(url?[{type:'paragraph',content:[{type:'text',text:url,marks:[{type:'link',attrs:{href:url}}]}]}]:[])]}};
+    return this.serial(async()=>{this.assertSession(session.epoch);const item:LocalRecord={id:crypto.randomUUID(),accountScope:recordScope(session),text:[text,title?'来源：'+title:'',url??''].filter(Boolean).join('\n'),document,attachments:[],createdAt:new Date().toISOString(),version:1,remoteVersion:0,server:session.server||null,sync:'pending',error:''};await this.store.put(item);return item;});
   }
   flush() {
     if (this.flushing) return this.flushing;

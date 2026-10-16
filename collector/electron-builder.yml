@@ -25,6 +25,7 @@ files:
   - desktop/settings-renderer.js
   - desktop/nodes.js
   - desktop/macos-policy.mjs
+  - desktop/editing.mjs
   - desktop/preload.cjs
   - desktop/renderer.js
   - desktop/index.html

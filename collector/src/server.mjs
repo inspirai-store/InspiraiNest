@@ -1,3 +1,4 @@
+import {createWriting as createSelectionWriting} from './selection-writing.mjs';
 import http from 'node:http';
 import { createRecords } from './records.mjs';
 import { createWriting } from './writing.mjs';
@@ -45,6 +46,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const attempts = new Map();
   const records = createRecords({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask});
   const writing = createWriting({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
+  const selectionWriting=createSelectionWriting({store,serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment});
   const locks = new Map();
   async function serialized(key, work) {
     const previous = locks.get(key) || Promise.resolve();
@@ -282,6 +284,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function publish(bundle, device, req, taskId) {
     if (Object.hasOwn(bundle,'inputAttachments')) { const {inputAttachments,...archiveBundle} = bundle; bundle = archiveBundle; }
     const taskRecord = taskId ? await assigned(device, taskId, req) : null;
+    requireValue(taskRecord?.purpose!=='selection-writing','文字任务不能归档',409);
     if (taskRecord?.inputAttachments?.length) bundle = { ...bundle, meta: { ...bundle.meta, inputAttachments: taskRecord.inputAttachments } };
     if (taskRecord?.tags?.length) bundle = { ...bundle, meta: { ...bundle.meta, tags: [...new Set([...(bundle.meta?.tags || []), ...taskRecord.tags])] } };
     validateArchive(bundle);
@@ -562,6 +565,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
       if (await records.handle(req,res,route,device)) return;
+      if (await selectionWriting.handle(req,res,route,device)) return;
       if (await writing.handle(req,res,route,device)) return;
       if (route.startsWith('/api/security')) {
         owner(device);
@@ -598,7 +602,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const archives = [];
         for (const archive of await store.list('archive')) if (!(await deleted(archive))) archives.push(archive);
         const devices = await Promise.all((await store.list('device')).filter(d => !d.revokedAt).map(d => sessions.ensure(d)));
-        return send(res, 200, { me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+        return send(res, 200, { writingProtocol:1, selectionWritingProtocol:1, me: publicDevice(device), devices: publicDevices(devices.filter(Boolean),clock()), tasks: (await store.list('task')).filter(t=>t.purpose!=='selection-writing').sort((a, b) => b.createdAt.localeCompare(a.createdAt)), archives: archives.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
       }
       if (route === '/api/pairings' && req.method === 'POST') {
         owner(device);
@@ -677,13 +681,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
         requireValue(input.writingProtocol === undefined || input.writingProtocol === 1, 'Invalid writing protocol');
         requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 2 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>s.version)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
+        requireValue(input.selectionWritingProtocol === undefined || input.selectionWritingProtocol === 1, 'Invalid selection writing protocol');
         requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
         const agentRuntime = input.agentRuntime;
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
@@ -729,7 +734,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         await recoverUnavailableTasks();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && supportsWritingTask(t, device) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -741,9 +746,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && supportsWritingTask(t, device) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
-              const selected = await skills.selection(candidate,device,tasks);
+              const selected = candidate.purpose==='selection-writing'?{eligible:true,selectedSkills:[]}:await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
               task = await store.transaction(async tx => {
                 const live = await tx.getForUpdate('device', device.id);
@@ -753,6 +758,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('client-update')).some(o=>o.deviceId===device.id && updateBlocksTasks(o))) return null;
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
+                if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
                 return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
@@ -818,6 +824,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           requireValue(active.includes(live.state), 'Task is not running', 409);
           const executionSkills = (live.selectedSkills || []).filter(s=>s.agent === (input.agent || live.agent));
           const updated = { ...live, agent: input.agent || live.agent || null, executionSkills };
+          if(live.purpose==='selection-writing'&&input.state==='failed')return saveTask(updated,'failed',message,tx);
           if (input.state === 'failed' || input.state === 'waiting_action' && nodeFailureCodes.has(input.failureCode)) {
             await saveTask(updated, input.state, message, tx);
             return reroute(updated, input.failureCode || 'EXECUTION_FAILED', '原工作节点未能完成采集', tx);

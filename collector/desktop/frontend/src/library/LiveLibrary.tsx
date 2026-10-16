@@ -1,3 +1,6 @@
+import {useCommandSurface} from '../interactions/InteractionProvider';
+import type {Command} from '../interactions/commands';
+import {Copy} from 'lucide-react';
 import {useAppTheme} from '../settings/SettingsProvider';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useUiState } from '../workspace/UiState';
@@ -53,20 +56,7 @@ export function LiveLibrary() {
   const remember = () => { const memory = rememberPage(root.current); pages.set(pageKey, { ...memory, focus: memory.focus ?? pages.get(pageKey)?.focus ?? null }); };
   const go = (path: string) => { remember(); navigate(path + location.search,{state:path==='/settings/account'?{settingsFocus:'content'}:null}); };
   useLayoutEffect(() => { if(root.current?.querySelector('[aria-label="搜索资料"]')===document.activeElement)return; if (!data.list.isPending && !data.content.isFetching) restorePage(root.current, pages.get(pageKey)); }, [pageKey, pages, data.list.isPending, data.content.isFetching]);
-  useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || document.querySelector('[aria-modal="true"]')) return;
-      if (event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        const input = root.current?.querySelector<HTMLInputElement>('[aria-label="搜索资料"]');
-        if (input?.getClientRects().length) input.focus();
-        else { remember(); navigate('/library' + location.search, {state:{focus:'search'}}); }
-      }
-      if (event.key.toLowerCase() === 'n') { event.preventDefault(); go('/records/new'); }
-    };
-    window.addEventListener('keydown', shortcut);
-    return () => window.removeEventListener('keydown', shortcut);
-  });
+
   useEffect(() => { if (location.state?.focus === 'search') root.current?.querySelector<HTMLInputElement>('[aria-label="搜索资料"]')?.focus(); }, [location.key, location.state]);
   const entry = data.entry.data ?? data.items.find(item=>item.id===data.id);
   const source = entry?.canonical_url || entry?.source_url;
@@ -75,6 +65,10 @@ export function LiveLibrary() {
   const remove=async(archiveId:string)=>{const startedSession=librarySession;setRemoving(true);setOperationError(false);try{if(!window.library?.remove)throw Error('回收站接口不可用');await window.library.remove(archiveId);await cache.invalidateQueries({queryKey:['live-library',librarySession]});}catch{if(currentSession.current===startedSession)setOperationError(true);}finally{if(currentSession.current===startedSession)setRemoving(false);}};
   useEffect(()=>{setTrashInvoker(null);setTagsInvoker(null);setDeletion(null);setOperationError(false);setRemoving(false);},[librarySession]);
   const clear = () => { setQuery(''); setType('全部类型'); setStatus('全部状态'); setSelected(null); update({favoritesOnly:false,tags:[]}); };
+  const openEntry=(id:string)=>{setSelected(id);go('/library/demo');};
+  const itemCommands=(item:import('./data/client').LibraryEntry):Command[]=>[{id:'library.open',label:'打开',run:()=>openEntry(item.id)},{id:'library.bookmark',label:bookmarks.includes(item.id)?'取消收藏':'收藏',icon:Bookmark,disabled:!bookmarksReady,run:()=>toggleBookmark(item.id)},{id:'library.copy',label:'复制标题',icon:Copy,run:()=>navigator.clipboard.writeText(item.title)},{id:'library.tags',label:'标签',icon:Tag,disabled:!item.tags?.length,children:item.tags?.map(tag=>({id:'library.tag.'+tag,label:tag,run:()=>update({tags:[tag],selected:null})}))},{id:'library.source',label:'来源',icon:ExternalLink,disabled:!item.canonical_url&&!item.source_url,run:()=>window.library?.openUrl?.(item.canonical_url||item.source_url||'')},{id:'library.delete',label:'移至回收站',icon:Trash2,danger:true,separator:true,disabled:removing,run:()=>setDeletion({title:item.title,archiveId:item.archive_id,invoker:document.activeElement as HTMLElement})}];
+  const libraryClient=useLibrarySession().client;
+  useCommandSurface(root,{commands:()=>entry?itemCommands(entry):[],quick:async query=>{const result=await libraryClient.entries({q:query,limit:50});return result.items.map(item=>({id:item.id,label:item.title,run:()=>openEntry(item.id)}));},newRecord:()=>go('/records/new'),search:()=>{const input=root.current?.querySelector<HTMLInputElement>('[aria-label="搜索资料"]');if(input?.getClientRects().length)input.focus();else navigate('/library'+location.search,{state:{focus:'search'}});}});
   return <div ref={root} onFocusCapture={remember} className={styles.app} data-list-first-error={data.list.isError && !data.id || undefined} data-theme={theme}>
     <AppShell area="library" go={go} taskCount={taskCount} libraryControlsDisabled libraryMenu={<MenuButton label="更多" icon={Ellipsis} iconOnly={false} compact={false} offset={dark?6:8} kind="ghost" width={160} align="end" options={[{label:"回收站",icon:Trash2,opensDialog:true,select:setTrashInvoker}]} />} favoritesDisabled={!bookmarksReady} favoritesOnly={ui.favoritesOnly} onFavorites={() => update({favoritesOnly:!ui.favoritesOnly,selected:null})} onAction={() => {}}>
       <SplitPane view={location.pathname!== '/library' ? 'detail' : 'list'}>
@@ -88,7 +82,7 @@ export function LiveLibrary() {
             </div>
           </div>
           {listLoading ? <ListSkeleton /> : data.list.isError ? <StatePanel kind="error" title="资料加载失败" action="重试" region="条目列表" onAction={() => void data.list.refetch()} /> : !data.items.length ? <StatePanel kind="no-results" title="无匹配资料" action="清除" region="条目列表" onAction={clear} /> : <div className={styles.rows} data-region="条目列表" onKeyDown={focusListItem} onWheel={event=>{const el=event.currentTarget;if(event.deltaY>0&&el.scrollHeight<=el.clientHeight&&data.list.hasNextPage&&!data.list.isFetchingNextPage)void data.list.fetchNextPage();}} onScroll={event => { const el = event.currentTarget; if (el.scrollHeight - el.scrollTop - el.clientHeight < 96 && data.list.hasNextPage && !data.list.isFetchingNextPage) void data.list.fetchNextPage(); }}>
-            {data.items.map(item => <EntityRow key={item.id} data-row={item.id} selected={item.id === data.id} entry={{ title: item.title, excerpt: item.summary || '', date: libraryDateLabel(item.collected_at), state: `${Object.keys(types).find(key => types[key] === item.type) || item.type} · ${Object.keys(states).find(key => states[key] === item.status) || item.status}` }} onClick={() => { setSelected(item.id); go('/library/demo'); }} />)}
+            {data.items.map(item => <EntityRow key={item.id} commands={itemCommands(item)} data-row={item.id} selected={item.id === data.id} entry={{ title: item.title, excerpt: item.summary || '', date: libraryDateLabel(item.collected_at), state: `${Object.keys(types).find(key => types[key] === item.type) || item.type} · ${Object.keys(states).find(key => states[key] === item.status) || item.status}` }} onClick={() => { setSelected(item.id); go('/library/demo'); }} />)}
           </div>}
           <footer className={styles.listCount} data-region="列表数量">{listLoading ? '加载中' : data.list.isError ? '加载失败' : `${ui.favoritesOnly || ui.tags.length>1 ? data.items.length : data.list.data?.pages[0]?.total ?? 0} 条资料`}</footer>
         </ListPane>
