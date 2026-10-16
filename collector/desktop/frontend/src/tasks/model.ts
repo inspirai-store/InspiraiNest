@@ -12,3 +12,5 @@ export function taskEventLabel(value:string){const date=new Date(value);if(Numbe
 export function taskAgentLabel(agent:string|null|undefined){return agent==='codex'?'Codex':agent==='claude'?'Claude Code':agent??'';}
 
 export function taskEntryId(task:Task,snapshot:TaskSnapshot|undefined){const archive=snapshot?.archives?.find(a=>a.id===task.archiveId);return archive?.entryId??archive?.meta?.id??null;}
+
+export function taskExcerpt(task:Task){const event=task.events?.at(-1);return task.state==='cancelled'&&event?.message==='已删除，执行已取消'?'已取消':event?.message??'';}

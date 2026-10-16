@@ -20,8 +20,9 @@ import {rememberPage,restorePage} from '../workspace/PageMemory';
 import {libraryDateLabel} from '../library/data/date-label';
 import {focusListItem} from '../components/ListKeyboard';
 import {scrollReader} from '../components/ReaderKeyboard';
-import {taskActions,taskLabels,taskTitle,taskEventLabel,taskAgentLabel,taskEntryId} from './model';
+import {taskActions,taskLabels,taskTitle,taskEventLabel,taskAgentLabel,taskEntryId,taskExcerpt} from './model';
 import type {TaskAction} from './model';
+import {performTaskAction} from './perform-action';
 import styles from '../app/Workbench.module.css';
 import taskStyles from './TasksPage.module.css';
 
@@ -43,11 +44,12 @@ export function TasksPage(){
  const entryId=task?taskEntryId(task,state.data):null;
  const hasPreview=!!task&&(task.state==='awaiting_review'||task.state==='completed'&&!!entryId);
  const currentTab=hasPreview?(ui.tabs[task!.id]??'结果预览'):'过程记录';
+ const approving=busy&&confirmation?.action==='approve'&&confirmation.id===task?.id;
  const preview=useQuery({queryKey:['desktop-tasks',session,'draft',task?.id,task?.state,entryId],queryFn:async()=>{
   if(task!.state==='awaiting_review')return client.draft(task!.id);
   const entry=await libraryClient.entry(entryId!);const file=readingFile(entry.files,'摘要');
   return {summary:file?(await libraryClient.content(entryId!,file.path)).content:entry.summary??''};
- },enabled:hasPreview&&currentTab==='结果预览',retry:false,refetchOnWindowFocus:false});
+ },enabled:hasPreview&&currentTab==='结果预览'&&!approving,retry:false,refetchOnWindowFocus:false});
  const pageKey='tasks-live:'+(task?.id??'')+':'+currentTab;
  const remember=()=>{const memory=rememberPage(root.current);pages.set(pageKey,{...memory,focus:memory.focus??pages.get(pageKey)?.focus??null});};
  const go=(path:string)=>{remember();navigate(path+location.search,{state:path==='/settings/account'?{settingsFocus:'content'}:null});};
@@ -64,7 +66,7 @@ export function TasksPage(){
  const confirmAction=(action:TaskAction,invoker:HTMLElement)=>{if(task){setActionError(false);setConfirmation({id:task.id,title:taskTitle(task),action,invoker});}};
  const submitAction=async()=>{
   if(!confirmation||busy)return;const started=session,action=confirmation;setBusy(true);setActionError(false);
-  try{await client.action(action.id,action.action);if(liveSession.current!==started)return;setConfirmation(null);await cache.invalidateQueries({queryKey:['desktop-tasks',session]});if(action.action==='approve')await cache.invalidateQueries({queryKey:['live-library',session]});requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>(`button[data-row="${action.id}"]`)?.focus());}
+  try{await performTaskAction(cache,client,started,action,()=>liveSession.current===started);if(liveSession.current!==started)return;setConfirmation(null);requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>(`button[data-row="${action.id}"]`)?.focus());}
   catch{if(liveSession.current===started)setActionError(true);}
   finally{if(liveSession.current===started)setBusy(false);}
  };
@@ -79,7 +81,7 @@ export function TasksPage(){
    <SplitPane view={location.pathname==='/tasks'?'list':'detail'}>
     <ListPane label="任务列表">
      <div className={styles.listFilters} data-region="列表搜索筛选"><SearchField label="搜索任务" value={ui.query} onChange={e=>update({query:e.target.value})} onKeyDown={e=>{if(e.key==='Escape')clear();}}/><div className={styles.filters} data-region="筛选栏"><MenuButton compact label={ui.filter} icon={ChevronDown} options={['全部状态',...Object.values(taskLabels)].map(label=>({label,selected:ui.filter===label,select:()=>update({filter:label})}))}/></div></div>
-     {state.isPending?<ListSkeleton/>:state.isError?<StatePanel kind="error" title="任务加载失败" action="重试" onAction={()=>void reloadList()} region="任务列表状态"/>:!tasks.length?<StatePanel kind={ui.query||ui.filter!=='全部状态'?'no-results':'library-empty'} icon={ui.query||ui.filter!=='全部状态'?undefined:ListChecks} title={ui.query||ui.filter!=='全部状态'?'无匹配任务':'暂无任务'} action={ui.query||ui.filter!=='全部状态'?'清除':'新建'} onAction={()=>ui.query||ui.filter!=='全部状态'?clear():taskCreation.open({key:'task:new'})} region="任务列表状态"/>:<div className={styles.rows} data-region="条目列表" onKeyDown={focusListItem}>{tasks.map(t=><EntityRow key={t.id} commands={taskCommands(t)} data-row={t.id} selected={t.id===task?.id} warning={['waiting_action','awaiting_review'].includes(t.state)} className={t.state==='failed'?taskStyles.failedRow:''} entry={{title:taskTitle(t),excerpt:t.events?.at(-1)?.message??'',date:libraryDateLabel(t.createdAt),state:taskLabels[t.state]}} onClick={()=>{remember();if(task)pages.set(pageKey,{...pages.get(pageKey)!,focus:`button[data-row=${JSON.stringify(task.id)}]`});update({selected:t.id});navigate('/tasks/'+encodeURIComponent(t.id)+location.search);}}/>)}</div>}
+     {state.isPending?<ListSkeleton/>:state.isError?<StatePanel kind="error" title="任务加载失败" action="重试" onAction={()=>void reloadList()} region="任务列表状态"/>:!tasks.length?<StatePanel kind={ui.query||ui.filter!=='全部状态'?'no-results':'library-empty'} icon={ui.query||ui.filter!=='全部状态'?undefined:ListChecks} title={ui.query||ui.filter!=='全部状态'?'无匹配任务':'暂无任务'} action={ui.query||ui.filter!=='全部状态'?'清除':'新建'} onAction={()=>ui.query||ui.filter!=='全部状态'?clear():taskCreation.open({key:'task:new'})} region="任务列表状态"/>:<div className={styles.rows} data-region="条目列表" onKeyDown={focusListItem}>{tasks.map(t=><EntityRow key={t.id} commands={taskCommands(t)} data-row={t.id} selected={t.id===task?.id} warning={['waiting_action','awaiting_review'].includes(t.state)} className={t.state==='failed'?taskStyles.failedRow:''} entry={{title:taskTitle(t),excerpt:taskExcerpt(t),date:libraryDateLabel(t.createdAt),state:taskLabels[t.state]}} onClick={()=>{remember();if(task)pages.set(pageKey,{...pages.get(pageKey)!,focus:`button[data-row=${JSON.stringify(task.id)}]`});update({selected:t.id});navigate('/tasks/'+encodeURIComponent(t.id)+location.search);}}/>)}</div>}
      <footer className={styles.listCount}>{state.isPending?'加载中':state.isError?'加载失败':tasks.length+' 项任务'}</footer>
     </ListPane>
     <ContentPane label="任务详情" backLabel="任务列表" onBack={()=>go('/tasks')}>
@@ -89,7 +91,7 @@ export function TasksPage(){
       <MenuButton label="任务操作" icon={Ellipsis} iconOnly compact kind="ghost" width={160} align="end" disabled={busy} options={[...taskCommands(task).filter(c=>c.id==='task.delete').map(c=>({label:c.label,icon:c.icon,danger:c.danger,opensDialog:true,select:()=>c.run()})),...allowed.filter(a=>a==='reassign'||a==='cancel').map(action=>({label:action==='reassign'?'更换节点':'取消任务',icon:action==='reassign'?RotateCcw:X,danger:action==='cancel',opensDialog:true,select:(invoker:HTMLElement)=>confirmAction(action,invoker)}))]}/>
      </SourceActions></div><ChoiceBar label="任务内容" options={['结果预览','过程记录']} disabledOptions={hasPreview?[]:['结果预览']} value={currentTab} onChange={setTab} tabs idPrefix="task-reader"/>
      <div className={styles.readerViewport} role="tabpanel" id="reader-panel" aria-labelledby={'task-reader-'+currentTab} tabIndex={0} onKeyDown={e=>scrollReader(e,reader.current)} data-region="任务阅读区">
-      {currentTab==='结果预览'&&preview.isFetching?<ContentSkeleton reader/>:currentTab==='结果预览'&&preview.isError?<StatePanel kind="error" title="结果加载失败" action="重试" onAction={()=>void reloadPreview()} region="任务结果状态"/>:<div ref={reader} className={styles.readerScroll} data-region="任务正文滚动" onScroll={remember}>{currentTab==='结果预览'?<LibraryMarkdown content={preview.data?.summary??''}/>:<div className={taskStyles.timeline}>{[...(task.events??[])].reverse().map((event,index)=><section key={index}><time>{taskEventLabel(event.at)} · {taskLabels[event.state]}</time><p>{event.message}</p></section>)}</div>}</div>}
+      {currentTab==='结果预览'&&(approving||preview.isFetching)?<ContentSkeleton reader/>:currentTab==='结果预览'&&preview.isError?<StatePanel kind="error" title="结果加载失败" action="重试" onAction={()=>void reloadPreview()} region="任务结果状态"/>:<div ref={reader} className={styles.readerScroll} data-region="任务正文滚动" onScroll={remember}>{currentTab==='结果预览'?<LibraryMarkdown content={preview.data?.summary??''}/>:<div className={taskStyles.timeline}>{[...(task.events??[])].reverse().map((event,index)=><section key={index}><time>{taskEventLabel(event.at)} · {taskLabels[event.state]}</time><p>{event.message}</p></section>)}</div>}</div>}
      </div></>:state.isPending?<ContentSkeleton reader/>:state.isError?null:<StatePanel kind="library-empty" icon={ListChecks} title="暂无任务" region="任务详情状态"/>}
     </ContentPane>
    </SplitPane>

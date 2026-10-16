@@ -25,3 +25,5 @@ export const isMac=()=>/Mac/i.test(navigator.platform);
 export const shortcutLabel=(key:string)=>key.replace('Mod',isMac()?'⌘':'Ctrl').replace(/Shift/g,'Shift');
 export const aiCommand:Command={id:'selection.ai',label:'AI',shortcut:'Mod+J',disabled:true};
 export function flattenCommands(commands:Command[]):Command[]{return commands.flatMap(c=>c.children?flattenCommands(c.children):[c]);}
+
+export function shortcutAvailable(action:ShortcutAction,pathname:string){return action==='new'?/^\/(records|library|tasks|writing|settings)(\/|$)/.test(pathname):/^\/(records|library)(\/|$)/.test(pathname);}

@@ -8,7 +8,7 @@ import {Modal,MenuRows} from '../components/Overlays';
 import menuStyles from '../components/Overlays.module.css';
 import {errorMessage} from '../shared/errors';
 import {FindBar} from './FindBar';
-import {flattenCommands,isMac,shortcutAction,shortcutLabel,shortcuts} from './commands';
+import {flattenCommands,isMac,shortcutAction,shortcutLabel,shortcuts,shortcutAvailable} from './commands';
 import type {Command,CommandSurface,QuickEntry,SelectionSnapshot} from './commands';
 import styles from './Interactions.module.css';
 type MenuState={commands:Command[];x:number;y:number;invoker:HTMLElement;restore:()=>void;path:Command[][]};
@@ -45,8 +45,9 @@ export function InteractionProvider({children}:{children:ReactNode}){
    const c=current.current;if(c.menu){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeMenu();}return;}
    if(document.querySelector('dialog[open], [role=menu]'))return;
    if(e.key==='Escape'&&c.find&&!(document.activeElement as HTMLElement)?.closest('[data-region="AI 面板"]')&&!(document.activeElement as HTMLElement)?.matches('[aria-label="链接地址"]')){e.preventDefault();e.stopImmediatePropagation();setFind(null);c.find.restore();return;}
-   if(!/^\/(records|library)(\/|$)/.test(c.location.pathname))return;
-   const action=shortcutAction(e,isMac());if(!action)return;if(action==='find'&&c.find){e.preventDefault();e.stopImmediatePropagation();const input=document.querySelector<HTMLInputElement>('[role=search][aria-label=查找正文] input');input?.focus();input?.select();return;}
+   const action=shortcutAction(e,isMac());if(!action||!shortcutAvailable(action,c.location.pathname))return;
+   if(action==='new'){e.preventDefault();e.stopImmediatePropagation();const page=[...scopes.current].find(s=>s.element.isConnected&&s.newRecord);if(page?.newRecord)page.newRecord();else navigate('/records/new'+c.location.search,{state:{focus:'editor'}});return;}
+   if(action==='find'&&c.find){e.preventDefault();e.stopImmediatePropagation();const input=document.querySelector<HTMLInputElement>('[role=search][aria-label=查找正文] input');input?.focus();input?.select();return;}
    const target=document.activeElement as HTMLElement,scope=surfaceAt(target)??surfaceAt(active.current);const page=[...scopes.current].find(s=>s.element.isConnected&&s.quick);const body=scope?.body?.()??[...scopes.current].map(s=>s.body?.()).find(el=>el?.isConnected&&el.getClientRects().length);
    const snapshot=scope?.selection?.();const restore=snapshot?.restore??(()=>{if(target?.isConnected)target.focus({preventScroll:true});});
    const global:Command[]=[{id:'page.new',label:'新记录',shortcut:'Mod+N',run:()=>{if(page?.newRecord)page.newRecord();else navigate('/records/new'+c.location.search);}},{id:'page.find',label:'查找正文',shortcut:'Mod+F',disabled:!body,run:()=>{if(body)setFind({root:body,initial:snapshot?.text??'',restore});}},{id:'page.search',label:'搜索列表',shortcut:'Mod+Shift+F',run:()=>page?.search?.()},{id:'page.help',label:'快捷键',run:()=>setHelp(target)}];

@@ -69,13 +69,13 @@ export function MoreMenu({ icon, iconOnly = true, compact = false, onAction, cla
 export function Modal({ title, children, footer, invoker, close, narrow = false, focusCancel = false, className = '', region }: {
   title: string; children: ReactNode; footer: ReactNode; invoker: HTMLElement; close: () => void; narrow?: boolean; focusCancel?: boolean; className?: string; region?: string;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null), heading = useRef<HTMLHeadingElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null), heading = useRef<HTMLHeadingElement>(null), backdropPress=useRef(false);
   const id = useId();
   const closeRef = useRef(close); closeRef.current = close;
   useLayoutEffect(() => {
     const element = dialog.current!;
     element.showModal();
-    if (focusCancel) element.querySelector<HTMLButtonElement>('[data-initial-cancel]')?.focus({ preventScroll: true });
+    if (focusCancel) {const cancel=element.querySelector<HTMLButtonElement>('[data-initial-cancel]');if(cancel&&!cancel.disabled)cancel.focus({preventScroll:true});else heading.current?.focus({preventScroll:true});}
     else heading.current?.focus({ preventScroll: true });
     return () => {
       if (element.open) element.close();
@@ -89,8 +89,9 @@ export function Modal({ title, children, footer, invoker, close, narrow = false,
     const index = items.indexOf(document.activeElement as HTMLElement);
     if (event.shiftKey && index <= 0) { event.preventDefault(); items.at(-1)?.focus(); }
     else if (!event.shiftKey && (index === items.length - 1 || index === -1)) { event.preventDefault(); items[0]?.focus(); }
-  }} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => {
-    if (event.target !== event.currentTarget) return;
+  }} onPointerDown={event=>{const rect=event.currentTarget.getBoundingClientRect();backdropPress.current=event.target===event.currentTarget&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom);}} onCancel={event => { event.preventDefault(); closeRef.current(); }} onClick={event => {
+    const outsidePress=backdropPress.current;backdropPress.current=false;
+    if (!outsidePress||event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeRef.current();
   }}>
