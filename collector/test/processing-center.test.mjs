@@ -113,22 +113,35 @@ test('trial pipeline pins Git HEAD, copies only committed project files, install
  for(const directory of [repository,project]){fs.mkdirSync(directory);assert.equal((await execute('git',['init'],{cwd:directory})).code,0);}
  fs.mkdirSync(path.join(repository,'skills','demo'),{recursive:true});fs.writeFileSync(path.join(repository,'skills','demo','SKILL.md'),'---\nname: demo\ndescription: Test protocol fixture\n---\nRun check.mjs.');fs.writeFileSync(path.join(repository,'skills','demo','check.mjs'),'console.log("actual fixture output 42");');
  fs.writeFileSync(path.join(project,'tracked.txt'),'committed project');
+ const longFile='long-'.repeat(27)+'.txt';fs.writeFileSync(path.join(project,longFile),'committed long path');
  for(const directory of [repository,project]){await execute('git',['add','.'],{cwd:directory});assert.equal((await execute('git',['-c','user.name=Fixture','-c','user.email=fixture@example.com','commit','-m','fixture'],{cwd:directory})).code,0);}
  const originalHead=(await execute('git',['rev-parse','HEAD'],{cwd:project})).tail.trim();
  fs.writeFileSync(path.join(project,'tracked.txt'),'dirty original must survive');fs.writeFileSync(path.join(project,'untracked.txt'),'do not copy');
  const config={dataDir:path.join(root,'worker'),server:'https://example.com',deviceId:'pc',skillProjects:[project]};
  const login=path.join(trialRoot(config),'login');fs.mkdirSync(login,{recursive:true});fs.writeFileSync(path.join(login,'auth.json'),'{}');
  const task={id:id(),assignmentId:id(),content:'测试夹具',trial:{deviceId:'pc',projectId:hash(fs.realpathSync(project)).slice(0,32),target:cleanTrialTarget({...target,ref:'HEAD'})}};
- const posts=[];
+ const posts=[];let interrupted=false,modelCalls=0;
  const run=async(command,args,options)=>{
    if(args[0]==='--version')return {code:0,tail:'codex-cli 0.148.0'};
    if(args[0]==='login')return {code:0,tail:'Fixture login'};
    if(args.includes('debug')){fs.writeFileSync(options.logFile,path.join(options.cwd,'.agents','skills',fs.readdirSync(path.join(options.cwd,'.agents','skills'))[0]));return {code:0,tail:''};}
-   if(command==='git')return execute(command,args.map(a=>a===target.repository?repository:a),options);
-   if(args[0]==='exec')return execute(process.execPath,[fileURLToPath(new URL('./fixtures/trial-codex.mjs',import.meta.url))],options);
+   if(command==='git'){
+     const result=await execute(command,args.map(a=>a===target.repository?repository:a),options);
+     if(args.includes('--force')&&!interrupted){fs.unlinkSync(path.join(trialRoot(config),'tasks',task.id,'project',longFile));interrupted=true;}
+     return result;
+   }
+   if(args[0]==='exec'){
+     modelCalls++;
+     assert.equal(fs.readFileSync(path.join(options.cwd,longFile),'utf8'),'committed long path');
+     assert.equal((await execute('git',['status','--porcelain','--untracked-files=no'],{cwd:options.cwd})).tail.trim(),'');
+     return execute(process.execPath,[fileURLToPath(new URL('./fixtures/trial-codex.mjs',import.meta.url))],options);
+   }
    throw Error('Unexpected command '+command);
  };
  await processCodexTrial(config,task,null,()=>{},async(...args)=>{posts.push(args);return {};},{run});
+ assert.equal(modelCalls,0);assert.equal(posts.at(-1)[3].actionRequired.kind,'dependency');
+ await processCodexTrial(config,task,null,()=>{},async(...args)=>{posts.push(args);return {};},{run});
+ assert.equal(modelCalls,1);
  const report=posts.find(args=>args[1].endsWith('/trial-report'))?.[3];assert.ok(report,JSON.stringify(posts));assert.equal(report.verdict,'passed');assert.equal(report.projectCommit,originalHead);assert.equal(report.evidence.every(e=>e.verified),true);
  const workspace=path.join(trialRoot(config),'tasks',task.id);assert.equal(fs.readFileSync(path.join(workspace,'project','tracked.txt'),'utf8'),'committed project');assert.equal(fs.existsSync(path.join(workspace,'project','untracked.txt')),false);assert.equal(fs.readFileSync(path.join(project,'tracked.txt'),'utf8'),'dirty original must survive');
  assert.equal(fs.readFileSync(path.join(login,'auth.json'),'utf8'),'{}');for(const name of fs.readdirSync(workspace).filter(n=>n.startsWith('home-')))assert.equal(fs.existsSync(path.join(workspace,name,'auth.json')),false);
