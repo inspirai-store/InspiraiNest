@@ -59,4 +59,6 @@ node collector/scripts/stage-writing.mjs
 - 使用真实隔离服务进行浏览器联调：固定批次、后台执行、输入保留、稍后/已读、跨客户端共享、可选项目提交，以及 320/360/393/412/736 宽度、日夜模式通过。打包页面另以模拟原生传输层连接真实服务检查导航、图标及大字号；这不等于 Android WebView 实机验收。
 - 独立 Android SDK 模拟器缺少 Windows 加速驱动，软件模拟启动未能就绪，已停止该实例；未操作其他已连接设备。
 
-真实测试账号登录后的 Codex 模型运行、安卓模拟器/物理分享、macOS 登录终端及正式升级仍待相应环境验收。当前仅生成本地 debug APK，未发布或部署生产。验证日志与页面截图保存在忽略目录 `collector/test-output/processing-center/`。
+正式交付（2026-10-16）：主站、Windows/macOS 0.2.7 及原签名 Android 1.3.13 / versionCode 20 已发布。完整公共 CI、Android 44 项 release 单测和 Lint、Mac 两种架构签名公证及签名包联调通过；生产文件、原有数据保留、公开下载与升级清单已回验。Android 包内资源与提交代码一致，签名与上一正式版一致。完整版本、文件哈希和回滚记录见 [发布记录](../../docs/releases/2026-10-16-codex-trials-0.2.7.md)。
+
+真实测试账号登录后的 Codex 模型运行、安卓模拟器/真机分享及覆盖升级、macOS 专用登录终端仍待相应环境验收。本轮没有操作用户手机或升级现有登记电脑。验证日志与页面截图保存在忽略目录 `collector/test-output/processing-center/`，私有发布证据保存在忽略目录 `.runtime/codex-trials-027-20261016/`。
