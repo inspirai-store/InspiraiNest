@@ -1,2 +1,3 @@
 collector/desktop/entitlements.mac.plist text eol=lf
 collector/skills/writing-workshop/** text eol=lf
+collector/skills/writing-workshop-v1/** text eol=lf

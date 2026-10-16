@@ -22,6 +22,7 @@ import WebKit
         let controller = CaptureController(onNavigate: { _ in })
         let session = UUID().uuidString.lowercased(), task = UUID().uuidString.lowercased()
         XCTAssertTrue(controller.allowed("/api/writing/sessions/\(session)/answers", "POST"))
+        XCTAssertTrue(controller.allowed("/api/writing/sessions/\(session)/turns", "POST"))
         XCTAssertTrue(controller.allowed("/api/writing/sessions/\(session)/history", "GET"))
         XCTAssertTrue(controller.allowed("/api/writing/sessions/\(session)/drafts/\(task)/files/" + String(repeating: "a", count: 64), "GET"))
         XCTAssertFalse(controller.allowed("/api/writing/tasks/\(task)/result", "POST"))

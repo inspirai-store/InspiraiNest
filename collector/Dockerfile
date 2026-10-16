@@ -7,6 +7,7 @@ COPY collector/package.json collector/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY collector/src ./src
 COPY collector/skills/writing-workshop ./skills/writing-workshop
+COPY collector/skills/writing-workshop-v1 ./skills/writing-workshop-v1
 COPY collector/public ./public
 COPY assets/vendor /app/assets/vendor
 COPY assets/library.js assets/library.css assets/library-time.js /app/assets/

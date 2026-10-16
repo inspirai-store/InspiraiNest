@@ -11,6 +11,7 @@ files:
   - desktop/account-session.mjs
   - desktop/runtime-events.mjs
   - desktop/main.mjs
+  - desktop/trial-login.mjs
   - desktop/manager.mjs
   - desktop/execution-environment.mjs
   - desktop/owner-client.mjs
@@ -56,6 +57,8 @@ files:
   - public/skill-market.css
   - src/**
   - skills/writing-workshop/**
+  - skills/writing-workshop-v1/**
+  - skills/writing-workshop-v2-025/**
   - worker.production.example.json
   - node_modules/**
 extraResources:

@@ -1,5 +1,7 @@
 # Collector
 
+[计划式写作共创](docs/WRITING_COAUTHOR.md)：从一句想法开始，由 AI 提方向、逐题共创提纲，明确开始后按版本化规则成文；兼容旧写作任务。
+
 See [installation and configuration](../docs/SELF_HOSTING.md), [security boundaries](../SECURITY.md), [rights decisions](../docs/RIGHTS.md) and [third-party notices](../docs/THIRD_PARTY.md).
 
 桌面客户端每次发布须同批交付 Windows x64、macOS arm64 和 macOS x64，统一源码提交与桌面版本号，并同步官网下载和自动更新入口。见 [发布约定与记录](docs/CLIENT_RELEASES.md)。

@@ -7,12 +7,15 @@ import store.inspirai.library.core.*;
 public class TaskActivity extends Screen {
  private String id,last="";private boolean loading;private final Handler timer=new Handler(Looper.getMainLooper());
  private final Runnable poll=new Runnable(){public void run(){load();timer.postDelayed(this,5000);}};
- @Override public void onCreate(Bundle state){super.onCreate(state);id=getIntent().getStringExtra("taskId");page("采集详情","查看进度与采集结果");notice("正在载入任务…");}
+ @Override public void onCreate(Bundle state){super.onCreate(state);id=getIntent().getStringExtra("taskId");page("任务详情","");notice("正在载入任务…");}
  @Override protected void onResume(){super.onResume();timer.post(poll);}
  @Override protected void onPause(){timer.removeCallbacks(poll);super.onPause();}
  private void load(){if(loading||id==null)return;loading=true;io.execute(()->{try{JSONArray tasks=new Api(new Credentials(this)).call("/api/state","GET",null).getJSONArray("tasks");JSONObject found=null;for(int i=0;i<tasks.length();i++)if(id.equals(tasks.getJSONObject(i).optString("id")))found=tasks.getJSONObject(i);JSONObject task=found;ui(()->{loading=false;if(task==null){notice("任务不存在或已不可访问。");return;}notice("");if(!last.equals(task.toString())){last=task.toString();render(task);}});}catch(Exception e){ui(()->{loading=false;fail(e);});}});}
  private void render(JSONObject task){int y=scroll.getScrollY();body.removeAllViews();String state=task.optString("state");LinearLayout summary=card(body);summary.addView(label(MainActivity.stateName(state),14,true));summary.addView(label(InputFiles.title(task),18,true));String scenario=task.optString("scenario");if(!scenario.isEmpty()&&!scenario.equals("null"))summary.addView(label(scenario,15,false));
   if(state.equals("awaiting_review"))primary(button(body,"阅读结果并审核",()->startActivity(new Intent(this,BundleActivity.class).putExtra("route","/api/tasks/"+id+"/draft").putExtra("taskId",id))));
+  if(task.optJSONObject("report")!=null||task.optJSONObject("actionRequired")!=null)primary(button(body,"在处理中心查看",()->startActivity(new Intent(this,CaptureActivity.class).putExtra("processing",true).putExtra("processingTask",id))));
+  JSONArray linked=task.optJSONArray("linkedTrials");if(linked!=null)for(int i=0;i<linked.length();i++){JSONObject child=linked.optJSONObject(i);button(body,child.optString("title","Codex 实测"),()->startActivity(new Intent(this,CaptureActivity.class).putExtra("processing",true).putExtra("processingTask",child.optString("id"))));}
+  JSONObject trial=task.optJSONObject("trial");if(trial!=null)button(body,"查看原资料",()->startActivity(new Intent(this,TaskActivity.class).putExtra("taskId",trial.optString("parentTaskId"))));
   JSONArray inputs=task.optJSONArray("inputAttachments");if(inputs!=null&&inputs.length()>0){body.addView(label("输入附件",18,true));for(int i=0;i<inputs.length();i++){JSONObject f=inputs.optJSONObject(i);button(body,f.optString("name")+" · 查看原件",()->startActivity(new Intent(this,InputAttachmentActivity.class).putExtra("route","/api/tasks/"+id+"/input-files/"+f.optString("sha256")).putExtra("meta",f.toString())));}}
   if(!task.isNull("archiveId"))primary(button(body,"阅读归档结果",()->startActivity(new Intent(this,BundleActivity.class).putExtra("route","/api/archives/"+task.optString("archiveId")))));
   if(state.equals("failed")||state.equals("waiting_action"))primary(button(body,"继续采集",()->action("retry")));

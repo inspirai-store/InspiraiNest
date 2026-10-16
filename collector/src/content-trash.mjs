@@ -31,12 +31,13 @@ export function createContentTrash({store,serialized,owner,authenticate,body,sen
    const deletedAt=action==='delete'?now():null,trashVersion=(current.trashVersion??0)+1;
    let next={...current,deletedAt,trashVersion};
    if(action==='delete'){
-    const related=type==='task'||type==='selection-writing'?[row]:type==='record'?(await tx.list('task')).filter(t=>t.recordId===targetId):type==='writing'?(await tx.list('task')).filter(t=>t.writingSessionId===targetId):[];
+    const related=type==='task'?[row,...(await tx.list('task')).filter(t=>t.trial?.parentTaskId===row.id)]:type==='selection-writing'?[row]:type==='record'?(await tx.list('task')).filter(t=>t.recordId===targetId):type==='writing'?(await tx.list('task')).filter(t=>t.writingSessionId===targetId):[];
     for(const task of related){let live=task;if(!terminal.has(task.state)){
      const cancelled=await saveTask({...task,assignmentId:id()},'cancelled','已删除，执行已取消',tx);
      if((type==='task'||type==='selection-writing')&&task.id===row.id)next={...cancelled,deletedAt,trashVersion};live=cancelled;
     }if(type==='writing'&&!live.deletedAt)await tx.put('task',{...live,deletedAt,trashVersion:(live.trashVersion??0)+1,deletedWithParent:'writing:'+targetId});}
    }
+   if(type==='task'&&action==='delete'&&row.codexTrial)next.codexTrialStopped=true;
    if(type==='writing'&&action==='restore')for(const task of await tx.list('task'))if(task.deletedWithParent==='writing:'+targetId)await tx.put('task',{...task,deletedAt:null,deletedWithParent:null,trashVersion:(task.trashVersion??0)+1});
    if(type==='writing'&&action==='restore'&&next.status==='processing')next.status='blocked';
    await tx.put(type==='library'?'trash':kinds[type],next);

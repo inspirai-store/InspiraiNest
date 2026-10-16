@@ -58,6 +58,9 @@ jobs:
       - name: Test mixed capture in Chrome
         run: node scripts/test-capture.cjs
         working-directory: collector
+      - name: Test asynchronous processing center against isolated REST
+        run: node scripts/test-processing-center.cjs
+        working-directory: collector
       - name: Test isolated MySQL authorization and skills
         run: node scripts/test-auth-mysql.cjs
         working-directory: collector
@@ -182,6 +185,8 @@ jobs:
         run: node collector/scripts/test-desktop-react.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged record conflicts and manual merge
         run: node collector/scripts/test-records-packaged.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
+      - name: Test packaged Windows planning conversation and owner bridge
+        run: node collector/scripts/test-desktop-writing.cjs collector/desktop/dist/win-unpacked/InspiraiNest.exe
       - name: Test packaged Windows update download
         shell: pwsh
         run: |
@@ -283,6 +288,7 @@ jobs:
             app=desktop/dist/mac/灵藏.app
           fi
           node scripts/test-records-packaged.cjs "$app/Contents/MacOS/灵藏"
+          node scripts/test-desktop-writing.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-update-lifecycle.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-packaged-update.cjs "$app/Contents/MacOS/灵藏" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
         working-directory: collector

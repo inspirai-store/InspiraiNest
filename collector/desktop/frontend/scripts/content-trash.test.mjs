@@ -30,3 +30,31 @@ test('旧 Worker 不领取卸载操作，恢复兼容声明后重新可见',asyn
  await f.app.store.put('agent-environment',agent);await f.app.store.put('skill-environment',skill);current=await heartbeat();assert.ok(current.agentOperations.includes(a.id));assert.ok(current.skillOperations.includes(b.id));});
 
 test('旧服务端明确提示待升级，不伪造删除成功',async()=>{const {ContentClient}=await import('../src/content/client.ts');const calls=[],client=new ContentClient({status:async()=>({paired:true,server:'https://old.invalid',deviceId:'A'}),request:async input=>{calls.push(input);return {status:404,json:{error:'Not found'}};}});await assert.rejects(client.list(),/服务端待升级/);await assert.rejects(client.change({type:'task',id:'task',title:'旧任务',version:0,trashVersion:0},'delete',crypto.randomUUID()),/服务端待升级/);assert.equal(calls.length,2);});
+
+
+test('删除后的采集任务不派生试运行，恢复也不自动重启；处理中心隐藏删除项',async t=>{
+ const f=await fixture(t),task=await api(f.identity,'/api/tasks','POST',{content:'待实测资料',submissionId:crypto.randomUUID()});
+ await f.app.store.put('task',{...task,state:'completed',codexTrial:{deviceId:'fixture-node'},trialCandidates:[],archiveId:'preserved-archive'});
+ await api(f.identity,'/api/content-trash/task/'+task.id+'/delete','POST',mutation(0));
+ assert.equal((await api(f.identity,'/api/state')).tasks.some(t=>t.trial?.parentTaskId===task.id),false);
+ assert.equal((await api(f.identity,'/api/processing-center')).items.some(t=>t.taskIds.includes(task.id)),false);
+ await api(f.identity,'/api/content-trash/task/'+task.id+'/restore','POST',mutation(0,1));
+ const restored=(await api(f.identity,'/api/state')).tasks.find(t=>t.id===task.id);assert.equal(restored.state,'completed');assert.equal(restored.archiveId,'preserved-archive');
+ assert.equal((await f.app.store.list('task')).some(t=>t.trial?.parentTaskId===task.id),false);
+});
+test('删除采集取消关联试运行；删除的实测报告不能读取或重试',async t=>{
+ const f=await fixture(t),task=await api(f.identity,'/api/tasks','POST',{content:'父任务',submissionId:crypto.randomUUID()}),child={...task,id:crypto.randomUUID(),purpose:'codex-trial',state:'running',deviceId:'fixture-node',assignmentId:crypto.randomUUID(),trial:{parentTaskId:task.id,deviceId:'fixture-node',target:{}},report:{markdown:'原报告'}};
+ await f.app.store.put('task',{...task,state:'completed',codexTrial:{deviceId:'fixture-node'}});await f.app.store.put('task',child);
+ await api(f.identity,'/api/content-trash/task/'+task.id+'/delete','POST',mutation(0));
+ const cancelled=await f.app.store.get('task',child.id);assert.equal(cancelled.state,'cancelled');assert.notEqual(cancelled.assignmentId,child.assignmentId);
+ await api(f.identity,'/api/content-trash/task/'+child.id+'/delete','POST',mutation(0));
+ await assert.rejects(api(f.identity,'/api/tasks/'+child.id+'/trial-report'),/尚未生成/);
+ await assert.rejects(api(f.identity,'/api/tasks/'+child.id+'/trial-rerun','POST',{requestId:crypto.randomUUID()}),/不存在/);
+});
+test('协作写作 v2 删除后不能提交新轮次，恢复保留想法与版本且不执行',async t=>{
+ const f=await fixture(t),session=await api(f.identity,'/api/writing/sessions','POST',{requestId:crypto.randomUUID(),protocolVersion:2,brief:'新的协作写作想法',sources:[]});
+ await api(f.identity,'/api/content-trash/writing/'+session.id+'/delete','POST',mutation(session.version));
+ await assert.rejects(api(f.identity,'/api/writing/sessions/'+session.id+'/turns','POST',{requestId:crypto.randomUUID(),baseVersion:session.version,text:'迟到继续'}),/不存在/);
+ await api(f.identity,'/api/content-trash/writing/'+session.id+'/restore','POST',mutation(session.version,1));
+ const restored=await api(f.identity,'/api/writing/sessions/'+session.id);assert.equal(restored.brief,'新的协作写作想法');assert.equal(restored.version,session.version);assert.ok(restored.runs.every(run=>['cancelled','completed','failed','interrupted'].includes(run.state)));
+});

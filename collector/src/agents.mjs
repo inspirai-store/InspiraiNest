@@ -1,6 +1,7 @@
 import spawn from 'cross-spawn';
 import fs from 'node:fs';
 import path from 'node:path';
+import {StringDecoder} from 'node:string_decoder';
 import { resolveAgentProfile, commandEnvironment, agentVersion } from './agent-paths.mjs';
 
 export const defaults = {
@@ -33,7 +34,7 @@ export function agentEnvironment(source = process.env) {
   return { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', ...Object.fromEntries(Object.entries(source).filter(([key]) => !blocked.test(key))) };
 }
 
-export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 30000, signal, env = agentEnvironment() } = {}) {
+export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 30000, signal, env = agentEnvironment(), onEvent } = {}) {
   return new Promise(resolve => {
     const child = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
     let tail = '';
@@ -45,6 +46,8 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
     let toolActivity = false;
     let permissionBlocked = false;
     let pendingLine = '';
+    let finalMessage = '';
+    const stdoutDecoder=new StringDecoder('utf8');
     const log = logFile ? fs.createWriteStream(logFile, { flags: 'a', mode: 0o600 }) : null;
     const collect = chunk => {
       tail = (tail + chunk.toString()).slice(-32000);
@@ -53,12 +56,19 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
     };
     child.stdout.on('data', collect);
     child.stdout.on('data', chunk => {
-      pendingLine += chunk.toString();
+      pendingLine += stdoutDecoder.write(chunk);
       const lines = pendingLine.split('\n');
       pendingLine = lines.pop().slice(-100000);
       for (const line of lines) {
         try {
           const event = JSON.parse(line);
+          if(event.type==='item.completed'&&event.item?.type==='agent_message')finalMessage=String(event.item.text||'').slice(-200000);
+          if(event.type==='assistant'&&Array.isArray(event.message?.content))finalMessage=event.message.content.filter(part=>part.type==='text').map(part=>part.text||'').join('\n').slice(-200000);
+          const toolTypes=['command_execution','file_change','mcp_tool_call','web_search','function_call'];
+          if(onEvent){
+            const activity=['thread.started','turn.started'].includes(event.type)?'started':event.type==='item.completed'&&toolTypes.includes(event.item?.type)?'tool_completed':event.type==='user'&&event.message?.content?.some?.(part=>part.type==='tool_result')?'tool_completed':null;
+            if(activity)try{onEvent({type:activity});}catch{ /* Progress observers cannot interrupt execution. */ }
+          }
           if (['command_execution', 'file_change', 'mcp_tool_call', 'web_search', 'function_call'].includes(event.item?.type) || event.message?.content?.some?.(part => part.type === 'tool_use')) toolActivity = true;
           const results = event.message?.content;
           if (Array.isArray(results) && results.some(part => part.type === 'tool_result' && /Permission to use .+ has been denied because this tool requires approval but permission prompts are not available in non-interactive mode/.test(typeof part.content === 'string' ? part.content : JSON.stringify(part.content)))) {
@@ -80,7 +90,7 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
       clearTimeout(forceTimer);
       signal?.removeEventListener('abort', abort);
       log?.end();
-      resolve({ code, tail, spawnError, timedOut, aborted, toolActivity, permissionBlocked });
+      resolve({ code, tail, spawnError, timedOut, aborted, toolActivity, permissionBlocked, finalMessage });
     });
     if (aborted) stop();
     else child.stdin.end(input);
@@ -136,7 +146,13 @@ export function agentOrder(config, task, available) {
   return [...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || ['codebuddy'])])].filter(name => available[name]?.available);
 }
 
-export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs }) {
+export function writingRoundArgs(name,args,reasoningEffort){
+  if(name!=='codex'||!reasoningEffort||!args.includes('exec')||args.some(arg=>/model_reasoning_effort\s*=/.test(arg)))return args;
+  if(!['minimal','low','medium','high'].includes(reasoningEffort))throw Error('Invalid writing round reasoning effort');
+  const index=args.at(-1)==='-'?args.length-1:args.length;
+  return [...args.slice(0,index),'-c',`model_reasoning_effort="${reasoningEffort}"`,...args.slice(index)];
+}
+export async function runAgent(name, profiles, { cwd, prompt, signal, timeoutMs, onEvent, reasoningEffort }) {
   const profile = agentProfile(name, profiles);
-  return execute(profile.command, profile.args, { cwd, input: prompt, signal, timeoutMs, env: commandEnvironment(profile, agentEnvironment()), logFile: path.join(cwd, '..', `${name}.log`) });
+  return execute(profile.command, writingRoundArgs(name,profile.args,reasoningEffort), { cwd, input: prompt, signal, timeoutMs, onEvent, env: commandEnvironment(profile, agentEnvironment()), logFile: path.join(cwd, '..', `${name}.log`) });
 }

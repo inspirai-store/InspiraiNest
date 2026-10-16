@@ -1,15 +1,16 @@
 import path from 'node:path';
 import { hash,id,now,requireValue,canonicalJson } from './common.mjs';
 import { validateArchive } from './archive.mjs';
-import { validateRound,validateAnswers,validateWritingCoverage,writingSkill } from './writing-protocol.mjs';
+import { validatePublicationImages } from './writing-images.mjs';
+import { validateRound,validateAnswers,validateWritingCoverage,skillForVersion,defaultWritingStyle } from './writing-protocol.mjs';
 
 const uuid=value=>typeof value==='string'&&/^[a-f0-9-]{36}$/i.test(value);
 const active=['queued','assigned','running','uploading'];
 const mimeFor=name=>({'.md':'text/markdown','.txt':'text/plain','.pdf':'application/pdf','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.avif':'image/avif','.srt':'text/plain','.vtt':'text/plain'})[path.extname(name).toLowerCase()]||'application/octet-stream';
 const publicSource=source=>({...source,files:source.files.map(({storageKey,archiveKey,archivePath,...file})=>file)});
 export function createWriting({store,storage,serialized,owner,assigned,authenticate,body,send,saveTask,publish}) {
-  async function sources(inputs) {
-    requireValue(Array.isArray(inputs)&&inputs.length>0&&inputs.length<=20,'请选择一至二十份材料');
+  async function sources(inputs,{allowEmpty=false}={}) {
+    requireValue(Array.isArray(inputs)&&(allowEmpty||inputs.length>0)&&inputs.length<=20,'请选择一至二十份材料');
     const result=[];let total=0;
     for(const input of inputs) {
       requireValue(['material','exemplar'].includes(input.role),'材料身份无效');
@@ -41,7 +42,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     requireValue(bytes.length===file.bytes&&hash(bytes)===file.sha256,'原件校验失败',500);return bytes;
   }
   async function view(session) {
-    const runs=await Promise.all(session.runs.map(async run=>{const task=await store.get('task',run.taskId);return {...run,state:task?.state||'failed',draftId:task?.draftId||null,archiveId:task?.archiveId||null,message:task?.events?.at(-1)?.message||''};}));
+    const runs=await Promise.all(session.runs.map(async run=>{const task=await store.get('task',run.taskId),device=task?.deviceId?await store.get('device',task.deviceId):null;return {...run,state:task?.state||'failed',draftId:task?.draftId||null,archiveId:task?.archiveId||null,message:task?.events?.at(-1)?.message||'',progress:task?.writingProgress||null,deviceName:device?.name||null};}));
     const latest=runs.at(-1); let status=session.ready?(session.style?'ready':'awaiting_style'):'awaiting_answers';
     if(latest&&active.includes(latest.state))status='processing';
     else if(latest&&['failed','waiting_action','interrupted'].includes(latest.state))status='blocked';
@@ -50,8 +51,8 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     return {...session,sources:session.sources.map(publicSource),runs,status};
   }
   async function queue(session,mode,tx,request={}) {
-    const skill=writingSkill();const {files,...pinnedSkill}=skill;
-    const taskId=id(),snapshot={sessionId:session.id,version:session.version,createdAt:session.createdAt,title:session.title,context:session.context,decisions:session.decisions||[],openIssues:session.openIssues||[],sources:session.sources,answers:session.answers,rounds:session.rounds,plan:session.plan,planVersion:session.planVersion,style:session.style,styleVersion:session.style?.id||null,request,allowReopen:request.allowReopen===true,skill:pinnedSkill};
+    const protocolVersion=session.protocolVersion||1,skill=skillForVersion(protocolVersion);const {files,...pinnedSkill}=skill;
+    const taskId=id(),snapshot={sessionId:session.id,version:session.version,protocolVersion,createdAt:session.createdAt,title:session.title,brief:session.brief||'',turns:session.turns||[],workingPlan:session.workingPlan||null,context:session.context,decisions:session.decisions||[],openIssues:session.openIssues||[],sources:session.sources,answers:session.answers,rounds:session.rounds,plan:session.plan,planVersion:session.planVersion,style:session.style,styleVersion:session.style?.id||null,request,allowReopen:request.allowReopen===true,skill:pinnedSkill};
     if(request.previousDraftKey){const bundle=validateArchive(JSON.parse(await storage.get(request.previousDraftKey)));snapshot.sources=[...snapshot.sources,{id:id(),kind:'draft',role:'previous',label:'上一版稿件',text:'请读取上一版完整稿件，按用户要求局部修改。',files:bundle.files.map(f=>({id:id(),path:f.path,mime:mimeFor(f.path),sha256:f.sha256,bytes:f.bytes,archiveKey:request.previousDraftKey,archivePath:f.path}))}];}
     await saveTask({id:taskId,type:'note',content:session.title,url:null,tags:[],scenario:null,autoArchive:false,deviceId:null,archiveId:null,createdAt:now(),preferredDeviceId:session.deviceId||null,preferredAgent:session.agent||null,recordId:session.sources.find(s=>s.kind==='record'&&s.role==='material')?.ref||null,writingSessionId:session.id,writingMode:mode,writingSnapshot:snapshot},'queued',mode==='round'?'等待电脑理解材料并提出问题':'等待电脑按写作约定成文',tx);
     session.runs.push({taskId,mode,version:session.version,planVersion:session.planVersion,styleVersion:session.style?.id||null,createdAt:now()});
@@ -63,27 +64,45 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     const requestHash=hash(canonicalJson({action,input}));
     const savedReceipt=await store.get('writing-receipt',`${sessionId||'new'}:${input.requestId}`);
     if(savedReceipt){requireValue(savedReceipt.hash===requestHash,'请求编号已用于其他内容',409);return savedReceipt.result;}
-    const material=(action==='create'||action==='materials')?await sources(input.sources):null;
+    requireValue(input.protocolVersion===undefined||input.protocolVersion===1||input.protocolVersion===2,'不支持的写作协议');
+    const creatingV2=action==='create'&&(input.protocolVersion===2||input.brief!==undefined);
+    if(creatingV2)requireValue(typeof (input.brief??'')==='string'&&(input.brief||'').length<=10000,'写作想法过长或无效');
+    const material=(action==='create'||action==='materials')?await sources(input.sources||(creatingV2?[]:undefined),{allowEmpty:creatingV2}):null;
     return serialized('claim',()=>store.transaction(async tx=>{
       const credential=await tx.getForUpdate('device',device.credentialId||device.id);requireValue(credential&&!credential.revokedAt&&(credential.tokenHash===device.credentialTokenHash||credential.ownerTokenHash===device.credentialTokenHash),'Device authorization required',401);
       const receiptId=`${sessionId||'new'}:${input.requestId}`,receipt=await tx.getForUpdate('writing-receipt',receiptId);
       if(receipt){requireValue(receipt.hash===requestHash,'请求编号已用于其他内容',409);return receipt.result;}
       let session;
       if(action==='create') {
-        requireValue(material.some(s=>s.role==='material'),'请先提供文章材料');
+        requireValue(material.some(s=>s.role==='material')||creatingV2&&input.brief?.trim(),'请说一句写作想法或选择已有材料');
         requireValue(!input.agent||['codex','codebuddy'].includes(input.agent),'未知 Agent');
-        session={id:id(),version:1,title:String(input.title||material[0].label||'新文章').slice(0,200),createdAt:now(),updatedAt:now(),context:{audience:'技术实践者',language:'zh-CN',outputs:['illustrated-article','offline-html','markdown','assets']},sources:material,answers:[],rounds:[],runs:[],plan:null,planVersion:0,style:null,styleCandidates:[],ready:false,deviceId:input.deviceId||null,agent:input.agent||null};
+        session={id:id(),version:1,protocolVersion:creatingV2?2:1,brief:creatingV2?(input.brief||''):'',titleSource:input.title?'user':'assistant',title:String(input.title||input.brief?.trim().split('\n')[0]||material[0]?.label||'新文章').slice(0,200),createdAt:now(),updatedAt:now(),context:{audience:'技术实践者',language:'zh-CN',outputs:['illustrated-article','offline-html','markdown','assets']},sources:material,answers:[],turns:[],rounds:[],runs:[],workingPlan:null,plan:null,planVersion:0,style:creatingV2?defaultWritingStyle():null,styleCandidates:[],ready:false,deviceId:input.deviceId||null,agent:input.agent||null};
         await queue(session,'round',tx);
       } else {
         session=await tx.getForUpdate('writing-session',sessionId);requireValue(session&&!session.deletedAt,'写作会话不存在',404);
         requireValue(session.version===input.baseVersion,'文章已在其他设备更新，本机输入保留，请刷新后继续',409);
         const latest=session.runs.at(-1),task=latest?await tx.getForUpdate('task',latest.taskId):null;
-        const changing=['materials','discuss','revise'].includes(action);
+        const changing=['materials','discuss','revise','turns'].includes(action);
         requireValue(!task||!active.includes(task.state)||changing,'这一轮仍在处理中',409);
         if(task&&active.includes(task.state)&&changing)await saveTask(task,'cancelled','材料或写作要求已更新，保留旧轮次快照',tx);
         session.version++;
-        if(action==='answers') {
-          const round=session.rounds.at(-1);requireValue(round&&round.id===input.roundId&&!round.answeredAt,'本轮问题已变化，请刷新',409);
+        if(action==='turns') {
+          const message=input.message??'',provided=input.answers??[];
+          requireValue(typeof message==='string'&&message.length<=10000,'补充内容过长或无效');
+          requireValue(Array.isArray(provided)&&(message.trim()||provided.length),'请选择答案或补充一句想法');
+          const round=session.rounds.at(-1);
+          requireValue(!input.roundId||round&&round.id===input.roundId&&!round.answeredAt&&!round.supersededAt,'本轮问题已变化，请刷新',409);
+          requireValue(!provided.length||input.roundId&&round,'答案必须对应当前问题');
+          const answers=provided.length?validateAnswers(round.result.questions,provided,{partial:true}):[];
+          const at=now();session.answers.push(...answers.map(a=>({...a,roundId:round.id,at})));
+          session.turns ||= [];session.turns.push({id:input.requestId,roundId:input.roundId||null,answers,message,at});
+          if(round&&!round.answeredAt&&!round.supersededAt&&round.result.questions.length){
+            if(answers.length===round.result.questions.length)round.answeredAt=at;else round.supersededAt=at;
+          }
+          session.protocolVersion=2;session.style ||= defaultWritingStyle();session.ready=false;
+          await queue(session,'round',tx,{message,allowReopen:Boolean(message.trim())});
+        } else if(action==='answers') {
+          const round=session.rounds.at(-1);requireValue(round&&round.id===input.roundId&&!round.answeredAt&&!round.supersededAt,'本轮问题已变化，请刷新',409);
           const answers=validateAnswers(round.result.questions,input.answers);session.answers.push(...answers.map(a=>({...a,roundId:round.id,at:now()})));round.answeredAt=now();session.ready=false;
           await queue(session,'round',tx);
         } else if(action==='materials') {
@@ -91,15 +110,15 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
           await queue(session,'round',tx,{message:input.message||'新材料加入，说明影响并仅重开受影响的决定',allowReopen:true});
         } else if(action==='style') {
           const previousStyle=session.style?.id;
-          if(input.profileId){const style=await tx.get('writing-style',input.profileId);requireValue(style,'行文规则不存在',404);session.style=style;}
+          if(input.profileId){const style=input.profileId==='builtin-editorial-v1'?defaultWritingStyle():await tx.get('writing-style',input.profileId);requireValue(style,'行文规则不存在',404);session.style=style;}
           else {
             const candidate=session.styleCandidates.find(c=>c.id===input.candidateId);requireValue(candidate,'范文规则候选已变化',409);
             requireValue(Array.isArray(input.ruleIds)&&input.ruleIds.length&&new Set(input.ruleIds).size===input.ruleIds.length&&input.ruleIds.every(ruleId=>candidate.rules.some(r=>r.id===ruleId)),'请选择有效行文规则');
-            session.style={id:id(),name:candidate.name,appliesTo:candidate.appliesTo,version:(session.style?.version||0)+1,parentId:session.style?.id||null,createdAt:now(),rules:candidate.rules.filter(r=>input.ruleIds.includes(r.id)),sample:candidate.sample,sources:session.sources.filter(s=>s.role==='exemplar').map(publicSource)};await tx.put('writing-style',session.style);
+            session.style={id:id(),origin:'exemplar',name:candidate.name,appliesTo:candidate.appliesTo,version:(session.style?.version||0)+1,parentId:session.style?.id||null,createdAt:now(),rules:candidate.rules.filter(r=>input.ruleIds.includes(r.id)),sample:candidate.sample,sources:session.sources.filter(s=>s.role==='exemplar').map(publicSource)};await tx.put('writing-style',session.style);
           }
           if(session.runs.some(r=>r.mode!=='round')&&previousStyle!==session.style.id){session.ready=false;await queue(session,'round',tx,{message:'作者确认了新的行文规则，只讨论受影响的表达与计划决定',allowReopen:true});}
         } else if(action==='start') {
-          requireValue(session.ready&&session.plan&&session.style,'请先确定写作约定并确认范文规则',409);
+          requireValue(session.ready&&session.plan&&session.style,'请先确定写作约定和行文规则',409);
           requireValue(input.planVersion===session.planVersion&&input.styleVersion===session.style.id,'写作约定或风格版本已变化',409);
           await queue(session,'draft',tx);
         } else if(action==='discuss'||action==='revise') {
@@ -139,6 +158,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
         requireValue(task.writingMode!=='round','问答轮不得提交整篇成稿',409);
         requireValue(input.bundle?.files?.some(f=>f.role==='publication'&&/\.md$/.test(f.path)),'缺少发表正文');
         validateWritingCoverage(input.coverage,task.writingSnapshot);
+        if(task.writingSnapshot.protocolVersion===2)validatePublicationImages(input.bundle);
         send(res,200,await publish(input.bundle,device,req,task.id));return true;
       }
       requireValue(task.writingMode==='round'||task.writingMode==='revision'&&input.result?.ready===false,'成文轮不得覆盖问答');validateRound(input.result,task.writingSnapshot);
@@ -151,6 +171,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
         requireValue(['assigned','running','uploading'].includes(live.state),'轮次已结束',409);
         const current=await tx.getForUpdate('writing-session',task.writingSessionId);requireValue(current.version===task.writingSnapshot.version&&current.runs.at(-1).taskId===task.id,'会话已经更新',409);
         const result=structuredClone(input.result);current.rounds.push({id:task.id,version:current.version,createdAt:now(),result});
+        if(result.schemaVersion===2){current.workingPlan=result.workingPlan;if(current.titleSource==='assistant')current.title=result.suggestedTitle;}
         if(result.styleCandidate)current.styleCandidates.push({...result.styleCandidate,id:task.id,createdAt:now()});
         if(result.ready){current.plan=result.plan;current.planVersion++;}current.ready=result.ready===true;
         current.understanding=result.understanding;current.directions=result.directions;current.decisions=result.decisions;current.openIssues=result.openIssues;
@@ -159,12 +180,12 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     }
     owner(device);
     if(route==='/api/writing/entries'&&req.method==='GET'){const deleted=new Set((await store.list('trash')).filter(t=>t.deletedAt).map(t=>t.id));const entries=new Map();for(const a of (await store.list('archive')).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)))if(!deleted.has(a.entryId)&&!entries.has(a.entryId))entries.set(a.entryId,{id:a.entryId,title:a.meta.title});send(res,200,{items:[...entries.values()],total:entries.size});return true;}
-    if(route==='/api/writing/styles'&&req.method==='GET'){send(res,200,{items:await store.list('writing-style')});return true;}
+    if(route==='/api/writing/styles'&&req.method==='GET'){send(res,200,{items:[defaultWritingStyle(),...await store.list('writing-style')]});return true;}
     if(route==='/api/writing/sessions') {
       if(req.method==='GET'){send(res,200,{items:await Promise.all((await store.list('writing-session')).filter(s=>!s.deletedAt).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(view))});return true;}
       requireValue(req.method==='POST','Method not allowed',405);send(res,201,await mutation(req,null,'create',device));return true;
     }
-    const match=route.match(/^\/api\/writing\/sessions\/([^/]+)(?:\/(answers|materials|discuss|start|style|revise|drafts|files|history)(?:\/([^/]+)(?:\/files\/([^/]+))?)?)?$/);
+    const match=route.match(/^\/api\/writing\/sessions\/([^/]+)(?:\/(answers|turns|materials|discuss|start|style|revise|drafts|files|history)(?:\/([^/]+)(?:\/files\/([^/]+))?)?)?$/);
     requireValue(match,'Writing route not found',404);const [,sessionId,action,taskId,fileId]=match;
     const session=await store.get('writing-session',sessionId);requireValue(session&&!session.deletedAt,'写作会话不存在',404);
     if(!action){requireValue(req.method==='GET','Method not allowed',405);send(res,200,await view(session));return true;}
