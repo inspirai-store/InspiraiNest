@@ -11,7 +11,7 @@ const {create,until}=require('./react-desktop-fixture.cjs');
    assert.equal(await f.app.evaluate(({app})=>app.getVersion()),version);assert.equal(await f.page.locator('iframe').count(),0);
    await f.login('A');await f.nav('记录');await button('新建记录').click();await f.page.getByRole('textbox',{name:'记录正文',exact:true}).fill('签名包完整记录');await button('保存记录').click();
    await until(async()=>(await f.api(f.targets.A.owner,'/api/records')).records.some(r=>r.text==='签名包完整记录'&&r.document),'complete rich document');
-   await f.close();await f.launch();assert.equal((await f.page.evaluate(()=>window.library.status())).paired,true);await f.nav('记录');await f.page.getByRole('button').filter({hasText:'签名包完整记录'}).click();await f.page.locator('[data-region=内容标题]').getByText('已同步',{exact:true}).waitFor();
+   await f.close();await f.launch();assert.equal((await f.page.evaluate(()=>window.library.status())).paired,true);await f.nav('记录');await f.page.getByRole('button').filter({hasText:'签名包完整记录'}).click();await f.page.locator('[data-region=内容标题]').getByText('已上传',{exact:true}).waitFor();
   });
   await f.check('conditional conflict resolution rejects stale review, preserves merge and creates one version',async()=>{
    const id=crypto.randomUUID(),first={requestId:crypto.randomUUID(),baseVersion:0,text:'共同基线',document:doc('共同基线'),attachments:[],createdAt:new Date().toISOString()};
