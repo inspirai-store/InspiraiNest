@@ -5,7 +5,8 @@
   "source": {
     "uncommittedChanges": true,
     "branch": "main",
-    "baseCommit": "e815139a79e5a86e5ca03d3edc82bee4311398f2"
+    "baseCommit": "e815139a79e5a86e5ca03d3edc82bee4311398f2",
+    "releaseCommit": "cd4b74cf7227be3d8f722ea57311d61e618b5075"
   },
   "candidate": {
     "size": 14245580,
@@ -136,5 +137,42 @@
     "real cross-device conflict and production Agent/model flow",
     "physical-device frame timing"
   ],
-  "deployed": false
+  "deployed": true,
+  "publication": {
+    "passed": true,
+    "version": "1.4.0",
+    "versionCode": 21,
+    "sourceCommit": "cd4b74cf7227be3d8f722ea57311d61e618b5075",
+    "image": "yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-android-native-140-20261017-r1@sha256:48d1d4709f647a3480e2e24b577bbe464e565441ca018f6911fafcbc34685fcd",
+    "rollback": "yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-local-agent-clients-0212-20261017-r1@sha256:7240ffd1bba9065e84f9f8c9761b3c9af9475488920995a630ead9bc57697b3e",
+    "trackedFiles": 325,
+    "downloads": [
+      {
+        "url": "/downloads/personal-library-1.4.0-release.apk",
+        "bytes": 14245580,
+        "sha256": "5c3b112769ea5b0a069382ed86b7a75a9a7eb34b580aecb2a0354bf14b5e31a0"
+      },
+      {
+        "url": "/downloads/InspiraiNest-v1.4.0-Android.apk",
+        "bytes": 14245580,
+        "sha256": "5c3b112769ea5b0a069382ed86b7a75a9a7eb34b580aecb2a0354bf14b5e31a0"
+      }
+    ],
+    "preserved": {
+      "device": 22,
+      "task": 114,
+      "archive": 152,
+      "capture": 13,
+      "skill-version": 4,
+      "record": 0,
+      "writing-session": 2
+    },
+    "otherClientManifestsPreserved": true,
+    "verifiedAt": "2026-10-17T09:48:06.982Z",
+    "ci": {
+      "url": "https://github.com/inspirai-store/InspiraiNest/actions/runs/39021893158",
+      "conclusion": "success"
+    },
+    "signingCertificateSha256": "9e7cfc75562a39a1e1f832493aa610855945a449eed71d85757e686a2d069a80"
+  }
 }

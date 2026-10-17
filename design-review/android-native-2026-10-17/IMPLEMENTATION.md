@@ -70,4 +70,4 @@
 - [四栏日夜运行对照](android-native-day-night.png)、[阅读、富文本与分享运行对照](android-native-reading-sharing.png)。图中使用验收夹具；不是静态设计图或正式用户资料。
 - [组件规范](COMPONENTS.md)、[页面与协议](PROTOCOLS.md)、[手机及正式服务验收清单](DEVICE-ACCEPTANCE.md)。
 
-本轮为本机实现及签名候选交付，未更新正式下载和升级清单。实际手机硬件/权限、TalkBack、真实跨端冲突及真实 Agent 全流程仍按验收清单检查；模拟器通过不代表这些边界已经通过。
+Android 1.4.0 已以原签名发布至正式主站，下载与升级清单已核验。部署和回滚信息见 [正式发布记录](../../docs/releases/2026-10-17-android-native-1.4.0.md)。实际手机硬件/权限、TalkBack、真实跨端冲突及真实 Agent 全流程仍按验收清单检查；模拟器通过不代表这些边界已经通过。
