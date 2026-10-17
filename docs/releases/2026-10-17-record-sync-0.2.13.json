@@ -1,0 +1,143 @@
+{
+  "publishedAt": "2026-10-17T12:55:49.278Z",
+  "source": {
+    "windows": {
+      "ci": "39031828648",
+      "publication": "39032267629",
+      "commit": "bba99c8aeaeafe891d9c4ab948326f002fe778da"
+    },
+    "macos": {
+      "publication": "39031834443",
+      "commit": "bba99c8aeaeafe891d9c4ab948326f002fe778da"
+    },
+    "android": {
+      "commit": "2bed765da5fd220a270769a462e0aff2e3ac8f2c",
+      "build": "local original signing identity",
+      "version": "1.4.1",
+      "versionCode": 22
+    }
+  },
+  "versions": {
+    "desktop": "0.2.13",
+    "android": "1.4.1",
+    "androidVersionCode": 22
+  },
+  "image": "yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-record-sync-clients-0213-20261017-r1@sha256:fc4ddbe099c5a2db9f9d99484dbd45af75ec06756bf0b0c819891fc7bda92e4a",
+  "rollback": "yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-record-sync-0213-20261017-r1@sha256:64bc9ed2c678e9270388bed1c3b18237cfd8d7a521f033faac599d8ef788bd37",
+  "preSyncRollback": "yunizeni-registry-vpc.cn-shenzhen.cr.aliyuncs.com/yunizeni/library-collector:prod-android-native-140-20261017-r1@sha256:48d1d4709f647a3480e2e24b577bbe464e565441ca018f6911fafcbc34685fcd",
+  "artifacts": {
+    "android": {
+      "version": "1.4.1",
+      "versionCode": 22,
+      "filename": "InspiraiNest-v1.4.1-Android.apk",
+      "sha256": "3168cf951b96de03eab97628af03313834db294ba544dcb5078c751d32e48d3d",
+      "size": 14265571,
+      "publishedAt": "2026-10-17T12:13:14.8353157+00:00",
+      "minimumAndroid": "8.0",
+      "url": "/downloads/personal-library-1.4.1-release.apk",
+      "browserUrl": "/downloads/InspiraiNest-v1.4.1-Android.apk",
+      "aliases": [
+        "/downloads/InspiraiNest-v1.4.1-Android.apk",
+        "/downloads/LingNest-v1.4.1-Android.apk"
+      ]
+    },
+    "windows_x64": {
+      "version": "0.2.13",
+      "filename": "InspiraiNest-v0.2.13-Windows-x64.exe",
+      "size": 118554805,
+      "sha256": "ba623d60f33371ceb958764193ae48ffa201d4ed032b32ffe47c2fd839f5dbc4",
+      "publishedAt": "2026-10-17T12:45:49.734Z",
+      "sourceCommit": "bba99c8aeaeafe891d9c4ab948326f002fe778da",
+      "ciRun": "39031828648",
+      "url": "/downloads/InspiraiNest-v0.2.13-Windows-x64.exe",
+      "aliases": [
+        "/downloads/InspiraiNest-v0.2.13-Windows-x64.exe",
+        "/downloads/LingNest-v0.2.13-Windows-x64.exe"
+      ],
+      "legacyUrl": "/downloads/personal-library-worker-0.2.13-windows-x64.exe"
+    },
+    "macos_x64": {
+      "version": "0.2.13",
+      "filename": "InspiraiNest-v0.2.13-macOS-x64.zip",
+      "size": 142681862,
+      "sha256": "c4dc27706138c52a3e8f43adbbd6e6ccefc740fe9d5caaf0e1e45bf0deac6138",
+      "publishedAt": "2026-10-17T12:45:49.734Z",
+      "sourceCommit": "bba99c8aeaeafe891d9c4ab948326f002fe778da",
+      "ciRun": "39031834443",
+      "url": "/downloads/InspiraiNest-v0.2.13-macOS-x64.zip",
+      "aliases": [
+        "/downloads/InspiraiNest-v0.2.13-macOS-x64.zip",
+        "/downloads/LingNest-v0.2.13-macOS-x64.zip"
+      ],
+      "legacyUrl": "/downloads/personal-library-worker-0.2.13-macos-x64.zip"
+    },
+    "macos_arm64": {
+      "version": "0.2.13",
+      "filename": "InspiraiNest-v0.2.13-macOS-arm64.zip",
+      "size": 135891792,
+      "sha256": "4d501a5f37c138097c42264279d9ac37673515af85fb3823e3b38c7feb1a5e58",
+      "publishedAt": "2026-10-17T12:45:49.734Z",
+      "sourceCommit": "bba99c8aeaeafe891d9c4ab948326f002fe778da",
+      "ciRun": "39031834443",
+      "url": "/downloads/InspiraiNest-v0.2.13-macOS-arm64.zip",
+      "aliases": [
+        "/downloads/InspiraiNest-v0.2.13-macOS-arm64.zip",
+        "/downloads/LingNest-v0.2.13-macOS-arm64.zip"
+      ],
+      "legacyUrl": "/downloads/personal-library-worker-0.2.13-macos-arm64.zip"
+    },
+    "macos_x64_dmg": {
+      "version": "0.2.13",
+      "filename": "InspiraiNest-v0.2.13-macOS-x64.dmg",
+      "size": 142658236,
+      "sha256": "d9c4fe10bd6c3d2d1c0a6991f8011148703d88f38d8323a129b961ec2bc7cedb",
+      "publishedAt": "2026-10-17T12:45:49.734Z",
+      "sourceCommit": "bba99c8aeaeafe891d9c4ab948326f002fe778da",
+      "ciRun": "39031834443",
+      "url": "/downloads/InspiraiNest-v0.2.13-macOS-x64.dmg",
+      "aliases": [
+        "/downloads/InspiraiNest-v0.2.13-macOS-x64.dmg",
+        "/downloads/LingNest-v0.2.13-macOS-x64.dmg"
+      ],
+      "legacyUrl": "/downloads/personal-library-worker-0.2.13-macos-x64-dmg.dmg"
+    },
+    "macos_arm64_dmg": {
+      "version": "0.2.13",
+      "filename": "InspiraiNest-v0.2.13-macOS-arm64.dmg",
+      "size": 135900800,
+      "sha256": "4b0630a78093a9a79035c0f0f8c0f064f56b8cb756594412b12816a90e3c963e",
+      "publishedAt": "2026-10-17T12:45:49.734Z",
+      "sourceCommit": "bba99c8aeaeafe891d9c4ab948326f002fe778da",
+      "ciRun": "39031834443",
+      "url": "/downloads/InspiraiNest-v0.2.13-macOS-arm64.dmg",
+      "aliases": [
+        "/downloads/InspiraiNest-v0.2.13-macOS-arm64.dmg",
+        "/downloads/LingNest-v0.2.13-macOS-arm64.dmg"
+      ],
+      "legacyUrl": "/downloads/personal-library-worker-0.2.13-macos-arm64-dmg.dmg"
+    }
+  },
+  "ci": {
+    "main": "https://github.com/inspirai-store/InspiraiNest/actions/runs/39031828648",
+    "signedMac": "https://github.com/inspirai-store/InspiraiNest/actions/runs/39031834443"
+  },
+  "localTests": {
+    "tests": 66,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "Warning": 13
+  },
+  "preserved": {
+    "device": 22,
+    "task": 115,
+    "archive": 152,
+    "capture": 13,
+    "skill-version": 4,
+    "record": 0,
+    "writing-session": 2
+  },
+  "physicalDeviceTested": false
+}
