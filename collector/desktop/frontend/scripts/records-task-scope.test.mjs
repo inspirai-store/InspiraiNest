@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {RecordsService} from '../src/records/data/service.ts';
 test('任务入口只计当前会话远端任务，保留另一账号本机记录',async()=>{
  const items=new Map([['draft',{id:'draft',recordId:'draft-a',text:'',attachments:[]}]]);
- const store={all:async()=>[...items.values()],get:async id=>items.get(id),put:async item=>items.set(item.id,item),commit:async()=>{}};
+ const store={all:async()=>[...items.values()],get:async id=>items.get(id),put:async item=>items.set(item.id,item),putMany:async values=>{for(const item of values)items.set(item.id,item);},commit:async()=>{}};
  let account='A';
  const transport={status:async()=>({paired:true,server:'http://same-service',deviceId:account}),request:async()=>({status:200,json:{records:[{id:account,text:account,attachments:[],version:1,tasks:[{id:account,state:account==='C'?'completed':'queued'}]}]}})};
  const service=new RecordsService(store,transport);
