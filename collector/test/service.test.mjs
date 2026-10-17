@@ -191,7 +191,8 @@ test('manual review keeps drafts private until owner approval and routes to the 
   await assert.rejects(api(second, `/api/tasks/${task.id}/approve`, 'POST', {}), { status: 403 });
   assert.equal((await api(second, '/api/claim', 'POST', {})).task, null);
   await api(second, `/api/tasks/${task.id}/result`, 'POST', draft);
-  await api(owner, `/api/tasks/${task.id}/approve`, 'POST', {});
+  await assert.rejects(api(owner, `/api/tasks/${task.id}/approve`, 'POST', { draftId: '0'.repeat(64) }), { status: 409 });
+  await api(owner, `/api/tasks/${task.id}/approve`, 'POST', { draftId: digest });
   await api(owner, `/api/tasks/${task.id}/approve`, 'POST', {});
   state = await api(owner, '/api/state');
   assert.equal(state.tasks[0].state, 'completed');

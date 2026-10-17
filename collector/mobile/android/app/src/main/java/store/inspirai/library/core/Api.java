@@ -209,6 +209,25 @@ public final class Api {
                     } catch (Exception ignored) {}
                     throw loginFailure(status, code);
                 }
+                if (relative.getRawPath().startsWith("/api/records")) {
+                    String code = "";
+                    try (InputStream errors = connection.getErrorStream()) {
+                        if (errors != null) {
+                            ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+                            byte[] chunk = new byte[512]; int count;
+                            while (errorBuffer.size() < 4097 && (count = errors.read(chunk, 0, Math.min(chunk.length, 4097-errorBuffer.size()))) != -1) errorBuffer.write(chunk,0,count);
+                            byte[] errorBytes = errorBuffer.toByteArray();
+                            if (errorBytes.length <= 4096) code = new JSONObject(new String(errorBytes, StandardCharsets.UTF_8)).optString("code");
+                        }
+                    } catch (Exception ignored) {}
+                    switch (code) {
+                        case "record_version_conflict": throw new Failure(status, "远端已有新版本，请比较本机与远端内容。", code);
+                        case "record_request_reused": throw new Failure(status, "待确认请求与原编号不一致，原内容已保留，请核对同步记录。", code);
+                        case "record_document_required": throw new Failure(status, "此记录需要保留富文本格式，请更新客户端。", code);
+                        case "record_media_missing": throw new Failure(status, "原件尚未完整上传，请重试。", code);
+                        default: break;
+                    }
+                }
                 throw new Failure(status, statusMessage(status));
             }
             String cookie = sessionCookie(connection);

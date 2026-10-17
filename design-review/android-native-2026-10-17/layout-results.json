@@ -1,0 +1,58 @@
+[
+  {
+    "case": "412-default",
+    "passed": true,
+    "pixels": "824x1784",
+    "fontScale": "1.0",
+    "density": 320,
+    "tests": 6
+  },
+  {
+    "case": "360-default",
+    "passed": true,
+    "pixels": "720x1600",
+    "fontScale": "1.0",
+    "density": 320,
+    "tests": 1
+  },
+  {
+    "case": "393-default",
+    "passed": true,
+    "pixels": "786x1704",
+    "fontScale": "1.0",
+    "density": 320,
+    "tests": 1
+  },
+  {
+    "case": "393-font-1.3",
+    "passed": true,
+    "pixels": "786x1704",
+    "fontScale": "1.3",
+    "density": 320,
+    "tests": 1
+  },
+  {
+    "case": "360-font-2.0",
+    "passed": true,
+    "pixels": "720x1600",
+    "fontScale": "2.0",
+    "density": 320,
+    "tests": 1
+  },
+  {
+    "case": "640-landscape",
+    "passed": true,
+    "pixels": "1280x720",
+    "fontScale": "1.0",
+    "density": 320,
+    "tests": 1
+  },
+  {
+    "case": "960-tablet",
+    "passed": true,
+    "pixels": "1920x1200",
+    "fontScale": "1.0",
+    "density": 320,
+    "tests": 1
+  }
+]

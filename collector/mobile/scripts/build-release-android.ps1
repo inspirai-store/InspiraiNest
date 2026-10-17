@@ -1,6 +1,7 @@
 param(
     [string]$SigningDirectory = "$env:LOCALAPPDATA/PersonalLibrary/signing",
-    [string]$CollectorServer
+    [string]$CollectorServer,
+    [string]$TestJavaExecutable
 )
 $ErrorActionPreference = 'Stop'
 & node (Join-Path $PSScriptRoot '../../scripts/stage-writing.mjs')
@@ -31,6 +32,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Signing key creation failed.' }
     }
     $gradleArgs = @('--no-daemon', ':app:assembleRelease', ':app:testReleaseUnitTest', ':app:lintRelease')
+    if (-not $TestJavaExecutable -and (Test-Path "$env:ProgramFiles/Android/Android Studio/jbr/bin/java.exe")) { $TestJavaExecutable = "$env:ProgramFiles/Android/Android Studio/jbr/bin/java.exe" }
+    if ($TestJavaExecutable) { $gradleArgs += "-PtestJavaExecutable=$TestJavaExecutable" }
     if ($CollectorServer) { $gradleArgs += "-PcollectorServer=$CollectorServer" }
     & ./gradlew.bat @gradleArgs
     if ($LASTEXITCODE -ne 0) { throw 'Release build/check failed.' }

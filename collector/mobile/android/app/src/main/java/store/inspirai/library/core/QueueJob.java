@@ -42,10 +42,12 @@ public final class QueueJob extends JobService {
         active = run;
         run.future = executor.submit(() -> {
             boolean reschedule = Outbox.flush(getApplicationContext());
+            reschedule |= store.inspirai.library.nativeui.data.NestDependencies.flushRecords(getApplicationContext());
+            final boolean retry = reschedule;
             main.post(() -> {
                 if (active == run && !run.stopped) {
                     active = null;
-                    jobFinished(params, reschedule);
+                    jobFinished(params, retry);
                 }
             });
         });

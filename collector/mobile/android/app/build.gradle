@@ -1,4 +1,9 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.kotlin.kapt'
+}
 // Optional build-time default. Runtime pairing can select any validated origin.
 def collectorServer = providers.gradleProperty('collectorServer').orElse('https://library.example.com').get()
 def collectorUri = new URI(collectorServer)
@@ -12,15 +17,18 @@ android {
         applicationId 'store.inspirai.library'
         minSdk 26
         targetSdk 36
-        versionCode 20
+        versionCode 21
         buildConfigField 'String', 'DEFAULT_SERVER', '"' + collectorServer + '"'
-        versionName '1.3.13'
+        versionName '1.4.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
-    buildFeatures { buildConfig true }
+    buildFeatures { buildConfig true; compose true }
+    kotlinOptions { jvmTarget = '17' }
     testOptions {
         unitTests.includeAndroidResources = true
         unitTests.all {
+            def testJava = providers.gradleProperty('testJavaExecutable').orNull
+            if (testJava) executable = testJava
             jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED', '--add-opens=java.base/java.util=ALL-UNNAMED', '--add-opens=java.base/java.io=ALL-UNNAMED', '--add-opens=java.base/java.net=ALL-UNNAMED', '--add-opens=java.base/java.security=ALL-UNNAMED', '--add-opens=java.base/java.text=ALL-UNNAMED', '--add-opens=java.base/jdk.internal.access=ALL-UNNAMED'
             systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
         }
@@ -39,13 +47,31 @@ android {
     buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
 }
 dependencies {
+    implementation platform('androidx.compose:compose-bom:2025.10.00')
+    implementation 'androidx.activity:activity-compose:1.11.0'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.9.4'
+    implementation 'androidx.room:room-runtime:2.8.3'
+    implementation 'androidx.room:room-ktx:2.8.3'
+    kapt 'androidx.room:room-compiler:2.8.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation 'org.commonmark:commonmark:0.27.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.27.0'
+    androidTestImplementation platform('androidx.compose:compose-bom:2025.10.00')
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
     implementation 'androidx.core:core:1.15.0'
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'junit:junit:4.13.2'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.17'
+    testImplementation platform('androidx.compose:compose-bom:2025.10.00')
+    testImplementation 'androidx.compose.ui:ui-test-junit4'
 }
+kapt { arguments { arg('room.schemaLocation', "$projectDir/schemas") } }
 tasks.register('verifyWritingAssets') {
     doLast {
         if (!file('src/main/assets/capture/writing/index.html').exists()) {

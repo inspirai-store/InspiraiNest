@@ -1,4 +1,5 @@
 android/.gradle/
+android/.kotlin/
 android/**/build/
 android/local.properties
 android/*.log
@@ -15,3 +16,5 @@ ios/**/*.xcuserstate
 ios/**/xcuserdata/
 test-output/
 dist/
+!android/app/src/main/java/store/inspirai/library/nativeui/data/
+!android/app/src/main/java/store/inspirai/library/nativeui/data/*.kt

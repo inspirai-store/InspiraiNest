@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><script>
+'use strict';
+// Runs only in a non-networked, app-supplied page at the original storage origin.
+let sequence=0;const waiting=new Map();
+window.ack=(id,error)=>{const p=waiting.get(id);if(!p)return;waiting.delete(id);error?p.reject(Error(error)):p.resolve()};
+function send(kind,data){return new Promise((resolve,reject)=>{const id=++sequence;waiting.set(id,{resolve,reject});Migration.postMessage(JSON.stringify({id,kind,data}))})}
+async function blob(recordId,fileId,part,value,meta){
+ if(!(value instanceof Blob))return;
+ const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await value.arrayBuffer()))).map(b=>b.toString(16).padStart(2,'0')).join('');
+ if(meta.sha256&&meta.sha256!==sha)throw Error('源附件哈希不符：'+(meta.name||fileId));
+ await send('fileStart',{recordId,fileId,part,bytes:value.size,mime:value.type,meta:{...meta,sha256:sha}});
+ for(let offset=0;offset<value.size;offset+=49152){const bytes=new Uint8Array(await value.slice(offset,offset+49152).arrayBuffer());let text='';for(const b of bytes)text+=String.fromCharCode(b);await send('chunk',{body:btoa(text)})}
+ await send('fileEnd',{});
+}
+window.run=async(mode)=>{try{
+ if(mode==='favorites'){let values=JSON.parse(localStorage.getItem('personal-library-favorites')||'[]');await send('favorites',values);return}
+ const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('inspirainest-capture-v1',1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('items'))request.result.createObjectStore('items',{keyPath:'id'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});
+ const rows=await new Promise((resolve,reject)=>{const tx=db.transaction('items','readonly');const req=tx.objectStore('items').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
+ const blobs=rows.flatMap(row=>(row.attachments||[]).flatMap(file=>[file.blob,file.thumbnail?.blob])).filter(value=>value instanceof Blob);
+ await send('begin',{count:rows.length});
+ for(const row of rows){const clean=JSON.parse(JSON.stringify(row,(key,value)=>value instanceof Blob?undefined:value));await send('recordStart',clean);
+  for(const file of row.attachments||[]){await blob(row.id,file.id,'original',file.blob,file);if(file.thumbnail)await blob(row.id,file.id,'thumbnail',file.thumbnail.blob,file.thumbnail)}
+  await send('recordEnd',{});
+ }
+ db.close();await send('complete',{count:rows.length,files:blobs.length,bytes:blobs.reduce((sum,file)=>sum+file.size,0)});
+ }catch(error){await send('error',{message:String(error.message||error)})}};
+</script>

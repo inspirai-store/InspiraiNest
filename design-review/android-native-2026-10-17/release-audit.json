@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-10-17T17:00:36.1774455+08:00",
+  "verifiedAt": "2026-10-17T09:10:08.2529099+00:00",
+  "source": {
+    "uncommittedChanges": true,
+    "branch": "main",
+    "baseCommit": "e815139a79e5a86e5ca03d3edc82bee4311398f2"
+  },
+  "candidate": {
+    "size": 14245580,
+    "version": "1.4.0",
+    "sha256": "5c3b112769ea5b0a069382ed86b7a75a9a7eb34b580aecb2a0354bf14b5e31a0",
+    "filename": "InspiraiNest-v1.4.0-Android.apk",
+    "versionCode": 21,
+    "installedBaseApkHashVerified": true,
+    "signingCertificateSha256": "9e7cfc75562a39a1e1f832493aa610855945a449eed71d85757e686a2d069a80"
+  },
+  "productionObserved": {
+    "version": "1.3.13",
+    "endpoint": "https://library.inspirai.store/client-release.json",
+    "versionCode": 20,
+    "sha256": "f08d09a389597bf82c4383f1f568a7ecc41f63d6526936942e13f1faf2331a9e"
+  },
+  "checks": {
+    "legacyShare": {
+      "passed": 1
+    },
+    "nativeUi": {
+      "passed": 6
+    },
+    "upgrade": {
+      "candidate": "1.4.0",
+      "freshMigration": true,
+      "baseline": "1.3.13",
+      "seedTests": 2,
+      "verifyTests": 2
+    },
+    "largeLibrary": {
+      "entries": 1001,
+      "scrolledToIndex": 700,
+      "returnedPositionPreserved": true,
+      "elapsedMillis": 6483,
+      "frameTimingMeasured": false
+    },
+    "androidUnit": {
+      "passed": 60,
+      "failed": 0,
+      "skipped": 0
+    },
+    "layouts": [
+      {
+        "case": "412-default",
+        "passed": true,
+        "pixels": "824x1784",
+        "fontScale": "1.0",
+        "density": 320,
+        "tests": 6
+      },
+      {
+        "case": "360-default",
+        "passed": true,
+        "pixels": "720x1600",
+        "fontScale": "1.0",
+        "density": 320,
+        "tests": 1
+      },
+      {
+        "case": "393-default",
+        "passed": true,
+        "pixels": "786x1704",
+        "fontScale": "1.0",
+        "density": 320,
+        "tests": 1
+      },
+      {
+        "case": "393-font-1.3",
+        "passed": true,
+        "pixels": "786x1704",
+        "fontScale": "1.3",
+        "density": 320,
+        "tests": 1
+      },
+      {
+        "case": "360-font-2.0",
+        "passed": true,
+        "pixels": "720x1600",
+        "fontScale": "2.0",
+        "density": 320,
+        "tests": 1
+      },
+      {
+        "case": "640-landscape",
+        "passed": true,
+        "pixels": "1280x720",
+        "fontScale": "1.0",
+        "density": 320,
+        "tests": 1
+      },
+      {
+        "case": "960-tablet",
+        "passed": true,
+        "pixels": "1920x1200",
+        "fontScale": "1.0",
+        "density": 320,
+        "tests": 1
+      }
+    ],
+    "server": {
+      "passed": 309,
+      "total": 328,
+      "failed": 0,
+      "skipped": 19
+    },
+    "lint": {
+      "warnings": 13,
+      "errors": 0
+    }
+  },
+  "migration": {
+    "records": 1,
+    "files": 1,
+    "bytes": 24,
+    "verifiedAt": "2026-10-17T09:03:21.960443Z",
+    "upgradeVerifiedAt": "2026-10-17T09:03:22.500049Z",
+    "recordIdPreserved": true,
+    "writeRequestIdPreserved": true,
+    "processRequestIdPreserved": true,
+    "versionPreserved": true,
+    "fileSizeAndSha256Verified": true,
+    "serverFavoritePreserved": true
+  },
+  "pending": [
+    "physical phone sharing/camera/QR/permissions/recording/lock-screen/update installer",
+    "TalkBack",
+    "real cross-device conflict and production Agent/model flow",
+    "physical-device frame timing"
+  ],
+  "deployed": false
+}

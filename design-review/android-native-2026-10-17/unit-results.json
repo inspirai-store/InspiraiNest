@@ -1,0 +1,107 @@
+[
+  {
+    "errors": 0,
+    "tests": 2,
+    "skipped": 0,
+    "name": "store.inspirai.library.AgentManagementTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 2,
+    "skipped": 0,
+    "name": "store.inspirai.library.AppearanceTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 4,
+    "skipped": 0,
+    "name": "store.inspirai.library.AppUpdateTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 5,
+    "skipped": 0,
+    "name": "store.inspirai.library.CaptureEntryTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 3,
+    "skipped": 0,
+    "name": "store.inspirai.library.ClientLoginTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 3,
+    "skipped": 0,
+    "name": "store.inspirai.library.DeviceIdentityTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 2,
+    "skipped": 0,
+    "name": "store.inspirai.library.DevicePresentationTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 1,
+    "skipped": 0,
+    "name": "store.inspirai.library.DeviceSkillsTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 6,
+    "skipped": 0,
+    "name": "store.inspirai.library.InputFilesTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 13,
+    "skipped": 0,
+    "name": "store.inspirai.library.MobileTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 7,
+    "skipped": 0,
+    "name": "store.inspirai.library.nativeui.NativeDataTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 2,
+    "skipped": 0,
+    "name": "store.inspirai.library.nativeui.NativeMigrationTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 3,
+    "skipped": 0,
+    "name": "store.inspirai.library.nativeui.NativeNavigationTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 4,
+    "skipped": 0,
+    "name": "store.inspirai.library.nativeui.NativeSyncTest",
+    "failures": 0
+  },
+  {
+    "errors": 0,
+    "tests": 3,
+    "skipped": 0,
+    "name": "store.inspirai.library.PairingCodeTest",
+    "failures": 0
+  }
+]

@@ -283,6 +283,15 @@ export function createReadApi({ dataDir, store, browser, publicUrl, authenticate
     requireValue(q.length <= 2000, 'Query too long');
     const terms = [...new Set(normalize(q).trim().split(/\s+/).filter(Boolean))];
     const where = [], args = [];
+    if (params.has('ids')) {
+      let ids;
+      try { ids = JSON.parse(params.get('ids')); } catch { requireValue(false, 'Invalid ids'); }
+      requireValue(Array.isArray(ids) && ids.length <= 1000
+        && ids.every(id => typeof id === 'string' && id.length > 0 && id.length <= 300), 'Invalid ids');
+      where.push('e.id IN (SELECT value FROM json_each(?))'); args.push(JSON.stringify([...new Set(ids)]));
+    }
+    const sort = params.get('sort');
+    requireValue(sort === null || ['collected_desc', 'collected_asc', 'title'].includes(sort), 'Invalid sort');
     for (const key of ['type', 'status']) if (params.has(key)) { where.push(`e.${key}=?`); args.push(params.get(key)); }
     if (params.has('tag')) { where.push("EXISTS(SELECT 1 FROM json_each(e.metadata,'$.tags') WHERE value=?)"); args.push(params.get('tag')); }
     if (from !== null) { where.push('e.collected>=?'); args.push(from); }
@@ -296,21 +305,34 @@ export function createReadApi({ dataDir, store, browser, publicUrl, authenticate
     }
     const condition = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = db.prepare(`SELECT count(*) AS n FROM read_entries e ${condition}`).get(...args).n;
-    const rank = terms.length ? `(SELECT count(*) FROM json_each(?) q WHERE instr(e.title_norm,q.value)>0 OR instr(e.tags_norm,q.value)>0) DESC,
+    const ranked = terms.length && sort === null;
+    const rank = ranked ? `(SELECT count(*) FROM json_each(?) q WHERE instr(e.title_norm,q.value)>0 OR instr(e.tags_norm,q.value)>0) DESC,
       (SELECT count(*) FROM json_each(?) q WHERE instr(e.summary_norm,q.value)>0) DESC,` : '';
+    const ordering = sort === 'title' ? 'e.title_norm ASC,e.id ASC' : `e.collected ${sort === 'collected_asc' ? 'ASC' : 'DESC'},e.id ASC`;
     const rows = db.prepare(`SELECT e.* FROM read_entries e ${condition} ORDER BY ${rank}
-      e.collected DESC,e.id ASC LIMIT ? OFFSET ?`).all(...args, ...(terms.length ? [query, query] : []), limit, offset);
+      ${ordering} LIMIT ? OFFSET ?`).all(...args, ...(ranked ? [query, query] : []), limit, offset);
     return { rows, total, limit, offset, terms, search };
   }
   async function handle(req, res, url, device) {
     const route = url.pathname.slice('/api/read/v1/'.length);
-    if (req.method !== 'GET' || !url.pathname.startsWith('/api/read/v1/') || !['entries', 'search', 'entry', 'content', 'file'].includes(route)) return false;
+    if (req.method !== 'GET' || !url.pathname.startsWith('/api/read/v1/') || !['entries', 'search', 'entry', 'content', 'file', 'categories'].includes(route)) return false;
     requireValue(!closing && !closed, 'Read API is closed', 503);
     let latest;
     try { latest = await synchronize(); } catch { requireValue(false, 'Read index unavailable', 503); }
     const params = url.searchParams;
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (route === 'categories') {
+      const rows = db.prepare('SELECT metadata FROM read_entries').all().map(row => JSON.parse(row.metadata));
+      const counts = values => [...values.reduce((map, value) => {
+        if (typeof value === 'string' && value.length) map.set(value, (map.get(value) || 0) + 1);
+        return map;
+      }, new Map())].sort(([a], [b]) => compare(a, b)).map(([value, count]) => ({ value, count }));
+      const response = { schema_version: 1, total: rows.length, types: counts(rows.map(row => row.type)),
+        statuses: counts(rows.map(row => row.status)), tags: counts(rows.flatMap(row => [...new Set(row.tags || [])])), index: indexState() };
+      await guard(req, latest, true);
+      send(res, 200, response); return true;
+    }
     if (route === 'entries' || route === 'search') {
       // Snapshot the SQL result before hydration: an incomplete cold search must
       // not claim the coverage of background work that finishes during this request.

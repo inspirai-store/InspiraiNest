@@ -1,0 +1,13 @@
+{
+  "records": 1,
+  "files": 1,
+  "bytes": 24,
+  "verifiedAt": "2026-10-17T09:03:21.960443Z",
+  "upgradeVerifiedAt": "2026-10-17T09:03:22.500049Z",
+  "recordIdPreserved": true,
+  "writeRequestIdPreserved": true,
+  "processRequestIdPreserved": true,
+  "versionPreserved": true,
+  "fileSizeAndSha256Verified": true,
+  "serverFavoritePreserved": true
+}

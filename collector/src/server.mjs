@@ -819,13 +819,17 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           owner(device);
           const task = await store.get('task', taskId);
           requireValue(task&&!task.deletedAt, 'Task not found', 404);
+          if (input.draftId !== undefined) requireValue(typeof input.draftId === 'string' && /^[a-f0-9]{64}$/.test(input.draftId)
+            && (task.draftId === input.draftId || task.archiveId === input.draftId), 'Draft changed; read the current result before approving', 409);
           if (task.state === 'completed') return send(res, 200, task);
           requireValue(task.state === 'awaiting_review', 'Invalid task transition', 409);
           const draft = await store.get('draft', task.draftId);
           requireValue(draft, 'Draft not found', 404);
           const result = await store.transaction(async tx => {
+            const live = await tx.getForUpdate('task', taskId);
+            requireValue(live && !live.deletedAt && live.state === 'awaiting_review' && live.draftId === draft.id, 'Draft changed; read the current result before approving', 409);
             await tx.put('archive', draft);
-            return saveTask({ ...task, archiveId: draft.id }, 'completed', '用户已确认归档', tx);
+            return saveTask({ ...live, archiveId: draft.id }, 'completed', '用户已确认归档', tx);
           });
           void readApi.refresh().catch(() => {});
           return send(res, 200, result);

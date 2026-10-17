@@ -21,12 +21,23 @@ public final class InputFiles {
     public JSONObject read(String submission,String id)throws Exception{return new JSONObject(new String(new AtomicFile(new File(file(submission,id).getParentFile(),id+".json")).readFully(),StandardCharsets.UTF_8));}
     private void write(String submission,JSONObject item)throws Exception{AtomicFile a=new AtomicFile(new File(file(submission,item.getString("id")).getParentFile(),item.getString("id")+".json"));FileOutputStream out=a.startWrite();try{out.write(item.toString().getBytes(StandardCharsets.UTF_8));a.finishWrite(out);}catch(Exception e){a.failWrite(out);throw e;}}
     public JSONObject copy(String submission,JSONObject pending,Uri uri)throws Exception{
+        return copy(submission,pending,uri,false);
+    }
+    /** Record sharing can retain video; collection still applies the narrower Agent input policy. */
+    public JSONObject copyShared(String submission,JSONObject pending,Uri uri)throws Exception{
+        return copy(submission,pending,uri,true);
+    }
+    private JSONObject copy(String submission,JSONObject pending,Uri uri,boolean recordMedia)throws Exception{
         JSONObject item=new JSONObject(pending.toString());File target=file(submission,item.getString("id")),temp=new File(target.getPath()+".tmp");
         try {
             String name="附件",mime=context.getContentResolver().getType(uri);long reported=-1;
             try(Cursor c=context.getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE},null,null,null)){if(c!=null&&c.moveToFirst()){int n=c.getColumnIndex(OpenableColumns.DISPLAY_NAME),s=c.getColumnIndex(OpenableColumns.SIZE);if(n>=0&&!c.isNull(n))name=c.getString(n);if(s>=0&&!c.isNull(s))reported=c.getLong(s);}}
             name=name.replaceAll("[\\p{Cntrl}]", " ");if(name.length()>200)name=name.substring(0,200);if(name.trim().isEmpty())name="附件";
-            mime=mime(name,mime);item.put("name",name).put("mime",mime==null?"":mime).put("bytes",reported);
+            String supported=mime(name,mime);
+            if(recordMedia&&supported==null&&Arrays.asList("video/mp4","video/webm","video/ogg").contains(mime))supported=mime;
+            if(recordMedia&&supported==null)supported=Arrays.asList("text/csv","application/json").contains(mime)?mime:"application/octet-stream";
+            item.put("agentSupported",mime(name,mime)!=null);
+            mime=supported;item.put("name",name).put("mime",mime==null?"":mime).put("bytes",reported);
             if(mime==null){item.put("selected",false);throw new IOException("暂不支持此文件类型");}
             if(reported>FILE_LIMIT)throw new IOException("单个文件超过 32 MiB");
             MessageDigest digest=MessageDigest.getInstance("SHA-256");long size=0;
@@ -47,7 +58,7 @@ public final class InputFiles {
         if(reported!=null)for(String type:types)if(type.equals(reported))return type;
         return null;
     }
-    public static String category(JSONObject f){String mime=f.optString("mime");return mime.startsWith("image/")?"图片":mime.startsWith("audio/")?"音频":"文档";}
+    public static String category(JSONObject f){String mime=f.optString("mime");return mime.startsWith("image/")?"图片":mime.startsWith("audio/")?"音频":mime.startsWith("video/")?"视频":"文档";}
     public static String title(JSONObject task){String text=task.optString("content",task.optString("url",""));if(!text.trim().isEmpty()&&!"null".equals(text))return text;JSONArray files=task.optJSONArray("inputAttachments");if(files==null)files=task.optJSONArray("attachments");return files!=null&&files.length()>0?"附件采集 · "+files.optJSONObject(0).optString("name","文件")+(files.length()>1?" 等 "+files.length()+" 个文件":""):"采集任务";}
     public static String progressText(JSONObject p){return p.optString("name").isEmpty()?"":String.format(Locale.ROOT,"上传 %d / %d · %s · %.1f / %.1f MiB",p.optInt("index"),p.optInt("count"),p.optString("name"),p.optLong("bytes")/1048576.0,p.optLong("total")/1048576.0);}
     public static JSONArray selected(JSONArray rows)throws Exception{

@@ -41,8 +41,13 @@ public class MobileTest {
             android.widget.Spinner computer=org.robolectric.util.ReflectionHelpers.getField(controller.get(),"trialComputer");
             java.util.List<String> computerIds=org.robolectric.util.ReflectionHelpers.getField(controller.get(),"trialComputerIds");computerIds.add("test-pc");
             computer.setAdapter(new android.widget.ArrayAdapter<>(controller.get(),android.R.layout.simple_spinner_dropdown_item,new String[]{"选择电脑","测试电脑"}));computer.setSelection(1);enabled.setChecked(true);
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+            assertTrue(String.valueOf(controller.get().status.getText()),org.robolectric.util.ReflectionHelpers.<Boolean>getField(controller.get(),"ready"));
+            assertFalse("Composition unexpectedly submitted",org.robolectric.util.ReflectionHelpers.<Boolean>getField(controller.get(),"submitted"));
             var persist=ShareActivity.class.getDeclaredMethod("persist");persist.setAccessible(true);assertEquals(true,persist.invoke(controller.get()));
-            assertTrue(new Drafts(context).read(id).getBoolean("trialEnabled"));assertEquals("test-pc",new Drafts(context).read(id).getString("trialDeviceId"));
+            JSONObject persisted=new Drafts(context).read(id);
+            assertTrue(persisted.has("trialEnabled"));
+            assertTrue(persisted.getBoolean("trialEnabled"));assertEquals("test-pc",persisted.getString("trialDeviceId"));
             SubmissionCredentials.allowSubmission=true;requireText(controller.get().root,"提交采集任务").performClick();
             JSONObject queued=queueRecord(context,id);assertNotNull(queued);assertEquals("test-pc",queued.getJSONObject("payload").getJSONObject("codexTrial").getString("deviceId"));assertEquals("分享原文保持完整",queued.getJSONObject("payload").getString("content"));
             assertNotNull(requireText(controller.get().root,"已保存到手机"));

@@ -1,0 +1,7 @@
+
+store.inspirai.library.UpgradePreservationTest:.
+store.inspirai.library.NativeUpgradeMigrationTest:.
+
+Time: 7.598
+
+OK (2 tests)

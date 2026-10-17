@@ -73,6 +73,24 @@ test('latest visible version, top-level metadata, checksums, filtering and stabl
   await assert.rejects(f.call('entry', { id: 'deleted' }), { status: 404 });
 });
 
+test('native categories, favorite IDs and explicit global sort remain compatible with relevance', async t => {
+  const f = await fixture(t, [archive('z', { title: 'Ａlpha', tags: ['AI', 'AI'], collected: '2026-10-01' }),
+    archive('a', { title: 'beta', tags: ['AI'], collected: '2026-09-01', status: 'partial' }),
+    archive('deleted', { type: 'video' })]);
+  f.trash.push({ id: 'deleted', deletedAt: '2026-10-01' }); await f.api.refresh();
+  const categories = (await f.call('categories')).body;
+  assert.equal(categories.total, 2); assert.deepEqual(categories.tags, [{ value: 'AI', count: 2 }]);
+  assert.deepEqual(categories.types, [{ value: 'article', count: 2 }]);
+  assert.deepEqual((await f.call('entries', { ids: JSON.stringify(['z', 'a', 'deleted']), sort: 'title' })).body.items.map(i => i.id), ['z', 'a']);
+  assert.deepEqual((await f.call('entries', { sort: 'collected_asc', limit: 1 })).body.items.map(i => i.id), ['a']);
+  assert.equal((await f.call('entries', { ids: '[]' })).body.total, 0);
+  assert.equal((await f.call('search', { q: 'beta', ids: '["z"]' })).body.total, 0);
+  for (const params of [{ ids: '{}' }, { ids: '[1]' }, { ids: 'bad' }, { ids: JSON.stringify(Array(1001).fill('a')) }, { sort: 'sql' }]) {
+    await assert.rejects(f.call('entries', params), { status: 400 });
+  }
+  f.revoke(); await assert.rejects(f.call('categories'), { status: 401 });
+});
+
 test('NFKC AND substring search across fields, ranking and exact original lines', async t => {
   const f = await fixture(t, [
     archive('body', { text: 'start\r\nﬃ ＡＬＰＨＡ\r\nthird', summary: 'beta' }),

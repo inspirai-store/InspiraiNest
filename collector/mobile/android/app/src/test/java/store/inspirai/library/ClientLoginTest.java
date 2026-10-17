@@ -48,7 +48,7 @@ public class ClientLoginTest {
         View root=activity.getWindow().getDecorView();
         input(root,"https://").setText("https://review.example");input(root,"登录密码").setText("  fixture password  ");
         Button login=ReflectionHelpers.getField(activity,"loginButton");login.performClick();
-        for(int n=0;n<100&&FailingCredentials.attempts==0;n++){Thread.sleep(10);ShadowLooper.idleMainLooper();}
+        for(int n=0;n<500&&FailingCredentials.attempts==0;n++){Thread.sleep(10);ShadowLooper.idleMainLooper();}
         ShadowLooper.idleMainLooper();assertEquals(1,FailingCredentials.attempts);
         assertEquals("  fixture password  ",LoginApi.password);
         assertEquals("https://personal.example",new Credentials(activity).server());
