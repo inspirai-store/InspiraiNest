@@ -34,6 +34,13 @@ export class MySqlStore {
     const [rows] = await this.pool.execute('SELECT body FROM records WHERE kind=?', [kind]);
     return rows.map(row => parseBody(row.body));
   }
+  async ensure(kind,value) {
+    await this.pool.execute('INSERT INTO records (kind,id,body) VALUES (?,?,?) ON DUPLICATE KEY UPDATE id=VALUES(id)',[kind,value.id,JSON.stringify(value)]);
+  }
+  async listAfter(kind,after,limit) {
+    const [rows]=await this.pool.execute('SELECT body FROM records WHERE kind=? AND id>? ORDER BY id LIMIT ?',[kind,after,Number(limit)]);
+    return rows.map(row=>parseBody(row.body));
+  }
   async put(kind, value) {
     await this.pool.execute('INSERT INTO records (kind,id,body) VALUES (?,?,?) ON DUPLICATE KEY UPDATE body=VALUES(body)', [kind, value.id, JSON.stringify(value)]);
     return value;

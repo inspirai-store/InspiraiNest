@@ -22,6 +22,7 @@ data class RecordFile(val recordId: String, val id: String, val json: String, va
     @Query("DELETE FROM records WHERE server=:server AND id=:id") suspend fun delete(server: String,id: String)
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun journal(log: MigrationLog)
     @Query("SELECT * FROM migration WHERE `key`=:key") suspend fun journal(key: String): MigrationLog?
+    @Query("SELECT * FROM migration WHERE `key`=:key") fun observeJournal(key: String): Flow<MigrationLog?>
     @Query("SELECT * FROM migration WHERE `key` LIKE :prefix") suspend fun journals(prefix: String): List<MigrationLog>
     @Query("DELETE FROM migration WHERE `key`=:key") suspend fun removeJournal(key: String)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun favorite(item: Favorite)

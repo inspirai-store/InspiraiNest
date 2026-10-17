@@ -11,6 +11,8 @@ export class Store {
   access(work) { return this.pendingTransactions ? this.transactionTail.then(() => this.access(work)) : work(); }
   get(kind, id) { return this.access(() => { const row = this.db.prepare('SELECT body FROM records WHERE kind=? AND id=?').get(kind, id); return row ? JSON.parse(row.body) : null; }); }
   getForUpdate(kind, id) { return this.get(kind, id); } // BEGIN IMMEDIATE owns the SQLite write lock.
+  ensure(kind, value) { return this.access(() => this.db.prepare('INSERT INTO records VALUES (?,?,?) ON CONFLICT(kind,id) DO NOTHING').run(kind,value.id,JSON.stringify(value))); }
+  listAfter(kind, after, limit) { return this.access(() => this.db.prepare('SELECT body FROM records WHERE kind=? AND id>? ORDER BY id LIMIT ?').all(kind,after,limit).map(row=>JSON.parse(row.body))); }
   list(kind) { return this.access(() => this.db.prepare('SELECT body FROM records WHERE kind=?').all(kind).map(row => JSON.parse(row.body))); }
   put(kind, value) { return this.access(() => { this.db.prepare('INSERT INTO records VALUES (?,?,?) ON CONFLICT(kind,id) DO UPDATE SET body=excluded.body').run(kind, value.id, JSON.stringify(value)); return value; }); }
   delete(kind, id) { return this.access(() => this.db.prepare('DELETE FROM records WHERE kind=? AND id=?').run(kind, id)); }

@@ -48,7 +48,8 @@ import store.inspirai.library.nativeui.design.*
                 }.padding(vertical=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Text(row.optString("title"),style=MaterialTheme.typography.titleMedium)
                     val message=row.optString("message");if(message.isNotBlank())Text(message,style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
-                    if(row.optString("deviceName").isNotEmpty())Text(listOf(row.optString("deviceName"),row.optString("projectName")).filter { it.isNotBlank() }.joinToString(" · "),style=MaterialTheme.typography.labelMedium)
+                    val metadata=listOf("deviceName","projectName").mapNotNull { row.opt(it) as? String }.filter { it.isNotBlank() }.joinToString(" · ")
+                    if(metadata.isNotEmpty())Text(metadata,style=MaterialTheme.typography.labelMedium)
                     if(section in listOf("attention","later"))TextButton(onClick={model.defer(row,if(section=="later")"restore" else "defer")}) { Text(if(section=="later")"移回待处理" else "稍后") }
                 };HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
             }

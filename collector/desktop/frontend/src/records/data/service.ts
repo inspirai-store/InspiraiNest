@@ -26,17 +26,24 @@ export class RecordsService {
   private activeTaskCount = 0;
   private connection: Connection = {paired:false,server:''};
   private flushing: Promise<void> | null = null;
+  private syncing: Promise<void> | null = null;
+  private syncAgain = false;
+  private syncFull = false;
+  private protocol: 0|1|null = null;
+  private probedAt=0;
   store: RecordStore; private baseStore:RecordStore; readonly transport: RecordTransport;
   constructor(store: RecordStore, transport: RecordTransport) {this.baseStore=store;this.store=new AccountRecordStore(store,this.connection);this.transport=transport;}
   private serial<T>(work: () => Promise<T>): Promise<T> { const result = this.queue.then(work); this.queue = result.catch(() => {}); return result; }
-  invalidateSession() { this.activeTaskCount = 0; this.epoch++; this.connection = {paired:false,server:''}; }
-  private async status() { const epoch=this.epoch;const status=await this.transport.status();this.assertSession(epoch);
-    if(status.server!==this.connection.server||status.paired!==this.connection.paired||status.deviceId!==this.connection.deviceId){this.epoch++;this.activeTaskCount=0;}
+  invalidateSession() { this.activeTaskCount = 0; this.epoch++; this.statusPending=null; this.protocol=null; this.connection = {paired:false,server:''}; }
+  private statusPending:Promise<Connection&{epoch:number}>|null=null;
+  private status() { if(this.statusPending)return this.statusPending;const pending=this.readStatus();this.statusPending=pending;void pending.finally(()=>{if(this.statusPending===pending)this.statusPending=null;}).catch(()=>{});return pending; }
+  private async readStatus() { const epoch=this.epoch;const status=await this.transport.status();this.assertSession(epoch);
+    if(status.server!==this.connection.server||status.paired!==this.connection.paired||status.deviceId!==this.connection.deviceId){this.epoch++;this.activeTaskCount=0;this.protocol=null;}
     this.connection=status;const session={...status,epoch:this.epoch};
     const scoped=new AccountRecordStore(this.baseStore,status);await this.serial(()=>scoped.migrate(status,()=>this.assertSession(session.epoch)));this.assertSession(session.epoch);this.store=scoped;return session;
   }
   private assertSession(epoch: number) { if (epoch !== this.epoch) throw new Error('登录状态已改变，记录仍保存在本机'); }
-  async load() { const session=await this.status();const all = await this.store.all();this.assertSession(session.epoch);let draft=all.find(i=>i.id==='draft') as LocalDraft|undefined;if(!draft)draft=await this.serial(async()=>{let stored=await this.store.get('draft') as LocalDraft|undefined;if(!stored){stored={...newDraft(),accountScope:recordScope(session)};await this.store.put(stored);}return stored;});return {draft,taskCount:this.activeTaskCount,records:all.filter(i=>i.id!=='draft'&&!(i as LocalRecord).deletedAt) as LocalRecord[]}; }
+  async load() { const session=await this.status();const all = await this.store.all();this.assertSession(session.epoch);let draft=all.find(i=>i.id==='draft') as LocalDraft|undefined;if(!draft)draft=await this.serial(async()=>{let stored=await this.store.get('draft') as LocalDraft|undefined;if(!stored){stored={...newDraft(),accountScope:recordScope(session)};await this.store.put(stored);}return stored;});const sync=await this.store.get('__record-sync__');return {draft,lastCheckedAt:sync?.checkedAt as string|undefined,taskCount:this.activeTaskCount,recoveries:all.filter(i=>i.id!=='draft'&&((i as LocalRecord).recoveryDrafts as LocalDraft[]|undefined)?.length) as LocalRecord[],records:all.filter(i=>i.id!=='draft'&&!(i as LocalRecord).deletedAt) as LocalRecord[]}; }
   async trash(){await this.status();return (await this.store.all()).filter(i=>i.id!=='draft'&&(i as LocalRecord).deletedAt&&(i as LocalRecord).deletedAt!=='restored-draft') as LocalRecord[];}
   async setDeleted(id:string,deleted:boolean){
     const session=await this.status(),store=this.store;
@@ -77,8 +84,8 @@ export class RecordsService {
         await this.serial(async()=>{const live=await store.get(id) as LocalRecord;live.deletionError=error instanceof RequestError&&(error.status===405||error.status===404&&/not found/i.test(error.message))?'服务端待升级':errorMessage(error);await store.put(live);});return;}
     }
   }
-  async saveDraft(draft: LocalDraft) { const snapshot=structuredClone(draft);const session=await this.status();if(snapshot.accountScope&&snapshot.accountScope!==recordScope(session))return; snapshot.accountScope=recordScope(session);return this.serial(async()=>{this.assertSession(session.epoch);const current=await this.store.get('draft') as LocalDraft|undefined;if(current?.recordId&&current.recordId!==snapshot.recordId)return;await this.store.put(snapshot);}); }
-  async saveRecord(draft: LocalDraft) {
+  async saveDraft(draft: LocalDraft) { const snapshot=structuredClone(draft);const session=await this.status();if(snapshot.accountScope&&snapshot.accountScope!==recordScope(session))return; snapshot.accountScope=recordScope(session);return this.serial(async()=>{this.assertSession(session.epoch);const current=await this.store.get('draft') as LocalDraft|undefined;if(current?.recordId&&current.recordId!==snapshot.recordId)return;const parent=snapshot.editingId?await this.store.get(snapshot.editingId) as LocalRecord|undefined:undefined;if(parent?.deletedAt){snapshot.remoteDeleted=true;snapshot.recoveryKind="editor";snapshot.recoveryTrashVersion=parent.trashVersion;parent.recoveryDrafts=[...(parent.recoveryDrafts as LocalDraft[]??[]).filter(d=>d.recoveryKind!=="editor"||d.recoveryTrashVersion!==parent.trashVersion),snapshot];await this.store.putMany!([parent,snapshot]);}else await this.store.put(snapshot);}); }
+  async saveRecord(draft: LocalDraft,recoveryParent?:string) {
     const snapshot=structuredClone(draft);const session=await this.status();if(snapshot.accountScope&&snapshot.accountScope!==recordScope(session))throw Error('资料空间已切换，记录仍保存在本机');
     return this.serial(async () => {
       this.assertSession(session.epoch);if (!snapshot.text.trim() && !snapshot.attachments.length) throw new Error('记录内容为空');
@@ -90,7 +97,8 @@ export class RecordsService {
       delete item.payload;
       delete item.repair;
       item.baseSnapshot=snapshot.baseSnapshot??previous?.baseSnapshot;item.errorCode=undefined;
-      const next={...newDraft(),accountScope:recordScope(session)}; await this.store.commit(item,next); return {item,draft:next};
+      const next={...newDraft(),accountScope:recordScope(session)}; const parent=recoveryParent?await this.store.get(recoveryParent) as LocalRecord|undefined:undefined;
+      if(parent){parent.recoveryDrafts=(parent.recoveryDrafts as LocalDraft[]??[]).filter(d=>!sameContent(d,snapshot));await this.store.putMany!([item,next,parent]);}else await this.store.commit(item,next); return {item,draft:next};
     });
   }
   private async remoteRecord(id:string,session:Connection&{epoch:number}) {
@@ -118,7 +126,7 @@ export class RecordsService {
     if (this.flushing) return this.flushing;
     this.flushing=(async()=>{
       const session=await this.status();if(!session.paired)return;const store=this.store;
-      const syncPut=async(item:LocalRecord)=>this.serial(async()=>{const live=await store.get(item.id) as LocalRecord|undefined;if(live?.deletedAt||live?.deletionQueue?.length)return;if(session.epoch!==this.epoch){if(live&&item.sync==='failed')await store.put({...live,sync:'failed',error:item.error,errorCode:item.errorCode});return;}await store.put(item);});
+      const syncPut=async(item:LocalRecord)=>this.serial(async()=>{const live=await store.get(item.id) as LocalRecord|undefined;if(live?.deletedAt||live?.deletionQueue?.length||Number(live?.trashVersion??0)>Number(item.trashVersion??0))return;if(session.epoch!==this.epoch){if(live&&item.sync==='failed')await store.put({...live,sync:'failed',error:item.error,errorCode:item.errorCode});return;}await store.put(item);});
       const api=<T>(route:string,method:'GET'|'PUT'|'POST'='GET',json?:unknown)=>requestJson<T>(this.transport,{route,method,json,server:session.server,deviceId:session.deviceId});
       let capabilities:Promise<void>|undefined;
       const requireRich=()=>capabilities??=(async()=>{
@@ -192,13 +200,60 @@ export class RecordsService {
       }
     })().finally(()=>{this.flushing=null;});return this.flushing;
   }
-  async refresh() {
-    const session=await this.status();if(!session.paired)return;
-    const data=await requestJson<{records:LocalRecord[];deleted?:{id:string;version:number;deletedAt:string;trashVersion:number}[]}>(this.transport,{route:'/api/records',server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
-    for(const removed of data.deleted??[])await this.serial(async()=>{this.assertSession(session.epoch);const existing=await this.store.get(removed.id) as LocalRecord|undefined;if(existing&&!existing.deletionQueue?.length){await this.store.put({...existing,...removed});}});
-    this.activeTaskCount=data.records.flatMap(record=>record.tasks??[]).filter(task=>!['completed','cancelled','failed'].includes(task.state)).length;
-    for(const remote of data.records)await this.serial(async()=>{this.assertSession(session.epoch);const existing=await this.store.get(remote.id) as LocalRecord|undefined;if(existing?.deletionQueue?.length||existing?.discardedDraft)return;if(existing?.deletedAt&&!remote.deletedAt){existing.deletedAt=null;existing.trashVersion=Number(remote.trashVersion??0);await this.store.put(existing);}if(existing && (existing.sync!=='synced' || existing.server && existing.server!==session.server))return;if(existing?.document&&!remote.document){existing.sync='failed';existing.error='云端返回的记录缺少完整排版；本机版本已保留，请检查服务端兼容性';existing.errorCode='record_protocol_incompatible';await this.store.put(existing);return;}this.assertSession(session.epoch);await this.store.put({...existing,...remote,accountScope:recordScope(session),server:session.server,sync:'synced',remoteVersion:remote.version,error:'',errorCode:undefined,document:remote.document,baseSnapshot:{...snapshot(remote),version:remote.version},attachments:remote.attachments.map(a=>({...a,blob:existing?.attachments.find(old=>old.sha256===a.sha256)?.blob,thumbnail:existing?.attachments.find(old=>old.sha256===a.sha256)?.thumbnail ?? a.thumbnail}))});});
+  sync(full=false):Promise<void> {
+    this.syncAgain=true;this.syncFull ||= full;
+    if(this.syncing)return this.syncing;
+    this.syncing=(async()=>{do{this.syncAgain=false;const forceFull=this.syncFull;this.syncFull=false;const session=await this.status();if(!session.paired)return;
+      if(this.protocol===null||this.protocol===0&&Date.now()-this.probedAt>300000){this.probedAt=Date.now();try{const caps=await requestJson<{recordSyncProtocol?:number}>(this.transport,{route:'/api/records/capabilities',server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);this.protocol=caps.recordSyncProtocol===1?1:0;}catch(error){if(error instanceof RequestError&&[404,405].includes(error.status))this.protocol=0;else throw error;}}
+      await this.refresh(0,forceFull);await this.flush();await this.refresh();
+    }while(this.syncAgain);})().finally(()=>{this.syncing=null;});return this.syncing;
   }
+  async watch(){if(this.protocol!==1)return false;await this.refresh(25);return true;}
+  async refresh(wait=0,full=false) {
+    const session=await this.status();if(!session.paired)return;
+    const store=this.store;
+    const incremental=this.protocol===1;
+    for(;;){
+      const meta=await store.get('__record-sync__'),cursor=meta?.cursor as string|undefined;
+      const route=incremental?'/api/records/changes?'+(cursor&&!full?'cursor='+encodeURIComponent(cursor)+'&':'')+'wait='+wait+'&limit=200':'/api/records';
+      const data=await requestJson<{mode?:string;cursor?:string;hasMore?:boolean;checkedAt?:string;records?:LocalRecord[];deleted?:Partial<LocalRecord>[];changes?:{seq:number;record:LocalRecord}[]}>(this.transport,{route,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
+      await this.serial(async()=>{
+        this.assertSession(session.epoch);
+        const latest=await store.get('__record-sync__'),current=latest?.cursor as string|undefined;
+        if(data.cursor&&current&&data.cursor!==current){const [epoch,sequence]=data.cursor.split(':'),[currentEpoch,currentSequence]=current.split(':');if(epoch===currentEpoch&&Number(sequence)<Number(currentSequence)||epoch!==currentEpoch&&current!==cursor)return;}
+        const updates=new Map<string,import('./types.ts').StoredItem>();
+        const get=async(id:string)=>(updates.get(id)??await store.get(id)) as LocalRecord|undefined;
+        const remoteRows=data.changes?data.changes.map(change=>({...change.record,changeSeq:change.seq})):[...(data.deleted??[]),...(data.records??[])];
+        for(const value of remoteRows){const remote=value as LocalRecord;if(!remote.id)throw Error('服务端返回了无效的记录变化');const existing=await get(remote.id);
+          if(existing?.deletionQueue?.length||existing?.discardedDraft)continue;
+          const remoteTrash=Number(remote.trashVersion??0),localTrash=Number(existing?.trashVersion??0);
+          if(remoteTrash<localTrash||existing?.changeSeq&&remote.changeSeq&&Number(remote.changeSeq)<Number(existing.changeSeq))continue;
+          if(remote.deletedAt){
+            const previous=existing??{id:remote.id,text:"",attachments:[],createdAt:remote.deletedAt,version:remote.version??0,remoteVersion:remote.version??0,server:session.server,sync:"synced",error:"",accountScope:recordScope(session)} as LocalRecord;
+            const activeDraft=(updates.get('draft')??await store.get('draft')) as LocalDraft|undefined;
+            const recoveries=[...(previous.recoveryDrafts as LocalDraft[]??[])];
+            if(previous.sync!=='synced'&&!recoveries.some(d=>sameContent(d,previous)))recoveries.push({id:'draft',recordId:previous.id,editingId:previous.id,text:previous.text,document:previous.document,attachments:previous.attachments,accountScope:recordScope(session),remoteDeleted:true,recoveryKind:"pending"});
+            if(activeDraft?.editingId===previous.id){const saved={...activeDraft,remoteDeleted:true,recoveryKind:"editor",recoveryTrashVersion:remoteTrash};updates.set('draft',saved);if(!recoveries.some(d=>sameContent(d,saved)))recoveries.push(saved);}
+            updates.set(previous.id,{...previous,deletedAt:remote.deletedAt,trashVersion:remoteTrash,changeSeq:remote.changeSeq??previous.changeSeq,...(recoveries.length?{recoveryDrafts:recoveries}:{}),cancelledProcess:previous.pendingProcess??previous.cancelledProcess,pendingProcess:undefined,cancelledPayload:previous.payload??previous.cancelledPayload,payload:undefined,sync:"synced",error:""});continue;
+          }
+          if(existing?.deletedAt&&remoteTrash<=localTrash)continue;
+          if(existing&&Number(existing.remoteVersion)>remote.version)continue;
+          if(existing&&existing.sync!=='synced'){
+            if(this.reconcile(existing,remote))updates.set(existing.id,existing);
+            else if(existing.remoteVersion<remote.version){this.backup(existing,'云端与本机均有修改',remote);updates.set(existing.id,{...existing,sync:'conflict',error:'本机与云端内容均有修改，请比较后同步'});}continue;
+          }
+          if(existing?.document&&!remote.document){updates.set(existing.id,{...existing,sync:'failed',error:'云端返回的记录缺少完整排版；本机版本已保留，请检查服务端兼容性',errorCode:'record_protocol_incompatible'});continue;}
+          updates.set(remote.id,{...existing,...remote,deletedAt:null,accountScope:recordScope(session),server:session.server,sync:'synced',remoteVersion:remote.version,error:'',errorCode:undefined,baseSnapshot:{...snapshot(remote),version:remote.version},attachments:remote.attachments.map(a=>({...a,blob:existing?.attachments.find(old=>old.sha256===a.sha256)?.blob,thumbnail:existing?.attachments.find(old=>old.sha256===a.sha256)?.thumbnail??a.thumbnail}))});
+        }
+        updates.set('__record-sync__',{id:'__record-sync__',...latest,...(data.cursor?{cursor:data.cursor}:{}),checkedAt:data.checkedAt??new Date().toISOString()} as unknown as import('./types.ts').StoredItem);
+        this.assertSession(session.epoch);await store.putMany!([...updates.values()]);
+      });
+      this.activeTaskCount=(await store.all()).filter(r=>r.id!=='draft'&&!(r as LocalRecord).deletedAt).flatMap(record=>(record as LocalRecord).tasks??[]).filter(task=>!['completed','cancelled','failed'].includes(task.state)).length;
+      if(!incremental||!data.hasMore)return;wait=0;
+    }
+  }
+  async saveRecoveryAsNew(draft:LocalDraft){return this.saveRecord({...draft,recordId:crypto.randomUUID(),editingId:undefined,baseVersion:undefined,baseSnapshot:undefined,remoteDeleted:false},draft.editingId);}
+  async openRecovery(id:string,index=0){await this.status();const current=await this.store.get('draft') as LocalDraft|undefined;if(current&&(current.text.trim()||current.attachments.length))throw Error('请先保存当前草稿');const item=await this.store.get(id) as LocalRecord|undefined;const draft=(item?.recoveryDrafts as LocalDraft[]|undefined)?.[index];if(!draft)throw Error('恢复草稿不存在');await this.store.put({...draft,recordId:id,editingId:id,remoteDeleted:true});}
   async edit(id:string) {const session=await this.status();return this.serial(async()=>{this.assertSession(session.epoch);const item=await this.store.get(id) as LocalRecord|undefined;if(!item||item.deletedAt)throw new Error('记录不存在或已删除');if(item.deletionQueue?.length)throw Error('请先完成删除或恢复同步');if(item.sync==='syncing'||item.sync==='conflict')throw new Error('请先完成同步或比较冲突内容');const attachments=[];for(const a of item.attachments)attachments.push({...a,blob:await this.readAttachment(item,a,session)});const draft:LocalDraft={accountScope:recordScope(session),id:'draft',recordId:item.id,editingId:item.id,baseVersion:item.remoteVersion,baseSnapshot:item.baseSnapshot??snapshot(item),text:item.text,document:item.document,attachments};await this.store.put(draft);return draft;});}
   async loadConflict(id:string):Promise<RecordConflict> {
     const session=await this.status(),item=await this.store.get(id) as LocalRecord|undefined;

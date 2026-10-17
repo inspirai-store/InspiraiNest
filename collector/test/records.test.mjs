@@ -37,7 +37,7 @@ test('concurrent edits keep immutable snapshots and one winner; workers cannot m
 
 test('record protocol announces rich documents and rejects destructive legacy writes without changing history',async t=>{
  const {request,input,app,worker}=await fixture(t),id=crypto.randomUUID();
- const capabilities=await request('/api/records/capabilities');assert.deepEqual(capabilities.value,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1});
+ const capabilities=await request('/api/records/capabilities');assert.deepEqual(capabilities.value,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1,recordSyncProtocol:1});
  const document={version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'保留排版',marks:[{type:'bold'}]}]}]}};
  const original=input({text:'保留排版',document});const created=await request('/api/records/'+id,'PUT',original);assert.deepEqual(created.value.document,document);
  const legacy=await request('/api/records/'+id,'PUT',input({baseVersion:1,text:'旧客户端修改'}));assert.equal(legacy.status,422);assert.equal(legacy.value.code,'record_document_required');
@@ -108,3 +108,55 @@ test('photo derivatives are separate checked files and never replace original by
  const saved=await request('/api/records/'+id,'PUT',input({attachments:[attachment]}));assert.equal(saved.status,200);assert.equal(saved.value.attachments[0].thumbnailSha256,thumbnailSha256);assert.deepEqual((await request('/api/records/media/'+sha)).value,original);
 });
 test('视频、PDF、UTF8文本与通用附件校验后可同步，错误签名仍拒绝',async t=>{const {request}=await fixture(t);for(const [mime,bytes] of [['video/mp4',Buffer.from('0000ftypisom')],['video/webm',Buffer.from('1a45dfa30000','hex')],['application/pdf',Buffer.from('%PDF-1.4\nfixture')],['text/plain',Buffer.from('路线说明')],['application/json',Buffer.from('{"route":"lake"}')],['application/octet-stream',Buffer.from([1,2,3])]]){const sha=hash(bytes);const uploaded=await request('/api/records/media/'+sha,'PUT',bytes,undefined,mime);assert.equal(uploaded.status,200,mime);const read=await request('/api/records/media/'+sha);if(mime==='application/json')assert.deepEqual(read.value,{route:'lake'});else assert.deepEqual(read.value,bytes);}const invalid=Buffer.from('not a pdf');assert.equal((await request('/api/records/media/'+hash(invalid),'PUT',invalid,undefined,'application/pdf')).status,415);});
+
+
+test('record changes snapshot, paged deltas, deletion and explicit restore preserve a durable cursor',async t=>{
+ const {request,input}=await fixture(t),id=crypto.randomUUID();
+ const initial=(await request('/api/records/changes?wait=0&limit=1')).value;
+ assert.equal(initial.mode,'snapshot');assert.equal(initial.records.length,0);
+ const record=(await request('/api/records/'+id,'PUT',input())).value;
+ const deletion={requestId:crypto.randomUUID(),version:1,trashVersion:0};
+ assert.equal((await request('/api/content-trash/record/'+id+'/delete','POST',deletion)).status,200);
+ assert.equal((await request('/api/content-trash/record/'+id+'/delete','POST',deletion)).status,200);
+ assert.equal((await request('/api/content-trash/record/'+id+'/restore','POST',{...deletion,requestId:crypto.randomUUID(),trashVersion:1})).status,200);
+ let cursor=initial.cursor;const events=[];
+ do{const page=await request('/api/records/changes?cursor='+encodeURIComponent(cursor)+'&wait=0&limit=1');assert.equal(page.status,200);events.push(...page.value.changes);cursor=page.value.cursor;if(!page.value.hasMore)break;}while(events.length<10);
+ assert.equal(events.length,3);assert.deepEqual(events.map(e=>e.seq),[1,2,3]);assert.deepEqual(events.map(e=>e.record.trashVersion),[0,1,2]);assert.ok(events[1].record.deletedAt);assert.equal(events[2].record.deletedAt,null);
+ const snapshot=(await request('/api/records/changes?cursor='+crypto.randomUUID()+':0&wait=0')).value;
+ assert.equal(snapshot.mode,'snapshot');assert.equal(snapshot.cursor,cursor);assert.equal(snapshot.records[0].id,record.id);
+ const legacy=(await request('/api/records')).value;assert.equal(legacy.records.length,1);assert.equal(legacy.deleted.length,0);
+});
+
+test('an online second client receives a deletion within three seconds without restarting',async t=>{
+ const {request,input}=await fixture(t),id=crypto.randomUUID();await request('/api/records/'+id,'PUT',input());
+ const before=(await request('/api/records/changes?wait=0')).value;
+ const started=Date.now(),pending=request('/api/records/changes?cursor='+encodeURIComponent(before.cursor)+'&wait=3');
+ await new Promise(resolve=>setTimeout(resolve,50));
+ await request('/api/content-trash/record/'+id+'/delete','POST',{requestId:crypto.randomUUID(),version:1,trashVersion:0});
+ const page=await pending;assert.equal(page.status,200);assert.equal(page.value.changes[0].record.id,id);assert.ok(page.value.changes[0].record.deletedAt);assert.ok(Date.now()-started<3000);
+});
+
+test('record change sequence rolls back with content and rejects worker and invalid waits',async t=>{
+ const {request,input,worker,app}=await fixture(t),node=await worker();
+ assert.equal((await request('/api/records/changes?wait=0','GET',undefined,node)).status,403);
+ assert.equal((await request('/api/records/changes?wait=26')).status,400);
+ const before=(await request('/api/records/changes?wait=0')).value;
+ const {lockRecordChanges,appendRecordChange}=await import('../src/record-changes.mjs');
+ await assert.rejects(app.store.transaction(async tx=>{const state=await lockRecordChanges(tx);await appendRecordChange(tx,{id:crypto.randomUUID(),text:'must roll back'},state);throw Error('rollback');}),/rollback/);
+ const after=(await request('/api/records/changes?cursor='+encodeURIComponent(before.cursor)+'&wait=0')).value;
+ assert.equal(after.cursor,before.cursor);assert.equal(after.changes.length,0);
+});
+
+test('long poll stops after device revocation and never returns queued record bodies',async t=>{
+ const {request,owner,server}=await fixture(t),code=await api(owner,'/api/pairings','POST',{role:'owner'}),other={server,...await api({server},'/api/pair','POST',{key:code.key,name:'another owner'})};
+ const snapshot=(await request('/api/records/changes?wait=0')).value;
+ const pending=request('/api/records/changes?cursor='+encodeURIComponent(snapshot.cursor)+'&wait=3');await new Promise(r=>setTimeout(r,50));
+ await api(other,'/api/devices/'+owner.device.id+'/revoke','POST',{});const response=await pending;assert.equal(response.status,401);assert.equal(response.value.changes,undefined);assert.equal(response.value.records,undefined);
+});
+
+test('concurrent writes commit a contiguous sequence and snapshots share the durable cursor',async t=>{
+ const {request,input,app}=await fixture(t);const before=(await request('/api/records/changes?wait=0')).value;
+ const ids=Array.from({length:8},()=>crypto.randomUUID());const saved=await Promise.all(ids.map(id=>request('/api/records/'+id,'PUT',input())));assert.ok(saved.every(r=>r.status===200));
+ const page=(await request('/api/records/changes?cursor='+encodeURIComponent(before.cursor)+'&wait=0')).value;assert.deepEqual(page.changes.map(e=>e.seq),[1,2,3,4,5,6,7,8]);assert.deepEqual(new Set(page.changes.map(e=>e.record.id)),new Set(ids));
+ const snapshot=(await request('/api/records/changes?wait=0')).value;assert.equal(snapshot.cursor,page.cursor);assert.equal(snapshot.records.length,8);assert.equal((await app.store.list('record-change')).length,8);
+});

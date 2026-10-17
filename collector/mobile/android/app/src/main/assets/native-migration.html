@@ -15,7 +15,7 @@ async function blob(recordId,fileId,part,value,meta){
 window.run=async(mode)=>{try{
  if(mode==='favorites'){let values=JSON.parse(localStorage.getItem('personal-library-favorites')||'[]');await send('favorites',values);return}
  const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('inspirainest-capture-v1',1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('items'))request.result.createObjectStore('items',{keyPath:'id'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});
- const rows=await new Promise((resolve,reject)=>{const tx=db.transaction('items','readonly');const req=tx.objectStore('items').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
+ const rows=await new Promise((resolve,reject)=>{const tx=db.transaction('items','readonly');const req=tx.objectStore('items').getAll();req.onsuccess=()=>resolve(req.result.filter(row=>!row.id.startsWith("__record-")));req.onerror=()=>reject(req.error)});
  const blobs=rows.flatMap(row=>(row.attachments||[]).flatMap(file=>[file.blob,file.thumbnail?.blob])).filter(value=>value instanceof Blob);
  await send('begin',{count:rows.length});
  for(const row of rows){const clean=JSON.parse(JSON.stringify(row,(key,value)=>value instanceof Blob?undefined:value));await send('recordStart',clean);

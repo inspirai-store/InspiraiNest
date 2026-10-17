@@ -1,0 +1,3 @@
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {fileURLToPath} from 'node:url';import {spawnSync} from 'node:child_process';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),profile=fs.mkdtempSync(path.join(os.tmpdir(),'capture-sync-ui-'));let status=1;
+try{status=spawnSync(require('electron'),[fileURLToPath(new URL('./capture-sync-qa.cjs',import.meta.url))],{stdio:'inherit',env:{...process.env,RECORD_SYNC_QA_PROFILE:profile}}).status??1;}finally{fs.rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});}process.exitCode=status;

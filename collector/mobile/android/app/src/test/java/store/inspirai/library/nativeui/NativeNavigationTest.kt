@@ -26,9 +26,9 @@ class NativeNavigationTest {
     private lateinit var db: NativeDatabase
     private lateinit var host: org.robolectric.android.controller.ActivityController<androidx.activity.ComponentActivity>
     private lateinit var root: android.view.View
-    private fun show(mode: String="light") {
+    private fun show(mode: String="light",taskItems: JSONArray=JSONArray()) {
         val context=RuntimeEnvironment.getApplication();db=Room.inMemoryDatabaseBuilder(context,NativeDatabase::class.java).build()
-        val repository=FixtureRepository(db)
+        val repository=FixtureRepository(db,taskItems)
         host=Robolectric.buildActivity(androidx.activity.ComponentActivity::class.java).setup().visible()
         host.get().setContent { root=androidx.compose.ui.platform.LocalView.current.rootView;NestTheme(mode) { NativeApp(repository,true,"",{}, {},mode,android.content.Intent(),{}) } }
         compose.waitUntil(10000) { compose.onAllNodesWithText("原生阅读与长篇中文资料").fetchSemanticsNodes().isNotEmpty() }
@@ -47,6 +47,22 @@ class NativeNavigationTest {
     }
     @Test fun dayLibraryRenders() { show();capture("day-library") }
     @Test fun nightLibraryRenders() { show("dark");capture("night-library") }
+    @Test fun taskMetadataOmitsJsonNullAndMissingNames() {
+        fun item(id: String,title: String)=JSONObject().put("id",id).put("title",title).put("section","attention").put("taskIds",JSONArray().put(id))
+        val items=JSONArray()
+            .put(item("no-project","未关联项目").put("deviceName","熊熊的小窝").put("projectName",JSONObject.NULL))
+            .put(item("project","项目实测").put("deviceName","测试电脑").put("projectName","灵藏"))
+            .put(item("project-only","仅项目").put("deviceName",JSONObject.NULL).put("projectName","单独项目"))
+            .put(item("missing","尚未分配"))
+        show(taskItems=items)
+        compose.onAllNodesWithText("任务").onLast().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("未关联项目").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("熊熊的小窝").assertExists()
+        compose.onNodeWithText("测试电脑 · 灵藏").assertExists()
+        compose.onNodeWithText("单独项目").assertExists()
+        compose.onNodeWithText("尚未分配").assertExists()
+        compose.onAllNodesWithText("null",substring=true).assertCountEquals(0)
+    }
     private fun capture(name: String) {
         compose.waitForIdle();val file=File("build/reports/native-ui/$name.png");file.parentFile!!.mkdirs()
         compose.runOnIdle {
@@ -55,7 +71,7 @@ class NativeNavigationTest {
             file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle()
         }
     }
-    private class FixtureRepository(db: NativeDatabase): NestRepository {
+    private class FixtureRepository(db: NativeDatabase,private val taskItems: JSONArray): NestRepository {
         override val dao=db.dao();override val credentials=Credentials(RuntimeEnvironment.getApplication())
         override val records=MutableStateFlow<List<LocalRecord>>(emptyList())
         private val item=JSONObject().put("id","fixture-reading").put("title","原生阅读与长篇中文资料").put("summary","用于组件验收的本地夹具").put("status","archived").put("type","article").put("collected_at","2026-10-17T10:00:00+08:00")
@@ -63,7 +79,7 @@ class NativeNavigationTest {
         override suspend fun content(id: String,file: String?)="# 正文示例\n\n"+"中文长文内容，保持舒适的行距与留白。\n\n".repeat(20)
         override suspend fun request(path: String,method: String,body: JSONObject?)=when {
             path.startsWith("/api/read/v1/entry")->item
-            path=="/api/processing-center"->JSONObject().put("items",JSONArray()).put("counts",JSONObject())
+            path=="/api/processing-center"->JSONObject().put("items",taskItems).put("counts",JSONObject())
             else->JSONObject().put("tasks",JSONArray()).put("devices",JSONArray())
         }
         override suspend fun saveRecord(value: JSONObject,draft: Boolean){}

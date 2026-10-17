@@ -39,7 +39,7 @@ import java.util.UUID
     var query by rememberSaveable { mutableStateOf("") };var filter by rememberSaveable { mutableStateOf("全部") };var more by remember { mutableStateOf(false) }
     val rows by model.rows.collectAsStateWithLifecycle();val state by model.status.collectAsStateWithLifecycle()
     val server=model.repository.credentials.server()
-    val selected=rows.filter { it.server==server }.filter { row -> val value=JSONObject(row.json)
+    val selected=rows.filter { it.server==server && JSONObject(it.json).let { value->value.isNull("deletedAt")||value.optString("deletedAt").isBlank() } }.filter { row -> val value=JSONObject(row.json)
         value.optString("text").contains(query,true) && when(filter) {
             "待同步"->value.optString("sync")!="synced";"待确认"->value.optJSONArray("tasks").objects().any { it.optString("state")=="awaiting_review" }
             "未加工"->value.optJSONArray("tasks").objects().isEmpty();else->true
@@ -74,7 +74,7 @@ import java.util.UUID
     }
 }
 fun recordDay(value: String)=runCatching { java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate().toString() }.getOrDefault("草稿")
-fun syncLabel(state: String)=when(state) {"synced"->"已同步";"conflict"->"同步冲突";"failed"->"同步失败";"draft"->"草稿";else->"待同步"}
+fun syncLabel(state: String)=when(state) {"synced"->"已上传";"conflict"->"同步冲突";"failed"->"同步失败";"draft"->"草稿";else->"待同步"}
 fun processingLabel(value: JSONObject): String = when {
     value.has("pendingProcess")->if(value.optString("processError").isNotBlank())"加工提交失败" else "加工待提交"
     value.optJSONArray("tasks").objects().any{it.optString("state")=="awaiting_review"}->"待确认"
@@ -89,15 +89,17 @@ fun processingLabel(value: JSONObject): String = when {
     val state by model.status.collectAsStateWithLifecycle();val context=LocalContext.current
     val value=row?.let { JSONObject(it.json) }
     DetailScaffold("记录",back,actions={
-        IconButton(onClick={open("edit:$id")}) { Icon(Icons.Outlined.Edit,"编辑记录") }
+        IconButton(enabled=value?.isNull("deletedAt")!=false,onClick={open("edit:$id")}) { Icon(Icons.Outlined.Edit,"编辑记录") }
         Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) {
-            DropdownMenuItem(text={Text("交给 Agent 加工")},onClick={more=false;process=true})
+            DropdownMenuItem(enabled=value?.isNull("deletedAt")!=false,text={Text("交给 Agent 加工")},onClick={more=false;process=true})
             DropdownMenuItem(text={Text("同步")},onClick={more=false;model.refresh()})
+            DropdownMenuItem(enabled=value?.isNull("deletedAt")!=false,text={Text("删除")},onClick={more=false;confirm="delete"})
         } }
     }) { padding ->
         Column(Modifier.padding(padding).widthIn(max=720.dp).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             state.error?.let { ErrorState(it){model.refresh()} }
             if(value==null) { EmptyState("正在读取记录");return@Column }
+            if(!value.isNull("deletedAt")){Text("已在其他设备删除",style=MaterialTheme.typography.titleLarge);if(value.optJSONArray("recoveryDrafts").objects().isNotEmpty())Button(onClick={open("edit:$id")}){Text("恢复草稿")};TextButton(onClick={open("record-trash")}){Text("查看回收站")};return@Column}
             Text("${value.optString("createdAt").take(16).replace('T',' ')} · ${syncLabel(value.optString("sync"))}",color=MaterialTheme.colorScheme.onSurfaceVariant)
             RecordDocument(value,value.optString("text"))
             value.optJSONObject("pendingProcess")?.let {
@@ -122,7 +124,7 @@ fun processingLabel(value: JSONObject): String = when {
             Button(onClick={process=true}) { Text("加工记录") }
         }
     }
-    if(confirm!=null)AlertDialog(onDismissRequest={confirm=null},title={Text("确认采用${if(confirm=="local")"本机" else "远端"}版本？")},confirmButton={TextButton(onClick={val local=confirm=="local";confirm=null;model.action { repository.resolveConflict(repository.credentials.server(),id,local);repository.syncRecords() }}) { Text("确认") }},dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})
+    if(confirm!=null)AlertDialog(onDismissRequest={confirm=null},title={Text(if(confirm=="delete")"删除这条记录？" else "确认采用${if(confirm=="local")"本机" else "远端"}版本？")},confirmButton={TextButton(onClick={val choice=confirm;confirm=null;model.action { if(choice=="delete")repository.setRecordDeleted(id,true) else repository.resolveConflict(repository.credentials.server(),id,choice=="local");repository.syncRecords() }}) { Text("确认") }},dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})
     if(process) {
         var preset by rememberSaveable { mutableStateOf("summary") };var instruction by rememberSaveable { mutableStateOf("") }
         var devices by remember { mutableStateOf<List<JSONObject>>(emptyList()) };var device by rememberSaveable { mutableStateOf("") };var agent by rememberSaveable { mutableStateOf("") }
@@ -140,9 +142,11 @@ fun processingLabel(value: JSONObject): String = when {
     }
 }
 
-@Composable fun RecordEditorPage(repository: NestRepository,existingId: String,shared: Intent?,back: ()->Unit) {
+@Composable fun RecordEditorPage(repository: NestRepository,existingId: String,shared: Intent?,back: ()->Unit,open: (String)->Unit={}) {
     val context=LocalContext.current;val scope=rememberCoroutineScope();val model=model("editor:$existingId") { PageModel(repository) }
     val state by model.status.collectAsStateWithLifecycle()
+    val syncedRows by repository.records.collectAsStateWithLifecycle(emptyList())
+    val remotelyDeleted=syncedRows.firstOrNull{it.id==existingId&&it.server==repository.credentials.server()}?.let{JSONObject(it.json).let{json->!json.isNull("deletedAt")&&json.optString("deletedAt").isNotBlank()}}?:false
     val id=rememberSaveable { existingId.ifBlank { UUID.randomUUID().toString() } }
     var value by remember { mutableStateOf<JSONObject?>(null) };var editor by remember { mutableStateOf<EditText?>(null) }
     var files by remember { mutableStateOf<List<JSONObject>>(emptyList()) };var error by remember { mutableStateOf<String?>(null) }
@@ -154,7 +158,7 @@ fun processingLabel(value: JSONObject): String = when {
         check(current.optJSONObject("document")?.let { RecordCodec.supported(it) }!=false) { "此格式仅可阅读，原文已保留" }
         val text=editor?.text ?: SpannableStringBuilder(current.optString("text"))
         current.put("text",text.toString().replace("\uFFFC","").replace("\u200B","")).put("document",RecordCodec.encode(text)).put("attachments",JSONArray(files))
-        repository.saveRecord(current,draft);value=current;onDone()
+        val recovered=if(!draft&&remotelyDeleted)repository.saveRecoveryAsNew(current) else {repository.saveRecord(current,draft);null};value=current;onDone();if(recovered!=null)open("record:$recovered")
     } }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> model.action {
         val current=files.toMutableList()
@@ -176,11 +180,11 @@ fun processingLabel(value: JSONObject): String = when {
     val cameraPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if(it)takePhoto() else error="未允许相机，可以添加已有图片" }
     LaunchedEffect(id) { model.action {
         val saved=repository.dao.record(repository.credentials.server(),id)
-        val row=saved?.let { JSONObject(it.json).let { json -> json.optJSONObject("editingDraft")?:json } }?:JSONObject().put("id",id).put("text",shared?.let { ShareActivity.sharedText(it) }?:"").put("createdAt",Instant.now().toString()).put("server",repository.credentials.server())
+        val row=saved?.let { JSONObject(it.json).let { json -> json.optJSONObject("editingDraft")?:json.optJSONArray("recoveryDrafts")?.optJSONObject(0)?:json } }?:JSONObject().put("id",id).put("text",shared?.let { ShareActivity.sharedText(it) }?:"").put("createdAt",Instant.now().toString()).put("server",repository.credentials.server())
         value=row;files=row.optJSONArray("attachments").objects()
         if(saved==null)repository.saveRecord(row,true)
     } }
-    DetailScaffold("${if(existingId.isBlank())"新建" else "编辑"}记录",{persist(true,back)},actions={TextButton(onClick={persist(false) { back() }}) { Text("保存") }},bottom={
+    DetailScaffold("${if(existingId.isBlank())"新建" else "编辑"}记录",{persist(true,back)},actions={TextButton(onClick={persist(false) { back() }}) { Text(if(remotelyDeleted)"另存记录" else "保存") }},bottom={
         Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal=12.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState())) {
                 listOf("粗体","斜体","下划线","删除线","代码","链接","标题","列表","引用","正文","撤销","重做").forEach { action -> TextButton(onClick={
@@ -207,6 +211,7 @@ fun processingLabel(value: JSONObject): String = when {
     }) { padding ->
         Column(Modifier.padding(padding).padding(horizontal=24.dp).fillMaxSize()) {
             state.error?.let { ErrorState(it){persist()} };error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+            if(remotelyDeleted) { Text("已在其他设备删除");Row { TextButton(onClick={persist(false){back()}}){Text("另存记录")};TextButton(onClick={open("record-trash")}){Text("查看回收站")} } }
             val document=value?.optJSONObject("document")
             val supported=document==null||RecordCodec.supported(document)
             if(!supported) { Text("此记录使用新格式，当前版本仅可阅读。原文未更改。");value?.let { RecordDocument(it,it.optString("text")) } }
@@ -241,4 +246,22 @@ fun processingLabel(value: JSONObject): String = when {
         editor?.text?.let { text->edits.add(SpannableString(text));text.getSpans(linkStart,linkEnd,URLSpan::class.java).forEach{text.removeSpan(it)};text.setSpan(URLSpan(link),linkStart,linkEnd,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
         linkDialog=false;persist()
     }){Text("应用")}},dismissButton={TextButton(onClick={linkDialog=false}){Text("取消")}})
+}
+
+@Composable fun RecordTrashPage(repository: NestRepository,back: ()->Unit,open: (String)->Unit) {
+    val model=model("record-trash"){PageModel(repository)};val state by model.status.collectAsStateWithLifecycle()
+    val rows by repository.records.collectAsStateWithLifecycle(emptyList())
+    val deleted=rows.filter{it.server==repository.credentials.server()&&!JSONObject(it.json).isNull("deletedAt")}
+    LaunchedEffect(Unit){model.action{repository.checkRecordSnapshot()}}
+    DetailScaffold("回收站",back){padding->LazyColumn(Modifier.padding(padding),contentPadding=PaddingValues(NestSpace.page)){
+        state.error?.let{item{ErrorState(it){model.action{repository.syncRecords()}}}}
+        if(deleted.isEmpty())item{EmptyState("回收站为空")}
+        items(deleted,key={it.id}){row->val value=JSONObject(row.json)
+            Column(Modifier.fillMaxWidth().padding(vertical=16.dp)){
+                Text(value.optString("text").take(120).ifBlank{"已删除记录"},style=MaterialTheme.typography.titleMedium)
+                Row{TextButton(enabled=!state.loading,onClick={model.action{repository.setRecordDeleted(row.id,false);repository.syncRecords()}}){Text("恢复原记录")}
+                if(value.optJSONArray("recoveryDrafts").objects().isNotEmpty())TextButton(onClick={open("edit:${row.id}")}){Text("恢复草稿")}}
+            };HorizontalDivider()
+        }
+    }}
 }

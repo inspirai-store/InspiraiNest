@@ -14,7 +14,7 @@ export class AccountRecordStore implements RecordStore {
   constructor(base:RecordStore,connection:Connection){this.base=base;this.scope=recordScope(connection);}
   private pack(item:StoredItem):StoredItem {return {...item,id:key(item.accountScope as string??this.scope,item.id),localId:item.id,accountScope:item.accountScope??this.scope} as StoredItem;}
   private unpack(item:StoredItem):StoredItem {return {...item,id:String(item.localId)} as StoredItem;}
-  async all(){return (await this.base.all()).filter(item=>item.accountScope===this.scope&&typeof item.localId==='string'&&!item.transferredTo).map(item=>this.unpack(item));}
+  async all(){return (await this.base.all()).filter(item=>item.accountScope===this.scope&&typeof item.localId==='string'&&item.localId!=='__record-sync__'&&!item.transferredTo).map(item=>this.unpack(item));}
   async get(id:string){const item=await this.base.get(key(this.scope,id));return item&&!item.transferredTo?this.unpack(item):undefined;}
   put(item:StoredItem){return this.base.put(this.pack(item));}
   async putMany(items:StoredItem[]){if(!this.base.putMany)throw Error('本机存储不支持安全批量保存');await this.base.putMany(items.map(item=>this.pack(item)));}

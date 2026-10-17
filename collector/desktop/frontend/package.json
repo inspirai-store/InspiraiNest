@@ -18,7 +18,7 @@
     "capture:states": "npm run build && electron scripts/capture-states.cjs && node scripts/check-states.mjs",
     "compare:states": "node scripts/compare-states.mjs",
     "check:states": "node scripts/check-states.mjs",
-    "test:records": "node --experimental-strip-types --test scripts/records-service.test.mjs",
+    "test:records": "node --experimental-strip-types --test scripts/records-service.test.mjs scripts/record-sync.test.mjs",
     "records:qa": "npm run build && electron scripts/records-qa.cjs",
     "test:record-media": "node --experimental-strip-types --test scripts/recording.test.mjs",
     "check:record-restart": "npm run build && node scripts/check-records-restart.mjs",

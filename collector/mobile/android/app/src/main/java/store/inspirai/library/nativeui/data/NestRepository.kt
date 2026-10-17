@@ -1,5 +1,6 @@
 package store.inspirai.library.nativeui.data
 
+import androidx.room.withTransaction
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ fun JSONObject.copyJson() = JSONObject(toString())
 fun encoded(value: String): String = Uri.encode(value)
 
 interface NestRepository {
+    val recordSyncSignals: Flow<Unit> get()=kotlinx.coroutines.flow.emptyFlow()
     val records: Flow<List<LocalRecord>>
     val dao: NativeDao
     val credentials: Credentials
@@ -35,6 +37,10 @@ interface NestRepository {
         val files=value.optJSONArray("attachments").objects().filter { it.optString("id")!=meta.getString("id") }+meta
         value.put("attachments",JSONArray(files));saveRecord(value,true)
     }
+    suspend fun saveRecoveryAsNew(value: JSONObject): String { error("当前存储不支持恢复草稿") }
+    suspend fun watchRecords(): Boolean = false
+    suspend fun checkRecordSnapshot() { syncRecords() }
+    suspend fun setRecordDeleted(id: String,deleted: Boolean) { error("当前存储不支持回收站") }
     suspend fun syncRecords()
     suspend fun resolveConflict(server: String, id: String, useLocal: Boolean)
     suspend fun processRecord(server: String, id: String, preset: String, instructions: String,deviceId: String?=null,agent: String?=null)
@@ -45,10 +51,14 @@ class AndroidNestRepository(private val context: Context,private val database: N
     private val call: (suspend (String,String,JSONObject?)->JSONObject)?=null): NestRepository {
     override val credentials = Credentials(context)
     override val dao = database.dao()
+    private val recordSync by lazy { RecordSyncClient(database,this,recordMutex) }
+    private val syncSignals=kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity=1)
+    override val recordSyncSignals: Flow<Unit> = syncSignals
     override val records = dao.observeRecords()
-    override suspend fun request(path: String, method: String, body: JSONObject?): JSONObject = withContext(Dispatchers.IO) {
-        val before=credentials.snapshot() ?: error("请先连接资料空间")
-        val response=call?.invoke(path,method,body)?:Api(credentials).call(path,method,body)
+    override suspend fun request(path: String, method: String, body: JSONObject?): JSONObject = requestBound(credentials.snapshot()?:error("请先连接资料空间"),path,method,body)
+    private suspend fun requestBound(before: Credentials.Snapshot,path: String,method: String,body: JSONObject?): JSONObject = withContext(Dispatchers.IO) {
+        check(before.generation==credentials.snapshot()?.generation) { "连接已改变，请重新加载" }
+        val response=call?.invoke(path,method,body)?:Api(credentials).call(before,path,method,body)
         check(before.generation==credentials.snapshot()?.generation) { "连接已改变，请重新加载" }
         response
     }
@@ -87,6 +97,11 @@ class AndroidNestRepository(private val context: Context,private val database: N
         val item=value.copyJson();val id=item.getString("id");val server=item.optString("server",credentials.server())
         val oldRow=dao.record(server,id)
         val previous=oldRow?.let { JSONObject(it.json) }
+        if(previous!=null&&!previous.isNull("deletedAt")&&previous.optString("deletedAt").isNotBlank()){
+            check(draft) { "已在其他设备删除，请另存记录" }
+            item.put("remoteDeleted",true).put("recoveryKind","editor").put("recoveryTrashVersion",previous.optLong("trashVersion"));previous.put("editingDraft",item).put("recoveryDrafts",JSONArray(previous.optJSONArray("recoveryDrafts").objects().filter { it.optString("recoveryKind")!="editor"||it.optLong("recoveryTrashVersion",-1)!=previous.optLong("trashVersion") }+item))
+            dao.put(oldRow!!.copy(json=previous.toString()));return
+        }
         check(previous?.optString("sync")!="conflict") { "请先处理同步冲突，再编辑" }
         previous?.optJSONObject("pendingProcess")?.let { item.put("pendingProcess",it) }
         previous?.optString("processError")?.takeIf { it.isNotBlank() }?.let { item.put("processError",it) }
@@ -106,12 +121,12 @@ class AndroidNestRepository(private val context: Context,private val database: N
             item.remove("editingDraft")
             dao.put(LocalRecord(server,id,item.toString(),System.currentTimeMillis(),draft))
         }
-        if(!draft) QueueJob.schedule(context)
+        if(!draft){QueueJob.schedule(context);syncSignals.tryEmit(Unit);Unit}
     }
     private suspend fun sendRecord(original: LocalRecord) {
         var current=dao.record(original.server,original.id)?:return
         var item=JSONObject(current.json)
-        if(current.draft || item.optString("sync")=="conflict")return
+        if(current.draft || item.optString("sync")=="conflict" || !item.isNull("deletedAt")&&item.optString("deletedAt").isNotBlank())return
         val snapshot=credentials.snapshot()?:return
         if(current.server!=snapshot.server)return
         try {
@@ -139,13 +154,15 @@ class AndroidNestRepository(private val context: Context,private val database: N
                     payload=proposed
                 }
                 val frozen=checkNotNull(payload)
-                val response=request("/api/records/${encoded(current.id)}","PUT",frozen)
+                val response=requestBound(snapshot,"/api/records/${encoded(current.id)}","PUT",frozen)
                 val remote=response.optJSONObject("record")?:response
                 check(remote.optString("id")==current.id && remote.getLong("version")==frozen.getLong("baseVersion")+1) { "服务端未确认原记录版本，请使用原请求重试" }
                 recordMutex.withLock {
+                    check(snapshot.generation==credentials.snapshot()?.generation) { "连接已改变，请重新加载" }
                     val latest=dao.record(current.server,current.id)?:return@withLock
                     val live=JSONObject(latest.json)
-                    check(live.optJSONObject("payload")?.optString("requestId")==frozen.optString("requestId")){"待提交请求已改变"}
+                    if(!live.isNull("deletedAt"))return@withLock
+                    if(live.optJSONObject("payload")?.optString("requestId")!=frozen.optString("requestId"))return@withLock
                     live.put("remoteVersion",remote.getLong("version")).put("sync","synced").remove("payload");live.remove("error")
                     val next=live.optJSONObject("nextEdit")
                     if(next!=null) {
@@ -156,9 +173,10 @@ class AndroidNestRepository(private val context: Context,private val database: N
                     item=next?:live;current=latest.copy(json=item.toString());dao.put(current)
                 }
             }
-            item.optJSONObject("pendingProcess")?.let { pending->
+            val pending=recordMutex.withLock { dao.record(current.server,current.id)?.let{JSONObject(it.json)}?.takeIf{it.isNull("deletedAt")&&it.optString("sync")=="synced"}?.optJSONObject("pendingProcess") }
+            pending?.let { pending->
                 try {
-                    val task=request("/api/records/${encoded(current.id)}/process","POST",pending)
+                    val task=requestBound(snapshot,"/api/records/${encoded(current.id)}/process","POST",pending)
                     check(task.optString("id").matches(Regex("[a-fA-F0-9-]{36}"))) { "服务端未确认加工任务，请使用原请求重试" }
                     recordMutex.withLock {
                         val latest=dao.record(current.server,current.id)?:return@withLock
@@ -186,6 +204,7 @@ class AndroidNestRepository(private val context: Context,private val database: N
             recordMutex.withLock {
                 val latest=dao.record(current.server,current.id)?:return@withLock
                 val live=JSONObject(latest.json)
+                if(!live.isNull("deletedAt")||live.optLong("trashVersion")>item.optLong("trashVersion"))return@withLock
                 // Keep newer local edits and the immutable request, even if its acknowledgement was lost.
                 live.put("sync",if(e is Api.Failure&&e.code=="record_version_conflict")"conflict" else "failed").put("error",e.message)
                 dao.put(latest.copy(json=live.toString()))
@@ -194,24 +213,61 @@ class AndroidNestRepository(private val context: Context,private val database: N
     }
     override suspend fun syncRecords() = syncMutex.withLock {
         if(dao.journal("records-v1")?.json!="complete")return@withLock
+        if(credentials.isPaired())recordSync.pull()
+        replayRecordOperations()
         for(local in dao.records())sendRecord(local)
-        if(!credentials.isPaired())return@withLock
-        val server=credentials.server();val response=request("/api/records")
-        recordMutex.withLock {
-            for(remote in response.optJSONArray("records").objects()) {
-                val id=remote.getString("id");val existing=dao.record(server,id)
-                if(existing!=null && (existing.draft || JSONObject(existing.json).optString("sync")!="synced" || JSONObject(existing.json).has("editingDraft") || JSONObject(existing.json).has("pendingProcess")))continue
-                val old=existing?.let { JSONObject(it.json) }
-                if(old!=null&&old.optLong("remoteVersion")>remote.optLong("version"))continue
-                remote.put("server",server).put("sync","synced").put("remoteVersion",remote.optLong("version"))
-                dao.put(LocalRecord(server,id,remote.toString(),runCatching { Instant.parse(remote.optString("updatedAt",remote.optString("createdAt"))).toEpochMilli() }.getOrDefault(0)))
-            }
-            for(deleted in response.optJSONArray("deleted").objects()) {
-                val local=dao.record(server,deleted.optString("id"))?:continue
-                val value=JSONObject(local.json)
-                if(value.optString("sync")=="synced"&&!value.has("editingDraft")&&!value.has("pendingProcess"))dao.delete(server,local.id)
+        if(credentials.isPaired())recordSync.pull()
+    }
+    override suspend fun saveRecoveryAsNew(value: JSONObject): String = recordMutex.withLock {
+        val server=credentials.server();val parent=value.getString("id");val newId=UUID.randomUUID().toString()
+        database.withTransaction {
+            val old=dao.record(server,parent)?:error("恢复草稿不存在");val original=JSONObject(old.json)
+            val fresh=value.copyJson().put("id",newId).put("remoteVersion",0).put("version",1).put("sync","pending").put("copiedFrom",parent).put("createdAt",Instant.now().toString())
+            listOf("deletedAt","trashVersion","changeSeq","payload","editingDraft","nextEdit","recoveryDrafts","pendingProcess","tasks","remoteDeleted").forEach { fresh.remove(it) }
+            dao.put(LocalRecord(server,newId,fresh.toString(),System.currentTimeMillis()))
+            dao.files(parent,server).forEach { dao.file(it.copy(recordId=newId)) }
+            original.remove("editingDraft");original.put("recoveryDrafts",JSONArray(original.optJSONArray("recoveryDrafts").objects().filter { it.optString("text")!=value.optString("text")||it.optJSONObject("document")?.toString()!=value.optJSONObject("document")?.toString()||it.optJSONArray("attachments")?.toString()!=value.optJSONArray("attachments")?.toString() }))
+            dao.put(old.copy(json=original.toString()))
+        }
+        QueueJob.schedule(context);syncSignals.tryEmit(Unit);Unit;newId
+    }
+    override suspend fun checkRecordSnapshot() { if(credentials.isPaired()&&dao.journal("records-v1")?.json=="complete")recordSync.pull(full=true);syncRecords() }
+    private fun operationPrefix()="record-operation:${credentials.server()}:${credentials.deviceId()}:"
+    override suspend fun setRecordDeleted(id: String,deleted: Boolean) = recordMutex.withLock {
+        val row=dao.record(credentials.server(),id)?:error("记录不存在")
+        val value=JSONObject(row.json);val key=operationPrefix()+id
+        check(dao.journal(key)==null){"请先完成上一次操作"}
+        val operation=JSONObject().put("id",id).put("action",if(deleted)"delete" else "restore").put("payload",JSONObject().put("requestId",UUID.randomUUID().toString()).put("version",value.optLong("remoteVersion",value.optLong("version"))).put("trashVersion",value.optLong("trashVersion")))
+        database.withTransaction {
+            dao.journal(MigrationLog(key,operation.toString()))
+            if(deleted){
+                val recoveries=value.optJSONArray("recoveryDrafts")?:JSONArray()
+                if(value.optString("sync")!="synced")recoveries.put(value.copyJson().apply { remove("recoveryDrafts");put("recoveryKind","pending") })
+                value.optJSONObject("editingDraft")?.let{recoveries.put(it.copyJson().put("recoveryKind","editor"))}
+                value.put("recoveryDrafts",recoveries).put("deletedAt",Instant.now().toString()).put("trashVersion",value.optLong("trashVersion")+1)
+                value.optJSONObject("payload")?.let{value.put("cancelledPayload",it)};value.remove("payload");value.optJSONObject("pendingProcess")?.let{value.put("cancelledProcess",it)};value.remove("pendingProcess");value.put("sync","synced")
+                dao.put(row.copy(json=value.toString()))
             }
         }
+        QueueJob.schedule(context);syncSignals.tryEmit(Unit);Unit
+    }
+    private suspend fun replayRecordOperations() {
+        if(!credentials.isPaired())return
+        val identity=credentials.snapshot()?:return
+        for(log in dao.journals(operationPrefix()+"%")){
+            val operation=JSONObject(log.json)
+            val result=requestBound(identity,"/api/content-trash/record/${encoded(operation.getString("id"))}/${operation.getString("action")}","POST",operation.getJSONObject("payload"))
+            recordMutex.withLock { database.withTransaction {
+                check(identity.generation==credentials.snapshot()?.generation){"连接已改变"}
+                val row=dao.record(identity.server,operation.getString("id"))
+                if(row!=null){val value=JSONObject(row.json);if(operation.getString("action")=="delete")value.put("deletedAt",result.opt("deletedAt")?:JSONObject.NULL).put("trashVersion",result.getLong("trashVersion"));dao.put(row.copy(json=value.toString()))}
+                dao.removeJournal(log.key)
+            } }
+        }
+    }
+    override suspend fun watchRecords(): Boolean {
+        if(!credentials.isPaired() || dao.journal("records-v1")?.json!="complete" || !recordSync.capable())return false
+        recordSync.pull(25);return true
     }
     override suspend fun resolveConflict(server: String,id: String,useLocal: Boolean) {
         check(server==credentials.server()) { "请连接原资料空间" }
@@ -222,7 +278,7 @@ class AndroidNestRepository(private val context: Context,private val database: N
             val item=if(useLocal)JSONObject(local.json).let { it.optJSONObject("editingDraft") ?: it.optJSONObject("nextEdit") ?: it } else remote
             item.remove("payload");item.remove("nextEdit");item.remove("editingDraft");item.remove("error")
             item.put("server",server).put("remoteVersion",remote.getLong("version")).put("sync",if(useLocal) "pending" else "synced")
-            dao.put(local.copy(json=item.toString()));QueueJob.schedule(context)
+            dao.put(local.copy(json=item.toString()));QueueJob.schedule(context);syncSignals.tryEmit(Unit);Unit
         }
     }
     override suspend fun processRecord(server: String,id: String,preset: String,instructions: String,deviceId: String?,agent: String?) = recordMutex.withLock {
@@ -235,7 +291,7 @@ class AndroidNestRepository(private val context: Context,private val database: N
             deviceId?.takeIf { it.isNotBlank() }?.let{put("deviceId",it)};agent?.takeIf { it.isNotBlank() }?.let{put("agent",it)}
         })
         item.remove("processError")
-        dao.put(local.copy(json=item.toString()));QueueJob.schedule(context)
+        dao.put(local.copy(json=item.toString()));QueueJob.schedule(context);syncSignals.tryEmit(Unit);Unit
     }
     override suspend fun download(route: String,meta: JSONObject): File = withContext(Dispatchers.IO) {
         val snapshot=credentials.snapshot() ?: error("请先连接资料空间")

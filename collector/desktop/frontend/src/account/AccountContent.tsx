@@ -1,3 +1,4 @@
+import {RecordSyncPanel} from '../records/RecordSyncPanel';
 import {TextInput} from '../components/FormControls';
 import {ModuleContent,ModuleHeader} from '../components/ModuleLayout';
 import {useEffect,useRef,useState} from 'react';
@@ -31,5 +32,5 @@ export function AccountContent(){
  </fieldset><div className={styles.actions}><Action type="submit" kind="primary" icon={busy?Loader:LogIn} disabled={busy}>{busy?'登录中':'登录'}</Action>{verify&&!busy&&<Action className={styles.factorToggle} kind="ghost" icon={KeyRound} onClick={()=>{setFactor('');setMode(mode==='otp'?'recovery':'otp');requestAnimationFrame(()=>form.current?.querySelector<HTMLInputElement>('[name=factor]')?.focus());}}>{mode==='otp'?'使用恢复码':'使用验证码'}</Action>}{state.phase==='signing-in'&&<Action icon={X} onClick={()=>{void client.current?.cancel();setKey('');setFactor('');}}>取消</Action>}</div></form>}
  {state.error&&!readError&&<p role="alert" className={styles.error}>{state.error.message}</p>}
  {invoker&&<Modal title="退出登录" region="退出登录对话框" className={styles.dialog} invoker={invoker} close={()=>setInvoker(null)} focusCancel footer={<><Action data-initial-cancel onClick={()=>setInvoker(null)}>取消</Action><Action kind="primary" icon={LogOut} onClick={()=>{setInvoker(null);setKey('');setFactor('');void client.current?.logout();}}>退出登录</Action></>}><p>退出当前资料空间<span className={styles.questionMark}>？</span></p></Modal>}
- </ModuleContent>;
+ {paired&&<RecordSyncPanel/>}</ModuleContent>;
 }

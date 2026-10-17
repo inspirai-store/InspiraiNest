@@ -1,4 +1,5 @@
 import {canonicalJson,hash,id,now,requireValue} from './common.mjs';
+import {lockRecordChanges,appendRecordChange} from './record-changes.mjs';
 const kinds={record:'capture',writing:'writing-session',task:'task','selection-writing':'task'};
 const terminal=new Set(['completed','cancelled','failed','interrupted']);
 export function createContentTrash({store,serialized,owner,authenticate,body,send,saveTask,refreshLibrary=async()=>{}}){
@@ -21,6 +22,7 @@ export function createContentTrash({store,serialized,owner,authenticate,body,sen
   const digest=hash(canonicalJson({type,targetId,action,input})),key=type+':'+targetId+':'+input.requestId;
   await authenticate(req);
   const result=await serialized('claim',()=>store.transaction(async tx=>{
+   const syncState=type==='record'?await lockRecordChanges(tx):null;
    const credential=await tx.getForUpdate('device',device.credentialId||device.id);
    requireValue(credential&&!credential.revokedAt&&[credential.tokenHash,credential.ownerTokenHash].includes(device.credentialTokenHash||hash(req.authToken)),'授权已失效',401);
    const old=await tx.getForUpdate('content-operation',key);if(old){requireValue(old.hash===digest,'请求编号已用于其他操作',409);return old.result;}
@@ -41,6 +43,7 @@ export function createContentTrash({store,serialized,owner,authenticate,body,sen
    if(type==='writing'&&action==='restore')for(const task of await tx.list('task'))if(task.deletedWithParent==='writing:'+targetId)await tx.put('task',{...task,deletedAt:null,deletedWithParent:null,trashVersion:(task.trashVersion??0)+1});
    if(type==='writing'&&action==='restore'&&next.status==='processing')next.status='blocked';
    await tx.put(type==='library'?'trash':kinds[type],next);
+   if(type==='record')await appendRecordChange(tx,next,syncState);
    const value={...view(type,type==='library'?{...row,title:current.title,deletedAt,trashVersion}:next),deleted:!!deletedAt};
    await tx.put('content-operation',{id:key,hash:digest,result:value});return value;
   }));if(type==='library')await refreshLibrary();send(res,200,result);return true;

@@ -126,21 +126,24 @@ import store.inspirai.library.nativeui.design.*
     when {
         route=="theme"->DetailScaffold("外观",back) { padding->Column(Modifier.padding(padding).padding(20.dp)){ThemeChoices(theme,onTheme)} }
         route=="update"->UpdatePage(repository,back)
+        route=="record-trash"->RecordTrashPage(repository,back,open)
         route=="sync"->{
             val model=model("sync") { RecordsModel(repository) };val rows by model.rows.collectAsStateWithLifecycle();val status by model.status.collectAsStateWithLifecycle()
-            val context=LocalContext.current;var recovery by remember { mutableStateOf<List<MigrationLog>>(emptyList()) };var imported by remember { mutableStateOf<JSONObject?>(null) }
+            val context=LocalContext.current;var recovery by remember { mutableStateOf<List<MigrationLog>>(emptyList()) };var imported by remember { mutableStateOf<JSONObject?>(null) };val syncLog by repository.dao.observeJournal("record-sync:${repository.credentials.server()}:${repository.credentials.deviceId()}").collectAsStateWithLifecycle(null);val checked=syncLog?.let{JSONObject(it.json).optString("checkedAt")}?:""
             fun recover() { model.action { RecordAudioStore.recover(context,repository);recovery=repository.dao.journals("audio-recovery:%");imported=repository.dao.journal("records-v1-report")?.let { JSONObject(it.json) } } }
             LaunchedEffect(Unit){recover()}
+
             DetailScaffold("记录同步",back) { padding->LazyColumn(Modifier.padding(padding),contentPadding=PaddingValues(NestSpace.page)) {
                 status.error?.let { item { ErrorState(it){model.refresh()} } }
-                item { Button(onClick={model.refresh()}){Text("立即同步")} }
+                item { if(checked.isNotBlank())Text("最近同步 ${runCatching{java.time.Instant.parse(checked).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}.getOrDefault(checked)}");Button(onClick={model.refresh()}){Text("立即同步")};TextButton(onClick={open("record-trash")}){Text("回收站")} }
+                items(rows.filter{it.server==repository.credentials.server()&&JSONObject(it.json).optJSONArray("recoveryDrafts").objects().isNotEmpty()},key={"recovery:"+it.id}){row->ListItem(headlineContent={Text(JSONObject(row.json).optString("text").take(100))},supportingContent={Text("恢复草稿")},modifier=Modifier.clickable{open("edit:${row.id}")})}
                 imported?.let { report->item { Text("历史资料导入",style=MaterialTheme.typography.titleMedium);Text("${report.optInt("records")} 条记录 · ${report.optInt("files")} 个附件 · ${report.optLong("bytes")/1024} KB");Text("大小与 SHA-256 已核对",style=MaterialTheme.typography.bodyMedium) } }
                 items(recovery) { row->val info=JSONObject(row.json)
                     val path=info.optString("originalPath").ifEmpty { runCatching { JSONObject(java.io.File(info.getString("path")).readText()).getString("path") }.getOrDefault("") }
                     ListItem(headlineContent={Text("未完成的录音")},supportingContent={Text(info.optString("error"))},modifier=Modifier.clickable { if(path.isNotBlank())openCachedFile(context,java.io.File(path),java.io.File(path).name,"audio/mp4") })
                 }
                 if(recovery.isNotEmpty())item { OutlinedButton(onClick={recover()}){Text("重新读取录音片段")} }
-                items(rows.filter { it.server==repository.credentials.server() && JSONObject(it.json).optString("sync")!="synced" }) { row -> val value=JSONObject(row.json);ListItem(headlineContent={Text(value.optString("text").take(100))},supportingContent={Text(syncLabel(value.optString("sync")))},modifier=Modifier.clickable { open("record:${row.id}") }) }
+                items(rows.filter { it.server==repository.credentials.server() && JSONObject(it.json).let{value->value.isNull("deletedAt")&&value.optString("sync")!="synced"} }) { row -> val value=JSONObject(row.json);ListItem(headlineContent={Text(value.optString("text").take(100))},supportingContent={Text(syncLabel(value.optString("sync")))},modifier=Modifier.clickable { open("record:${row.id}") }) }
             } }
         }
         route.startsWith("agents")->AgentsPage(repository,route.substringAfter(':',""),back,open)

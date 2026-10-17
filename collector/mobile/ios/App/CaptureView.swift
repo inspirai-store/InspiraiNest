@@ -79,7 +79,9 @@ private final class CaptureNoRedirects: NSObject, URLSessionTaskDelegate {
     func allowed(_ route: String, _ method: String) -> Bool {
         func match(_ pattern: String) -> Bool { route.range(of: pattern, options: .regularExpression) != nil }
         let writing = method == "GET" && (match("^/api/writing/(sessions|styles|entries)$") || match("^/api/writing/sessions/[a-f0-9-]{36}(/drafts/[a-f0-9-]{36}(/files/[a-f0-9]{64})?|/files/[a-f0-9-]{36}|/history)?$")) || method == "POST" && (route == "/api/writing/sessions" || match("^/api/writing/sessions/[a-f0-9-]{36}/(answers|turns|materials|discuss|start|style|revise)$"))
-        return writing || method == "GET" && (route == "/api/state" || route == "/api/records" || match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$") || match("^/api/tasks/[a-zA-Z0-9-]+/draft$"))
+        let changes = method == "GET" && match("^/api/records/changes[?](cursor=[a-fA-F0-9%:-]+&)?wait=([0-9]|1[0-9]|2[0-5])(&limit=([1-9][0-9]?|1[0-9]{2}|200))?$")
+        let trash = method == "GET" && route == "/api/content-trash" || method == "POST" && match("^/api/content-trash/record/[a-zA-Z0-9-]+/restore$")
+        return changes || trash || writing || method == "GET" && (route == "/api/state" || route == "/api/records" || match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$") || match("^/api/tasks/[a-zA-Z0-9-]+/draft$"))
             || method == "PUT" && (match("^/api/records/[a-zA-Z0-9-]+$") || match("^/api/records/media/[a-f0-9]{64}$"))
             || method == "POST" && (match("^/api/records/[a-zA-Z0-9-]+/process$") || match("^/api/tasks/[a-zA-Z0-9-]+/(approve|retry|cancel)$"))
     }

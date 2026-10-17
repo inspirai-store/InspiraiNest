@@ -17,6 +17,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,6 +37,8 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
 @Composable fun NativeApp(repository: NestRepository,ready: Boolean,migration: String,onRetryMigration: ()->Unit,
     onTheme: (String)->Unit,theme: String,initialIntent: Intent,onFinish: ()->Unit,onConnectionChanged: ()->Unit={}) {
     val context=LocalContext.current
+    val syncLifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val syncScope=rememberCoroutineScope()
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val shared=initialIntent.action in listOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)
@@ -57,6 +62,28 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
     BackHandler(stack.isNotEmpty()) { back() }
     val stateHolder=rememberSaveableStateHolder()
     val connection=repository.credentials.server()+":"+repository.credentials.deviceId()
+    var syncAuthorized by remember(repository,connection,ready) { mutableStateOf(true) }
+    LaunchedEffect(repository,connection,ready) {
+        if(ready)syncLifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            kotlinx.coroutines.supervisorScope {
+                launch { repository.recordSyncSignals.collect { if(syncAuthorized)try{repository.syncRecords()}catch(e: kotlinx.coroutines.CancellationException){throw e}catch(e: Exception){if(e is store.inspirai.library.core.Api.Failure&&e.status==401)syncAuthorized=false} } }
+                launch { var failures=0
+                    while(kotlinx.coroutines.currentCoroutineContext().isActive&&syncAuthorized){
+                        try { repository.syncRecords();val live=repository.watchRecords();failures=0;if(!live)kotlinx.coroutines.delay(15000) }
+                        catch(e: kotlinx.coroutines.CancellationException){throw e}
+                        catch(e: Exception){if(e is store.inspirai.library.core.Api.Failure&&e.status==401)syncAuthorized=false else kotlinx.coroutines.delay((1000L shl failures.coerceAtMost(5)).coerceAtMost(30000));failures++}
+                    }
+                }
+                launch { while(kotlinx.coroutines.currentCoroutineContext().isActive&&syncAuthorized){kotlinx.coroutines.delay(30000);if(syncAuthorized)try{repository.checkRecordSnapshot()}catch(e: kotlinx.coroutines.CancellationException){throw e}catch(e: Exception){if(e is store.inspirai.library.core.Api.Failure&&e.status==401)syncAuthorized=false}} }
+            }
+        }
+    }
+    DisposableEffect(repository,connection,ready) {
+        val manager=context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val callback=object: android.net.ConnectivityManager.NetworkCallback(){override fun onAvailable(network: android.net.Network){syncScope.launch{if(ready&&syncAuthorized&&syncLifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))try{repository.syncRecords()}catch(e: kotlinx.coroutines.CancellationException){throw e}catch(e: Exception){if(e is store.inspirai.library.core.Api.Failure&&e.status==401)syncAuthorized=false}}}}
+        manager.registerDefaultNetworkCallback(callback)
+        onDispose { manager.unregisterNetworkCallback(callback) }
+    }
     val library=model("library:$connection") { LibraryModel(repository) }
     val records=model("records:$connection") { RecordsModel(repository) }
     val tasks=model("tasks:$connection") { TaskModel(repository) }
@@ -88,7 +115,7 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
                     when {
                         target.startsWith("reader:")->ReaderPage(repository,target.removePrefix("reader:"),{back()},onTheme,theme,::open)
                         target.startsWith("record:")->RecordPage(repository,records,target.removePrefix("record:"),{back()},::open)
-                        target.startsWith("edit:")->RecordEditorPage(repository,target.removePrefix("edit:"),initialIntent.takeIf { shared },{back()})
+                        target.startsWith("edit:")->RecordEditorPage(repository,target.removePrefix("edit:"),initialIntent.takeIf { shared },{back()},::open)
                         target.startsWith("share:")->SharePage(repository,target.removePrefix("share:"),initialIntent.takeIf { shared },onFinish={back()},open=::open)
                         target.startsWith("task:")->TaskPage(repository,target.removePrefix("task:"),{back()},::open,
                             next=if(session.getOrNull(sessionIndex)==target.removePrefix("task:"))({if(sessionIndex+1<session.size){sessionIndex++;stack[stack.lastIndex]="task:${session[sessionIndex]}"}else{session=emptyList();back()}}) else null,

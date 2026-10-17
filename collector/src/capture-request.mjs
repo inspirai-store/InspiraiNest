@@ -11,7 +11,8 @@ export function validateCaptureRequest(input) {
   const writingGet=method==='GET'&&(/^\/api\/writing\/(sessions|styles|entries)$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}(?:\/drafts\/[a-f0-9-]{36}(?:\/files\/[a-f0-9]{64})?|\/files\/[a-f0-9-]{36}|\/history)?$/.test(route));
   const writingPost=method==='POST'&&(/^\/api\/writing\/sessions$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}\/(answers|turns|materials|discuss|start|style|revise)$/.test(route));
   const contentTrash=method==='GET'&&(route==='/api/content-trash'||/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+$/.test(route))||method==='POST'&&/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+\/(delete|restore)$/.test(route);
-  requireValue(allowed||writingGet||writingPost||contentTrash,'Capture route not allowed',403);
+  const recordChanges=method==='GET'&&/^\/api\/records\/changes\?(?:cursor=[a-f0-9%:-]+&)?wait=(?:[0-9]|1[0-9]|2[0-5])(?:&limit=(?:[1-9][0-9]?|1[0-9]{2}|200))?$/i.test(route);
+  requireValue(allowed||writingGet||writingPost||contentTrash||recordChanges,'Capture route not allowed',403);
   if (input.bytes !== undefined) requireValue(typeof input.bytes === 'string' && input.bytes.length <= 44739244 && method === 'PUT' && route.includes('/media/'),'Invalid media body');
   return input;
 }

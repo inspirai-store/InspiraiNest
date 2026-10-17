@@ -2,6 +2,7 @@ import { hash, id, now, requireValue } from './common.mjs';
 import { workerAuthorized } from './device-metadata.mjs';
 import { documentExtensions, validDocument } from './input-attachments.mjs';
 import { validateDocument } from './record-document.mjs';
+import {lockRecordChanges,appendRecordChange,readRecordChanges} from './record-changes.mjs';
 
 export const MEDIA_LIMIT = 32 * 1024 * 1024;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -65,8 +66,9 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     if (!route.startsWith('/api/records')) return false;
     owner(device);
     if (route === '/api/records/capabilities' && req.method === 'GET') {
-      send(res,200,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1}); return true;
+      send(res,200,{protocol:1,documentVersions:[1],structuredErrors:true,contentTrashProtocol:1,recordSyncProtocol:1}); return true;
     }
+    if(route==='/api/records/changes'&&req.method==='GET'){await readRecordChanges({store,req,res,authenticate});return true;}
     const mediaRoute = route.match(/^\/api\/records\/media\/([a-f0-9]{64})$/);
     if (mediaRoute) {
       const sha = mediaRoute[1];
@@ -104,6 +106,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     const payloadHash = hash(JSON.stringify(canonical({method:req.method,input})));
     const operationId = `${recordId}:${requestId}`;
     const response = await serialized(`capture:${recordId}`,async () => store.transaction(async tx => {
+      const syncState=await lockRecordChanges(tx);
       const credential = await tx.getForUpdate('device',device.credentialId || device.id);
       const live = await tx.get('device',device.id);
       requireValue(credential && live && !credential.revokedAt && !live.revokedAt && [credential.tokenHash,credential.ownerTokenHash].includes(device.credentialTokenHash || hash(req.authToken)), 'Device authorization required',401);
@@ -144,6 +147,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         if(input.document!==undefined)validateDocument(input.document,attachments);
         result = {id:recordId,text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,trashVersion:current?.trashVersion??0,createdAt,updatedAt:now()};
         await tx.put('capture-version',{...result,id:`${recordId}:${result.version}`,recordId}); await tx.put('capture',result);
+        await appendRecordChange(tx,result,syncState);
       }
       await tx.put('capture-operation',{id:operationId,hash:payloadHash,result}); return result;
     }));

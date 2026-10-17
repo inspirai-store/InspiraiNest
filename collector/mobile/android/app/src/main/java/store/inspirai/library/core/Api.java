@@ -31,6 +31,20 @@ public final class Api {
         return authenticated(null, path, method, body).body;
     }
 
+    /** Freeze both the request and response to the pairing that scheduled the operation. */
+    public JSONObject call(Credentials.Snapshot expected, String path, String method, JSONObject body) throws Exception {
+        requireBackground();
+        if (expected == null || !stillPaired(expected)) throw new Failure(0, "配对状态已改变，请重新尝试。");
+        JSONObject result;
+        try { result = request(expected.server, expected.token, path, method, body).body; }
+        catch (Exception failure) {
+            if (!stillPaired(expected)) throw new Failure(0, "配对状态已改变，请重新尝试。");
+            throw failure;
+        }
+        if (!stillPaired(expected)) throw new Failure(0, "配对状态已改变，请重新尝试。");
+        return result;
+    }
+
     /** The UI must verify response.device.role == "owner" before saving these credentials. */
     public static JSONObject pair(String server, String key, String name) throws Exception {
         requireBackground();
