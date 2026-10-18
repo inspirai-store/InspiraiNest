@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execute, agentExecution, runAgent, describeAgentFailure } from '../../ai-assistant/worker/agents.mjs';
+import { execute, agentExecution, runAgent, describeAgentFailure } from '../../ai-assistant/api/agents.mjs';
 import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile,publishTaskPlugin,executedAgentMetadata,taskTrustCleanup} from '../server/codex-local-agent.mjs';
 import { atomicJson, readJson, hash, contained, requireValue, canonicalJson } from '../../../packages/core/node/common.mjs';
 

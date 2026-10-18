@@ -45,6 +45,6 @@ const control=http.createServer(async(req,res)=>{try{
  res.setHeader('Content-Type','application/json');res.end(JSON.stringify(snapshot));
  }catch(error){res.writeHead(500).end(JSON.stringify({error:error.message}));}});
 await new Promise(resolve=>control.listen(previous?Number(new URL(previous.control).port):0,'127.0.0.1',resolve));
-const manifest={root,config,filesDir,frontend:path.resolve(here,'../desktop/frontend/dist/index.html'),control:'http://127.0.0.1:'+control.address().port,spaces:Object.fromEntries(Object.entries(targets).map(([label,t])=>[label,{server:t.server,key:t.key}]))};
+const manifest={root,config,filesDir,frontend:path.resolve(here,'../../apps/desktop/frontend/dist/index.html'),control:'http://127.0.0.1:'+control.address().port,spaces:Object.fromEntries(Object.entries(targets).map(([label,t])=>[label,{server:t.server,key:t.key}]))};
 fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(manifest,null,2),{mode:0o600});console.log(JSON.stringify(manifest));
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{control.close();for(const t of Object.values(targets))await t.service.close();process.exit(0);});

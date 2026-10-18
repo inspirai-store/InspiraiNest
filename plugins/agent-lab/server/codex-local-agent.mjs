@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {parse,stringify} from 'smol-toml';
-import {agentExecution,execute} from '../../ai-assistant/worker/agents.mjs';
+import {agentExecution,execute} from '../../ai-assistant/api/agents.mjs';
 import {hash,requireValue,contained,atomicJson,readJson} from '../../../packages/core/node/common.mjs';
 
 export const codexHome=env=>path.resolve(env.CODEX_HOME || path.join(os.homedir(),'.codex'));

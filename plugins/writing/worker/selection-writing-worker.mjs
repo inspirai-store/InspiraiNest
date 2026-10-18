@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {atomicJson,requireValue,hash} from '../../../packages/core/node/common.mjs';
-import {agentOrder,runAgent,unavailableBeforeWork,describeAgentFailure} from '../../ai-assistant/worker/agents.mjs';
+import {agentOrder,runAgent,unavailableBeforeWork,describeAgentFailure} from '../../ai-assistant/api/agents.mjs';
 import {writingResult} from '../server/selection-writing.mjs';
 export function writingPrompt(task){
  const labels={polish:'润色',shorten:'精简',expand:'扩写',translate:'翻译',custom:'按要求改写'};

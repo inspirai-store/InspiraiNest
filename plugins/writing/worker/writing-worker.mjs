@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { atomicJson,readJson,hash,requireValue,safePath,contained,remoteURL } from '../../../packages/core/node/common.mjs';
-import { agentOrder,runAgent,unavailableBeforeWork,execute } from '../../ai-assistant/worker/agents.mjs';
+import { agentOrder,runAgent,unavailableBeforeWork,execute } from '../../ai-assistant/api/agents.mjs';
 import { packageEntry } from '../../../packages/core/node/archive.mjs';
 import { validatePublicationImages } from '../server/writing-images.mjs';
 import { skillForSnapshot,fastWritingRound,writingPrompt,validateRound,validateWritingCoverage } from '../protocol/writing-protocol.mjs';
