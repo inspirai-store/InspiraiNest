@@ -30,7 +30,7 @@ async function main() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(server);
+    await page.goto(server+'/legacy');
     await page.locator('#login-form input[name=key]').fill(key);
     await page.locator('#login-form button').click();
     await page.locator('#app').waitFor({ state: 'visible' });

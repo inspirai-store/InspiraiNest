@@ -34,7 +34,7 @@ const path = require('node:path');
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(base); await page.locator('#login-form [name=key]').fill(key);
+    await page.goto(base+'/legacy'); await page.locator('#login-form [name=key]').fill(key);
     await page.locator('#login-form button[type=submit]').click(); await page.locator('#app').waitFor({ state: 'visible' });
     const library = page.frameLocator('#library-frame'); await library.locator('#search').fill('阅读状态保留');
     await page.locator('#worker-node-count').filter({ hasText: '2/4' }).waitFor();

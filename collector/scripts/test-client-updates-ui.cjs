@@ -12,7 +12,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),os=require('node:os
  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port,browser=await chromium.launch({channel:'chrome',headless:true}),output=path.resolve(__dirname,'../test-output/client-updates');fs.mkdirSync(output,{recursive:true});
  try{
   const page=await browser.newPage({viewport:{width:1240,height:820}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form [type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
+  await page.goto(base+'/legacy');await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form [type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
   await page.locator('[data-view=devices]').click();assert.equal(await page.locator('[data-category=desktop] .row').count(),2);
   assert.equal(await page.locator('.device-grants').count(),0);assert.equal(await page.locator(`[data-revoke="${management.id}"]`).count(),0);
   assert.equal(await page.locator(`[data-revoke="${worker.id}"]`).count(),1);assert.doesNotMatch(await page.locator('#devices').innerText(),/独立授权|管理端|采集端/);await page.screenshot({path:path.join(output,'unified-clients.png')});

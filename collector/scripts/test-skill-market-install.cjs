@@ -18,7 +18,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
  const output=path.resolve(__dirname,'../test-output/market-install-'+(web?'web':'desktop'));fs.mkdirSync(output,{recursive:true});
  let app,page;const errors=[];
  try{
-  if(web){app=await chromium.launch({channel:'chrome',headless:true});page=await app.newPage({viewport:{width:1240,height:820}});await page.goto(server);await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});}
+  if(web){app=await chromium.launch({channel:'chrome',headless:true});page=await app.newPage({viewport:{width:1240,height:820}});await page.goto(server+'/legacy');await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});}
   else{
    const config=path.join(root,'worker.json');fs.writeFileSync(config,JSON.stringify({server,dataDir:path.join(root,'desktop')}));
    const env={...process.env,COLLECTOR_CONFIG:config,COLLECTOR_NODE:process.execPath,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;
@@ -52,7 +52,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
    if(web)await page.setViewportSize({width,height:820});
    else await app.evaluate(({BrowserWindow},width)=>{const main=BrowserWindow.getAllWindows().find(w=>!w.webContents.getURL().includes('compact=1'));main.setMinimumSize(320,580);main.setSize(width,820);},width);
    await page.screenshot({path:path.join(output,'installed-'+width+'.png')});
-   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page overflow '+width);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page overflow '+width+' '+JSON.stringify(await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).filter(e=>e.scrollWidth>e.clientWidth+1).slice(0,12).map(e=>({tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width,scroll:e.scrollWidth,client:e.clientWidth})))));
   }
   await page.locator('[data-market-provider=lingnest]').click();await page.locator('.market-card h2').filter({hasText:'fixture-market'}).waitFor();
   await page.locator('[data-detail]').click();await dialog.locator('[data-install-compare]').waitFor({state:'visible'});

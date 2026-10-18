@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     for (const width of [1440, 375, 320]) {
-      await page.setViewportSize({ width, height: 900 }); await page.goto(server);
+      await page.setViewportSize({ width, height: 900 }); await page.goto(server+'/legacy');
       await page.locator('#login-form').waitFor({ state: 'visible' });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       await page.screenshot({ path: path.join(output, `login-${width}.png`), fullPage: true });

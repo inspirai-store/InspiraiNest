@@ -29,7 +29,7 @@ const path = require('node:path');
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(base);
+    await page.goto(base+'/legacy');
     await page.locator('#login-form [name=key]').fill(key);
     await page.locator('#login-form button[type=submit]').click();
     await page.locator('#app').waitFor({ state: 'visible' });
