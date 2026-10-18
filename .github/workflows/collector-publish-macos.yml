@@ -40,14 +40,13 @@ jobs:
           name: InspiraiNest-macOS-local-${{ inputs.source_run }}
           path: artifacts/desktop
       - run: npm ci --omit=dev --ignore-scripts
-        working-directory: collector
       - name: Verify exact ZIP and DMG update hashes
         working-directory: collector
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs';import crypto from 'node:crypto';import assert from 'node:assert/strict';import yaml from 'js-yaml';
-          const version=JSON.parse(fs.readFileSync('package.json')).version,meta=yaml.load(fs.readFileSync('desktop/dist/latest-mac.yml','utf8'));assert.equal(meta.version,version);
-          for(const arch of ['arm64','x64'])for(const ext of ['zip','dmg']){const name=`InspiraiNest-v${version}-macOS-${arch}.${ext}`,bytes=fs.readFileSync('desktop/dist/'+name),entry=meta.files.find(item=>item.url===name);assert.ok(entry);assert.equal(entry.size,bytes.length);assert.equal(entry.sha512,crypto.createHash('sha512').update(bytes).digest('base64'));}
+          const version=JSON.parse(fs.readFileSync('package.json')).version,meta=yaml.load(fs.readFileSync('../artifacts/desktop/latest-mac.yml','utf8'));assert.equal(meta.version,version);
+          for(const arch of ['arm64','x64'])for(const ext of ['zip','dmg']){const name=`InspiraiNest-v${version}-macOS-${arch}.${ext}`,bytes=fs.readFileSync('../artifacts/desktop/'+name),entry=meta.files.find(item=>item.url===name);assert.ok(entry);assert.equal(entry.size,bytes.length);assert.equal(entry.sha512,crypto.createHash('sha512').update(bytes).digest('base64'));}
           JS
       - name: Upload unchanged signed packages and verify private OSS readback
         working-directory: collector

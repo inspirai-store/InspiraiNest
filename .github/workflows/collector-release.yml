@@ -111,7 +111,7 @@ jobs:
             fs.writeFileSync(config, JSON.stringify({dataDir:path.join(root,'data')}));
             const env = {...process.env, COLLECTOR_CONFIG:config, COLLECTOR_DESKTOP_TEST:'1'};
             delete env.ELECTRON_RUN_AS_NODE; delete env.COLLECTOR_DESKTOP_STORAGE_FIXTURE;
-            const app = await _electron.launch({executablePath:path.resolve('desktop/dist/mac-arm64/灵藏.app/Contents/MacOS/灵藏'),env});
+            const app = await _electron.launch({executablePath:path.resolve('../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏'),env});
             try {
               await app.firstWindow();
               const result = await app.evaluate(({safeStorage}) => {
@@ -144,7 +144,7 @@ jobs:
           JS
           (cd ../artifacts/desktop && shasum -a 256 -c SHASUMS256.txt)
           for arch in arm64 x64; do
-            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
+            app="../artifacts/desktop/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
             codesign --verify --deep --strict "$app"
             test "$(lipo -archs "$app/Contents/MacOS/灵藏")" = "$([[ "$arch" == arm64 ]] && echo arm64 || echo x86_64)"
             xcrun stapler validate "$app"
@@ -156,7 +156,7 @@ jobs:
         run: |
           node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-records-packaged.cjs ../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏
           version=$(node -p "require('./package.json').version")
-          node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-packaged-update.cjs ../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏 "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+          node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-packaged-update.cjs ../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏 "../artifacts/desktop/InspiraiNest-v${version}-macOS-arm64.zip"
           node "$GITHUB_WORKSPACE/qa-tools/collector/scripts/run-macos-gui-qa.cjs" scripts/test-desktop-update-lifecycle.cjs ../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏
       - name: Publish unchanged retained macOS packages after native QA
         if: ${{ inputs.verify_macos_workspace }}
@@ -207,7 +207,6 @@ jobs:
           name: InspiraiNest-Windows-x64
           path: artifacts/desktop
       - run: npm ci --ignore-scripts
-        working-directory: collector
       - name: Verify and relay the unchanged Windows CI files
         working-directory: collector
         env:
@@ -246,9 +245,7 @@ jobs:
           test -f public-source/apps/desktop/macos-policy.mjs
           test -f public-source/collector/electron-builder.yml
       - run: npm ci --ignore-scripts
-        working-directory: public-source/collector
-      - run: npm ci --ignore-scripts
-        working-directory: public-source/apps/desktop/frontend
+        working-directory: public-source
       - name: Test React desktop adapters and state
         working-directory: public-source/apps/desktop/frontend
         run: node --experimental-strip-types --test scripts/*.test.mjs
@@ -281,9 +278,9 @@ jobs:
           version=$(node -p "require('./package.json').version")
           test -s ../artifacts/desktop/latest-mac.yml
           for arch in arm64 x64; do
-            zip="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
-            dmg="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.dmg"
-            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
+            zip="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.zip"
+            dmg="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.dmg"
+            app="../artifacts/desktop/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
             test -s "$zip"
             test -s "$dmg"
             unzip -tq "$zip" >/dev/null
@@ -300,7 +297,7 @@ jobs:
           done
           grep -F 'provider: generic' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
           grep -F 'https://library.inspirai.store/updates/macos' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
-          node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("desktop/dist/latest-mac.yml","utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`desktop/dist/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
+          node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("../artifacts/desktop/latest-mac.yml","utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`../artifacts/desktop/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
           (cd ../artifacts/desktop && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
@@ -321,7 +318,7 @@ jobs:
           version=$(node -p "require('./package.json').version")
           node scripts/run-macos-gui-qa.cjs scripts/test-packaged-update.cjs \
             ../artifacts/desktop/mac-arm64/灵藏.app/Contents/MacOS/灵藏 \
-            "desktop/dist/InspiraiNest-v${version}-macOS-arm64.zip"
+            "../artifacts/desktop/InspiraiNest-v${version}-macOS-arm64.zip"
       - name: Test signed macOS update window shutdown
         if: ${{ inputs.publish_macos }}
         working-directory: public-source/collector
@@ -383,9 +380,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: npm ci --ignore-scripts
-        working-directory: public-source/collector
-      - run: npm ci --ignore-scripts
-        working-directory: public-source/apps/desktop/frontend
+        working-directory: public-source
       - name: Stage the shared writing and capture pages
         working-directory: public-source/collector
         run: |

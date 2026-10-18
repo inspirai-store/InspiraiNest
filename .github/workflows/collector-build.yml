@@ -68,7 +68,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
-        working-directory: collector
       - run: node scripts/check-public-ci.mjs
         working-directory: collector
       - run: npm test
@@ -116,11 +115,7 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
-      - run: npm ci --ignore-scripts && node ../node_modules/electron/install.js
-        working-directory: collector
-      - name: Install shared React frontend dependencies
-        run: npm ci --ignore-scripts
-        working-directory: apps/desktop/frontend
+      - run: npm ci --ignore-scripts && node node_modules/electron/install.js
       - name: Test shared React adapters
         run: node --experimental-strip-types --test scripts/*.test.mjs
         working-directory: apps/desktop/frontend
@@ -150,7 +145,6 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts
-        working-directory: apps/desktop/frontend
       - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: bash ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
@@ -180,10 +174,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
-        working-directory: collector
-      - name: Install shared React frontend dependencies
-        run: npm ci --ignore-scripts
-        working-directory: apps/desktop/frontend
       - name: Test shared React adapters and account isolation
         run: node --experimental-strip-types --test scripts/*.test.mjs
         working-directory: apps/desktop/frontend
@@ -244,10 +234,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
-        working-directory: collector
-      - name: Install shared React frontend dependencies
-        run: npm ci --ignore-scripts
-        working-directory: apps/desktop/frontend
       - name: Build macOS Worker for CI
         run: npm run build:worker:mac
         working-directory: collector
@@ -259,9 +245,9 @@ jobs:
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
           for arch in arm64 x64; do
-            zip="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
-            dmg="desktop/dist/InspiraiNest-v${version}-macOS-${arch}.dmg"
-            app="desktop/dist/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
+            zip="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.zip"
+            dmg="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.dmg"
+            app="../artifacts/desktop/$([[ "$arch" == arm64 ]] && echo mac-arm64 || echo mac)/灵藏.app"
             test -s "$zip"
             test -s "$dmg"
             unzip -tq "$zip" > /dev/null
@@ -300,15 +286,15 @@ jobs:
           version=$(node -p "require('./package.json').version")
           if [[ "$(uname -m)" == arm64 ]]; then
             arch=arm64
-            app=desktop/dist/mac-arm64/灵藏.app
+            app=../artifacts/desktop/mac-arm64/灵藏.app
           else
             arch=x64
-            app=desktop/dist/mac/灵藏.app
+            app=../artifacts/desktop/mac/灵藏.app
           fi
           node scripts/test-records-packaged.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-writing.cjs "$app/Contents/MacOS/灵藏"
           node scripts/test-desktop-update-lifecycle.cjs "$app/Contents/MacOS/灵藏"
-          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/灵藏" "desktop/dist/InspiraiNest-v${version}-macOS-${arch}.zip"
+          node scripts/test-packaged-update.cjs "$app/Contents/MacOS/灵藏" "../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.zip"
         working-directory: collector
       - uses: actions/upload-artifact@v4
         if: always()
@@ -343,7 +329,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
-        working-directory: collector
       - uses: actions/download-artifact@v4
         with:
           name: InspiraiNest-macOS
@@ -353,12 +338,12 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
-          zip="desktop/dist/InspiraiNest-v${version}-macOS-x64.zip"
+          zip="../artifacts/desktop/InspiraiNest-v${version}-macOS-x64.zip"
           test -s "$zip"
           test -s ../artifacts/desktop/latest-mac.yml
           mkdir -p ../artifacts/desktop/intel-unpacked
           ditto -x -k "$zip" ../artifacts/desktop/intel-unpacked
-          app=desktop/dist/intel-unpacked/灵藏.app
+          app=../artifacts/desktop/intel-unpacked/灵藏.app
           codesign --verify --deep --strict "$app"
           test "$(lipo -archs "$app/Contents/MacOS/灵藏")" = x86_64
           node scripts/test-packaged-update.cjs "$app/Contents/MacOS/灵藏" "$zip"
@@ -402,7 +387,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --ignore-scripts
-        working-directory: collector
       - name: Test native directory and installation transactions
         run: node --test test/agent-management.test.mjs
         working-directory: collector
