@@ -32,6 +32,15 @@ try{
  await page.waitForFunction(()=>document.querySelector('input[type=checkbox]')&&Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='写作工作台')?.querySelector('input')?.checked);
  await page.locator('[data-region="导航 / 写作"]').waitFor();
  await page.screenshot({path:path.join(output,'plugins-enabled.png'),fullPage:true});
+ await page.goto(origin+'/workbench/#/writing/new?data=local');
+ await page.getByLabel('你想聊什么，或想写什么？',{exact:true}).fill('刷新空间配置时保留写作输入');
+ const refreshed=page.waitForResponse(r=>r.url()===origin+'/api/plugins'&&r.status()===200);
+ await page.evaluate(()=>{window.__writingEditor=document.querySelector('textarea');window.dispatchEvent(new Event('online'));});
+ await refreshed;
+ await page.getByLabel('你想聊什么，或想写什么？',{exact:true}).waitFor();
+ if(!await page.evaluate(()=>window.__writingEditor?.isConnected&&window.__writingEditor.value==='刷新空间配置时保留写作输入'))throw Error('Plugin refresh remounted the editor');
+ await page.goto(origin+'/workbench/#/settings/plugins?data=local');
+ await page.getByLabel('写作工作台',{exact:true}).waitFor();
  await page.getByLabel('AI 助手',{exact:true}).click();
  await page.getByRole('alert').filter({hasText:'写作工作台'}).waitFor();
  await page.getByLabel('写作工作台',{exact:true}).click();
@@ -51,6 +60,6 @@ try{
  const persisted=await app.store.list('capture');if(!persisted.some(r=>r.text==='插件关闭后保存的原始灵感'))throw Error('Original not synced');
  await page.setViewportSize({width:780,height:920});await page.screenshot({path:path.join(output,'web-narrow.png'),fullPage:true});
  if(errors.length)throw Error(errors.join('\n'));
- fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,scenarios:['core-and-plugin-settings-route-parameters','real-browser-cookie-login','enable-writing','dependency-block','disable-all-extensions','save-edit-and-sync-core-record','narrow-web-layout'],pageErrors:errors},null,2));
+ fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,scenarios:['core-and-plugin-settings-route-parameters','real-browser-cookie-login','enable-writing','background-refresh-keeps-editor','dependency-block','disable-all-extensions','save-edit-and-sync-core-record','narrow-web-layout'],pageErrors:errors},null,2));
  console.log('Browser plugin lifecycle and core capture QA passed.');
 }catch(error){await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});console.error(await page.locator('body').innerText());throw error;}finally{await browser.close();await app.close();}

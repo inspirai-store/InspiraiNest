@@ -106,7 +106,7 @@ function Workbench({ area, view }: { area: 'records' | 'library'; view: 'list' |
 }
 
 function PluginProviders({children}:{children:import('react').ReactNode}){const {active}=usePluginViews();return active.reduceRight((content,plugin)=>plugin.Provider?<plugin.Provider key={plugin.id}>{content}</plugin.Provider>:content,children);}
-function PluginRoute({pluginId,Component}:{pluginId:string;Component:import('react').ComponentType}){const {available,loading}=usePlugins();return loading?<ContentSkeleton/>:available(pluginId)?<Component/>:<Navigate to="/records?data=local" replace/>;}
+function PluginRoute({pluginId,Component}:{pluginId:string;Component:import('react').ComponentType}){const {available,loading,snapshot}=usePlugins();return loading&&!snapshot?<ContentSkeleton/>:available(pluginId)?<Component/>:<Navigate to="/records?data=local" replace/>;}
 const queryClient=new QueryClient();
 function RecordsRoute({view}:{view:'list'|'new'|'detail'}) {
  const location=useLocation();const preview=import.meta.env.DEV&&new URLSearchParams(location.search).get('data')==='fixture';return preview?<Workbench area="records" view={view}/>:<LiveRecords/>;
