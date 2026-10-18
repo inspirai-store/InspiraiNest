@@ -7,6 +7,8 @@ import {createHash} from 'node:crypto';
 import {createRegistry,scopedStore} from '../../packages/plugin-sdk/runtime.mjs';
 import {manifests} from '../../packages/plugin-sdk/catalog.mjs';
 import {createService} from '../../services/api/server.mjs';
+import {createPluginHost} from '../../packages/plugin-sdk/server.mjs';
+import {definitions} from '../../plugins/registry.mjs';
 import {Store} from '../../services/api/storage/store.mjs';
 const key='plugin-test-key-'.repeat(4);
 async function fixture(t,{legacy=false}={}){
@@ -35,7 +37,14 @@ test('dependencies, active jobs, authorization and stale updates are enforced se
  const busy=await toggle('ai-assistant',false);assert.equal(busy.status,409);assert.equal(busy.body.details.jobs[0].id,'busy');
  await app.store.put('task',{id:'busy',state:'completed',pluginId:'ai-assistant'});
  const stale=await request('/api/plugins/ai-assistant','PUT',{enabled:false,revision:0});assert.equal(stale.body.code,'plugin_config_changed');
+ await app.store.put('agent-operation',{id:'cancel-pending',state:'cancel_requested'});
+ assert.equal((await toggle('ai-assistant',false)).body.details.jobs[0].id,'cancel-pending');
+ await app.store.put('agent-operation',{id:'cancel-pending',state:'cancelled'});
  assert.equal((await toggle('ai-assistant',false)).status,200);
+ const host=createPluginHost({store:app.store,serialized:async(_key,work)=>work(),definitions});await host.ready;
+ const access=host.access('ai-assistant',['agent-operation']);
+ await assert.rejects(access.transaction(tx=>tx.put('agent-operation',{id:'late-operation',state:'queued'})),e=>e.code==='plugin_disabled');
+ assert.equal(await app.store.get('agent-operation','late-operation'),null);
  const denied=await request('/api/plugins','GET',undefined,'invalid');assert.equal(denied.status,401);
  assert.equal((await request('/api/writing/sessions','POST',{})).body.code,'plugin_disabled');
 });

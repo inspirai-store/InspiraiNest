@@ -1,4 +1,4 @@
-import {createRegistry, PluginError} from './runtime.mjs';
+import {createRegistry, PluginError, BUSY_JOB_STATES} from './runtime.mjs';
 import {manifests} from './catalog.mjs';
 export const registry = createRegistry(manifests);
 export function createPluginHost({store, serialized, owner, body, send, definitions, profile}) {
@@ -18,6 +18,14 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
   const snapshot = async () => { const value = await config(); return {...value,plugins:manifests.map(p => ({...p,enabled:registry.resolve(value.enabled,p.id)}))}; };
   return {
     ready, jobOwner, snapshot, assertEnabled,
+    access(pluginId, allowed) {
+      return collectionAccess(store,allowed,async(kind,value,target)=>{
+        if(['agent-operation','skill-operation'].includes(kind)&&BUSY_JOB_STATES.has(value.state)){
+          await target.getForUpdate('setting',key);
+          await assertEnabled(pluginId,target);
+        }
+      });
+    },
     async enabled(id) { return registry.resolve((await config()).enabled,id); },
     async guardJob(task, state, target = store) {
       const pluginId = jobOwner(task);
@@ -54,13 +62,14 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
 }
 // Explicit host collection adapter preserves existing IDs and transactions during migration.
 // No plugin imports a database driver or obtains the raw database connection.
-export function collectionAccess(store, allowed) {
+export function collectionAccess(store, allowed, beforePut) {
   const allow = new Set(allowed);
   const adapter = {};
   for (const method of ['get','getForUpdate','put','list','delete','ensure','listAfter']) adapter[method] = (kind,...args) => {
     if (!allow.has(kind)) throw new Error('Collection not granted: '+kind);
+    if(method==='put'&&beforePut)return Promise.resolve(beforePut(kind,args[0],store)).then(()=>store.put(kind,...args));
     return store[method](kind,...args);
   };
-  adapter.transaction = work => store.transaction(tx => work(collectionAccess(tx,allowed)));
+  adapter.transaction = work => store.transaction(tx => work(collectionAccess(tx,allowed,beforePut)));
   return Object.freeze(adapter);
 }

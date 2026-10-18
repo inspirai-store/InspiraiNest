@@ -1,5 +1,5 @@
 export const HOST_VERSION = 1;
-export const BUSY_JOB_STATES = new Set(['queued', 'assigned', 'running', 'uploading']);
+export const BUSY_JOB_STATES = new Set(['queued', 'assigned', 'running', 'uploading', 'cancel_requested']);
 export class PluginError extends Error {
   constructor(code, message, details = {}, status = 409) { super(message); this.name = 'PluginError'; Object.assign(this, {code, status, details}); }
 }

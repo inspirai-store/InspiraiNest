@@ -78,9 +78,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const clientUpdates = createClientUpdateService({ store, serialized, owner, worker, body, send, clock, releases:download.workerReleases });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
-  const skills = createSkillService({ store, storage, serialized, updateDevice, owner, worker, body, send, clock });
-  const skillMarket = createSkillMarketService({ store, storage, skillHub, serialized, owner, body, send, clock, fetcher:skillMarketFetch });
-  const agents = createAgentService({ store, serialized, owner, worker, body, send, clock, catalog: agentCatalog, deploymentId: async () => (await identityPolicy()).namespace });
+  const skills = createSkillService({ store:plugins.access('ai-assistant',["client-update","device","skill-environment","skill-operation","skill-stage","skill-version","task"]), storage, serialized, updateDevice, owner, worker, body, send, clock });
+  const skillMarket = createSkillMarketService({ store:plugins.access('ai-assistant',["device","skill-environment","skill-import","skill-version"]), storage, skillHub, serialized, owner, body, send, clock, fetcher:skillMarketFetch });
+  const agents = createAgentService({ store:plugins.access('ai-assistant',["agent-environment","agent-operation","client-update","device","task"]), serialized, owner, worker, body, send, clock, catalog: agentCatalog, deploymentId: async () => (await identityPolicy()).namespace });
   const deleted = async archive => Boolean((await store.get('trash', archive.entryId))?.deletedAt);
   async function identityPolicy() {
     return serialized('device-policy', () => store.transaction(async tx => {
