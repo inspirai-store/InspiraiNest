@@ -10,9 +10,10 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
     return tx.put('setting',{id:key,protocol:1,revision:1,enabled:registry.defaults(legacy),migrated:legacy});
   }));
   const ready = initialize();
-  const config = async (target = store) => { await ready; return target.get('setting',key); };
-  const assertEnabled = async (id, target = store) => {
-    const value = await config(target);
+  // Locking reads must supply the value: a normal MySQL SELECT can retain an older transaction snapshot.
+  const config = async (target = store, lock = false) => { await ready; return lock ? target.getForUpdate('setting',key) : target.get('setting',key); };
+  const assertEnabled = async (id, target = store, lock = false) => {
+    const value = await config(target,lock);
     if (!registry.resolve(value.enabled,id)) throw new PluginError('plugin_disabled','插件已停用',{pluginId:id});
   };
   const snapshot = async () => { const value = await config(); return {...value,plugins:manifests.map(p => ({...p,enabled:registry.resolve(value.enabled,p.id)}))}; };
@@ -21,8 +22,7 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
     access(pluginId, allowed) {
       return collectionAccess(store,allowed,async(kind,value,target)=>{
         if(['agent-operation','skill-operation'].includes(kind)&&BUSY_JOB_STATES.has(value.state)){
-          await target.getForUpdate('setting',key);
-          await assertEnabled(pluginId,target);
+          await assertEnabled(pluginId,target,true);
         }
       });
     },
@@ -30,8 +30,7 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
     async guardJob(task, state, target = store) {
       const pluginId = jobOwner(task);
       if (pluginId && ['queued','assigned','running','uploading'].includes(state)) {
-        await target.getForUpdate('setting',key);
-        await assertEnabled(pluginId,target);
+        await assertEnabled(pluginId,target,true);
       }
       return {...task,pluginId};
     },
