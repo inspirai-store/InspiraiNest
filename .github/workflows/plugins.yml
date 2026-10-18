@@ -21,6 +21,8 @@ jobs:
       - run: npm run build:native-assets
       - name: Test embedded writing with the native bridge
         run: node collector/scripts/qa-writing.mjs
+      - name: Test plugin lifecycle and settings routes in the browser
+        run: node tooling/plugins/browser-qa.mjs
       - run: npm test
       - run: node scripts/catalog.mjs build && node scripts/catalog.mjs check
   android:

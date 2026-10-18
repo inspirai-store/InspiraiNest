@@ -118,6 +118,9 @@ export function App() {
   const updateNavigate=useNavigate(),updateLocation=useLocation(),updateSearch=useRef(updateLocation.search);updateSearch.current=updateLocation.search;
   useEffect(()=>updateBridge()?.onOpen?.(()=>updateNavigate('/settings/updates'+updateSearch.current,{state:{settingsFocus:'content',updateCheckRequest:Date.now()}})),[updateNavigate]);
   return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><PluginProvider><PluginViewsProvider value={webPlugins}><PluginProviders><InteractionProvider><Routes>
+    <Route path="/settings/nodes/:nodeId" element={<SettingsPage/>}/>
+    <Route path="/settings/updates/:updateNodeId" element={<SettingsPage/>}/>
+    {webPlugins.flatMap(plugin=>(plugin.settings??[]).filter(item=>item.path).map(item=><Route key={plugin.id+item.id} path={'/settings/'+item.path} element={<SettingsPage/>}/>))}
     <Route path="/settings/*" element={<SettingsPage/>}/>
     <Route path="/status" element={<StatusPanel/>} />
     {webPlugins.flatMap(plugin=>(plugin.routes??[]).map(route=><Route key={plugin.id+route.path} path={route.path} element={<PluginRoute pluginId={plugin.id} Component={route.Component}/>}/>))}

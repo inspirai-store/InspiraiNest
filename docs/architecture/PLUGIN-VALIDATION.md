@@ -14,7 +14,7 @@
 - `collector/scripts/test-desktop-writing.cjs` 使用打包后的真实 Electron 客户端通过写作及 Owner IPC 回归；`test-record-conflict.cjs` 通过明暗及两种宽度下的冲突比较、手动合并、条件保存和重启读取。
 - macOS arm64/x64 ZIP、DMG 构建通过，使用临时签名；这些本地制品没有公证或作为正式更新发布。
 - Android 单元测试 67 项、Debug APK 和 lint 通过。
-- iOS 应用及分享扩展 Simulator 编译通过，Python 契约检查 7 项通过。本地 XCTest 卡在模拟器安装启动阶段，未取得运行通过证据；干净 runner 的测试在 PR CI 中执行。
+- iOS 应用及分享扩展 Simulator 编译通过，Python 契约检查 7 项通过。本地 XCTest 卡在模拟器安装启动阶段，未取得运行通过证据；干净 runner 的全部 33 项 XCTest（含原生 WebKit 渲染）已在提交 `05e6d28` 的 CI 中通过。
 - Go CLI 单元测试通过；需要真实系统钥匙串的集成测试未启用。
 - 从不包含本机依赖及构建制品的 Docker 上下文重新安装根锁文件，生产 Web 和镜像构建通过。
 - 离线阅读器索引 build/check 通过，保持 file:// 入口。

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {chromium} from 'playwright';
 import {createService} from '../../services/api/server.mjs';
 import {repositoryRoot} from '../layout.mjs';
@@ -8,14 +8,22 @@ const output=path.join(repositoryRoot,'artifacts/plugin-qa');fs.mkdirSync(output
 const data=fs.mkdtempSync(path.join(output,'space-')),key=randomBytes(32).toString('hex');
 const app=createService({dataDir:data,masterKey:key});await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+app.server.address().port;
+await fetch(origin+'/healthz');
+const routeNodes=[{id:randomUUID(),name:'路由节点 A'},{id:randomUUID(),name:'路由节点 B'}];
+for(const node of routeNodes)await app.store.put('device',{...node,role:'worker',clientType:'worker',platform:'linux',tokenHash:randomBytes(32).toString('hex'),agents:['codex'],capabilities:['note'],lastHeartbeatAt:new Date().toISOString(),agentRuntime:{schemaVersion:1,busy:false}});
 const executablePath=process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
-const browser=await chromium.launch({headless:true,...(executablePath?{executablePath}:{})});
+const browser=await chromium.launch({headless:true,...(executablePath?{executablePath}:{channel:process.platform==='win32'?'msedge':'chrome'})});
 const page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 try{
  await page.goto(origin+'/workbench/#/records/new?data=local');
  await page.getByRole('button',{name:'保存记录',exact:true}).waitFor();
  await page.evaluate(async ({key,origin})=>{await window.library.pair({server:origin,key,name:'浏览器验收'});},{key,origin});
+ await page.goto(origin+'/workbench/#/settings/nodes/'+routeNodes[1].id+'?data=local');
+ await page.getByRole('button',{name:'派发任务',exact:true}).waitFor();
+ await page.getByRole('heading',{name:'路由节点 B',exact:true}).waitFor();
+ await page.goto(origin+'/workbench/#/settings/agents/'+routeNodes[1].id+'?data=local');
+ await page.locator('[data-region="Agent目标节点字段"]').getByText('路由节点 B',{exact:true}).waitFor();
  await page.goto(origin+'/workbench/#/settings/plugins?data=local');
  await page.getByLabel('AI 助手',{exact:true}).waitFor();
  if(!await page.getByLabel('AI 助手',{exact:true}).isChecked())throw Error('AI default is disabled');
@@ -40,6 +48,6 @@ try{
  const persisted=await app.store.list('capture');if(!persisted.some(r=>r.text==='插件关闭后保存的原始灵感'))throw Error('Original not synced');
  await page.setViewportSize({width:780,height:920});await page.screenshot({path:path.join(output,'web-narrow.png'),fullPage:true});
  if(errors.length)throw Error(errors.join('\n'));
- fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,scenarios:['real-browser-cookie-login','enable-writing','dependency-block','disable-all-extensions','save-edit-and-sync-core-record','narrow-web-layout'],pageErrors:errors},null,2));
+ fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,scenarios:['core-and-plugin-settings-route-parameters','real-browser-cookie-login','enable-writing','dependency-block','disable-all-extensions','save-edit-and-sync-core-record','narrow-web-layout'],pageErrors:errors},null,2));
  console.log('Browser plugin lifecycle and core capture QA passed.');
 }catch(error){await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});console.error(await page.locator('body').innerText());throw error;}finally{await browser.close();await app.close();}
