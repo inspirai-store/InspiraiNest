@@ -1,23 +1,45 @@
 # 灵藏 · InspiraiNest
 
-A local-first personal research library with offline browsing, a self-hosted collection service, desktop Agent Workers, mobile sharing clients and a read-only CLI.
+围绕灵感收集的本地优先资料库。基础收集、保存、同步、检索与阅读始终可用；AI 助手、写作工作台与 Agent 实验室按资料空间启用。
 
-**License: [MIT](LICENSE). Copyright (c) 2026 Wuhan Inspirai Technology Co., Ltd.** The brand is InspiraiNest, using the current application icon. See [rights and brand scope](docs/RIGHTS.md). This snapshot carries no private Git history, personal library entries, production deployment scripts or signing workflow.
+## 开发
 
-Start with [self-hosting instructions](docs/SELF_HOSTING.md) and the [Worker security model](SECURITY.md). To use only the offline library, install Node.js 24+, run `node scripts/catalog.mjs build` and `node scripts/catalog.mjs check`, then double-click `index.html`.
+需要 Node.js 24+；JS/TS 采用 npm workspaces 和根目录锁文件。
 
-The data format is documented in [AGENTS.md](AGENTS.md) and [templates](templates/README.md). Edit each entry's `source.json`; regenerate the catalog instead of editing generated files. Browser dependencies are bundled locally; `file://` remains supported.
+```sh
+npm ci --ignore-scripts
+npm run build:all
+npm start
+# 另一个终端
+npm run desktop
+```
 
-General source code and third-party components have separate rights; retain [third-party notices](docs/THIRD_PARTY.md). Public CI tests synthetic fixtures and builds unsigned/ad-hoc test artifacts. It does not publish a release or connect to a production service.
+首次桌面开发需运行 `node node_modules/electron/install.js`。Web 使用 API 服务的 `/workbench/`，桌面和 Web 共用工作台、组件和插件贡献。开发 Web 可运行 `npx vite --config apps/web/vite.config.ts apps/web`。
 
-The desktop Worker supports in-app Windows/macOS update checks against public GitHub Releases. Release packaging, signing and verification are described in [desktop update instructions](collector/DESKTOP_UPDATES.md).
+```sh
+npm run build:native-assets
+npm test
+node scripts/catalog.mjs build
+node scripts/catalog.mjs check
+```
 
-The planned Windows WeChat share-target integration is tracked in the [implementation plan](docs/WINDOWS_WECHAT_SHARE_TARGET_PLAN.md). Implementation and Windows/WeChat acceptance are pending.
+最后两条命令继续生成根 `index.html`、`assets/` 和资料索引，支持 `file://` 离线阅读。资料正文和运行数据库保持原位置，默认运行目录仍兼容 `collector/data`、`collector/worker-data`，也可使用现有环境变量配置外部路径。
 
-Collection extension research, WeChat extraction contracts, comment collection boundaries and the proposed development sequence are indexed in [plugin development references](docs/plugin-development/README.md). These are research inputs, not newly shipped plugins.
+## 目录
 
-The [comment collection research and validation report](docs/COMMENT_COLLECTION_RESEARCH.md) records the CatBus prototype, Bilibili results, WeChat session limitations and follow-up acceptance criteria. It is a development reference; comment collection is not integrated into InspiraiNest.
+| 目录 | 职责 |
+|---|---|
+| `apps` | Web、Windows/macOS、Android、iOS、CLI 和离线阅读器 |
+| `services` | API、存储适配与 Worker 宿主 |
+| `packages/core` | 收集、内容、阅读、同步与基础业务 |
+| `packages/plugin-sdk` | 清单、注册、生命周期、能力及宿主接口 |
+| `packages/ui-react`、`packages/design-tokens` | 共享组件与视觉定义 |
+| `packages/library-kit`、`packages/contracts` | 归档工具和跨端协议 |
+| `plugins` | AI 助手、写作、Agent 实验室 |
+| `resources` | 品牌、技能和资料模板 |
+| `infra`、`tooling`、`tests` | 部署、构建、检查和测试 |
+| `collector` | 旧命令兼容入口、既有测试与发布辅助脚本 |
 
-The [five-platform commerce data feasibility report](docs/research/ecommerce-public-data-feasibility.md) records candidate tools, supplied-link probes, Catbus validation and a proposed store-monitoring workflow. Store-wide enumeration and several metrics remain unverified; the report is a research deliverable.
+插件机制、数据归属、迁移及跨端支持见 [架构说明](docs/architecture/PLUGINS.md)。项目管理为后续可选插件，本轮未创建业务实现。
 
-The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).
+[自托管](docs/SELF_HOSTING.md) · [安全模型](SECURITY.md) · [MIT License](LICENSE) · [第三方声明](docs/THIRD_PARTY.md)

@@ -1,3 +1,4 @@
+import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -5,7 +6,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 
 if (process.platform !== 'win32') throw new Error('This local launcher currently supports Windows only');
-const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const project = collectorRoot;
 const require = createRequire(import.meta.url);
 const output = path.resolve(project, '../.runtime/local-workbench');
 const build = path.join(output, 'build');
@@ -18,14 +19,14 @@ const run = (program, args) => {
 };
 fs.mkdirSync(output, { recursive: true });
 if (!process.argv.includes('--prepare-only')) {
-  run(process.execPath, [path.join(project, 'scripts/stage-worker-template.mjs')]);
+  run(process.execPath, [collectorPath( 'scripts/stage-worker-template.mjs')]);
   run(process.execPath, [require.resolve('electron-builder/out/cli/cli.js'), '--win', '--x64', '--dir', `--config.directories.output=${build}`, '--publish', 'never']);
 }
 if (!fs.existsSync(exe)) throw new Error('Build the local workbench first');
 // Directory builds skip the installer target which normally creates this resource.
 const yaml = require('js-yaml');
-const packaging = yaml.load(fs.readFileSync(path.join(project, 'electron-builder.yml'), 'utf8'));
-const pkg = JSON.parse(fs.readFileSync(path.join(project, 'package.json'), 'utf8'));
+const packaging = yaml.load(fs.readFileSync(collectorPath( 'electron-builder.yml'), 'utf8'));
+const pkg = JSON.parse(fs.readFileSync(collectorPath( 'package.json'), 'utf8'));
 fs.writeFileSync(path.join(build, 'win-unpacked/resources/app-update.yml'), yaml.dump({ ...packaging.publish, updaterCacheDirName: `${pkg.name}-updater` }));
 const literal = value => '"' + value.replaceAll('"', '""') + '"';
 const launcher = path.join(output, 'Start-Workbench.vbs');

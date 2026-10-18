@@ -1,3 +1,4 @@
+import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 // Build an explicit public download allowlist; never expose an entire directory.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,9 @@ import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-const collector = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const dist = path.join(collector, 'cli/dist');
-const output = path.resolve(process.argv[2] || path.join(collector, 'mobile/dist'));
+const collector = collectorRoot;
+const dist = collectorPath( 'cli/dist');
+const output = path.resolve(process.argv[2] || collectorPath( 'mobile/dist'));
 const manifest = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.json'), 'utf8'));
 const version = manifest.version;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid version');
@@ -35,7 +36,7 @@ let offset = 0;
 const files = ['SKILL.md', 'references/cli.md', 'agents/openai.yaml'];
 for (const relative of files) {
   const filename = Buffer.from('lingnest-library/' + relative);
-  const bytes = fs.readFileSync(path.join(collector, '../skills/lingnest-library', relative));
+  const bytes = fs.readFileSync(collectorPath( '../skills/lingnest-library', relative));
   const crc = crc32(bytes);
   const local = Buffer.alloc(30);
   local.writeUInt32LE(0x04034b50); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x800, 6);

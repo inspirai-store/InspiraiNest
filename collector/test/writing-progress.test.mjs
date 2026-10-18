@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';
-import {execute,writingRoundArgs} from '../src/agents.mjs';
-import {writingProgress} from '../src/writing-progress.mjs';
-import {skillForSnapshot,writingSkill,previousWritingSkillRoot,writingCapabilities,writingPrompt} from '../src/writing-protocol.mjs';
-import {processTask} from '../src/worker.mjs';
+import {execute,writingRoundArgs} from '../../plugins/ai-assistant/worker/agents.mjs';
+import {writingProgress} from '../../plugins/writing/server/writing-progress.mjs';
+import {skillForSnapshot,writingSkill,previousWritingSkillRoot,writingCapabilities,writingPrompt} from '../../plugins/writing/protocol/writing-protocol.mjs';
+import {processTask} from '../../services/worker/worker.mjs';
 import {fixture} from './writing-fixture.mjs';import {roundV2,v2Worker} from './writing-v2-fixture.mjs';
 
 test('Agent stream reports bounded activity and retains final JSON across UTF-8 chunks',async()=>{

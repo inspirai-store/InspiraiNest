@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { createService } from '../src/server.mjs';
-import { hash, secret } from '../src/common.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { hash, secret } from '../../packages/core/node/common.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lingnest-budget-'));
 const app = createService({ dataDir: root, masterKey: secret() });

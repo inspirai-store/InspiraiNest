@@ -5,7 +5,7 @@ name: InspiraiNest reader service
     paths:
       - collector/src/**
       - collector/test/**
-      - collector/public/**
+      - apps/web/public/**
       - collector/scripts/*reader*
       - .github/workflows/lingnest-reader.yml
 permissions:

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { WorkerSession } from '../desktop/worker-session.mjs';
+import { WorkerSession } from '../../apps/desktop/worker-session.mjs';
 
 function fixture() {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'worker-session-')), 'session.json');

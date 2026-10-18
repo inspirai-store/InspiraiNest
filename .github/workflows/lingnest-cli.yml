@@ -3,12 +3,12 @@ name: InspiraiNest CLI
   workflow_dispatch: null
   push:
     paths:
-      - collector/cli/**
+      - apps/cli/**
       - skills/lingnest-library/**
       - .github/workflows/lingnest-cli.yml
   pull_request:
     paths:
-      - collector/cli/**
+      - apps/cli/**
       - skills/lingnest-library/**
       - .github/workflows/lingnest-cli.yml
 permissions:
@@ -25,15 +25,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: collector/cli
+        working-directory: apps/cli
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-go@v5
         with:
-          go-version-file: collector/cli/go.mod
-          cache-dependency-path: collector/cli/go.sum
+          go-version-file: apps/cli/go.mod
+          cache-dependency-path: apps/cli/go.sum
       - name: Native build and unit tests
         run: |
           go run ./tools/package -native -version ci
@@ -78,28 +78,28 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: lingnest-native-${{ runner.os }}-${{ runner.arch }}
-          path: collector/cli/dist/lingnest*
+          path: apps/cli/dist/lingnest*
   package:
     needs: native
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: collector/cli
+        working-directory: apps/cli
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-go@v5
         with:
-          go-version-file: collector/cli/go.mod
-          cache-dependency-path: collector/cli/go.sum
+          go-version-file: apps/cli/go.mod
+          cache-dependency-path: apps/cli/go.sum
       - run: go run ./tools/package -version ci
       - run: cd dist && sha256sum -c SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: lingnest-cli-distribution
           path: |
-            collector/cli/dist/*.zip
-            collector/cli/dist/*.tar.gz
-            collector/cli/dist/SHA256SUMS
-            collector/cli/dist/manifest.json
+            apps/cli/dist/*.zip
+            apps/cli/dist/*.tar.gz
+            apps/cli/dist/SHA256SUMS
+            apps/cli/dist/manifest.json

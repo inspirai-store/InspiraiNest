@@ -1,9 +1,9 @@
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 (async()=>{
- const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{createSkillRuntime}=await import('../src/skill-runtime.mjs'),{scanSkillInventory,globalSkillRoots}=await import('../src/skill-inventory.mjs');
+ const {createService}=await import('../../services/api/server.mjs'),{api}=await import('../../services/worker/worker.mjs'),{createSkillRuntime}=await import('../../plugins/ai-assistant/worker/skill-runtime.mjs'),{scanSkillInventory,globalSkillRoots}=await import('../../plugins/ai-assistant/server/skill-inventory.mjs');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-desktop-')),key=crypto.randomUUID();
- const service=createService({dataDir:path.join(root,'service'),masterKey:key});await new Promise(r=>service.server.listen(0,'127.0.0.1',r));const server='http://127.0.0.1:'+service.server.address().port;
+ const service=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:key});await new Promise(r=>service.server.listen(0,'127.0.0.1',r));const server='http://127.0.0.1:'+service.server.address().port;
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'Fixture owner'})};
  async function node(name){const pairing=await api(owner,'/api/pairings','POST',{role:'worker'});const config={server,...await api({server},'/api/pair','POST',{key:pairing.key,name,clientType:'worker',platform:process.platform})};config.deviceId=config.device.id;await api(config,'/api/heartbeat','POST',{agents:['codex'],capabilities:['article']});return config;}
  const source=await node('技能源节点'),target=await node('技能目标节点'),sourceHome=path.join(root,'source-home'),targetHome=path.join(root,'target-home');fs.mkdirSync(sourceHome);fs.mkdirSync(targetHome);

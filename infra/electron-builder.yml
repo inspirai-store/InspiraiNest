@@ -1,0 +1,62 @@
+appId: store.inspirai.library.worker
+productName: InspiraiNest
+asar: false
+directories:
+  app: .
+  output: artifacts/desktop
+files:
+  - package.json
+  - LICENSE
+  - apps/desktop/*.mjs
+  - apps/desktop/*.cjs
+  - apps/desktop/*.js
+  - apps/desktop/*.html
+  - apps/desktop/*.css
+  - apps/desktop/*.png
+  - apps/desktop/vendor/**
+  - apps/desktop/frontend/dist/**
+  - apps/web/public/**
+  - apps/offline-reader/**
+  - services/**
+  - packages/**
+  - '!packages/core/web/**'
+  - plugins/**/*.mjs
+  - resources/**
+  - collector/package.json
+  - collector/worker*.example.json
+  - scripts/*.mjs
+  - tooling/layout.mjs
+  - tooling/layout-map.json
+  - node_modules/**
+extraResources:
+  - from: apps/desktop/template
+    to: library
+win:
+  icon: apps/desktop/icon.ico
+  target: nsis
+  artifactName: InspiraiNest-v${version}-Windows-${arch}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+mac:
+  extendInfo:
+    NSMicrophoneUsageDescription: 用于保存你主动录制的语音记录。
+    NSCameraUsageDescription: 用于拍照记录。
+  icon: apps/desktop/icon.png
+  target:
+    - zip
+    - dmg
+  artifactName: InspiraiNest-v${version}-macOS-${arch}.${ext}
+  hardenedRuntime: true
+  entitlements: apps/desktop/entitlements.mac.plist
+  entitlementsInherit: apps/desktop/entitlements.mac.plist
+  notarize: true
+  publish:
+    provider: generic
+    url: https://library.inspirai.store/updates/macos
+    useMultipleRangeRequest: false
+publish:
+  provider: github
+  owner: inspirai-store
+  repo: InspiraiNest

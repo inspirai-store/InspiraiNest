@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { Store } from '../src/store.mjs';
-import { secret, hash } from '../src/common.mjs';
-import { browserLifetime, browserCookie } from '../src/browser-session.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { Store } from '../../services/api/storage/store.mjs';
+import { secret, hash } from '../../packages/core/node/common.mjs';
+import { browserLifetime, browserCookie } from '../../services/api/modules/browser-session.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-sessions-'));
   const store = process.env.BROWSER_SESSION_MYSQL_TEST === '1' ? await mysqlFixture() : new Store(path.join(root, 'state.sqlite'));
   const key = secret(); let at = Date.now();
-  const app = createService({ dataDir: root, masterKey: key, store, clock: () => at });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, store, clock: () => at });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });

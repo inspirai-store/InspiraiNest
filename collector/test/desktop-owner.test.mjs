@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
-import { OwnerClient } from '../desktop/owner-client.mjs';
+import { OwnerClient } from '../../apps/desktop/owner-client.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const encryption = { isEncryptionAvailable: () => true,

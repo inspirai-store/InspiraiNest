@@ -5,10 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret, hash } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret, hash } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-task-overlay-'));
-  const key = secret(), service = createService({ dataDir: root, masterKey: key });
+  const key = secret(), service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   const output = path.resolve(__dirname, '../test-output/task-overlay');
   fs.mkdirSync(output, { recursive: true });
   const states = ['queued', 'assigned', 'running', 'uploading', 'waiting_action', 'awaiting_review', 'failed', 'completed', 'cancelled'];

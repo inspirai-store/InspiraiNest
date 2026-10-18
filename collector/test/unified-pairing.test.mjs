@@ -4,16 +4,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { api } from '../src/worker.mjs';
-import { secret, hash, atomicJson } from '../src/common.mjs';
-import { WorkerManager } from '../desktop/manager.mjs';
-import { OwnerClient } from '../desktop/owner-client.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api } from '../../services/worker/worker.mjs';
+import { secret, hash, atomicJson } from '../../packages/core/node/common.mjs';
+import { WorkerManager } from '../../apps/desktop/manager.mjs';
+import { OwnerClient } from '../../apps/desktop/owner-client.mjs';
 
 async function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'unified-pairing-'));
   const masterKey = secret();
-  const service = createService({ dataDir: root, masterKey, publicUrl: 'https://library.example' });
+  const service = createService({pluginProfile:'legacy', dataDir: root, masterKey, publicUrl: 'https://library.example' });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${service.server.address().port}`;
   const owner = { server, ...await api({ server }, '/api/pair', 'POST', { key: masterKey, name: 'Fixture browser', clientType: 'web' }) };

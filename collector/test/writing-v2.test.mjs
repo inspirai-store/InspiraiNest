@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fixture,round} from './writing-fixture.mjs';
 import {roundV2,v2Worker} from './writing-v2-fixture.mjs';
-import {writingCapabilities,skillForVersion} from '../src/writing-protocol.mjs';
-import {validateCaptureRequest} from '../src/capture-request.mjs';
-import {processTask} from '../src/worker.mjs';
-import {createService} from '../src/server.mjs';
+import {writingCapabilities,skillForVersion} from '../../plugins/writing/protocol/writing-protocol.mjs';
+import {validateCaptureRequest} from '../../packages/core/node/capture-request.mjs';
+import {processTask} from '../../services/worker/worker.mjs';
+import {createService} from '../../services/api/server.mjs';
 
 const create=f=>f.create({protocolVersion:2,brief:'连续学习、连续思考',sources:[]});
 test('brief alone is durable intent, uses builtin rules and routes only to a matching Worker',async t=>{
@@ -52,7 +52,7 @@ test('worker saves one v2 round and releases execution without asking or writing
 });
 test('submitted mixed turns and working outline resume after restart on a different owner device',async t=>{
  const f=await fixture(t),created=await create(f),node=await v2Worker(f),task=await f.claim(node);await f.submit(task,node,roundV2(task));let s=await f.session(created.id);await f.change(s,'turns',{roundId:s.rounds[0].id,answers:[{questionId:'q2',selected:['general'],text:'',uncertain:false}],message:'保留通用情境'});await f.stop();
- const app=createService({dataDir:f.root,masterKey:f.masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());const server=`http://127.0.0.1:${app.server.address().port}`;
+ const app=createService({pluginProfile:'legacy',dataDir:f.root,masterKey:f.masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());const server=`http://127.0.0.1:${app.server.address().port}`;
  const owner=await (await fetch(server+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:f.masterKey,name:'second owner'})})).json();const current=await (await fetch(server+'/api/writing/sessions/'+s.id,{headers:{Authorization:'Bearer '+owner.token}})).json();assert.equal(current.turns[0].message,'保留通用情境');assert.equal(current.answers[0].selected[0],'general');assert.deepEqual(current.workingPlan,s.workingPlan);assert.equal(current.brief,'连续学习、连续思考');
 });
 test('turn route uses owner credentials and does not widen Worker inbox management',async t=>{

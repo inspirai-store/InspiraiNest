@@ -1,0 +1,10 @@
+{
+  "name": "@inspirainest/ui-react",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

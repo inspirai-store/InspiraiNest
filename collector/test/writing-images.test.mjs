@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePublicationImages} from '../src/writing-images.mjs';
+import {validatePublicationImages} from '../../plugins/writing/server/writing-images.mjs';
 const bundle=(body,images=[])=>({files:[{path:'article.md',role:'publication',body:Buffer.from(body).toString('base64')},...images.map(name=>({path:name,role:'image',bytes:1}))]});
 test('a generated SVG removed by the archive policy cannot silently become a successful illustrated article',()=>{
  assert.throws(()=>validatePublicationImages(bundle('![流程](images/flow.svg)')),/配图未进入/);

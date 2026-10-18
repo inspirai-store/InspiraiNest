@@ -5,10 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret, hash } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret, hash } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-sessions-ui-'));
-  const key = secret(), service = createService({ dataDir: root, masterKey: key });
+  const key = secret(), service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${service.server.address().port}`;
   const browser = await chromium.launch({ channel: 'chrome', headless: true });

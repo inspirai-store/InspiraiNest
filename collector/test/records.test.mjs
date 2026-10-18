@@ -4,17 +4,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createService } from '../src/server.mjs';
-import { api,processTask } from '../src/worker.mjs';
-import { hash,secret } from '../src/common.mjs';
-import { prepareRecordInput,recordPrompt } from '../src/record-input.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api,processTask } from '../../services/worker/worker.mjs';
+import { hash,secret } from '../../packages/core/node/common.mjs';
+import { prepareRecordInput,recordPrompt } from '../../packages/core/node/record-input.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
-import { captureRequest } from '../desktop/capture-client.mjs';
+import { captureRequest } from '../../apps/desktop/capture-client.mjs';
 
 async function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'capture-tests-')),key=secret();
   const store=process.env.CAPTURE_MYSQL_TEST==='1'?await mysqlFixture():undefined;
-  const app=createService({dataDir:root,masterKey:key,store});await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
+  const app=createService({pluginProfile:'legacy',dataDir:root,masterKey:key,store});await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
   const server=`http://127.0.0.1:${app.server.address().port}`;t.after(()=>app.close());
   const owner={server,...await api({server},'/api/pair','POST',{key,name:'owner'})};
   async function request(route,method='GET',value,config=owner,mime) {const response=await fetch(server+route,{method,headers:{Authorization:`Bearer ${config.token}`,...(value===undefined?{}:{'Content-Type':mime||'application/json'})},body:value===undefined?undefined:Buffer.isBuffer(value)?value:JSON.stringify(value)});return {status:response.status,value:response.headers.get('content-type')?.startsWith('application/json')?await response.json():Buffer.from(await response.arrayBuffer())};}
@@ -51,7 +51,7 @@ test('record protocol announces rich documents and rejects destructive legacy wr
 test('a committed old receipt stays immutable after protocol upgrade; one new request restores document and retries exactly',async t=>{
  const {request,input,app}=await fixture(t),id=crypto.randomUUID(),requestId=crypto.randomUUID();
  const document={version:1,doc:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'恢复正文'}]}]}},payload=input({requestId,text:'恢复正文',document});
- const {canonicalJson:canonicalJSON}=await import('../src/common.mjs');
+ const {canonicalJson:canonicalJSON}=await import('../../packages/core/node/common.mjs');
  const store=app.store;
  assert.ok(store,'test service exposes isolated store');
  const old={id,text:payload.text,attachments:[],createdAt:payload.createdAt,updatedAt:new Date().toISOString(),version:1};
@@ -141,7 +141,7 @@ test('record change sequence rolls back with content and rejects worker and inva
  assert.equal((await request('/api/records/changes?wait=0','GET',undefined,node)).status,403);
  assert.equal((await request('/api/records/changes?wait=26')).status,400);
  const before=(await request('/api/records/changes?wait=0')).value;
- const {lockRecordChanges,appendRecordChange}=await import('../src/record-changes.mjs');
+ const {lockRecordChanges,appendRecordChange}=await import('../../packages/core/node/record-changes.mjs');
  await assert.rejects(app.store.transaction(async tx=>{const state=await lockRecordChanges(tx);await appendRecordChange(tx,{id:crypto.randomUUID(),text:'must roll back'},state);throw Error('rollback');}),/rollback/);
  const after=(await request('/api/records/changes?cursor='+encodeURIComponent(before.cursor)+'&wait=0')).value;
  assert.equal(after.cursor,before.cursor);assert.equal(after.changes.length,0);

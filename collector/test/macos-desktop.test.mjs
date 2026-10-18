@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from '../desktop/macos-policy.mjs';
+import { macosTrayGUID, macosWorkerActions, statusPanelPosition, createStatusPanelController, createDrainQuitController } from '../../apps/desktop/macos-policy.mjs';
 
 test('menu-bar identity is stable for the same normalized Worker directory', () => {
   const first = macosTrayGUID('/tmp/lingnest-worker');

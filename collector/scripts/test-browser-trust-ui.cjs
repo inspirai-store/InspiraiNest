@@ -5,13 +5,13 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret } = await import('../src/common.mjs');
-  const { trustCookie } = await import('../src/browser-trust.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret } = await import('../../packages/core/node/common.mjs');
+  const { trustCookie } = await import('../../services/api/modules/browser-trust.mjs');
   const OTPAuth = await import('otpauth');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-trust-ui-')), key = secret();
   let at = Date.now();
-  const app = createService({ dataDir: root, masterKey: key, clock: () => at });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, clock: () => at });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   let browser = await chromium.launch({ channel: 'chrome', headless: true });

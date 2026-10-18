@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {OwnerClient} from '../desktop/owner-client.mjs';import {logoutOwnerSession} from '../desktop/account-session.mjs';
+import {OwnerClient} from '../../apps/desktop/owner-client.mjs';import {logoutOwnerSession} from '../../apps/desktop/account-session.mjs';
 test('native logout aborts login and publishes unauthenticated state without removing local records',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-account-session-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const file=path.join(dir,'owner.json'),recordFile=path.join(dir,'records.json');fs.writeFileSync(recordFile,'{"draft":"keep"}');
  const owner=new OwnerClient({file,workerServer:()=> 'https://library.example',encryption:{isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}});owner.saveCredential({server:'https://library.example',deviceId:'qa-owner',installationId:'qa-installation',token:'synthetic-token'});
@@ -9,10 +9,10 @@ test('native logout aborts login and publishes unauthenticated state without rem
 test('failed authorization removal does not publish a successful session exit',()=>{const events=[];assert.throws(()=>logoutOwnerSession({owner:{logout:()=>{throw Error('write failed');}},cancelLogin:()=>{},publish:s=>events.push(s)}),/write failed/);assert.equal(events.length,0);});
 
 test('unified desktop pairing uses real WorkerManager and retains installation across service A/B/A',async t=>{
- const {pairOwnerSession}=await import('../desktop/account-session.mjs');const {WorkerManager}=await import('../desktop/manager.mjs');const {createService}=await import('../src/server.mjs');const {secret,atomicJson}=await import('../src/common.mjs');
+ const {pairOwnerSession}=await import('../../apps/desktop/account-session.mjs');const {WorkerManager}=await import('../../apps/desktop/manager.mjs');const {createService}=await import('../../services/api/server.mjs');const {secret,atomicJson}=await import('../../packages/core/node/common.mjs');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'unified-account-session-')),previous=process.env.COLLECTOR_DESKTOP_TEST;process.env.COLLECTOR_DESKTOP_TEST='1';// Close the SQLite handles before Windows removes their directory.
  t.after(async()=>{try{await a.close();await b.close();}finally{if(previous===undefined)delete process.env.COLLECTOR_DESKTOP_TEST;else process.env.COLLECTOR_DESKTOP_TEST=previous;fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
- const keyA=secret(),keyB=secret(),a=createService({dataDir:path.join(dir,'a'),masterKey:keyA}),b=createService({dataDir:path.join(dir,'b'),masterKey:keyB});for(const service of [a,b])await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));const serverA='http://127.0.0.1:'+a.server.address().port,serverB='http://127.0.0.1:'+b.server.address().port;
+ const keyA=secret(),keyB=secret(),a=createService({pluginProfile:'legacy',dataDir:path.join(dir,'a'),masterKey:keyA}),b=createService({pluginProfile:'legacy',dataDir:path.join(dir,'b'),masterKey:keyB});for(const service of [a,b])await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));const serverA='http://127.0.0.1:'+a.server.address().port,serverB='http://127.0.0.1:'+b.server.address().port;
  const config=path.join(dir,'worker.json');atomicJson(config,{dataDir:path.join(dir,'worker')});const manager=new WorkerManager(config),owner=new OwnerClient({file:path.join(dir,'owner.json'),workerServer:()=>manager.configuration().server,encryption:{isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}}),events=[];
  let installation,deviceA;
  for(const [server,key] of [[serverA,keyA],[serverB,keyB],[serverA,keyA]]){
@@ -22,14 +22,14 @@ test('unified desktop pairing uses real WorkerManager and retains installation a
 });
 
 test('running worker blocks account pairing without changing either authorization',{timeout:20000},async t=>{
- const {pairOwnerSession}=await import('../desktop/account-session.mjs');
- const {WorkerManager}=await import('../desktop/manager.mjs');
- const {createService}=await import('../src/server.mjs');
- const {secret,atomicJson}=await import('../src/common.mjs');
+ const {pairOwnerSession}=await import('../../apps/desktop/account-session.mjs');
+ const {WorkerManager}=await import('../../apps/desktop/manager.mjs');
+ const {createService}=await import('../../services/api/server.mjs');
+ const {secret,atomicJson}=await import('../../packages/core/node/common.mjs');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'account-running-worker-'));
  const previous=process.env.COLLECTOR_DESKTOP_TEST;
  process.env.COLLECTOR_DESKTOP_TEST='1';
- const key=secret(),service=createService({dataDir:path.join(dir,'service'),masterKey:key});
+ const key=secret(),service=createService({pluginProfile:'legacy',dataDir:path.join(dir,'service'),masterKey:key});
  await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
  const server='http://127.0.0.1:'+service.server.address().port;
  const config=path.join(dir,'worker.json');atomicJson(config,{dataDir:path.join(dir,'worker')});

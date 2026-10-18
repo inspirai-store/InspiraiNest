@@ -1,11 +1,12 @@
+import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
-const collector=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const source=path.join(collector,'brand/ui-icons');
-const android=path.join(collector,'mobile/android/app/src/main');
+const collector=collectorRoot;
+const source=collectorPath('brand/ui-icons');
+const android=collectorPath('mobile/android/app/src/main');
 const names=['library','collect','person','bookmark','scan','update'];
 const write=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,data);};
 const manifest=[];

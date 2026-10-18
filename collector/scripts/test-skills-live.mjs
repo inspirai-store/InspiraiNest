@@ -1,18 +1,19 @@
+import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
-import {createService} from '../src/server.mjs';
-import {api,prepareWorkspace,taskPrompt} from '../src/worker.mjs';
-import {createSkillRuntime} from '../src/skill-runtime.mjs';
-import {scanSkillInventory,globalSkillRoots} from '../src/skill-inventory.mjs';
-import {packageSkill} from '../src/skill-package.mjs';
-import {verifySkillExtraction} from '../src/skill-verification.mjs';
-import {secret} from '../src/common.mjs';
+import {createService} from '../../services/api/server.mjs';
+import {api,prepareWorkspace,taskPrompt} from '../../services/worker/worker.mjs';
+import {createSkillRuntime} from '../../plugins/ai-assistant/worker/skill-runtime.mjs';
+import {scanSkillInventory,globalSkillRoots} from '../../plugins/ai-assistant/server/skill-inventory.mjs';
+import {packageSkill} from '../../plugins/ai-assistant/server/skill-package.mjs';
+import {verifySkillExtraction} from '../../plugins/ai-assistant/server/skill-verification.mjs';
+import {secret} from '../../packages/core/node/common.mjs';
 
 if(!process.argv.includes('--live'))throw new Error('Use --live to run the native Agent acceptance and temporarily install the isolated pilot skill');
-const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const project=collectorRoot;
 const sample=process.env.WECHAT_SAMPLE_URL || 'https://mp.weixin.qq.com/s/Y7dyRC7CJ09miHWU6LBzBA';
 const expectedText=process.env.WECHAT_SAMPLE_TEXT || '但现在想想，当时我的答案并不准确。因为其实我最近在玩的游戏，叫做 Vibe Coding';
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-skills-live-')),home=os.homedir(),skillName='lingnest-wechat-archive',pilotAgents=['codex'];
@@ -23,7 +24,7 @@ const address='http://127.0.0.1:'+app.server.address().port;
 const owner={server:address,...await api({server:address},'/api/pair','POST',{key,name:'Live skill acceptance'})};
 async function node(name){const pair=await api(owner,'/api/pairings','POST',{role:'worker'});const config={server:address,dataDir:path.join(root,name),...await api({server:address},'/api/pair','POST',{key:pair.key,name,clientType:'worker',platform:process.platform})};config.deviceId=config.device.id;await api(config,'/api/heartbeat','POST',{agents:['codex'],capabilities:['article']});return config;}
 const source=await node('source'),target=await node('native-target'),sourceHome=path.join(root,'source-home');
-const sourceDir=path.join(globalSkillRoots(sourceHome).codex,skillName);fs.mkdirSync(path.dirname(sourceDir),{recursive:true});fs.cpSync(path.join(project,'examples/skills',skillName),sourceDir,{recursive:true});
+const sourceDir=path.join(globalSkillRoots(sourceHome).codex,skillName);fs.mkdirSync(path.dirname(sourceDir),{recursive:true});fs.cpSync(collectorPath('examples/skills',skillName),sourceDir,{recursive:true});
 const workspace=prepareWorkspace({id:'_environment'},target.dataDir);
 const sourceRuntime=createSkillRuntime(source,{home:sourceHome,cwd:sourceHome,scan:(config,options)=>scanSkillInventory(config,{...options,nativeCodex:async()=>null}),api:(...args)=>api(source,...args)});
 const nativeRuntime=createSkillRuntime(target,{home,cwd:workspace,api:(...args)=>api(target,...args),verify:(op,bundle,directory)=>verifySkillExtraction(target,op,bundle,directory,{prepare:destination=>{

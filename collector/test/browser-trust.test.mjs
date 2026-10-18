@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as OTPAuth from 'otpauth';
-import { createService } from '../src/server.mjs';
-import { Store } from '../src/store.mjs';
-import { secret, hash } from '../src/common.mjs';
-import { browserCookie, browserLifetime } from '../src/browser-session.mjs';
-import { trustCookie, trustLifetime } from '../src/browser-trust.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { Store } from '../../services/api/storage/store.mjs';
+import { secret, hash } from '../../packages/core/node/common.mjs';
+import { browserCookie, browserLifetime } from '../../services/api/modules/browser-session.mjs';
+import { trustCookie, trustLifetime } from '../../services/api/modules/browser-trust.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 const profile = { installationId: '9be8f91e-f5bd-4a46-829e-4761ca9934df', clientType: 'web',
@@ -21,7 +21,7 @@ async function fixture(t, { totp = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-trust-'));
   const store = process.env.BROWSER_TRUST_MYSQL_TEST === '1' ? await mysqlFixture() : new Store(path.join(root, 'state.sqlite'));
   const key = secret(); let at = Date.now();
-  const app = createService({ dataDir: root, masterKey: key, store, clock: () => at });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, store, clock: () => at });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });
@@ -126,7 +126,7 @@ test('confirmation is persisted across service restarts and metadata cannot crea
     const value = Reflect.get(target, key);
     return typeof value === 'function' ? value.bind(target) : value;
   } });
-  const replica = createService({ dataDir: f.root, masterKey: f.key, store: borrowed, clock: f.now });
+  const replica = createService({pluginProfile:'legacy', dataDir: f.root, masterKey: f.key, store: borrowed, clock: f.now });
   await new Promise(resolve => replica.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${replica.server.address().port}`;
   try {

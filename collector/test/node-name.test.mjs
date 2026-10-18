@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { secret } from '../src/common.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { secret } from '../../packages/core/node/common.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function fixture(t, mysql) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'node-name-')), key = secret();
-  const app = createService({dataDir:root,masterKey:key,...(mysql ? {store:await mysqlFixture()} : {})});
+  const app = createService({pluginProfile:'legacy',dataDir:root,masterKey:key,...(mysql ? {store:await mysqlFixture()} : {})});
   await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await app.close(); fs.rmSync(root,{recursive:true,force:true});});
   const request = async (token,route,input) => {

@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { secret, hash } from '../src/common.mjs';
-import { readerAuthorization } from '../src/reader-auth.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { secret, hash } from '../../packages/core/node/common.mjs';
+import { readerAuthorization } from '../../services/api/modules/reader-auth.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lingnest-auth-'));
   const masterKey = secret();
   const store = process.env.LINGNEST_TEST_MYSQL === '1' ? await mysqlFixture() : undefined;
-  const app = createService({ dataDir: root, masterKey, store, publicUrl: null });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey, store, publicUrl: null });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });

@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createService} from '../src/server.mjs';
-import {hash,secret} from '../src/common.mjs';
-import {api} from '../src/worker.mjs';
+import {createService} from '../../services/api/server.mjs';
+import {hash,secret} from '../../packages/core/node/common.mjs';
+import {api} from '../../services/worker/worker.mjs';
 export async function fixture(t){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'writing-tests-')),masterKey=secret(),app=createService({dataDir:root,masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));let closed=false;const stop=async()=>{if(!closed){closed=true;await app.close();}};t.after(stop);
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'writing-tests-')),masterKey=secret(),app=createService({pluginProfile:'legacy',dataDir:root,masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));let closed=false;const stop=async()=>{if(!closed){closed=true;await app.close();}};t.after(stop);
  const server=`http://127.0.0.1:${app.server.address().port}`,owner={server,...await api({server},'/api/pair','POST',{key:masterKey,name:'owner'})};
  const request=async(route,method='GET',value,config=owner,assignment)=>{const response=await fetch(server+route,{method,headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json',...(assignment?{'X-Task-Assignment':assignment}:{})},body:value===undefined?undefined:JSON.stringify(value)});return {status:response.status,value:response.headers.get('content-type')?.includes('json')?await response.json():Buffer.from(await response.arrayBuffer())};};
  const worker=async(protocol=1)=>{const pairing=await api(owner,'/api/pairings','POST',{role:'worker'}),node={server,...await api({server},'/api/pair','POST',{key:pairing.key,name:'writer'})};await api(node,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],writingProtocol:protocol||undefined,recordProtocol:1});return node;};

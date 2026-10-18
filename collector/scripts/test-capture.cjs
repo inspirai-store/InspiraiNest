@@ -2,8 +2,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('nod
 const {pathToFileURL}=require('node:url');
 const {chromium}=require('playwright');
 (async()=>{
- const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{captureRequest}=await import('../desktop/capture-client.mjs'),{secret}=await import('../src/common.mjs');
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'capture-browser-')),key=secret(),service=createService({dataDir:root,masterKey:key});
+ const {createService}=await import('../../services/api/server.mjs'),{api}=await import('../../services/worker/worker.mjs'),{captureRequest}=await import('../../apps/desktop/capture-client.mjs'),{secret}=await import('../../packages/core/node/common.mjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'capture-browser-')),key=secret(),service=createService({pluginProfile:'legacy',dataDir:root,masterKey:key});
  await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));const server=`http://127.0.0.1:${service.server.address().port}`;
  const auth=await api({server},'/api/pair','POST',{key,name:'browser-fixture'}),owner={identity:{server,token:auth.token},fetcher:fetch};
  const output=path.resolve(__dirname,'../test-output/capture');fs.mkdirSync(output,{recursive:true});
@@ -11,7 +11,7 @@ const {chromium}=require('playwright');
  try {
   const page=await browser.newPage({viewport:{width:390,height:844}});page.on('pageerror',error=>errors.push(error.message));
   await page.exposeFunction('captureHost',async(action,input)=>{if(action==='status')return {paired:true,server:currentServer};if(action==='navigate')return {};if(offline)throw new Error('network fixture offline');return captureRequest(owner,input);});
-  const entry=pathToFileURL(path.resolve(__dirname,'../public/capture/index.html')).href;await page.goto(entry);
+  const entry=pathToFileURL(path.resolve(__dirname,'../../apps/web/public/capture/index.html')).href;await page.goto(entry);
   await page.waitForFunction(()=>document.querySelector('#connection-label').textContent==='已连接');
   await page.locator('#record-text').fill('真实服务的混合记录');
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvBYAAAAASUVORK5CYII=','base64');

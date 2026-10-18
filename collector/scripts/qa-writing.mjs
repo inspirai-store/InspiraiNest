@@ -7,7 +7,7 @@ import {chromium} from 'playwright';
 import yauzl from 'yauzl';
 import {fixture} from '../test/writing-fixture.mjs';
 import {roundV2,v2Worker} from '../test/writing-v2-fixture.mjs';
-import {hash} from '../src/common.mjs';
+import {hash} from '../../packages/core/node/common.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url)),output=path.join(root,'test-output/writing');fs.mkdirSync(output,{recursive:true});
 const cleanup=[],f=await fixture({after:fn=>cleanup.push(fn)}),node=await v2Worker(f);let browser,web;

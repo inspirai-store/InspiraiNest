@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {writingSkill,skillForVersion,writingCapabilities} from '../src/writing-protocol.mjs';
+import {writingSkill,skillForVersion,writingCapabilities} from '../../plugins/writing/protocol/writing-protocol.mjs';
 
 test('writing Skill contents and version are stable across Windows and Unix line endings',t=>{
   const original=writingSkill(),root=fs.mkdtempSync(path.join(os.tmpdir(),'writing-skill-eol-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { DesktopUpdater } from '../desktop/updater.mjs';
+import { DesktopUpdater } from '../../apps/desktop/updater.mjs';
 
 class FakeUpdater extends EventEmitter {
   checks = 0;

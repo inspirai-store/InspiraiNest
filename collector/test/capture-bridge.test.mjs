@@ -9,7 +9,7 @@ test('embedded capture recovers an initial status request sent before the parent
   const parent={postMessage(message){messages.push(message.captureRequest);if(ready)queueMicrotask(()=>listeners.get('message')({source:parent,data:{captureResponse:{id:message.captureRequest.id,value:{paired:true,theme:'dark'}}}}));}};
   const window={parent};
   const context=vm.createContext({window,crypto:{randomUUID},setTimeout,clearTimeout,setInterval,clearInterval,addEventListener:(event,listener)=>listeners.set(event,listener)});
-  vm.runInContext(fs.readFileSync(new URL('../public/capture/bridge.js',import.meta.url),'utf8'),context);
+  vm.runInContext(fs.readFileSync(new URL('../../apps/web/public/capture/bridge.js',import.meta.url),'utf8'),context);
   const pending=window.captureBridge.call('status');
   setTimeout(()=>{ready=true;},400);
   const result=await pending;

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createReadApi } from '../src/read-api.mjs';
-import { hash, requireValue } from '../src/common.mjs';
+import { createReadApi } from '../../packages/core/server/read-api.mjs';
+import { hash, requireValue } from '../../packages/core/node/common.mjs';
 
 function archive(id, { title = id, summary = '', tags = [], text = 'first\nsecond\nthird', createdAt = '2026-09-26T00:00:00Z', collected = '2026-09-25T12:00:00+08:00', files, ...overrides } = {}) {
   const contents = files || [{ path: 'summary.md', role: 'summary', text }];

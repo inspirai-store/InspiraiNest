@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createService } from '../src/server.mjs';
-import { api, runWorker } from '../src/worker.mjs';
-import { atomicJson, secret } from '../src/common.mjs';
-import { workerSnapshot, sendControl, redact, createWorkerControl } from '../src/worker-control.mjs';
-import { WorkerManager } from '../desktop/manager.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api, runWorker } from '../../services/worker/worker.mjs';
+import { atomicJson, secret } from '../../packages/core/node/common.mjs';
+import { workerSnapshot, sendControl, redact, createWorkerControl } from '../../packages/core/node/worker-control.mjs';
+import { WorkerManager } from '../../apps/desktop/manager.mjs';
 
 export async function until(fn, timeout = 12000) {
   const limit = Date.now() + timeout;
@@ -18,7 +18,7 @@ export async function until(fn, timeout = 12000) {
 async function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-control-'));
   const masterKey = secret();
-  const service = createService({ dataDir: path.join(root, 'server'), masterKey });
+  const service = createService({pluginProfile:'legacy', dataDir: path.join(root, 'server'), masterKey });
   // The control fixture can wait over the default 5s idle socket lifetime.
   service.server.keepAliveTimeout = 30000;
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));

@@ -4,8 +4,8 @@ import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {fixture} from '../test/writing-fixture.mjs';
 import {v2Worker} from '../test/writing-v2-fixture.mjs';
-import {writingCapabilities} from '../src/writing-protocol.mjs';
-import {processTask} from '../src/worker.mjs';
+import {writingCapabilities} from '../../plugins/writing/protocol/writing-protocol.mjs';
+import {processTask} from '../../services/worker/worker.mjs';
 const close=[],f=await fixture({after:fn=>close.push(fn)}),dataDir=fileURLToPath(new URL('../test-output/writing-agent-v2/',import.meta.url));
 try{
  const material=process.argv.slice(2).find(arg=>arg!=='--draft');

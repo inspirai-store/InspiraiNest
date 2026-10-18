@@ -1,0 +1,5 @@
+.node,.label{font-size:14px;font-weight:600;line-height:20px;}
+.input{composes: input from '../../../../packages/ui-react/src/FormControls.module.css';font-size:14px;flex-shrink:0;}
+.textarea{composes: textarea from '../../../../packages/ui-react/src/FormControls.module.css';height:160px;font-size:14px;line-height:20px;}
+.select{composes: selectTrigger from '../../../../packages/ui-react/src/FormControls.module.css';width:100%;font-size:14px;}
+.error{font-size:14px;line-height:20px;color:var(--danger);}

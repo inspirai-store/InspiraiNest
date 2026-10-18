@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MySqlStore } from '../src/mysql-store.mjs';
+import { MySqlStore } from '../../services/api/storage/mysql-store.mjs';
 
 // Exercise the real MySQL transaction implementation in a disposable table.
 // The application's records table is never used for fixture data.

@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { createAgentCatalog, AGENT_CATALOG } from '../src/agent-catalog.mjs';
-import { createAgentInstaller } from '../src/agent-install.mjs';
+import { createAgentCatalog, AGENT_CATALOG } from '../../plugins/ai-assistant/server/agent-catalog.mjs';
+import { createAgentInstaller } from '../../plugins/ai-assistant/worker/agent-install.mjs';
 
 // Exercise vendor packages in a disposable OS-user directory. No login or model task.
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-install-acceptance-'));

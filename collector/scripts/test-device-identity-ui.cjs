@@ -5,10 +5,10 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'device-ui-'));
-  const key = secret(), service = createService({ dataDir: root, masterKey: key });
+  const key = secret(), service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${service.server.address().port}`;
   const post = async (route, body) => (await fetch(server + route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();

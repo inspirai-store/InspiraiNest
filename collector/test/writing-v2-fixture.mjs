@@ -1,4 +1,4 @@
-import {writingCapabilities} from '../src/writing-protocol.mjs';
+import {writingCapabilities} from '../../plugins/writing/protocol/writing-protocol.mjs';
 export async function v2Worker(f){const node=await f.worker();await f.request('/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],recordProtocol:1,writingProtocol:1,writingSkills:writingCapabilities()},node);return node;}
 export function roundV2(task,ready=false){
  const answered=task.writingSnapshot.answers.length>0;

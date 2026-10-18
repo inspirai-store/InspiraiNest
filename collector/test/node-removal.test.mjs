@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { secret } from '../src/common.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { secret } from '../../packages/core/node/common.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function fixture(t, mysql) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'node-removal-'));
   const key = secret(); let at = Date.now();
   const store = mysql ? await mysqlFixture() : undefined;
-  const app = createService({ dataDir: root, masterKey: key, clock: () => at, ...(store ? { store } : {}) });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, clock: () => at, ...(store ? { store } : {}) });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${app.server.address().port}`;
   const request = async (token, route, body, base = server) => {
@@ -29,7 +29,7 @@ async function fixture(t, mysql) {
     if (key === 'close') return async () => {};
     const value = Reflect.get(object, key); return typeof value === 'function' ? value.bind(object) : value;
   } });
-  const replica = createService({ dataDir: path.join(root, 'replica'), masterKey: key, store: replicaStore, clock: () => at });
+  const replica = createService({pluginProfile:'legacy', dataDir: path.join(root, 'replica'), masterKey: key, store: replicaStore, clock: () => at });
   await new Promise(resolve => replica.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await replica.close(); await app.close(); fs.rmSync(root, { recursive: true, force: true }); });
   return { store: app.store, owner, pair, heartbeat, remove, request,

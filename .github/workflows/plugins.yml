@@ -1,0 +1,52 @@
+name: Plugin workspace
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  shared:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build:all
+      - run: npm run build:native-assets
+      - run: npm test
+      - run: node scripts/catalog.mjs build && node scripts/catalog.mjs check
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci --ignore-scripts && npm run build:native-assets
+      - run: bash apps/android/gradlew -p apps/android --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts && npm run build:native-assets
+      - run: brew install xcodegen
+      - run: cp apps/ios/Config/Local.xcconfig.example apps/ios/Config/Local.xcconfig && xcodegen generate --spec apps/ios/project.yml
+      - run: python3 apps/ios/scripts/check_contract.py
+      - name: Test app and share extension
+        run: |
+          destination=$(xcrun simctl list devices available -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=Object.values(JSON.parse(s).devices).flat().find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(1);process.stdout.write(d.udid)})')
+          xcodebuild -project apps/ios/PersonalLibrary.xcodeproj -scheme PersonalLibrary -destination "platform=iOS Simulator,id=$destination" -derivedDataPath artifacts/ios CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
