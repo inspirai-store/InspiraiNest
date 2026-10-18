@@ -39,6 +39,9 @@ try{
  await page.getByLabel('AI 助手',{exact:true}).click();
  await page.waitForFunction(()=>!Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='AI 助手')?.querySelector('input')?.checked);
  await page.waitForFunction(()=>!document.querySelector('[data-region="导航 / 写作"]'));
+ await page.goto(origin+'/workbench/#/settings/nodes/'+routeNodes[1].id+'?data=local');
+ await page.getByRole('heading',{name:'路由节点 B',exact:true}).waitFor();
+ for(const name of ['派发任务','Agent','技能'])if(await page.getByRole('button',{name,exact:true}).count())throw Error('Disabled capability remains on a node: '+name);
  await page.goto(origin+'/workbench/#/records/new?data=local');
  await page.getByLabel('记录正文',{exact:true}).fill('插件关闭后保存的原始灵感');
  await page.getByRole('button',{name:'保存记录',exact:true}).click();
