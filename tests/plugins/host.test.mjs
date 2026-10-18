@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {createRegistry,scopedStore} from '../../packages/plugin-sdk/runtime.mjs';
 import {manifests} from '../../packages/plugin-sdk/catalog.mjs';
 import {createService} from '../../services/api/server.mjs';
@@ -17,7 +18,7 @@ async function fixture(t,{legacy=false}={}){
  t.after(async()=>{await app.close();fs.rmSync(dir,{recursive:true,force:true});});
  const origin='http://127.0.0.1:'+app.server.address().port;
  const pair=await fetch(origin+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,name:'plugin-owner'})}).then(r=>r.json());
- async function request(route,method='GET',input,token=pair.token){const response=await fetch(origin+route,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:input===undefined?undefined:JSON.stringify(input)});return {status:response.status,body:await response.json()};}
+ async function request(route,method='GET',input,token=pair.token,mime='application/json'){const response=await fetch(origin+route,{method,headers:{Authorization:'Bearer '+token,'Content-Type':mime},body:input===undefined?undefined:Buffer.isBuffer(input)?input:JSON.stringify(input)});return {status:response.status,body:await response.json()};}
  const toggle=async(id,enabled)=>{const current=(await request('/api/plugins')).body;return request('/api/plugins/'+id,'PUT',{enabled,revision:current.revision});};
  return {app,request,toggle,origin};
 }
@@ -40,14 +41,17 @@ test('dependencies, active jobs, authorization and stale updates are enforced se
 });
 test('all extensions off: legacy sharing saves raw links and attachments, sync and read remain available',async t=>{
  const {app,request,toggle}=await fixture(t);assert.equal((await toggle('ai-assistant',false)).status,200);
- const input={submissionId:'raw-share',codexTrial:{deviceId:crypto.randomUUID()},url:'https://example.com/post?lang=zh',type:'webpage',tags:['灵感']};
+ const bytes=Buffer.from('89504e470d0a1a0a00000000','hex'),sha=createHash('sha256').update(bytes).digest('hex');
+ assert.equal((await request('/api/records/media/'+sha,'PUT',bytes,undefined,'image/png')).status,200);
+ const attachment={id:crypto.randomUUID(),sha256:sha,name:'original.png'};
+ const input={attachments:[attachment],submissionId:'raw-share',codexTrial:{deviceId:crypto.randomUUID()},url:'https://example.com/post?lang=zh',type:'webpage',tags:['灵感']};
  const shared=await request('/api/tasks','POST',input);assert.equal(shared.status,201);assert.equal(shared.body.state,'completed');assert.equal(shared.body.pluginId,null);
  const record=await request('/api/records/'+shared.body.sourceRecordId);assert.equal(record.status,200);assert.equal(record.body.text,input.url);assert.deepEqual(record.body.tasks,[]);
  assert.equal((await request('/api/tasks','POST',input)).body.id,shared.body.id);
  const changes=await request('/api/records/changes');assert.ok(changes.body.records.some(r=>r.id===record.body.id));
  const process=await request('/api/records/'+record.body.id+'/process','POST',{requestId:crypto.randomUUID(),baseVersion:1,preset:'summary'});assert.equal(process.body.code,'plugin_disabled');
  const saved=await app.store.get('capture',record.body.id);assert.equal(saved.text,input.url);
- const exported=await request('/api/records/'+record.body.id+'/export');assert.equal(exported.status,200);assert.equal(exported.body.record.text,input.url);assert.equal(exported.body.kind,'inspirainest-record');
+ const exported=await request('/api/records/'+record.body.id+'/export');assert.equal(exported.status,200);assert.equal(exported.body.record.text,input.url);assert.equal(exported.body.kind,'inspirainest-record');assert.equal(exported.body.files[0].sha256,sha);assert.deepEqual(Buffer.from(exported.body.files[0].body,'base64'),bytes);
  await toggle('ai-assistant',true);assert.equal((await app.store.list('task')).filter(t=>t.purpose==='codex-trial').length,0);assert.equal((await request('/api/records/'+record.body.id)).body.text,input.url);
 });
 test('disabled writing keeps history; re-enable recovers existing sessions without erasing data',async t=>{

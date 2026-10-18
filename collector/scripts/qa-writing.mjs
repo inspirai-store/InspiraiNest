@@ -1,3 +1,4 @@
+import {collectorPath} from '../../tooling/layout.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
