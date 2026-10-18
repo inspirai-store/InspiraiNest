@@ -40,7 +40,7 @@ test('dependencies, active jobs, authorization and stale updates are enforced se
 });
 test('all extensions off: legacy sharing saves raw links and attachments, sync and read remain available',async t=>{
  const {app,request,toggle}=await fixture(t);assert.equal((await toggle('ai-assistant',false)).status,200);
- const input={submissionId:'raw-share',url:'https://example.com/post?lang=zh',type:'webpage',tags:['灵感']};
+ const input={submissionId:'raw-share',codexTrial:{deviceId:crypto.randomUUID()},url:'https://example.com/post?lang=zh',type:'webpage',tags:['灵感']};
  const shared=await request('/api/tasks','POST',input);assert.equal(shared.status,201);assert.equal(shared.body.state,'completed');assert.equal(shared.body.pluginId,null);
  const record=await request('/api/records/'+shared.body.sourceRecordId);assert.equal(record.status,200);assert.equal(record.body.text,input.url);assert.deepEqual(record.body.tasks,[]);
  assert.equal((await request('/api/tasks','POST',input)).body.id,shared.body.id);
@@ -48,7 +48,7 @@ test('all extensions off: legacy sharing saves raw links and attachments, sync a
  const process=await request('/api/records/'+record.body.id+'/process','POST',{requestId:crypto.randomUUID(),baseVersion:1,preset:'summary'});assert.equal(process.body.code,'plugin_disabled');
  const saved=await app.store.get('capture',record.body.id);assert.equal(saved.text,input.url);
  const exported=await request('/api/records/'+record.body.id+'/export');assert.equal(exported.status,200);assert.equal(exported.body.record.text,input.url);assert.equal(exported.body.kind,'inspirainest-record');
- await toggle('ai-assistant',true);assert.equal((await request('/api/records/'+record.body.id)).body.text,input.url);
+ await toggle('ai-assistant',true);assert.equal((await app.store.list('task')).filter(t=>t.purpose==='codex-trial').length,0);assert.equal((await request('/api/records/'+record.body.id)).body.text,input.url);
 });
 test('disabled writing keeps history; re-enable recovers existing sessions without erasing data',async t=>{
  const {app,request,toggle}=await fixture(t);await toggle('writing',true);

@@ -758,17 +758,17 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return await serialized(`submission:${submissionId}`, async () => {
           const existing = (await store.list('task')).find(t => t.submissionId === submissionId);
           if (existing) {
-            requireValue(JSON.stringify(existing.codexTrial || null)===JSON.stringify(codexTrial),'Submission ID already used',409);
+            requireValue(JSON.stringify((existing.purpose==='core-capture'?existing.requestedCodexTrial:existing.codexTrial) || null)===JSON.stringify(codexTrial),'Submission ID already used',409);
             requireValue(JSON.stringify(inputReferences(existing.inputAttachments || [])) === JSON.stringify(inputReferences(inputAttachments)), 'Submission ID already used', 409);
             requireValue((existing.content ?? null) === content && existing.url === (source?.href || null) && existing.scenario === (input.scenario?.trim() || null) && existing.type === taskType && existing.preferredAgent === (input.agent || null) && (existing.autoArchive ?? true) === autoArchive && JSON.stringify(existing.tags || []) === JSON.stringify(tags) && (existing.preferredDeviceId || null) === preferredDeviceId, 'Submission ID already used', 409);
             return send(res, 200, existing);
           }
-          if(codexTrial)await plugins.assertEnabled('agent-lab');
           const original=await collectOriginal({store,submissionId,text:content,url:source?.href || null,tags,inputAttachments,attachments:inputAttachments,createdAt:now()});
           if(!await plugins.enabled('ai-assistant')) {
-            const saved={id:id(),submissionId,content,url:source?.href || null,type:taskType,autoArchive,tags,preferredDeviceId,preferredAgent:input.agent || null,scenario:input.scenario?.trim() || null,codexTrial:null,deviceId:null,archiveId:null,sourceRecordId:original.id,pluginId:null,purpose:'core-capture',createdAt:original.createdAt,...(inputAttachments.length?{inputAttachments}:{})};
+            const saved={id:id(),submissionId,content,url:source?.href || null,type:taskType,autoArchive,tags,preferredDeviceId,preferredAgent:input.agent || null,scenario:input.scenario?.trim() || null,requestedCodexTrial:codexTrial,deviceId:null,archiveId:null,sourceRecordId:original.id,pluginId:null,purpose:'core-capture',createdAt:original.createdAt,...(inputAttachments.length?{inputAttachments}:{})};
             return send(res,201,await saveTask(saved,'completed','原始内容已保存'));
           }
+          if(codexTrial)await plugins.assertEnabled('agent-lab');
           await codexTrials.request(input.codexTrial);
           if(preferredDeviceId)requireValue(workerAuthorized(await store.get('device',preferredDeviceId) || {}),'Invalid dispatch device');
           const task = { id: id(), submissionId, content, url: source?.href || null, type: taskType, autoArchive, tags, preferredDeviceId, scenario: input.scenario?.trim() || null, preferredAgent: input.agent || null, deviceId: null, archiveId: null, createdAt: now(), ...(inputAttachments.length ? { inputAttachments } : {}) };

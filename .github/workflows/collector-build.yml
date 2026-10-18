@@ -14,15 +14,15 @@ name: Collector builds
     branches: [main]
     paths:
       - collector/**
-    - apps/**
-    - packages/**
-    - services/**
-    - plugins/**
-    - resources/**
-    - tooling/**
-    - infra/**
-    - package.json
-    - package-lock.json
+      - apps/**
+      - packages/**
+      - services/**
+      - plugins/**
+      - resources/**
+      - tooling/**
+      - infra/**
+      - package.json
+      - package-lock.json
       - assets/library.js
       - assets/library.css
       - assets/library-time.js
@@ -39,15 +39,15 @@ name: Collector builds
   pull_request:
     paths:
       - collector/**
-    - apps/**
-    - packages/**
-    - services/**
-    - plugins/**
-    - resources/**
-    - tooling/**
-    - infra/**
-    - package.json
-    - package-lock.json
+      - apps/**
+      - packages/**
+      - services/**
+      - plugins/**
+      - resources/**
+      - tooling/**
+      - infra/**
+      - package.json
+      - package-lock.json
       - assets/**
       - index.html
       - scripts/write-collection-json.mjs

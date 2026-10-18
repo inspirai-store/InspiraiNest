@@ -9,5 +9,5 @@ import {TrialLogin} from './agent-lab/web/TrialLogin';
 export const webPlugins:PluginView[]=[
  {id:'ai-assistant',settings:[{id:'agents',label:'Agent',icon:Bot,Component:AgentsContent},{id:'skills',label:'技能',icon:Puzzle,Component:SkillsContent}]},
  {id:'writing',Provider:WritingProvider,routes:[{path:'/writing',Component:WritingPage},{path:'/writing/new',Component:WritingPage},{path:'/writing/:id',Component:WritingPage}]},
- {id:'agent-lab',generalSettings:[TrialLogin]}
+ {id:'agent-lab',generalSettings:window.worker?[TrialLogin]:[]}
 ];

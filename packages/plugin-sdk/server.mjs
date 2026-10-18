@@ -39,6 +39,7 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
       const match = route.match(/^\/api\/plugins\/([a-z][a-z0-9-]+)$/);
       if (!match || req.method !== 'PUT') throw new PluginError('plugin_not_found','插件接口不存在',{},404);
       const input = await body(req);
+      if(!input||typeof input.enabled!=='boolean'||!Number.isSafeInteger(input.revision))throw new PluginError('plugin_invalid','插件配置无效',{},400);
       await ready;
       await serialized('claim',() => store.transaction(async tx => {
         const current = await tx.getForUpdate('setting',key);

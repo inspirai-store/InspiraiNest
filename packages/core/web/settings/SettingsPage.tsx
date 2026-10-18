@@ -48,11 +48,11 @@ export function SettingsPage(){
     <ContentPane label="设置内容" backLabel="设置" onBack={()=>go('/settings')}>{plugins?<PluginsContent/>:devices?<DevicesContent/>:diagnostics?<DiagnosticsContent/>:updates?<UpdatesContent/>:ExtensionContent?<ExtensionContent/>:nodes?<NodesContent/>:account?<AccountContent/>:<ModuleContent className={styles.general} data-region="设置通用内容"><ModuleHeader title="通用" height={29} data-region="内容标题"/>
      {settings.loading?<div className={styles.skeleton} aria-busy="true" aria-label="设置加载中"><i/><i/><i/><i/></div>:settings.loadError||!value?<StatePanel kind="error" title="设置加载失败" action="重试" onAction={()=>void reload()} region="设置加载错误"/>:<>
       {choices('themeMode','外观',[['system','跟随系统'],['light','浅色'],['dark','深色']])}
-      {choices('closeBehavior','关闭窗口',[['tray','保留托盘'],['quit','退出客户端']])}
-      <fieldset className={styles.field} disabled={settings.saving||!value.loginItem.supported}><legend>启动</legend><CheckboxField className={styles.startup} checked={value.launchAtLogin&&value.loginItem.supported} onChange={e=>void save({launchAtLogin:e.target.checked},e.currentTarget)}>开机启动</CheckboxField></fieldset>
+      {window.worker&&choices('closeBehavior','关闭窗口',[['tray','保留托盘'],['quit','退出客户端']])}
+      {window.worker&&<fieldset className={styles.field} disabled={settings.saving||!value.loginItem.supported}><legend>启动</legend><CheckboxField className={styles.startup} checked={value.launchAtLogin&&value.loginItem.supported} onChange={e=>void save({launchAtLogin:e.target.checked},e.currentTarget)}>开机启动</CheckboxField></fieldset>}
       <ShortcutButton/>
       {extensions.generalSettings.map((Component,index)=><Component key={index}/>)}
-      {!value.loginItem.supported&&<p className={styles.status}>不支持开机启动</p>}
+      {window.worker&&!value.loginItem.supported&&<p className={styles.status}>不支持开机启动</p>}
       {value.loginItem.supported&&value.launchAtLogin&&value.loginItem.status==='requires-approval'&&<p className={styles.status}>等待系统批准</p>}
       {value.loginItem.supported&&value.launchAtLogin&&value.loginItem.status==='disabled-by-system'&&<p className={styles.status}>已被系统停用</p>}
       {settings.failedPatch&&<div className={styles.failure} role="alert"><p>设置未保存</p><Action icon={RotateCcw} onClick={()=>void retry()}>重试</Action></div>}
