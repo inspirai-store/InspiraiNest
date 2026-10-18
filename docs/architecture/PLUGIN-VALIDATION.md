@@ -19,6 +19,12 @@
 - 从不包含本机依赖及构建制品的 Docker 上下文重新安装根锁文件，生产 Web 和镜像构建通过。
 - 离线阅读器索引 build/check 通过，保持 file:// 入口。
 
+## 跨平台 CI 补充
+
+产品源码验收基于 `ae7e4aa` 及其未改动对应平台源码的前序提交。共享 CI、Windows 打包及全部真实客户端回归、macOS 主构建与回归、Android、Docker、CLI 三平台检查已分别通过。iOS 全部 33 项 XCTest 已通过；Intel Mac 更新及外部 Agent 安装的继承检查仍以 PR 中对应任务的最终状态为准。最后的文档提交只同步验收记录，不改变产品源码。
+
+新增浏览器回归同时验证：节点及插件详情路由选择正确的节点，关闭 AI 后节点不残留失效操作，后台配置刷新保留同一写作编辑器及输入。
+
 ## 可复核入口
 
 - PR：<https://github.com/inspirai-store/InspiraiNest/pull/10>。
