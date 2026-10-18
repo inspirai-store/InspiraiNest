@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {attachmentPairs} from '../../../../packages/core/web/records/data/attachment-layout.ts';
+const files=[{id:'v',mime:'video/mp4'},{id:'p',mime:'application/pdf'},{id:'i',mime:'image/jpeg'}],n=id=>({type:'attachment',attrs:{attachmentId:id}});
+test('三个连续附件不会重复使用中间文件配对',()=>{assert.deepEqual([...attachmentPairs([n('v'),n('p'),n('v')],files)],[[0,'first'],[1,'second']]);assert.deepEqual([...attachmentPairs([n('p'),n('v'),n('p')],files)],[[0,'first'],[1,'second']]);});
+test('图片和段落打断配对，四个对象保持两组原顺序',()=>{assert.equal(attachmentPairs([n('v'),{type:'paragraph'},n('p')],files).size,0);assert.equal(attachmentPairs([n('v'),n('i'),n('p')],files).size,0);assert.deepEqual([...attachmentPairs([n('v'),n('p'),n('v'),n('p')],files)],[[0,'first'],[1,'second'],[2,'first'],[3,'second']]);});

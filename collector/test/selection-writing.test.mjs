@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createService} from '../src/server.mjs';
-import {api,runWorker,processTask} from '../src/worker.mjs';
-import {writingInput,writingResult} from '../src/selection-writing.mjs';
-import {validateCaptureRequest} from '../src/capture-request.mjs';
-async function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'writing-protocol-')),key=crypto.randomUUID();const service=createService({dataDir:path.join(root,'service'),masterKey:key});await new Promise(r=>service.server.listen(0,'127.0.0.1',r));t.after(async()=>{await service.close();fs.rmSync(root,{recursive:true,force:true});});const server=`http://127.0.0.1:${service.server.address().port}`;const owner={server,...await api({server},'/api/pair','POST',{key,name:'writing owner'})};const pair=async name=>{const p=await api(owner,'/api/pairings','POST',{role:'worker'});return {server,...await api({server},'/api/pair','POST',{key:p.key,name})};};return {root,service,server,owner,pair};}
+import {createService} from '../../services/api/server.mjs';
+import {api,runWorker,processTask} from '../../services/worker/worker.mjs';
+import {writingInput,writingResult} from '../../plugins/writing/server/selection-writing.mjs';
+import {validateCaptureRequest} from '../../packages/core/node/capture-request.mjs';
+async function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'writing-protocol-')),key=crypto.randomUUID();const service=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:key});await new Promise(r=>service.server.listen(0,'127.0.0.1',r));t.after(async()=>{await service.close();fs.rmSync(root,{recursive:true,force:true});});const server=`http://127.0.0.1:${service.server.address().port}`;const owner={server,...await api({server},'/api/pair','POST',{key,name:'writing owner'})};const pair=async name=>{const p=await api(owner,'/api/pairings','POST',{role:'worker'});return {server,...await api({server},'/api/pair','POST',{key:p.key,name})};};return {root,service,server,owner,pair};}
 const request=patch=>({requestId:crypto.randomUUID(),operation:'polish',text:'这是一段写作素材。',...patch});
 const beat=(worker,protocol)=>api(worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],...(protocol?{selectionWritingProtocol:1}:{} )});
 test('writing input is bounded text; preload does not allow Worker result submission or arbitrary endpoints',()=>{

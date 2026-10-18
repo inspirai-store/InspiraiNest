@@ -4,16 +4,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createService } from '../src/server.mjs';
-import { api, processTask, runWorker } from '../src/worker.mjs';
-import { secret, hash } from '../src/common.mjs';
-import { LocalStorage } from '../src/storage.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api, processTask, runWorker } from '../../services/worker/worker.mjs';
+import { secret, hash } from '../../packages/core/node/common.mjs';
+import { LocalStorage } from '../../services/api/storage/storage.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function fixture(t, mysql = false, storage) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'task-failover-')), key = secret(); let at = Date.now();
   const store = mysql ? await mysqlFixture() : undefined;
-  const app = createService({ dataDir: root, masterKey: key, clock: () => at, ...(store ? { store } : {}), ...(storage ? { storage } : {}) });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, clock: () => at, ...(store ? { store } : {}), ...(storage ? { storage } : {}) });
   await new Promise(r => app.server.listen(0, '127.0.0.1', r));
   const server = `http://127.0.0.1:${app.server.address().port}`;
   const owner = { server, ...await api({ server }, '/api/pair', 'POST', { key, name: 'owner' }) };
@@ -36,7 +36,7 @@ for (const mysql of [false, true]) {
   test(`${engine}: independent API instances cannot assign one task twice or two execution slots to one node`, options, async t => {
     const f = await fixture(t, mysql), a = await f.node('A'), b = await f.node('B');
     const store = new Proxy(f.app.store, { get(object, key) { if (key === 'close') return async () => {}; const value = Reflect.get(object, key); return typeof value === 'function' ? value.bind(object) : value; } });
-    const replica = createService({ dataDir: path.join(f.root, 'replica'), masterKey: secret(), store });
+    const replica = createService({pluginProfile:'legacy', dataDir: path.join(f.root, 'replica'), masterKey: secret(), store });
     await new Promise(r => replica.server.listen(0, '127.0.0.1', r)); f.replicas.push(replica);
     const alternate = node => ({ ...node, server: `http://127.0.0.1:${replica.server.address().port}` });
     const first = await f.submit();

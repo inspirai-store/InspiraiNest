@@ -74,10 +74,10 @@ async function exercise(page, fixture, output) {
   try {
     let fixture;
     if(web){
-      const state=makeFixture(),{createService}=await import('../src/server.mjs'), key=crypto.randomUUID();
-      service=createService({dataDir:path.join(root,'service'),masterKey:key,skillHub:state});await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
+      const state=makeFixture(),{createService}=await import('../../services/api/server.mjs'), key=crypto.randomUUID();
+      service=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:key,skillHub:state});await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
       app=await chromium.launch({channel:'chrome',headless:true});page=await app.newPage({viewport:{width:1440,height:1000}});
-      await page.goto('http://127.0.0.1:'+service.server.address().port);await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
+      await page.goto('http://127.0.0.1:'+service.server.address().port+'/legacy');await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
       fixture={calls:async()=>state.calls,release:async key=>state.release(key)};
     } else {
       const config=path.join(root,'worker.json');fs.writeFileSync(config,JSON.stringify({dataDir:path.join(root,'worker')}));

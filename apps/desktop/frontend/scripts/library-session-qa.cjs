@@ -1,0 +1,18 @@
+// Isolated QA identities only; native menu invokes the same changed IPC as production.
+const {Menu,MenuItem}=require('electron');
+exports.install=async({window,owner,profile,createService,api,secret,preserveMenu=false,taskAudit=false})=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const key=secret(),second=createService({pluginProfile:'legacy',dataDir:path.join(profile,'account-b'),masterKey:key});
+ await new Promise(r=>second.server.listen(0,'127.0.0.1',r));
+ const server='http://127.0.0.1:'+second.server.address().port;
+ const paired=await api({server},'/api/pair','POST',{key,name:'Library QA B'});
+ await require('./library-qa-fixtures.cjs').seedLibrary((config,route,method,body)=>api({...config,token:paired.token},route,method,body),server,second.store);
+ const identities={A:{...owner.identity},B:{server,token:paired.token,deviceId:paired.device.id}};
+ const directory=path.resolve(__dirname,'../../../../design-review/desktop-refactor/'+(taskAudit?'stage-06-tasks-v1':'stage-05-library-v1')+'/evidence');
+ const audit=[];let account='A';
+ const switchAccount=name=>{owner.identity=identities[name];account=name;window.webContents.send('records-qa:changed');audit.push({event:'switch',account:name});};
+ const menu=Menu.buildFromTemplate([{label:'Library QA',submenu:[{label:'账号 A',accelerator:'CmdOrCtrl+Shift+1',click:()=>switchAccount('A')},{label:'账号 B',accelerator:'CmdOrCtrl+Shift+2',click:()=>switchAccount('B')},...[[3,900,740],[4,740,740],[7,1240,820]].map(([key,width,height])=>({label:width+'px',accelerator:'CmdOrCtrl+Shift+'+key,click:()=>window.setContentSize(width,height)})),...[['5','light'],['6','dark']].map(([key,theme])=>({label:theme,accelerator:'CmdOrCtrl+Shift+'+key,click:()=>{const url=new URL(window.webContents.getURL());url.hash='/library/demo?data=local&theme='+theme;void window.loadURL(url.href);}}))]}]);
+ if(preserveMenu){const existing=Menu.getApplicationMenu();existing.append(new MenuItem({label:"Session QA",submenu:Menu.buildFromTemplate(['A','B'].map((name,i)=>({label:'账号 '+name,accelerator:'CmdOrCtrl+Shift+'+(i+1),click:()=>switchAccount(name)})))}));Menu.setApplicationMenu(existing);}else Menu.setApplicationMenu(menu);
+ const timer=setInterval(async()=>{try{const state=await window.webContents.executeJavaScript(`(()=>({route:location.hash,search:document.querySelector('[aria-label="搜索资料"], [aria-label="搜索任务"]')?.value,rows:Array.from(document.querySelectorAll('[data-row]')).map(x=>({id:x.dataset.row,text:x.textContent,selected:x.getAttribute('aria-pressed')})),favorite:document.querySelector('[aria-label="收藏资料"]')?.getAttribute('aria-pressed'),favoritesOnly:document.querySelector('[aria-label="只看收藏"]')?.getAttribute('aria-pressed'),tab:document.querySelector('[role="tab"][aria-selected="true"]')?.textContent,content:document.querySelector('[data-region="阅读正文"]')?.textContent,scroll:document.querySelector('[data-region="阅读正文滚动"]')?.scrollTop,focused:document.activeElement?.getAttribute('aria-label'),regions:Array.from(document.querySelectorAll('[data-region]')).filter(x=>['导航区','列表区','内容区','阅读滚动区'].includes(x.dataset.region)).map(x=>{const b=x.getBoundingClientRect();return {name:x.dataset.region,x:b.x,y:b.y,w:b.width,h:b.height};})}))()`);const item={account,...state};if(JSON.stringify(item)!==JSON.stringify(audit.at(-1))){audit.push(item);fs.writeFileSync(path.join(directory,taskAudit?'task-session-audit.json':'remaining-library-session-audit.json'),JSON.stringify({scope:'native keyboard/menu actions; read-only DOM observations; isolated REST identities',events:audit},null,2));}}catch{}},600);
+ return()=>{clearInterval(timer);void second.close();};
+};

@@ -5,11 +5,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret } = await import('../../packages/core/node/common.mjs');
   const OTPAuth = await import('otpauth');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'security-ui-')), key = secret(), next = 'Nest2030';
-  const service = createService({ dataDir: root, masterKey: key });
+  const service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${service.server.address().port}`;
   const browser = await chromium.launch({ channel: 'chrome', headless: true });

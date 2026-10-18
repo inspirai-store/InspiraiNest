@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createService} from '../src/server.mjs';
-import {api} from '../src/worker.mjs';
-import {secret,hash} from '../src/common.mjs';
-import {skillZip} from '../src/skill-market-service.mjs';
-import {scanSkillInventory} from '../src/skill-inventory.mjs';
-import {createSkillRuntime} from '../src/skill-runtime.mjs';
-import {sharedSkillRoot} from '../src/skill-links.mjs';
+import {createService} from '../../services/api/server.mjs';
+import {api} from '../../services/worker/worker.mjs';
+import {secret,hash} from '../../packages/core/node/common.mjs';
+import {skillZip} from '../../plugins/ai-assistant/server/skill-market-service.mjs';
+import {scanSkillInventory} from '../../plugins/ai-assistant/server/skill-inventory.mjs';
+import {createSkillRuntime} from '../../plugins/ai-assistant/worker/skill-runtime.mjs';
+import {sharedSkillRoot} from '../../plugins/ai-assistant/worker/skill-links.mjs';
 import {mysqlFixture} from './mysql-fixture.mjs';
 
 import {zip,files} from './fixtures/skill-market.mjs';
 const fixtureHub={request:async input=>input.kind==='detail'?{item:{slug:input.slug,name:'市场技能',version:'1.0.0'}}:{items:[]}};
 async function setup(t,{fetcher,store}={}){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'skills-market-')),key=secret(),app=createService({dataDir:path.join(root,'service'),masterKey:key,...(store?{store}:{}),skillHub:fixtureHub,skillMarketFetch:fetcher || (async url=>url.startsWith('https://api.skillhub.cn/')?new Response('',{status:302,headers:{location:'https://skillhub-1388575217.cos.accelerate.myqcloud.com/skills/fixture-market/1.0.0.zip'}}):new Response(zip(files)))});
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'skills-market-')),key=secret(),app=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:key,...(store?{store}:{}),skillHub:fixtureHub,skillMarketFetch:fetcher || (async url=>url.startsWith('https://api.skillhub.cn/')?new Response('',{status:302,headers:{location:'https://skillhub-1388575217.cos.accelerate.myqcloud.com/skills/fixture-market/1.0.0.zip'}}):new Response(zip(files)))});
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
  t.after(async()=>{await app.close();fs.rmSync(root,{recursive:true,force:true});});
  const server='http://127.0.0.1:'+app.server.address().port,owner={server,...await api({server},'/api/pair','POST',{key,name:'Owner'})};

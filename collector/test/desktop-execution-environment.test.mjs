@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { desktopExecutionEnvironment } from '../desktop/execution-environment.mjs';
-import { execute } from '../src/agents.mjs';
-import { scanSkillInventory } from '../src/skill-inventory.mjs';
+import { desktopExecutionEnvironment } from '../../apps/desktop/execution-environment.mjs';
+import { execute } from '../../plugins/ai-assistant/worker/agents.mjs';
+import { scanSkillInventory } from '../../plugins/ai-assistant/server/skill-inventory.mjs';
 
 test('Mac GUI worker discovers all five CLIs from the user shell with a restricted launch PATH', { skip: process.platform !== 'darwin' }, async t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lingnest-cli-path-'));

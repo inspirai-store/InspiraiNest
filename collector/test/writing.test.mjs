@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fixture,round} from './writing-fixture.mjs';
-import {createService} from '../src/server.mjs';
-import { hash } from '../src/common.mjs';
-import { processTask } from '../src/worker.mjs';
-import {validateCaptureRequest} from '../src/capture-request.mjs';
-import {captureRequest} from '../desktop/capture-client.mjs';
+import {createService} from '../../services/api/server.mjs';
+import { hash } from '../../packages/core/node/common.mjs';
+import { processTask } from '../../services/worker/worker.mjs';
+import {validateCaptureRequest} from '../../packages/core/node/capture-request.mjs';
+import {captureRequest} from '../../apps/desktop/capture-client.mjs';
 
 test('owner session and history survive restart and a different device resumes the same version',async t=>{
  const f=await fixture(t),created=await f.create(),node=await f.worker(),task=await f.claim(node);await f.submit(task,node,round(task));
- await f.stop();const app=createService({dataDir:f.root,masterKey:f.masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
+ await f.stop();const app=createService({pluginProfile:'legacy',dataDir:f.root,masterKey:f.masterKey});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
  const server=`http://127.0.0.1:${app.server.address().port}`;const second=await (await fetch(server+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:f.masterKey,name:'another device'})})).json();const read=async route=>await (await fetch(server+route,{headers:{Authorization:'Bearer '+second.token}})).json();
  const s=await read('/api/writing/sessions/'+created.id);assert.equal(s.rounds.length,1);assert.equal(s.status,'awaiting_answers');
  const history=await read(`/api/writing/sessions/${s.id}/history`);assert.equal(history.items.length,2);assert.equal(history.items[0].sources[0].text,s.sources[0].text);

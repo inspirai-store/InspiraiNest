@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
-import { createService } from '../src/server.mjs';
+import { createService } from '../../services/api/server.mjs';
 
 for (const brand of ['InspiraiNest', 'LingNest']) test(`${brand} releases preserve aliases, checksums and credential isolation`, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-release-'));
@@ -41,7 +41,7 @@ for (const brand of ['InspiraiNest', 'LingNest']) test(`${brand} releases preser
     return [key, { filename, size: bytes.length, sha256: meta.sha256 }];
   }));
   fs.writeFileSync(path.join(root, 'reader-release.json'), JSON.stringify({ version: '0.1.0', assets: readerAssets }));
-  const app = createService({ dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
+  const app = createService({pluginProfile:'legacy', dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(() => app.close());
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -144,7 +144,7 @@ test('macOS update feed serves only verified current release assets', async t =>
   assets['latest-mac.yml'] = stage('latest-mac.yml');
   fs.writeFileSync(path.join(root, 'worker-release.json'), JSON.stringify(workers));
   fs.writeFileSync(path.join(root, 'macos-update.json'), JSON.stringify({ version, assets }));
-  const app = createService({ dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
+  const app = createService({pluginProfile:'legacy', dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
     await app.close();

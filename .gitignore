@@ -35,3 +35,21 @@ collector/mobile/ios/DerivedData*/
 collector/desktop/frontend/dist-writing/
 collector/mobile/android/app/src/main/assets/capture/writing/
 collector/mobile/ios/CaptureAssets/writing/
+
+# Canonical workspace build output
+/artifacts/
+/artifacts*.log
+/assets/
+/index.html
+/apps/web/dist/
+/apps/desktop/frontend/dist*/
+/apps/desktop/template/
+/apps/ios/PersonalLibrary.xcodeproj/
+/apps/ios/Config/Local.xcconfig
+/apps/ios/DerivedData*/
+/collector/desktop/frontend/dist*/
+/apps/android/**/build/
+/apps/android/.gradle/
+/apps/android/local.properties
+/apps/desktop/frontend/.runtime/
+/apps/ios/*.xcresult/

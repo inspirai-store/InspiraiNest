@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createService} from '../src/server.mjs';
-import {api} from '../src/worker.mjs';
-import {secret,hash,now} from '../src/common.mjs';
-import {packageSkill,validateSkillPackage,writeSkillPackage,skillDigest} from '../src/skill-package.mjs';
-import {scanSkillInventory,globalSkillRoots,dependencyStatus,fixedSkillProfiles} from '../src/skill-inventory.mjs';
-import {createSkillRuntime,taskSkillSnapshots} from '../src/skill-runtime.mjs';
+import {createService} from '../../services/api/server.mjs';
+import {api} from '../../services/worker/worker.mjs';
+import {secret,hash,now} from '../../packages/core/node/common.mjs';
+import {packageSkill,validateSkillPackage,writeSkillPackage,skillDigest} from '../../plugins/ai-assistant/server/skill-package.mjs';
+import {scanSkillInventory,globalSkillRoots,dependencyStatus,fixedSkillProfiles} from '../../plugins/ai-assistant/server/skill-inventory.mjs';
+import {createSkillRuntime,taskSkillSnapshots} from '../../plugins/ai-assistant/worker/skill-runtime.mjs';
 import {mysqlFixture} from './mysql-fixture.mjs';
-import {sharedSkillRoot} from '../src/skill-links.mjs';
+import {sharedSkillRoot} from '../../plugins/ai-assistant/worker/skill-links.mjs';
 
 const resources=new WeakMap();
 function resource(t) {
@@ -52,7 +52,7 @@ test('five Agent schemes distinguish compatibility reads, Gemini disabling and O
  assert.equal(result.inventory.agents.filter(a=>['gemini','opencode','claude'].includes(a.name)).some(a=>a.executionEnabled),false);
 });
 async function setup(t,store){
- const dataDir=temporary(t),key=secret(),app=createService({dataDir,masterKey:key,...(store?{store}:{})});
+ const dataDir=temporary(t),key=secret(),app=createService({pluginProfile:'legacy',dataDir,masterKey:key,...(store?{store}:{})});
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));cleanup(t,()=>app.close());
  const server='http://127.0.0.1:'+app.server.address().port;
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'Owner'})};

@@ -6,12 +6,12 @@ const assert = require('node:assert/strict');
 const { _electron } = require('playwright');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { api } = await import('../src/worker.mjs');
-  const { WorkerManager } = await import('../desktop/manager.mjs');
-  const { atomicJson, secret } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { api } = await import('../../services/worker/worker.mjs');
+  const { WorkerManager } = await import('../../apps/desktop/manager.mjs');
+  const { atomicJson, secret } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-fixture-'));
-  const key = secret(); const service = createService({ dataDir: path.join(root, 'server'), masterKey: key });
+  const key = secret(); const service = createService({pluginProfile:'legacy', dataDir: path.join(root, 'server'), masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${service.server.address().port}`;
   const owner = { server, ...await api({ server }, '/api/pair', 'POST', { key, name: 'fixture-owner' }) };
@@ -170,7 +170,7 @@ const { _electron } = require('playwright');
     if (macOS) {
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().popover.isVisible()), true, 'single click shows immediately');
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().trayImage.isTemplateImage()), true);
-      const { macosTrayGUID } = await import('../desktop/macos-policy.mjs');
+      const { macosTrayGUID } = await import('../../apps/desktop/macos-policy.mjs');
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().tray.getGUID()), macosTrayGUID(config.dataDir), 'native macOS tray uses its stable Worker identity');
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().tray.getIgnoreDoubleClickEvents()), true);
       assert.equal(await app.evaluate(() => globalThis.workerDesktop().main.isVisible()), false);

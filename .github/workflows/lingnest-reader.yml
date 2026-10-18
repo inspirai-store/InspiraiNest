@@ -5,7 +5,7 @@ name: InspiraiNest reader service
     paths:
       - collector/src/**
       - collector/test/**
-      - collector/public/**
+      - apps/web/public/**
       - collector/scripts/*reader*
       - .github/workflows/lingnest-reader.yml
 permissions:
@@ -21,7 +21,6 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts
-        working-directory: collector
       - run: npm test
         working-directory: collector
       - name: Verify synthetic indexing at production resource limits

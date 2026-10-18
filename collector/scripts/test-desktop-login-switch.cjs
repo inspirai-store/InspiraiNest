@@ -2,11 +2,11 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),asse
 const {_electron}=require('playwright');
 const {showSettings}=require('./desktop-test-helpers.cjs');
 (async()=>{
- const {createService}=await import('../src/server.mjs');
+ const {createService}=await import('../../services/api/server.mjs');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-origin-switch-'));
  const services=[];
  async function service(label){
-  const password=label+' fixture password '.repeat(3),app=createService({dataDir:path.join(root,label),masterKey:password});
+  const password=label+' fixture password '.repeat(3),app=createService({pluginProfile:'legacy',dataDir:path.join(root,label),masterKey:password});
   await new Promise(r=>app.server.listen(0,'127.0.0.1',r));services.push(app);
   return {origin:'http://127.0.0.1:'+app.server.address().port,password};
  }

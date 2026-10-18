@@ -4,17 +4,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createService } from '../src/server.mjs';
-import { api } from '../src/worker.mjs';
-import { hash, secret } from '../src/common.mjs';
-import { computerMetadata, identityDigest, validHardwareUUID, probeComputer } from '../src/device-identity.mjs';
-import { deviceLabel } from '../src/device-metadata.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api } from '../../services/worker/worker.mjs';
+import { hash, secret } from '../../packages/core/node/common.mjs';
+import { computerMetadata, identityDigest, validHardwareUUID, probeComputer } from '../../packages/core/node/device-identity.mjs';
+import { deviceLabel } from '../../packages/core/node/device-metadata.mjs';
 
 const uuid = '12345678-1234-1234-1234-123456789abc';
 async function authorizedFixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'device-auth-'));
   const masterKey = secret();
-  const service = createService({ dataDir: root, masterKey });
+  const service = createService({pluginProfile:'legacy', dataDir: root, masterKey });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${service.server.address().port}`;
   const owner = { server, ...await api({ server }, '/api/pair', 'POST', { key: masterKey, name: 'Owner', clientType: 'web' }) };
@@ -66,7 +66,7 @@ test('device policy is persisted independently of deployment, domain or master-k
   const first = await api({ server }, '/api/device-policy');
   assert.deepEqual(await api({ server }, '/api/device-policy'), first);
   assert.equal((await service.store.get('setting', 'device-identity-v2')).namespace, first.namespace);
-  const secondService = createService({ dataDir: root, masterKey: secret(), publicUrl: 'https://new-domain.example' });
+  const secondService = createService({pluginProfile:'legacy', dataDir: root, masterKey: secret(), publicUrl: 'https://new-domain.example' });
   await new Promise(resolve => secondService.server.listen(0, '127.0.0.1', resolve));
   try { assert.deepEqual(await api({ server: `http://127.0.0.1:${secondService.server.address().port}` }, '/api/device-policy'), first); }
   finally { await secondService.close(); }
@@ -119,7 +119,7 @@ test('unknown browser OS versions remain unknown and legacy native labels are no
 
 test('website login is available alongside downloads, specialized authorization and client resources', async t => {
   const { server } = await authorizedFixture(t);
-  const home = await (await fetch(server)).text();
+  const home = await (await fetch(server + '/login')).text();
   assert.match(home, /id="login-form"/); assert.match(home, /\/device-identity.js/);
   for (const route of ['/login', '/login/']) assert.equal(await (await fetch(server + route)).text(), home);
   const download = await (await fetch(server + '/download')).text();

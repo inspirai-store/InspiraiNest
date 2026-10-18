@@ -2,8 +2,8 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 (async()=>{
- const {createService}=await import('../src/server.mjs'),{id,secret,hash}=await import('../src/common.mjs'),{cleanTrialTarget}=await import('../src/codex-trial.mjs');
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'processing-ui-')),key=secret(),service=createService({dataDir:root,masterKey:key});
+ const {createService}=await import('../../services/api/server.mjs'),{id,secret,hash}=await import('../../packages/core/node/common.mjs'),{cleanTrialTarget}=await import('../../plugins/agent-lab/server/codex-trial.mjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'processing-ui-')),key=secret(),service=createService({pluginProfile:'legacy',dataDir:root,masterKey:key});
  const output=path.resolve(__dirname,'../test-output/processing-center');fs.mkdirSync(output,{recursive:true});
  const pc='fixture-pc',token=secret(),parentId=id(),chooseId=id(),loginId=id(),approveId=id(),reportId=id();
  const put=task=>service.store.put('task',{type:'auto',tags:[],events:[],createdAt:'2026-10-16T00:00:00Z',...task});
@@ -19,7 +19,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
  const browser=await chromium.launch({channel:process.env.PROCESSING_BROWSER || (process.platform==='win32'?'msedge':'chrome'),headless:true});const errors=[];
  try {
   const context=await browser.newContext({viewport:{width:1440,height:960}}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
+  await page.goto(base+'/legacy');await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});
   await page.locator('#tasks-toggle').click();const center=page.locator('.processing-center');await center.locator('.pc-card').first().waitFor();
   await page.screenshot({path:path.join(output,'desktop-day.png')});
   await center.locator('[data-pc=batch]').click();assert.match(await center.locator('.pc-heading').innerText(),/1 \/ 3/);
@@ -41,7 +41,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
   await center.locator('[data-pc=end]').click();await center.locator('[data-tab=later]').click();await center.locator('[data-pc=restore]').click();await center.locator('[data-tab=attention]').click();assert.equal(await center.locator('.pc-card').count(),2);
   for(const width of [320,360,393,412,736]){await page.setViewportSize({width,height:852});assert.equal(await center.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'horizontal overflow '+width);}
   await page.setViewportSize({width:393,height:852});await page.screenshot({path:path.join(output,'mobile-night.png')});await page.emulateMedia({colorScheme:'light'});await page.screenshot({path:path.join(output,'mobile-day.png')});
-  const second=await context.newPage();await second.goto(base);await second.locator('#app').waitFor({state:'visible'});await second.locator('#tasks-toggle').click();await second.locator('.processing-center .pc-card').first().waitFor();assert.equal(await second.locator('.processing-center .pc-card').count(),2);
+  const second=await context.newPage();await second.goto(base+'/legacy');await second.locator('#app').waitFor({state:'visible'});await second.locator('#tasks-toggle').click();await second.locator('.processing-center .pc-card').first().waitFor();assert.equal(await second.locator('.processing-center .pc-card').count(),2);
   await center.locator('[data-pc=new]').click();assert.equal(await page.locator('#trial-enabled').isChecked(),false);assert.equal(await page.locator('#trial-options').isVisible(),false);
   await page.locator('#task-form [name=content]').fill('浏览器分享 · 实测关联项目');await page.locator('#trial-enabled').check();await page.locator('#trial-computer').selectOption(pc);await page.locator('#trial-project').selectOption(hash('fixture-project').slice(0,32));await page.locator('#task-form button[type=submit]').click();await page.locator('#task-dialog').waitFor({state:'hidden'});
   const submission=(await service.store.list('task')).find(task=>task.content==='浏览器分享 · 实测关联项目');assert.deepEqual(submission.codexTrial,{deviceId:pc,projectId:hash('fixture-project').slice(0,32)});
@@ -49,7 +49,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
   const pairing=await fetch(base+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,name:'Native bridge fixture',clientType:'android',platform:'android'})}).then(r=>r.json());
   let nativeTheme='light';const navigation=[];const native=await browser.newPage({viewport:{width:393,height:852}});native.on('pageerror',e=>errors.push(e.message));
   await native.exposeFunction('captureHost',async(action,input)=>{if(action==='status')return {paired:true,theme:nativeTheme,server:base};if(action==='navigate'){navigation.push(input);return {};}assert.equal(action,'request');const response=await fetch(base+input.route,{method:input.method || 'GET',headers:{Authorization:'Bearer '+pairing.token,'Content-Type':'application/json'},body:input.json?JSON.stringify(input.json):undefined});return {status:response.status,json:await response.json()};});
-  await native.goto(require('node:url').pathToFileURL(path.resolve(__dirname,'../public/capture/processing.html')).href);await native.locator('.pc-card').first().waitFor();
+  await native.goto(require('node:url').pathToFileURL(path.resolve(__dirname,'../../apps/web/public/capture/processing.html')).href);await native.locator('.pc-card').first().waitFor();
   assert.equal(await native.locator('#navigation img').evaluateAll(images=>images.every(img=>img.complete && img.naturalWidth>0)),true);
   await native.screenshot({path:path.join(output,'android-shell-day.png')});nativeTheme='dark';await native.waitForFunction(()=>document.body.dataset.theme==='dark');await native.screenshot({path:path.join(output,'android-shell-night.png')});
   await native.locator('[data-tab=results]').click();await native.locator('[data-pc=history]').click();await native.locator(`[data-item="${reportId}"] [data-pc=open]`).click();await native.getByRole('heading',{name:'示例插件 · Codex 实测'}).waitFor();assert.equal(await native.locator('#navigation').isVisible(),false);assert.equal(await native.evaluate(()=>window.captureBack()),true);assert.equal(await native.locator('#navigation').isVisible(),true);

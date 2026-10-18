@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentEnvironment, execute, agentProfile } from '../src/agents.mjs';
+import { agentEnvironment, execute, agentProfile } from '../../plugins/ai-assistant/worker/agents.mjs';
 
 test('spawned agents cannot inherit deployment and pairing credentials', async () => {
   const env = agentEnvironment({ ...process.env, COLLECTOR_MASTER_KEY: 'fixture-admin',

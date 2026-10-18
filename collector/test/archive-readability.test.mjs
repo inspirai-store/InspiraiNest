@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { requireReadableMetadata } from '../src/archive.mjs';
-import { createService } from '../src/server.mjs';
-import { api } from '../src/worker.mjs';
-import { hash, secret } from '../src/common.mjs';
+import { requireReadableMetadata } from '../../packages/core/node/archive.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api } from '../../services/worker/worker.mjs';
+import { hash, secret } from '../../packages/core/node/common.mjs';
 
 const metadata = () => ({
   schema_version: 1, id: 'article:readability', title: 'Readable archive', type: 'article',
@@ -31,7 +31,7 @@ test('readable metadata allows ordinary questions but rejects corrupted text and
 test('upload rejects corrupted metadata before storing an archive and still accepts valid content', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archive-readability-'));
   const key = secret();
-  const app = createService({ dataDir: root, masterKey: key });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });
   const server = `http://127.0.0.1:${app.server.address().port}`;

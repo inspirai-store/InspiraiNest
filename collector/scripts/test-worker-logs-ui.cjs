@@ -8,8 +8,8 @@ const { _electron } = require('playwright');
 // Isolated synthetic log records, no production task or credential access.
 (async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-log-ui-'));
-  const { createWorkerEvents } = await import('../src/worker-events.mjs');
-  const { atomicJson } = await import('../src/common.mjs');
+  const { createWorkerEvents } = await import('../../packages/core/node/worker-events.mjs');
+  const { atomicJson } = await import('../../packages/core/node/common.mjs');
   let now = Date.now() - 5000;
   const journal = createWorkerEvents(root, { token: 'private-fixture-token', runId: 'fixture-run', now: () => now });
   const config = path.join(root, 'worker.json'); atomicJson(config, { dataDir: root, token: 'private-fixture-token', server: 'http://127.0.0.1:9' });

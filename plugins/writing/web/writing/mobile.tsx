@@ -1,0 +1,22 @@
+import {createRoot} from 'react-dom/client';
+import {HashRouter,Routes,Route,Navigate} from 'react-router-dom';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {UiStateProvider} from '../../../../packages/core/web/workspace/UiState';
+import {LibraryProvider} from '../../../../packages/core/web/library/LibraryProvider';
+import {SettingsProvider} from '../../../../packages/core/web/settings/SettingsProvider';
+import '../register';
+import {RecordsProvider} from '../../../../packages/core/web/records/RecordsProvider';
+import {WritingPage} from './WritingPage';
+import type {CaptureReply,Connection} from '../../../../packages/core/web/records/data/types';
+import '../../../../packages/design-tokens/tokens.css';
+import '../../../../packages/design-tokens/global.css';
+import './mobile.css';
+
+const native=(window as unknown as {captureBridge:{call:(action:string,input?:unknown)=>Promise<unknown>}}).captureBridge.call;
+document.body.dataset.writingMobile='true';
+const listeners=new Set<()=>void>();let identity='';
+window.library={status:async()=>{const result=await native('status') as Connection;const current=JSON.stringify([result.paired,result.server,result.deviceId]);if(identity&&identity!==current)queueMicrotask(()=>listeners.forEach(fn=>fn()));identity=current;return result;},capture:async input=>await native('request',input) as CaptureReply,entries:async()=>{const response=await native('request',{route:'/api/writing/entries'}) as CaptureReply;if(response.status!==200)throw Error('范文列表读取失败');return response.json as Awaited<ReturnType<NonNullable<NonNullable<typeof window.library>['entries']>>>;},onChanged:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}};
+window.writingExport=input=>native('export',input);
+const navigate=(path:string)=>void native('navigate',path.startsWith('/records')?'record':path.startsWith('/library')?'library':path.startsWith('/tasks')?'tasks':'settings');
+addEventListener('focus',()=>void window.library!.status().catch(()=>{}));
+createRoot(document.getElementById('root')!).render(<HashRouter><QueryClientProvider client={new QueryClient()}><UiStateProvider><SettingsProvider><RecordsProvider><LibraryProvider><Routes><Route path="/writing" element={<WritingPage onNavigate={navigate}/>}/><Route path="/writing/new" element={<WritingPage onNavigate={navigate}/>}/><Route path="/writing/:id" element={<WritingPage onNavigate={navigate}/>}/><Route path="*" element={<Navigate to="/writing" replace/>}/></Routes></LibraryProvider></RecordsProvider></SettingsProvider></UiStateProvider></QueryClientProvider></HashRouter>);

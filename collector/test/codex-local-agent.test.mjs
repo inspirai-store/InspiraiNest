@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile,taskTrustCleanup} from '../src/codex-local-agent.mjs';
-import {runAgent} from '../src/agents.mjs';
-import {trialEnvironment} from '../src/codex-trial.mjs';
-import {probeTrialEnvironment,trialRoot} from '../src/codex-trial-worker.mjs';
+import {localAgentContext,probeLocalAgent,rememberAuthFailure,taskPluginProfile,taskTrustCleanup} from '../../plugins/agent-lab/server/codex-local-agent.mjs';
+import {runAgent} from '../../plugins/ai-assistant/worker/agents.mjs';
+import {trialEnvironment} from '../../plugins/agent-lab/server/codex-trial.mjs';
+import {probeTrialEnvironment,trialRoot} from '../../plugins/agent-lab/worker/codex-trial-worker.mjs';
 
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'codex-local-agent-'));process.env.CODEX_HOME=home;
 const config={agents:{codex:{command:'custom-codex',args:['exec','--json','-m','configured-model','-c','model_provider="private"','-']}}};

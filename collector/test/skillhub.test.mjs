@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createSkillHubClient } from '../src/skillhub.mjs';
-import { createService } from '../src/server.mjs';
-import { api } from '../src/worker.mjs';
+import { createSkillHubClient } from '../../plugins/ai-assistant/server/skillhub.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api } from '../../services/worker/worker.mjs';
 
 const json = value => new Response(JSON.stringify(value), { headers:{ 'Content-Type':'application/json' } });
 const list = { code:0, data:{ total:1, skills:[{ slug:'wechat-extract', name:'公众号', description_zh:'正文提取', source:'new-source', version:'1.2', tags:null, downloads:12, labels:null }] } };
@@ -62,7 +62,7 @@ test('identical in-flight requests coalesce, cache expires and callers cannot ch
 });
 test('service exposes authenticated owner-only GET proxy and static shared assets', async t => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'skillhub-service-')), key=crypto.randomUUID(), requests=[];
-  const service=createService({dataDir:root,masterKey:key,skillHub:{request:async input=>{requests.push(input); if(input.keyword==='limit')throw Object.assign(new Error('SkillHub 请求过于频繁，请稍后重试'),{status:429,code:'skillhub_rate_limited'}); return {items:[],total:0};}}});
+  const service=createService({pluginProfile:'legacy',dataDir:root,masterKey:key,skillHub:{request:async input=>{requests.push(input); if(input.keyword==='limit')throw Object.assign(new Error('SkillHub 请求过于频繁，请稍后重试'),{status:429,code:'skillhub_rate_limited'}); return {items:[],total:0};}}});
   await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve)); const server='http://127.0.0.1:'+service.server.address().port;
   t.after(async()=>{await service.close();fs.rmSync(root,{recursive:true,force:true});});
   assert.equal((await fetch(server+'/api/skillhub?kind=search')).status,401);assert.equal(requests.length,0);

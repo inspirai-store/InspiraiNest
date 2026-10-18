@@ -2,11 +2,11 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),asse
 const {_electron,chromium}=require('playwright');
 const {showSettings}=require('./desktop-test-helpers.cjs');
 (async()=>{
- const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{createSkillRuntime}=await import('../src/skill-runtime.mjs'),{scanSkillInventory,globalSkillRoots}=await import('../src/skill-inventory.mjs'),{zip,files}=await import('../test/fixtures/skill-market.mjs');
+ const {createService}=await import('../../services/api/server.mjs'),{api}=await import('../../services/worker/worker.mjs'),{createSkillRuntime}=await import('../../plugins/ai-assistant/worker/skill-runtime.mjs'),{scanSkillInventory,globalSkillRoots}=await import('../../plugins/ai-assistant/server/skill-inventory.mjs'),{zip,files}=await import('../test/fixtures/skill-market.mjs');
  const web=process.argv.includes('--web'),root=fs.mkdtempSync(path.join(os.tmpdir(),'market-install-ui-')),key=crypto.randomUUID(),calls=[];
  const skill={slug:'fixture-market',name:'市场示例',description:'完整文件安装预览 · 隔离测试',version:'1.0.0',owner:'Fixture',downloads:1};
  const skillHub={request:async input=>input.kind==='categories'?{items:[]}:input.kind==='detail'?{item:skill}:{page:1,pageSize:20,total:1,items:[skill]}};
- const service=createService({dataDir:path.join(root,'service'),masterKey:key,skillHub,skillMarketFetch:async(url,options)=>{calls.push(url);return url.startsWith('https://api.skillhub.cn/')?new Response('',{status:302,headers:{location:'https://skillhub-1388575217.cos.accelerate.myqcloud.com/skills/fixture-market/1.0.0.zip'}}):new Response(zip(files));}});
+ const service=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:key,skillHub,skillMarketFetch:async(url,options)=>{calls.push(url);return url.startsWith('https://api.skillhub.cn/')?new Response('',{status:302,headers:{location:'https://skillhub-1388575217.cos.accelerate.myqcloud.com/skills/fixture-market/1.0.0.zip'}}):new Response(zip(files));}});
  await new Promise(r=>service.server.listen(0,'127.0.0.1',r));const server='http://127.0.0.1:'+service.server.address().port;
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'Fixture'})},pairing=await api(owner,'/api/pairings','POST',{role:'worker'});
  const target={server,...await api({server},'/api/pair','POST',{key:pairing.key,name:'测试节点',platform:process.platform})};target.deviceId=target.device.id;target.dataDir=path.join(root,'worker');
@@ -18,7 +18,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
  const output=path.resolve(__dirname,'../test-output/market-install-'+(web?'web':'desktop'));fs.mkdirSync(output,{recursive:true});
  let app,page;const errors=[];
  try{
-  if(web){app=await chromium.launch({channel:'chrome',headless:true});page=await app.newPage({viewport:{width:1240,height:820}});await page.goto(server);await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});}
+  if(web){app=await chromium.launch({channel:'chrome',headless:true});page=await app.newPage({viewport:{width:1240,height:820}});await page.goto(server+'/legacy');await page.locator('#login-form [name=key]').fill(key);await page.locator('#login-form button[type=submit]').click();await page.locator('#app').waitFor({state:'visible'});}
   else{
    const config=path.join(root,'worker.json');fs.writeFileSync(config,JSON.stringify({server,dataDir:path.join(root,'desktop')}));
    const env={...process.env,COLLECTOR_CONFIG:config,COLLECTOR_NODE:process.execPath,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;
@@ -52,7 +52,7 @@ const {showSettings}=require('./desktop-test-helpers.cjs');
    if(web)await page.setViewportSize({width,height:820});
    else await app.evaluate(({BrowserWindow},width)=>{const main=BrowserWindow.getAllWindows().find(w=>!w.webContents.getURL().includes('compact=1'));main.setMinimumSize(320,580);main.setSize(width,820);},width);
    await page.screenshot({path:path.join(output,'installed-'+width+'.png')});
-   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page overflow '+width);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page overflow '+width+' '+JSON.stringify(await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).filter(e=>e.scrollWidth>e.clientWidth+1).slice(0,12).map(e=>({tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width,scroll:e.scrollWidth,client:e.clientWidth})))));
   }
   await page.locator('[data-market-provider=lingnest]').click();await page.locator('.market-card h2').filter({hasText:'fixture-market'}).waitFor();
   await page.locator('[data-detail]').click();await dialog.locator('[data-install-compare]').waitFor({state:'visible'});

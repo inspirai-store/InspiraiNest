@@ -1,8 +1,8 @@
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
 const {_electron}=require('playwright');
 (async()=>{
- const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{secret}=await import('../src/common.mjs');
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-capture-')),key=secret(),service=createService({dataDir:path.join(root,'server'),masterKey:key});await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
+ const {createService}=await import('../../services/api/server.mjs'),{api}=await import('../../services/worker/worker.mjs'),{secret}=await import('../../packages/core/node/common.mjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-capture-')),key=secret(),service=createService({pluginProfile:'legacy',dataDir:path.join(root,'server'),masterKey:key});await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
  const server=`http://127.0.0.1:${service.server.address().port}`,auth=await api({server},'/api/pair','POST',{key,name:'desktop-test'});
  const file=path.join(root,'worker.json');fs.writeFileSync(file,JSON.stringify({server,dataDir:path.join(root,'worker')}));
  const env={...process.env,COLLECTOR_CONFIG:file,COLLECTOR_DESKTOP_TEST:'1',COLLECTOR_DESKTOP_STORAGE_FIXTURE:'1'};delete env.ELECTRON_RUN_AS_NODE;

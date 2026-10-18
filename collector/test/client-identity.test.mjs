@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createService } from '../src/server.mjs';
-import { hash, secret, atomicJson } from '../src/common.mjs';
-import { api } from '../src/worker.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { hash, secret, atomicJson } from '../../packages/core/node/common.mjs';
+import { api } from '../../services/worker/worker.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
-import { OwnerClient } from '../desktop/owner-client.mjs';
+import { OwnerClient } from '../../apps/desktop/owner-client.mjs';
 
 process.env.COLLECTOR_DESKTOP_TEST = '1';
 const encryption = { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('encrypted:' + value), decryptString: value => value.toString().slice(10) };
@@ -18,7 +18,7 @@ async function fixture(t) {
   const releaseDir = path.join(root, 'releases'), filename = 'InspiraiNest-v0.2.0-Windows-x64.exe', bytes = Buffer.from('test installer, not executed');
   fs.mkdirSync(releaseDir); fs.writeFileSync(path.join(releaseDir, filename), bytes);
   atomicJson(path.join(releaseDir, 'worker-release.json'), { windows_x64: { version: '0.2.0', filename, size: bytes.length, sha256: hash(bytes) } });
-  const app = createService({ dataDir: root, masterKey, releaseDir, ...(process.env.LINGNEST_TEST_MYSQL === '1' ? { store: await mysqlFixture() } : {}) });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey, releaseDir, ...(process.env.LINGNEST_TEST_MYSQL === '1' ? { store: await mysqlFixture() } : {}) });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${app.server.address().port}`;
   const cleanup = [];
@@ -111,7 +111,7 @@ test('migration is idempotent across simultaneous servers and rejects aliases of
   const f = await fixture(t), sharedStore = new Proxy(f.app.store, { get(object, key) {
     if (key === 'close') return () => {};
     const value = object[key]; return typeof value === 'function' ? value.bind(object) : value;
-  } }), second = createService({ dataDir: f.root, masterKey: f.masterKey, store: sharedStore });
+  } }), second = createService({pluginProfile:'legacy', dataDir: f.root, masterKey: f.masterKey, store: sharedStore });
   await new Promise(resolve => second.server.listen(0, '127.0.0.1', resolve));
   f.cleanup.push(() => second.close());
   const other = { server: `http://127.0.0.1:${second.server.address().port}`, token: f.owner.token };

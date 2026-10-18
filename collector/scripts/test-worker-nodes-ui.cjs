@@ -5,11 +5,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { hash, secret } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { hash, secret } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-worker-nodes-'));
   let at = Date.now();
-  const key = secret(), service = createService({ dataDir: root, masterKey: key, clock: () => at });
+  const key = secret(), service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, clock: () => at });
   const output = path.resolve(__dirname, '../test-output/worker-nodes'); fs.mkdirSync(output, { recursive: true });
   const stamp = offset => new Date(at + offset).toISOString();
   const device = (id, overrides = {}) => ({ id, name: '家里台式', role: 'worker', category: 'desktop', tokenHash: hash(secret()),
@@ -34,7 +34,7 @@ const path = require('node:path');
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(base); await page.locator('#login-form [name=key]').fill(key);
+    await page.goto(base+'/legacy'); await page.locator('#login-form [name=key]').fill(key);
     await page.locator('#login-form button[type=submit]').click(); await page.locator('#app').waitFor({ state: 'visible' });
     const library = page.frameLocator('#library-frame'); await library.locator('#search').fill('阅读状态保留');
     await page.locator('#worker-node-count').filter({ hasText: '2/4' }).waitFor();

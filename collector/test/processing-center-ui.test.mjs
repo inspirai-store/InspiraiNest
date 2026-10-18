@@ -7,7 +7,7 @@ test('opening a linked trial waits for an already pending processing-center refr
   const content={innerHTML:'',querySelector:()=>null},error={textContent:'',hidden:true};
   const root={classList:{add(){}},innerHTML:'',querySelector:selector=>selector==='.pc-content'?content:error,addEventListener(){}};
   const context=vm.createContext({window:{},document:{activeElement:null}});
-  vm.runInContext(fs.readFileSync(new URL('../public/processing-center.js',import.meta.url),'utf8'),context);
+  vm.runInContext(fs.readFileSync(new URL('../../apps/web/public/processing-center.js',import.meta.url),'utf8'),context);
   let finish,requests=0;const response=new Promise(resolve=>{finish=resolve;});
   const center=context.window.createProcessingCenter({root,request:()=>{requests++;return response;}});
   const background=center.refresh({silent:true});let foregroundFinished=false;

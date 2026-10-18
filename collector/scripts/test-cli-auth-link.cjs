@@ -8,11 +8,11 @@ const { promisify } = require('node:util');
 const run = promisify(execFile);
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret } = await import('../../packages/core/node/common.mjs');
   const binary = path.resolve(process.argv[2] || path.join(__dirname, '../cli/dist', process.platform === 'win32' ? 'lingnest.exe' : 'lingnest'));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-link-ui-')), key = secret();
-  const service = createService({ dataDir: root, masterKey: key });
+  const service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${service.server.address().port}`;
   const browser = await chromium.launch({ channel: 'chrome', headless: true });

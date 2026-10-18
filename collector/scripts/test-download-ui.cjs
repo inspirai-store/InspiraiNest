@@ -6,7 +6,7 @@ const path = require('node:path');
 const { randomBytes, createHash } = require('node:crypto');
 
 async function main() {
-  const { createService } = await import('../src/server.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'download-ui-'));
   const releases = {};
   for (const [platform, version, suffix] of [['windows_x64', '0.1.11', 'Windows-x64.exe'], ['macos_arm64_dmg', '0.1.7', 'macOS-arm64.dmg'], ['macos_x64_dmg', '0.1.7', 'macOS-x64.dmg']]) {
@@ -15,7 +15,7 @@ async function main() {
     releases[platform] = { version, filename, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
   }
   fs.writeFileSync(path.join(root, 'worker-release.json'), JSON.stringify(releases));
-  const app = createService({ dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
+  const app = createService({pluginProfile:'legacy', dataDir: root, releaseDir: root, masterKey: randomBytes(32).toString('hex') });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const output = path.resolve(__dirname, '../test-output/download');

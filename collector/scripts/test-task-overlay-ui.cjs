@@ -5,10 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 (async () => {
-  const { createService } = await import('../src/server.mjs');
-  const { secret, hash } = await import('../src/common.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { secret, hash } = await import('../../packages/core/node/common.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-task-overlay-'));
-  const key = secret(), service = createService({ dataDir: root, masterKey: key });
+  const key = secret(), service = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   const output = path.resolve(__dirname, '../test-output/task-overlay');
   fs.mkdirSync(output, { recursive: true });
   const states = ['queued', 'assigned', 'running', 'uploading', 'waiting_action', 'awaiting_review', 'failed', 'completed', 'cancelled'];
@@ -29,7 +29,7 @@ const path = require('node:path');
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(base);
+    await page.goto(base+'/legacy');
     await page.locator('#login-form [name=key]').fill(key);
     await page.locator('#login-form button[type=submit]').click();
     await page.locator('#app').waitFor({ state: 'visible' });

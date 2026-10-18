@@ -4,12 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { api, runWorker } from '../src/worker.mjs';
-import { createWorkerEvents, readWorkerEvents } from '../src/worker-events.mjs';
-import { createWorkerControl } from '../src/worker-control.mjs';
-import { createService } from '../src/server.mjs';
-import { watchCollectionSteps } from '../src/collection-steps.mjs';
-import { describeAgentFailure } from '../src/agents.mjs';
+import { api, runWorker } from '../../services/worker/worker.mjs';
+import { createWorkerEvents, readWorkerEvents } from '../../packages/core/node/worker-events.mjs';
+import { createWorkerControl } from '../../packages/core/node/worker-control.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { watchCollectionSteps } from '../../packages/core/node/collection-steps.mjs';
+import { describeAgentFailure } from '../../plugins/ai-assistant/worker/agents.mjs';
 
 const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), 'worker-events-'));
 
@@ -149,7 +149,7 @@ test('UTF-8 BOM progress is accepted and corrupted messages produce a separate s
 test('source obstacles remain business events while local environment errors are separate system issues', async t => {
   for (const category of ['source', 'environment']) {
     const root = temporary(); const key = crypto.randomUUID();
-    const service = createService({ dataDir: path.join(root, 'server'), masterKey: key });
+    const service = createService({pluginProfile:'legacy', dataDir: path.join(root, 'server'), masterKey: key });
     await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
     t.after(() => service.close());
     const server = `http://127.0.0.1:${service.server.address().port}`;

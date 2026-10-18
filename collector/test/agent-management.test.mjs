@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createService } from '../src/server.mjs';
-import { api } from '../src/worker.mjs';
-import { secret, hash, atomicJson } from '../src/common.mjs';
-import { AGENT_CATALOG, validateRelease } from '../src/agent-catalog.mjs';
-import { scanAgents, installerEnvironment, createAgentInstaller } from '../src/agent-install.mjs';
-import { createAgentRuntime } from '../src/agent-runtime.mjs';
-import { agentHome, resolveAgentProfile, commandEnvironment } from '../src/agent-paths.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api } from '../../services/worker/worker.mjs';
+import { secret, hash, atomicJson } from '../../packages/core/node/common.mjs';
+import { AGENT_CATALOG, validateRelease } from '../../plugins/ai-assistant/server/agent-catalog.mjs';
+import { scanAgents, installerEnvironment, createAgentInstaller } from '../../plugins/ai-assistant/worker/agent-install.mjs';
+import { createAgentRuntime } from '../../plugins/ai-assistant/worker/agent-runtime.mjs';
+import { agentHome, resolveAgentProfile, commandEnvironment } from '../../plugins/ai-assistant/worker/agent-paths.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 const release=agent=>({package:AGENT_CATALOG.find(a=>a.id===agent).package,version:'1.2.3',tarball:'https://registry.npmjs.org/'+AGENT_CATALOG.find(a=>a.id===agent).package+'/-/'+AGENT_CATALOG.find(a=>a.id===agent).package.split('/').at(-1)+'-1.2.3.tgz',integrity:'sha512-'+Buffer.alloc(64).toString('base64')});
 const environment=()=>({schemaVersion:1,platform:process.platform,arch:process.arch,agents:AGENT_CATALOG.map(a=>({id:a.id,installed:false,version:null,source:'unknown',probeState:'not_found',fingerprint:hash(a.id),originalSupported:false}))});
 async function setup(t,store){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-agents-'));let clock=Date.now();
- const key=secret(),app=createService({dataDir:root,masterKey:key,...(store?{store}:{}),clock:()=>clock,agentCatalog:{release:async agent=>release(agent)}});
+ const key=secret(),app=createService({pluginProfile:'legacy',dataDir:root,masterKey:key,...(store?{store}:{}),clock:()=>clock,agentCatalog:{release:async agent=>release(agent)}});
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
  t.after(async()=>{await app.close();fs.rmSync(root,{recursive:true,force:true});});
  const server='http://127.0.0.1:'+app.server.address().port;
@@ -139,7 +139,7 @@ test('Original npm updates wait for external sessions and reconcile an interrupt
 });
 
 test('Windows npm command shims are identified against the matching vendor package',async t=>{
- const {originalInstallation}=await import('../src/agent-install.mjs');
+ const {originalInstallation}=await import('../../plugins/ai-assistant/worker/agent-install.mjs');
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-win-shim-'));t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
  const pkg=path.join(home,'node_modules/@openai/codex');fs.mkdirSync(path.join(pkg,'bin'),{recursive:true});atomicJson(path.join(pkg,'package.json'),{name:'@openai/codex',version:'1.2.3',bin:{codex:'bin/codex.js'}});fs.writeFileSync(path.join(pkg,'bin/codex.js'),'fixture');
  const command=path.join(home,'codex.cmd');fs.writeFileSync(command,'@node "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*');fs.writeFileSync(path.join(home,'npm.cmd'),'fixture');
@@ -148,7 +148,7 @@ test('Windows npm command shims are identified against the matching vendor packa
 });
 
 test('External session detection follows npm launch aliases without exposing process arguments',{skip:process.platform==='win32'},async t=>{
- const {externalAgentRunning}=await import('../src/agent-install.mjs'),{spawn}=await import('node:child_process');
+ const {externalAgentRunning}=await import('../../plugins/ai-assistant/worker/agent-install.mjs'),{spawn}=await import('node:child_process');
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'lingnest-session-'));t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
  const file=path.join(home,'original.mjs'),alias=path.join(home,'launch.mjs');fs.writeFileSync(file,"process.stdout.write('ready');setInterval(()=>{},1000)");fs.symlinkSync(file,alias);
  const child=spawn(process.execPath,[alias],{stdio:['ignore','pipe','ignore']});t.after(()=>child.kill());await new Promise(resolve=>child.stdout.once('data',resolve));

@@ -1,6 +1,6 @@
 // Disposable local REST services and genuine Worker pipeline; GUI is exercised manually through Cua.
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import http from 'node:http';import {fileURLToPath} from 'node:url';
-import {createService} from '../src/server.mjs';import {api,processTask} from '../src/worker.mjs';
+import {createService} from '../../services/api/server.mjs';import {api,processTask} from '../../services/worker/worker.mjs';
 const root=process.env.WRITING_REGRESSION_ROOT||fs.mkdtempSync(path.join(os.tmpdir(),'inspirainest-writing-b-')),targets={};fs.mkdirSync(root,{recursive:true});
 const old=fs.existsSync(path.join(root,'manifest.json'))?JSON.parse(fs.readFileSync(path.join(root,'manifest.json'))):null;
 for(const label of ['A','B']){

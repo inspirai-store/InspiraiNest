@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createService } from '../src/server.mjs';
-import { secret, atomicJson } from '../src/common.mjs';
-import { clientOrigin, loginFailure } from '../src/client-login.mjs';
-import { WorkerManager } from '../desktop/manager.mjs';
-import { OwnerClient } from '../desktop/owner-client.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { secret, atomicJson } from '../../packages/core/node/common.mjs';
+import { clientOrigin, loginFailure } from '../../packages/core/node/client-login.mjs';
+import { WorkerManager } from '../../apps/desktop/manager.mjs';
+import { OwnerClient } from '../../apps/desktop/owner-client.mjs';
 import * as OTPAuth from 'otpauth';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
@@ -17,7 +17,7 @@ async function service(t, password) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'native-login-'));
   const key = secret(); let at = Date.now();
   const store = process.env.CLIENT_LOGIN_MYSQL_TEST === '1' ? await mysqlFixture() : undefined;
-  const app = createService({ dataDir: root, masterKey: key, store, clock: () => at });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, store, clock: () => at });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const server = 'http://127.0.0.1:' + app.server.address().port;
   t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });

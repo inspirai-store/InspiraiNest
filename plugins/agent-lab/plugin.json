@@ -1,0 +1,29 @@
+{
+  "id": "agent-lab",
+  "name": "Agent 实验室",
+  "version": "1.0.0",
+  "hostVersion": 1,
+  "defaultEnabled": false,
+  "dependencies": [
+    "ai-assistant"
+  ],
+  "platforms": [
+    "web",
+    "desktop",
+    "android",
+    "ios",
+    "cli",
+    "worker",
+    "server"
+  ],
+  "capabilities": [
+    "agent-lab.trials"
+  ],
+  "contributes": {
+    "navigation": [],
+    "settings": true,
+    "jobs": [
+      "agent-lab.trials"
+    ]
+  }
+}

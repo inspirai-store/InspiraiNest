@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 async function main(){
  const out=path.resolve(process.env.RECORD_CONFLICT_OUTPUT||'test-output/record-conflict');fs.mkdirSync(out,{recursive:true});
  const env={...process.env,SETTINGS_QA:'1',RECORDS_QA_ROUTE:'/records?data=local'};delete env.ELECTRON_RUN_AS_NODE;
- const app=await electron.launch({args:[path.resolve('desktop/frontend/scripts/records-qa.cjs'),...(process.platform==='linux'?['--no-sandbox']:[])],env});
+ const app=await electron.launch({args:[path.resolve(__dirname,'../../apps/desktop/frontend/scripts/records-qa.cjs'),...(process.platform==='linux'?['--no-sandbox']:[])],env});
  try{
   const page=await app.firstWindow();await page.waitForURL(url=>url.searchParams.has('qaBuild'));await page.getByRole('navigation',{name:'主导航'}).waitFor();await page.waitForFunction(()=>!!window.library?.capture);
   const id=await page.evaluate(async()=>{

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DesktopLoginItem } from '../desktop/login-item.mjs';
+import { DesktopLoginItem } from '../../apps/desktop/login-item.mjs';
 
 test('Windows registers only the fixed installed executable and startup flag', () => {
   let item = { openAtLogin: false, launchItems: [] }, call, query;

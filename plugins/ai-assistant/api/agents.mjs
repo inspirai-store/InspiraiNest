@@ -1,0 +1,2 @@
+// Public execution contract for official plugins declaring an ai-assistant dependency.
+export {execute,agentExecution,agentOrder,runAgent,unavailableBeforeWork,describeAgentFailure} from '../worker/agents.mjs';

@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as OTPAuth from 'otpauth';
-import { Store } from '../src/store.mjs';
-import { accountSecurity } from '../src/account-security.mjs';
-import { createService } from '../src/server.mjs';
-import { secret, hash } from '../src/common.mjs';
+import { Store } from '../../services/api/storage/store.mjs';
+import { accountSecurity } from '../../services/api/modules/account-security.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { secret, hash } from '../../packages/core/node/common.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 async function fixture(t) {
@@ -106,7 +106,7 @@ test('credential rotation requires MFA, invalidates pending setup; revoked devic
 
 test('HTTP boundary protects owner settings and allows approved pairing codes without bypassing MFA', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'account-http-')); const masterKey = secret();
-  const service = createService({ dataDir: root, masterKey });
+  const service = createService({pluginProfile:'legacy', dataDir: root, masterKey });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve)); const base = `http://127.0.0.1:${service.server.address().port}`;
   t.after(async () => { await service.close(); fs.rmSync(root, { recursive: true, force: true }); });
   async function request(route, input, token) {

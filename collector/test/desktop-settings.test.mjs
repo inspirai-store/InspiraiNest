@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { DesktopSettings } from '../desktop/settings.mjs';
-import { DesktopLoginItem } from '../desktop/login-item.mjs';
+import { DesktopSettings } from '../../apps/desktop/settings.mjs';
+import { DesktopLoginItem } from '../../apps/desktop/login-item.mjs';
 
 class Theme extends EventEmitter {
   themeSource = 'system'; systemDark = false;

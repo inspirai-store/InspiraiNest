@@ -5,15 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createService } from '../src/server.mjs';
-import { api,processTask,prepareWorkspace } from '../src/worker.mjs';
-import { hash,secret } from '../src/common.mjs';
-import { validDocument,decodeInputText,resolveInputAttachments,INPUT_TOTAL_LIMIT } from '../src/input-attachments.mjs';
-import { prepareTaskInput,verifyInputCoverage } from '../src/task-input.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api,processTask,prepareWorkspace } from '../../services/worker/worker.mjs';
+import { hash,secret } from '../../packages/core/node/common.mjs';
+import { validDocument,decodeInputText,resolveInputAttachments,INPUT_TOTAL_LIMIT } from '../../packages/core/node/input-attachments.mjs';
+import { prepareTaskInput,verifyInputCoverage } from '../../packages/core/node/task-input.mjs';
 const docx=Buffer.from('UEsDBBQAAAAIALBzTV2sbhJanQAAANwAAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbF2PMQ7CMAxFr1JlRdSIgQG1XdiBgQtYqdtGxHaUGCi3RwWpA/PXe0+/ub0TlWrmKKV1k1k6AhQ/EWOpNZHMHAfNjFZqzSMk9HccCfa73QG8ipHY1haH65rLk3IOPVVXzHZGptbBS3MPvfoHk1g9c3TV6Yct5dZhSjF4tKACT+n/mlsdhuBp5RdbyuqplCAjx3pdGINsFj10DXxPdR9QSwMEFAAAAAgAsHNNXfvvWA6kAAAAFgEAABEAAAB3b3JkL2RvY3VtZW50LnhtbHWQyw6CMBBFf4VAwpJiVSwFWRhd+hFQKpD0lbam9e9NS4yycHPPLM48Mq3DoyRPToVNPGfCYHdOZ2sVBsCQmfLeFFJR4Tl7SM17awqpJ+CkHpWWhBqziIkzAMuyArxfRNq1Dg9yfAWqELbLM3+4wWuTZ746olMkKiNrVKOmBcEKuTYMLELHJD+D9jC5L5eNHuqobMQdRP/MAL0i7AGfa8H3E90bUEsBAhQAFAAAAAgAsHNNXaxuElqdAAAA3AAAABMAAAAAAAAAAAAAAIABAAAAAFtDb250ZW50X1R5cGVzXS54bWxQSwECFAAUAAAACACwc01d++9YDqQAAAAWAQAAEQAAAAAAAAAAAAAAgAHOAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAIAAgCAAAAAoQEAAAAA','base64');
 
 async function fixture(t){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'task-input-')),key=secret(),app=createService({dataDir:root,masterKey:key});
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'task-input-')),key=secret(),app=createService({pluginProfile:'legacy',dataDir:root,masterKey:key});
  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const server=`http://127.0.0.1:${app.server.address().port}`;
  t.after(async()=>{await app.close();fs.rmSync(root,{recursive:true,force:true});});
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'owner'})};

@@ -1,0 +1,31 @@
+{
+  "id": "ai-assistant",
+  "name": "AI 助手",
+  "version": "1.0.0",
+  "hostVersion": 1,
+  "defaultEnabled": true,
+  "dependencies": [],
+  "platforms": [
+    "web",
+    "desktop",
+    "android",
+    "ios",
+    "cli",
+    "worker",
+    "server"
+  ],
+  "capabilities": [
+    "ai.process",
+    "ai.agents",
+    "ai.skills"
+  ],
+  "contributes": {
+    "navigation": [],
+    "settings": true,
+    "jobs": [
+      "ai.process",
+      "ai.agents",
+      "ai.skills"
+    ]
+  }
+}

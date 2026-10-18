@@ -1,0 +1,44 @@
+import {localContentProvider,pluginTrash} from '../../../plugin-sdk/content';
+import {recordScope} from '../records/data/account-store';
+import {useEffect,useRef,useState} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
+import {Trash2,RotateCcw} from 'lucide-react';
+import {Modal} from '../../../ui-react/src/Overlays';
+import {Action,ChoiceBar} from '../../../ui-react/src/Controls';
+import {StatePanel,ListSkeleton} from '../../../ui-react/src/AsyncState';
+import {useRecords} from '../records/RecordsProvider';
+import {errorMessage} from '../shared/errors';
+import {ContentClient,contentLabels} from './client';
+import type {TrashItem} from './client';
+import styles from './ContentDialogs.module.css';
+export function useContentActions(){
+ const records=useRecords(),cache=useQueryClient(),[deletion,setDeletion]=useState<{item:TrashItem;invoker:HTMLElement;related:string[];after?:()=>void}|null>(null),[trash,setTrash]=useState<HTMLElement|null>(null);
+ const [metadataReady,setMetadataReady]=useState(true),[preparing,setPreparing]=useState(false);
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),requestId=useRef(''),live=useRef(records.session);live.current=records.session;
+ useEffect(()=>{requestId.current='';setDeletion(null);setTrash(null);setBusy(false);setPreparing(false);setError('');return()=>{requestId.current='';};},[records.session]);
+ const refresh=async()=>{await Promise.all([records.reload(),cache.invalidateQueries({queryKey:['desktop-tasks']}),cache.invalidateQueries({queryKey:['writing']}),cache.invalidateQueries({queryKey:['live-library']})]);};
+ const readMetadata=(target:NonNullable<typeof deletion>,attempt:string)=>{const started=records.session;setPreparing(true);setMetadataReady(false);setError('');const current=()=>live.current===started&&requestId.current===attempt;
+  void new ContentClient(records.service.transport).metadata(target.item).then(meta=>{if(current()){setDeletion({...target,item:{...target.item,trashVersion:meta.trashVersion}});setMetadataReady(true);}}).catch(e=>{if(current())setError(errorMessage(e));}).finally(()=>{if(current())setPreparing(false);});
+ };
+ const remove=(item:TrashItem,related:string[]=[],after?:()=>void)=>{setError('');requestId.current=crypto.randomUUID();const target={item,invoker:document.activeElement as HTMLElement,related,after};setDeletion(target);setBusy(false);setPreparing(false);setMetadataReady(item.type!=='library');if(item.type==='library')readMetadata(target,requestId.current);};
+ const closeDeletion=()=>{if(busy)return;requestId.current='';setDeletion(null);setPreparing(false);};
+ const submit=async()=>{if(!deletion||busy||preparing||!metadataReady)return;const session=records.session;setBusy(true);setError('');try{if(deletion.item.local&&deletion.item.type==='record')await records.service.setDeleted(deletion.item.id,true);else if(deletion.item.local&&localContentProvider(deletion.item.type)){await localContentProvider(deletion.item.type)!.remove(recordScope(await records.service.transport.status()),deletion.item,()=>new ContentClient(records.service.transport).change(deletion.item,'delete',requestId.current));}else await new ContentClient(records.service.transport).change(deletion.item,'delete',requestId.current);if(live.current!==session)return;
+   window.dispatchEvent(new CustomEvent('content-deleted',{detail:{type:deletion.item.type,id:deletion.item.id,scope:records.draft?.accountScope}}));
+   await refresh();if(live.current!==session)return;setDeletion(null);deletion.after?.();requestAnimationFrame(()=>{if(deletion.item.type==='selection-writing'){const editor=document.querySelector<HTMLElement>('[aria-label="记录正文"]');if(editor?.getClientRects().length){editor.focus({preventScroll:true});return;}}const nodes=['button[data-row][aria-pressed="true"]','button[data-row]','input[type="search"]','[data-region="返回列表"]'].flatMap(selector=>Array.from(document.querySelectorAll<HTMLElement>(selector)));nodes.find(node=>!!node.getClientRects().length)?.focus({preventScroll:true});});if(deletion.item.local)void records.service.flush().then(refresh).catch(()=>{});
+  }catch(e){if(live.current===session)setError(errorMessage(e));}finally{if(live.current===session)setBusy(false);}};
+ const dialogs=<>{deletion&&<Modal className={styles.confirmDialog} title="删除" region="删除内容" narrow focusCancel invoker={deletion.invoker} close={closeDeletion} footer={<><Action data-initial-cancel disabled={busy} onClick={closeDeletion}>取消</Action><Action kind="primary" disabled={busy||preparing||!metadataReady} onClick={()=>void submit()}>删除</Action></>}><p>删除「{deletion.item.title}」？</p>{!!deletion.related.length&&<><p>同时取消未完成任务：</p><ul>{deletion.related.map((title,i)=><li key={i}>{title}</li>)}</ul></>}{error&&<p role="alert" className={styles.error}>{error}</p>}{!metadataReady&&!preparing&&error&&<Action onClick={()=>readMetadata(deletion,requestId.current)}>重试</Action>}</Modal>}{trash&&<ContentTrash invoker={trash} close={()=>setTrash(null)} refresh={refresh}/>}</>;
+ return {remove,openTrash:(invoker:HTMLElement)=>setTrash(invoker),dialogs};
+}
+export function ContentTrash({invoker,close,refresh}:{invoker:HTMLElement;close:()=>void;refresh:()=>Promise<void>}){
+ const records=useRecords(),[items,setItems]=useState<TrashItem[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[remoteError,setRemoteError]=useState(''),[filter,setFilter]=useState('全部'),[busy,setBusy]=useState(false),live=useRef(records.session),attempts=useRef(new Map<string,string>());live.current=records.session;
+ const load=async()=>{const started=records.session;setLoading(true);setError('');try{
+   const local:TrashItem[]=(await records.service.trash()).map(item=>({type:'record' as const,id:item.id,title:item.text.trim().split('\n')[0]||item.attachments[0]?.name||'草稿',version:item.remoteVersion,trashVersion:item.trashVersion??0,deletedAt:item.deletedAt,local:true,error:item.deletionError}));
+   const scope=recordScope(await records.service.transport.status());local.push(...await pluginTrash(scope));
+   let remote:TrashItem[]=[];try{remote=(await new ContentClient(records.service.transport).list()).items;setRemoteError('');}catch(e){if(live.current===started)setRemoteError(errorMessage(e));}
+   if(live.current!==started)return;setItems([...local,...remote.filter(item=>!local.some(l=>item.type===l.type&&item.id===l.id))].sort((a,b)=>(b.deletedAt??'').localeCompare(a.deletedAt??'')));
+  }catch(e){if(live.current===started)setError(errorMessage(e));}finally{if(live.current===started)setLoading(false);}};
+ useEffect(()=>{void load();},[records.session]);
+ const restore=async(item:TrashItem)=>{const started=records.session;setBusy(true);setError('');try{if(item.local&&localContentProvider(item.type)){await localContentProvider(item.type)!.restore(recordScope(await records.service.transport.status()),item,()=>new ContentClient(records.service.transport).change(item,'restore',crypto.randomUUID()));}else if(item.local){await records.service.setDeleted(item.id,false);await records.service.flush();}else{const key=item.type+':'+item.id;if(!attempts.current.has(key))attempts.current.set(key,crypto.randomUUID());await new ContentClient(records.service.transport).change(item,'restore',attempts.current.get(key)!);}if(live.current!==started)return;window.dispatchEvent(new Event('content-restored'));await refresh();await load();requestAnimationFrame(()=>document.querySelector<HTMLElement>('dialog[open] h2')?.focus());}catch(e){if(live.current===started)setError(errorMessage(e));}finally{if(live.current===started)setBusy(false);}};
+ const filtered=items.filter(item=>filter==='全部'||contentLabels[item.type]===filter);
+ return <Modal className={styles.trashDialog} title="回收站" region="公共回收站" invoker={invoker} close={()=>{if(!busy)close();}} footer={null}><div className={styles.body}><ChoiceBar label="回收站类型" options={['全部','记录','资料','写作','任务','AI 写作']} value={filter} onChange={setFilter}/>{error&&<p role="alert" className={styles.error}>{error}</p>}{remoteError&&<div role="status"><span>{remoteError}</span> <Action disabled={busy} onClick={()=>void load()}>重试</Action></div>}{loading?<ListSkeleton/>:!filtered.length?<StatePanel kind="library-empty" icon={Trash2} title="回收站为空" region="回收站状态"/>:filtered.map(item=><div className={styles.row} key={item.type+item.id}><div className={styles.info}><strong>{item.title}</strong><span>{contentLabels[item.type]} · {item.deletedAt?new Date(item.deletedAt).toLocaleDateString('zh-CN'):''}</span>{item.error&&<p role="alert" className={styles.error}>{item.error}</p>}</div><>{item.error&&<Action disabled={busy} onClick={()=>{setBusy(true);void records.service.flush().then(refresh).then(load).finally(()=>setBusy(false));}}>重试</Action>}<Action icon={RotateCcw} disabled={busy} onClick={()=>void restore(item)}>恢复</Action></></div>)}</div></Modal>;
+}

@@ -6,12 +6,12 @@ const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 
 async function main() {
-  const { createService } = await import('../src/server.mjs');
-  const { api, processTask } = await import('../src/worker.mjs');
-  const { detectAgents } = await import('../src/agents.mjs');
+  const { createService } = await import('../../services/api/server.mjs');
+  const { api, processTask } = await import('../../services/worker/worker.mjs');
+  const { detectAgents } = await import('../../plugins/ai-assistant/worker/agents.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-ui-'));
   const key = require('node:crypto').randomBytes(32).toString('hex');
-  const app = createService({ dataDir: root, masterKey: key });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${app.server.address().port}`;
   const owner = { server, ...(await api({ server }, '/api/pair', 'POST', { key, name: '测试管理端' })) };
@@ -30,7 +30,7 @@ async function main() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(server);
+    await page.goto(server+'/legacy');
     await page.locator('#login-form input[name=key]').fill(key);
     await page.locator('#login-form button').click();
     await page.locator('#app').waitFor({ state: 'visible' });

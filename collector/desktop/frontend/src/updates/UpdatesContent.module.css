@@ -1,4 +1,0 @@
-.content{composes: content scroll from "../components/ModuleLayout.module.css";font-size:14px;line-height:20px;}
-.content h2{font-size:20px;font-weight:600;line-height:29px;}
-.content>button{width:112px;flex-shrink:0;}
-.status{color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;}

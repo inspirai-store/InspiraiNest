@@ -3,9 +3,9 @@ const { _electron }=require('playwright');
 const {setTheme,showSettings}=require('./desktop-test-helpers.cjs');
 
 (async()=>{
-  const {createService}=await import('../src/server.mjs'),{api}=await import('../src/worker.mjs'),{WorkerManager}=await import('../desktop/manager.mjs');
+  const {createService}=await import('../../services/api/server.mjs'),{api}=await import('../../services/worker/worker.mjs'),{WorkerManager}=await import('../../apps/desktop/manager.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'settings-nodes-')), master=crypto.randomUUID();
-  const service=createService({dataDir:path.join(root,'service'),masterKey:master});
+  const service=createService({pluginProfile:'legacy',dataDir:path.join(root,'service'),masterKey:master});
   await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));
   const server=`http://127.0.0.1:${service.server.address().port}`;
   const owner={server,...await api({server},'/api/pair','POST',{key:master,name:'fixture-owner'})};

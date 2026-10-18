@@ -4,12 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createService } from '../src/server.mjs';
-import { api, processTask, runWorker, syncLibrary } from '../src/worker.mjs';
-import { packageEntry, unpackArchive, validateArchive, permitted } from '../src/archive.mjs';
-import { agentOrder, detectAgents, unavailableBeforeWork, execute } from '../src/agents.mjs';
-import { secret, hash, safePath } from '../src/common.mjs';
-import { loadWorkerConfig, initializeWorkerConfig } from '../src/config.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api, processTask, runWorker, syncLibrary } from '../../services/worker/worker.mjs';
+import { packageEntry, unpackArchive, validateArchive, permitted } from '../../packages/core/node/archive.mjs';
+import { agentOrder, detectAgents, unavailableBeforeWork, execute } from '../../plugins/ai-assistant/worker/agents.mjs';
+import { secret, hash, safePath } from '../../packages/core/node/common.mjs';
+import { loadWorkerConfig, initializeWorkerConfig } from '../../services/worker/config.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 
 const fixture = fileURLToPath(new URL('./fixtures/fake-agent.mjs', import.meta.url));
@@ -48,7 +48,7 @@ test('original text and legacy source/transcript roles survive light archive pac
 async function setup(t, overrides = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-collector-test-'));
   const key = secret();
-  const app = createService({ dataDir: root, masterKey: key, ...overrides });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: key, ...overrides });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const server = `http://127.0.0.1:${app.server.address().port}`;
   t.after(() => app.close());
@@ -65,7 +65,7 @@ async function setup(t, overrides = {}) {
 
 test('temporary review service refuses all access after its expiry', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-review-test-'));
-  const app = createService({ dataDir: root, masterKey: secret(), reviewExpiresAt: new Date(Date.now() - 1000).toISOString() });
+  const app = createService({pluginProfile:'legacy', dataDir: root, masterKey: secret(), reviewExpiresAt: new Date(Date.now() - 1000).toISOString() });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(() => app.close());
   const server = `http://127.0.0.1:${app.server.address().port}`;
@@ -399,7 +399,7 @@ test('SQLite persists assignments; invalid and revoked uploads are rejected', as
   const { app, owner, root, pairWorker, submit } = await setup(t);
   const worker = await pairWorker(); const task = await submit();
   await api(worker, '/api/claim', 'POST', {});
-  const { Store } = await import('../src/store.mjs');
+  const { Store } = await import('../../services/api/storage/store.mjs');
   const second = new Store(path.join(root, 'state.sqlite'));
   assert.equal(second.get('task', task.id).deviceId, worker.device.id); second.close();
   // Invalid payloads are rejected before any object is stored.

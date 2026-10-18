@@ -5,9 +5,9 @@ import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {createService} from '../src/server.mjs';
-import {api} from '../src/worker.mjs';
-import {createWorkerEvents} from '../src/worker-events.mjs';
+import {createService} from '../../services/api/server.mjs';
+import {api} from '../../services/worker/worker.mjs';
+import {createWorkerEvents} from '../../packages/core/node/worker-events.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const root=process.env.NATIVE_REGRESSION_ROOT||fs.mkdtempSync(path.join(os.tmpdir(),'inspirainest-native-021-'));
 const previous=fs.existsSync(path.join(root,'manifest.json'))?JSON.parse(fs.readFileSync(path.join(root,'manifest.json'))):null;
@@ -18,7 +18,7 @@ function pdfFixture(){
  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');let pdf='%PDF-1.4\n';const offsets=[0];for(let i=0;i<objects.length;i++){offsets.push(Buffer.byteLength(pdf));pdf+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;}const xref=Buffer.byteLength(pdf);return Buffer.from(pdf+`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
 }
 fs.writeFileSync(path.join(filesDir,'native-3-pages.pdf'),pdfFixture());
-fs.copyFileSync(path.join(here,'../desktop/frontend/src/records/fixtures/route.mp4'),path.join(filesDir,'route.mp4'));
+fs.copyFileSync(path.join(here,'../../packages/core/web/records/fixtures/route.mp4'),path.join(filesDir,'route.mp4'));
 const targets={},requests=[];
 for(const label of ['A','B']){
  const key='native-021-disposable-regression-account-'+label;
@@ -45,6 +45,6 @@ const control=http.createServer(async(req,res)=>{try{
  res.setHeader('Content-Type','application/json');res.end(JSON.stringify(snapshot));
  }catch(error){res.writeHead(500).end(JSON.stringify({error:error.message}));}});
 await new Promise(resolve=>control.listen(previous?Number(new URL(previous.control).port):0,'127.0.0.1',resolve));
-const manifest={root,config,filesDir,frontend:path.resolve(here,'../desktop/frontend/dist/index.html'),control:'http://127.0.0.1:'+control.address().port,spaces:Object.fromEntries(Object.entries(targets).map(([label,t])=>[label,{server:t.server,key:t.key}]))};
+const manifest={root,config,filesDir,frontend:path.resolve(here,'../../apps/desktop/frontend/dist/index.html'),control:'http://127.0.0.1:'+control.address().port,spaces:Object.fromEntries(Object.entries(targets).map(([label,t])=>[label,{server:t.server,key:t.key}]))};
 fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(manifest,null,2),{mode:0o600});console.log(JSON.stringify(manifest));
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{control.close();for(const t of Object.values(targets))await t.service.close();process.exit(0);});

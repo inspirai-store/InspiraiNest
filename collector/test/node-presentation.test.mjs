@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const context = {window:{}};
-vm.runInNewContext(fs.readFileSync(new URL('../public/node-presentation.js',import.meta.url),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(new URL('../../apps/web/public/node-presentation.js',import.meta.url),'utf8'),context);
 const view = context.window.nodePresentation, devices = [{id:'node-1',name:'同名电脑'},{id:'node-2',name:'同名电脑'}];
 test('task node labels distinguish actual execution, completion, initial preference and failover',()=>{
   assert.equal(view.task({state:'running',deviceId:'node-2',preferredDeviceId:'node-1'},devices).id,'node-2');

@@ -5,13 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { writeCollectionJson } from '../../scripts/write-collection-json.mjs';
-import { createService } from '../src/server.mjs';
-import { api, runWorker, prepareWorkspace, taskPrompt } from '../src/worker.mjs';
-import { readWorkerEvents } from '../src/worker-events.mjs';
-import { agentEnvironment } from '../src/agents.mjs';
+import { writeCollectionJson } from '../../packages/library-kit/write-collection-json.mjs';
+import { createService } from '../../services/api/server.mjs';
+import { api, runWorker, prepareWorkspace, taskPrompt } from '../../services/worker/worker.mjs';
+import { readWorkerEvents } from '../../packages/core/node/worker-events.mjs';
+import { agentEnvironment } from '../../plugins/ai-assistant/worker/agents.mjs';
 
-const helper = fileURLToPath(new URL('../../scripts/write-collection-json.mjs', import.meta.url));
+const helper = fileURLToPath(new URL('../../packages/library-kit/write-collection-json.mjs', import.meta.url));
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64');
 const metadata = () => ({ schema_version: 1, id: 'article:utf8-fixture', type: 'article', platform: 'fixture', title: '中文标题',
   source_url: 'https://example.com/utf8-fixture', canonical_url: null, aliases: [], creator: null, published_at: null,
@@ -43,7 +43,7 @@ test('Windows PowerShell 5.1 ASCII pipe damages Chinese but the workspace writer
 
 test('damaged ready checkpoint is blocked locally, then repaired and retried without running the Agent again', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-utf8-')), key = crypto.randomUUID();
-  const service = createService({ dataDir: path.join(root, 'service'), masterKey: key });
+  const service = createService({pluginProfile:'legacy', dataDir: path.join(root, 'service'), masterKey: key });
   await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await service.close(); fs.rmSync(root, { recursive: true, force: true }); });
   const server = `http://127.0.0.1:${service.server.address().port}`;
