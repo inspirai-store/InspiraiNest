@@ -16,4 +16,6 @@ The planned Windows WeChat share-target integration is tracked in the [implement
 
 Collection extension research, WeChat extraction contracts, comment collection boundaries and the proposed development sequence are indexed in [plugin development references](docs/plugin-development/README.md). These are research inputs, not newly shipped plugins.
 
+The [comment collection research and validation report](docs/COMMENT_COLLECTION_RESEARCH.md) records the CatBus prototype, Bilibili results, WeChat session limitations and follow-up acceptance criteria. It is a development reference; comment collection is not integrated into InspiraiNest.
+
 The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).
