@@ -12,4 +12,6 @@ General source code and third-party components have separate rights; retain [thi
 
 The desktop Worker supports in-app Windows/macOS update checks against public GitHub Releases. Release packaging, signing and verification are described in [desktop update instructions](collector/DESKTOP_UPDATES.md).
 
+The planned Windows WeChat share-target integration is tracked in the [implementation plan](docs/WINDOWS_WECHAT_SHARE_TARGET_PLAN.md). Implementation and Windows/WeChat acceptance are pending.
+
 The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).
