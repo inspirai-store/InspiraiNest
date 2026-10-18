@@ -1,0 +1,427 @@
+{
+  "schema_version": 1,
+  "prepared_at": "2026-10-18T14:37:21+08:00",
+  "observation_period": [
+    "2026-10-11",
+    "2026-10-12"
+  ],
+  "live_platform_retested_on_preparation_date": false,
+  "scope": "Historical browser/CLI observations, pinned-source inspection and minimal normalization repair. No complete collector, paid API call or store enumeration.",
+  "catbus": {
+    "repository": "https://github.com/cv-cat/catbus",
+    "commit": "e637cb43078cbe776313ac3500cf0646c2a7b843",
+    "version": "0.1.0",
+    "node": "v24.19.0",
+    "npm": "11.17.0",
+    "local_repair_branch": "codex/douyin-product-images",
+    "repair_files": [
+      "src/platforms/douyin/web/normalize.ts",
+      "tests/douyin.test.ts"
+    ],
+    "diffstat": {
+      "files": 2,
+      "insertions": 29,
+      "deletions": 1
+    },
+    "checks": [
+      {
+        "check": "npm.cmd test -- tests/douyin.test.ts",
+        "result": "passed",
+        "passed_tests": 122,
+        "recorded_at": "2026-10-12T00:00:06+08:00"
+      },
+      {
+        "check": "npm.cmd run typecheck",
+        "result": "passed",
+        "recorded_at": "2026-10-12T00:00:06+08:00"
+      },
+      {
+        "check": "npm.cmd run build",
+        "result": "passed",
+        "evidence": "Earlier successful build tool output from the same repair stage; not rerun during report preparation"
+      },
+      {
+        "check": "git diff --check",
+        "result": "passed",
+        "evidence": "Historical repair verification and read-only check on 2026-10-18"
+      }
+    ],
+    "repair_integrated_into_InspiraiNest": false
+  },
+  "browser_stage": {
+    "pdd": {
+      "recorded_at": "2026-10-11T20:54:07+08:00",
+      "coverage": "浏览器实测与公开业务字段摘录；完整长URL、登录及设备跟踪数据未保存。",
+      "method": "Codex 浏览器普通导航",
+      "product_id": "938660939400",
+      "landing_origin": "https://mobile.yangkeduo.com",
+      "landing_path": "/login.html",
+      "visible_text": [
+        "手机登录",
+        "扫码登录",
+        "发送验证码",
+        "同意协议并登录"
+      ],
+      "product_title": null,
+      "shop_id": null,
+      "shop_name": null,
+      "shop_list": null,
+      "current_sales": null,
+      "product_good_rate": null,
+      "reviews": null,
+      "missing_reason": "商品详情访问要求登录；未提供已有账号的登录状态。"
+    },
+    "jd": {
+      "recorded_at": "2026-10-11T20:54:07+08:00",
+      "coverage": "浏览器实测与公开业务字段摘录；完整长URL、登录及设备跟踪数据未保存。",
+      "method": "Codex 浏览器普通导航、店铺入口点击、正常加载响应检查",
+      "sku_id": "100274600522",
+      "visible_title": "猛玛微影无线图传手机相机监视器4K移动小监高码率传输图片视频直播短视频剧组拍摄直...",
+      "title_is_truncated": true,
+      "shop_id": "1000418405",
+      "shop_name": "猛玛京东自营旗舰店",
+      "shop_goods_count_display": 63,
+      "shop_goods_count_is_full_list": false,
+      "shop_followers_display": "22万+",
+      "displayed_price": "9??",
+      "login_messages": [
+        "登录查看价格",
+        "登录看更多商品信息"
+      ],
+      "shop_list_entry": "https://shop.m.jd.com/shop/home?shopId=1000418405&venderId=1000418405&skuId=100274600522&categoryId=652_828_33754",
+      "shop_list_result": "403 Forbidden / openresty",
+      "normal_response": {
+        "endpoint": "https://api.m.jd.com/mshop/BatchGetShopInfoByVenderId",
+        "function_id": "batchGetShopInfoByVenderId",
+        "http_status": 200,
+        "shop_id_field": "data[0].shopInfo.shopId",
+        "shop_name_field": "data[0].shopInfo.shopName",
+        "shop_id": "1000418405",
+        "shop_name": "猛玛京东自营旗舰店",
+        "shop_total_score_raw": "0.00",
+        "score_interpretation": "未作真实评分或好评率解释"
+      },
+      "current_sales": null,
+      "product_good_rate": null,
+      "product_reviews": null,
+      "qa_is_product_review": false
+    },
+    "taobao": {
+      "recorded_at": "2026-10-11T20:54:07+08:00",
+      "coverage": "浏览器实测与公开业务字段摘录；完整长URL、登录及设备跟踪数据未保存。",
+      "method": "网页读取工具及 Codex 浏览器导航尝试",
+      "browser_result": "Browser site-safety policy blocked navigation to e.tb.cn/h.j0S7na9jx9dV4qk",
+      "user_title": "u盘全套视频教程教学课程办公软件word/ppt/excel/office学习教程",
+      "title_source": "用户提供的分享文案，非页面核验",
+      "canonical_url": null,
+      "product_id": null,
+      "seller_id": null,
+      "shop_name": null,
+      "shop_list": null,
+      "current_sales": null,
+      "product_good_rate": null,
+      "reviews": null
+    },
+    "douyin": {
+      "recorded_at": "2026-10-11T20:54:07+08:00",
+      "coverage": "浏览器实测与公开业务字段摘录；完整长URL、登录及设备跟踪数据未保存。",
+      "method": "Codex 浏览器普通导航、入口点击、正常加载公开响应检查",
+      "landing_origin": "https://haohuo.jinritemai.com",
+      "landing_path": "/ecommerce/trade/detail/index.html",
+      "product_id": "3835787882229006441",
+      "title": "财务出纳会计记账管理系统excel表格日常开支明细费用账单优盘U盘",
+      "visible_parameters": {
+        "brand": "QZGY",
+        "repair": "寄修",
+        "file_system": "FAT32",
+        "storage_type": "UDP一体封装闪存",
+        "protection": [
+          "防泼水",
+          "耐低温",
+          "防冲击",
+          "耐高温"
+        ]
+      },
+      "displayed_price": "4? 起",
+      "shop_name": "瀚惠数码专营店",
+      "shop_grade": 4.6,
+      "shop_grade_is_good_rate": false,
+      "sec_shop_id": "kEwwCQXz",
+      "supplier_shop_id": null,
+      "sec_shop_id_compatibility": "SDK shopId 类型为字符串；文档未说明可直接接受 sec_shop_id，未作等价转换。",
+      "review_total": 18,
+      "preview_comment_count": 1,
+      "review_tags": [
+        {
+          "label": "回头客",
+          "count": 2
+        },
+        {
+          "label": "性价比高",
+          "count": 3
+        }
+      ],
+      "shop_entry_result": "在“抖音”中打开此页面？",
+      "review_entry_result": "在“抖音”中打开此页面？",
+      "native_shop_schema": "sslocal://goods/store",
+      "native_review_schema": "sslocal://ec_goods_comment/",
+      "sales_explanation": [
+        "“已售”，指该店铺在抖音电商平台内，销售该款商品的数量。",
+        "“同款热销”，系同型号同规格的同款商品，在抖音电商平台内多店铺历史销量汇总统计所得，供消费者参考。"
+      ],
+      "share_url_snapshot": {
+        "title": "财务出纳会计记账管理系统excel表格日常开支明细费用账单优盘U盘",
+        "sales": 585,
+        "min_price_raw": 4600,
+        "max_price_raw": 5000,
+        "is_live_verified": false
+      },
+      "normal_response": {
+        "endpoint": "https://haohuo.jinritemai.com/aweme/v2/shop/promotion/pack/h5/",
+        "http_status": 200,
+        "business_status": 0,
+        "fields": {
+          "promotion_h5.basic_info_data.product_id": "3835787882229006441",
+          "promotion_h5.shop_info.basic_info.shop_name": "瀚惠数码专营店",
+          "promotion_h5.shop_info.basic_info.grade_info.score": 4.6,
+          "promotion_h5.comment_data.good_comment.title_bar.sum": 18
+        }
+      },
+      "current_sales": null,
+      "product_good_rate": null,
+      "whole_shop_list": null,
+      "full_review_list": null
+    },
+    "xianyu": {
+      "recorded_at": "2026-10-11T20:54:07+08:00",
+      "coverage": "浏览器实测与公开业务字段摘录；完整长URL、登录及设备跟踪数据未保存。",
+      "method": "网页读取工具及 Codex 浏览器导航尝试",
+      "browser_result": "Browser site-safety policy blocked navigation to m.tb.cn/h.jZ0e3vV",
+      "user_title": "叶飞飞WorkBuddy财务自动化精讲",
+      "title_source": "用户提供的分享文案，非页面核验",
+      "product_id": null,
+      "seller_id": null,
+      "shop_name": null,
+      "shop_list": null,
+      "current_sales": null,
+      "seller_good_rate": null,
+      "trade_reviews": null
+    }
+  },
+  "jd_cli": {
+    "recorded_at": "2026-10-11T22:28:47+08:00",
+    "authenticated": true,
+    "detail": {
+      "ok": false,
+      "sku_id": "100274600522",
+      "error": {
+        "code": "RISK_CONTROL",
+        "detail": {
+          "status": 403,
+          "kind": "rate_limit",
+          "session": "alive"
+        }
+      }
+    },
+    "comments": {
+      "returned_count": 3,
+      "review_ids": [
+        "103132570154766027",
+        "24449051242",
+        "103521880162906895"
+      ],
+      "page": {
+        "cursor": null,
+        "has_more": false
+      },
+      "coverage": "First batch only; handler performs a single request, not proof of complete reviews"
+    }
+  },
+  "douyin_cli": {
+    "product_id": "3835787882229006441",
+    "promotion_id": "3835787882229006441",
+    "shop_id": "299558479",
+    "comment_observation_at": "2026-10-11T22:28:47+08:00",
+    "manual_pagination": {
+      "page1_count": 10,
+      "page1_cursor": "10",
+      "page1_has_more": true,
+      "page2_count": 8,
+      "page2_cursor": null,
+      "page2_has_more": false,
+      "total": 18,
+      "unique_ids": 18,
+      "overlap_ids": [],
+      "product_ids": [
+        "3835787882229006441"
+      ],
+      "nonempty_text_count": 7,
+      "empty_text_count": 11,
+      "author_returned_count": 0
+    },
+    "automatic_pagination": {
+      "returned": 18,
+      "unique": 18,
+      "manual_page_ids_match": true
+    },
+    "detail_after_repair": {
+      "recorded_at": "2026-10-11T23:56:54+08:00",
+      "ok": true,
+      "id": "3835787882229006441",
+      "image_count": 20,
+      "title": null,
+      "price": null,
+      "author": null,
+      "raw_status_code": 0,
+      "raw_title_image_is_array": false,
+      "raw_detail_image_count": 19,
+      "raw_body_keys": [
+        "status_code",
+        "detail_info",
+        "extra",
+        "log_pb"
+      ],
+      "specifications": [
+        {
+          "name": "品牌",
+          "values": [
+            "QZGY"
+          ]
+        },
+        {
+          "name": "维修方式",
+          "values": [
+            "寄修"
+          ]
+        },
+        {
+          "name": "出厂文件系统格式",
+          "values": [
+            "FAT32"
+          ]
+        },
+        {
+          "name": "存储技术类型",
+          "values": [
+            "UDP一体封装闪存"
+          ]
+        },
+        {
+          "name": "防护特性",
+          "values": [
+            "防泼水",
+            "耐低温",
+            "防冲击",
+            "耐高温"
+          ]
+        },
+        {
+          "name": "闪存颗粒类型",
+          "values": [
+            "TLC"
+          ]
+        },
+        {
+          "name": "是否支持加密",
+          "values": [
+            "否"
+          ]
+        },
+        {
+          "name": "接口类型",
+          "values": [
+            "2.0"
+          ]
+        },
+        {
+          "name": "生产企业名称",
+          "values": [
+            "湛江市瀚惠电子商务有限公司"
+          ]
+        }
+      ],
+      "limitation": "20 includes a decorative product-detail header; basic product title/price/shop not returned by this CLI result"
+    },
+    "product_review_counter": {
+      "recorded_at": "2026-10-11T23:59:17+08:00",
+      "source": "Existing Catbus productCommentCounter, one-off internal API probe",
+      "endpoint_path": "/aweme/v1/web/ecom/product/comment/counter/",
+      "status_code": 0,
+      "data": {
+        "Total": 18,
+        "GoodCount": 16,
+        "MidCount": 2,
+        "BadCount": 0,
+        "GoodRatio": 88.88888888888889
+      },
+      "scope": "single product",
+      "store_good_rate": null,
+      "public_cli_metric_command_added": false
+    }
+  },
+  "douyin_shop": {
+    "shop_page": "https://haohuo.jinritemai.com/views/shop/index?id=kEwwCQXz&url_maker=shop_sdk",
+    "get_info": {
+      "recorded_at": "2026-10-12T00:07:45+08:00",
+      "http_status": 200,
+      "business_st": 0,
+      "sec_shop_id": "kEwwCQXz",
+      "shop_name": "瀚惠数码专营店",
+      "report_id__for_event": "299558479",
+      "endpoint": "https://ec.snssdk.com/shop/getInfo",
+      "account_cookies_sent": false
+    },
+    "goods_first_page": {
+      "recorded_at": "2026-10-12T00:07:45+08:00",
+      "endpoint": "https://ec.snssdk.com/shop/goodsList",
+      "query": {
+        "shop_id": "kEwwCQXz",
+        "size": 10,
+        "page": 0,
+        "b_type_new": 0,
+        "is_outside": 1
+      },
+      "http_status": 200,
+      "business_response": {
+        "status_code": 100111,
+        "status_msg": "系统开小差了，请稍后重试"
+      },
+      "account_cookies_sent": false,
+      "items_returned": null,
+      "coverage": "No successful first page or final-page proof; independent request did not reproduce every browser parameter"
+    },
+    "browser_list_failure": {
+      "recorded_at": "2026-10-12T00:06:56+08:00",
+      "endpoints": [
+        "/shop/goodsList",
+        "/productcategory/getShopList"
+      ],
+      "cors_error": "MissingAllowOriginHeader",
+      "items_returned": null
+    },
+    "score": {
+      "evidence_recorded_at": "2026-10-12T00:10:01+08:00",
+      "endpoint_path": "/shop/score",
+      "data": {
+        "shop": 4.6,
+        "product": 4.6,
+        "logistics": 4.7
+      },
+      "is_store_good_rate": false
+    },
+    "current_sales": null,
+    "store_good_rate": null,
+    "whole_shop_list": null,
+    "last_exploration_interrupted": true
+  },
+  "remaining_unverified": [
+    "Complete store enumeration on all five platforms",
+    "Current sales for all five supplied products",
+    "Store-wide good-review rates",
+    "JD full review pagination",
+    "Target Taobao/PDD/Xianyu details and reviews",
+    "Commercial provider results for these targets",
+    "Cross-account and long-running reliability"
+  ],
+  "redaction": "Only selected public business fields and aggregate/count evidence. Excludes credentials, account identities, QR tokens, signed media URLs, internal telemetry, raw orders and entire session logs."
+}

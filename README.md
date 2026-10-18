@@ -18,4 +18,6 @@ Collection extension research, WeChat extraction contracts, comment collection b
 
 The [comment collection research and validation report](docs/COMMENT_COLLECTION_RESEARCH.md) records the CatBus prototype, Bilibili results, WeChat session limitations and follow-up acceptance criteria. It is a development reference; comment collection is not integrated into InspiraiNest.
 
+The [five-platform commerce data feasibility report](docs/research/ecommerce-public-data-feasibility.md) records candidate tools, supplied-link probes, Catbus validation and a proposed store-monitoring workflow. Store-wide enumeration and several metrics remain unverified; the report is a research deliverable.
+
 The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).
