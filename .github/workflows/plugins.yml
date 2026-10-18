@@ -19,6 +19,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build:all
       - run: npm run build:native-assets
+      - name: Test embedded writing with the native bridge
+        run: node collector/scripts/qa-writing.mjs
       - run: npm test
       - run: node scripts/catalog.mjs build && node scripts/catalog.mjs check
   android:

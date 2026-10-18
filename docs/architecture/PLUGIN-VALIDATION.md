@@ -8,6 +8,8 @@
 - `npm run typecheck`、插件清单生成一致性、核心依赖及插件存储边界检查通过。
 - `npm test`：插件宿主 6 项、服务 316 项、React 197 项通过；服务另有 17 项依赖外部环境的测试跳过。
 - 插件测试覆盖新旧空间默认值、依赖及执行中作业阻止停用、修订冲突、服务端拒绝停用插件的新作业、全部扩展停用后的链接与原始附件收集和导出、历史数据保留、Worker 注册分发及命名空间隔离。
+- 隔离 MySQL 授权及技能回归 124 项通过。
+- `collector/scripts/qa-writing.mjs` 验证桌面与移动嵌入包的完整讨论、附件、历史恢复、图片、离线导出和确认归档流程，已加入共享 CI。
 - `tooling/plugins/browser-qa.mjs` 使用真实浏览器和 Cookie 登录，验证插件启停、依赖提示、关闭全部扩展、核心记录保存与同步和窄屏布局。
 - `collector/scripts/test-desktop-writing.cjs` 使用打包后的真实 Electron 客户端通过写作及 Owner IPC 回归；`test-record-conflict.cjs` 通过明暗及两种宽度下的冲突比较、手动合并、条件保存和重启读取。
 - macOS arm64/x64 ZIP、DMG 构建通过，使用临时签名；这些本地制品没有公证或作为正式更新发布。
