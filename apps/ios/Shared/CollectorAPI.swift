@@ -47,6 +47,10 @@ final class CollectorAPI: @unchecked Sendable {
                 let code = body?["code"] as? String ?? ""
                 throw CollectorError.login(["mfa_required", "mfa_invalid", "credential_invalid"].contains(code) ? code : "", http.statusCode)
             }
+            if path.hasPrefix("/api/plugins/"), http.statusCode == 409,
+               let value = try? JSONDecoder().decode(PluginChangeProblem.self, from: data) {
+                throw CollectorError.message(value.message)
+            }
             throw CollectorError.http(http.statusCode)
         }
         return (data, http)
