@@ -14,4 +14,6 @@ The desktop Worker supports in-app Windows/macOS update checks against public Gi
 
 The planned Windows WeChat share-target integration is tracked in the [implementation plan](docs/WINDOWS_WECHAT_SHARE_TARGET_PLAN.md). Implementation and Windows/WeChat acceptance are pending.
 
+Collection extension research, WeChat extraction contracts, comment collection boundaries and the proposed development sequence are indexed in [plugin development references](docs/plugin-development/README.md). These are research inputs, not newly shipped plugins.
+
 The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).

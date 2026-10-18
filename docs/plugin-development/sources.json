@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "organized_on": "2026-10-18",
+  "timezone": "Asia/Shanghai",
+  "repository": "https://github.com/inspirai-store/InspiraiNest",
+  "project_baseline": "5ef1cab50f2aa6f155a10f8b34e4b3b5c50f9589",
+  "scope": "Research references only; no third-party code, personal archive, comments, platform session or production configuration added.",
+  "local_skill": {
+    "name": "wechat-article-spider",
+    "declared_version": "1.0.1",
+    "location_hint": "<user-home>/.codebuddy/skills/wechat-article-spider",
+    "reviewed_on": "2026-10-18",
+    "license_observation": "No root LICENSE file found in the inspected local installation; redistribution not cleared.",
+    "files": [
+      { "path": "SKILL.md", "bytes": 2952, "sha256": "8f658f559dacef63d2f0e5f54290989b3947c491087c79596f961bc726141237" },
+      { "path": "scripts/main.py", "bytes": 4381, "sha256": "4e4542ebba02971a4e6e788dc10e51e305c4ca2fefdcd5098c2e99985b69c55d" },
+      { "path": "scripts/scraper.py", "bytes": 8402, "sha256": "9233711ef200fab834df3d720372b96ec69152fde8d7d411fb9bdc5054421a8c" },
+      { "path": "scripts/images.py", "bytes": 2392, "sha256": "758d3d8ccbffa64361084074a9fc75f3f17c98c58c70db2f5ce0ac91f589ad3a" },
+      { "path": "scripts/requirements.txt", "bytes": 52, "sha256": "2edd650543f108fd8abac273882495a47f0088c41450f54dfb2d4404f39f7059" },
+      { "path": "tests/test_spider.py", "bytes": 6042, "sha256": "9584d90a3aece515394db4434892a000a617f46d32a43b3dfa4bb3471cffd337" }
+    ],
+    "validation": {
+      "kind": "offline synthetic unittest on the external local installation",
+      "command_template": "python -B -m unittest discover -s <skill-root>/tests -v",
+      "passed": 9,
+      "failed": 0,
+      "python": "3.14.7",
+      "dependencies": { "requests": "2.34.2", "beautifulsoup4": "4.15.0", "lxml": "6.1.3" },
+      "live_fetch_rerun": false,
+      "agent_execution_rerun": false,
+      "tests_vendored": false
+    }
+  },
+  "existing_repository_example": {
+    "path": "collector/examples/skills/lingnest-wechat-archive",
+    "upstream": "https://github.com/Yui-cx/wechat-article-to-md-skill",
+    "fixed_commit": "41f1ed58a9c74e8c61ffbe8f3290c0d13e5ff759",
+    "license": "MIT",
+    "license_file": "collector/examples/skills/lingnest-wechat-archive/LICENSE",
+    "relationship": "Separate implementation; not a copy of the local wechat-article-spider installation."
+  },
+  "historical_sources": [
+    {
+      "repository": "https://github.com/cv-cat/catbus",
+      "fixed_commit": "e637cb43078cbe776313ac3500cf0646c2a7b843",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "LICENSE and package metadata say MIT; README also contains non-commercial learning wording. Clarify before product adoption.",
+      "evidence_paths": ["README.md", "LICENSE", "package.json", "src/platforms/bilibili/web/commands.ts", "src/platforms/bilibili/web/normalize.ts"],
+      "local_extension_evidence_commit": "11860ec7612f49fc41a17974f49443b475da8563",
+      "local_extension_note": "Historical local development evidence only; not asserted to be upstream, public or integrated into InspiraiNest."
+    },
+    {
+      "repository": "https://github.com/NanmiCoder/MediaCrawler",
+      "fixed_commit": "156c602c8d689266e6c5e9130b36f0b70495f5f0",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "Non-commercial learning license 1.1; not an MIT product dependency.",
+      "evidence_paths": ["config/base_config.py", "media_platform/bilibili/client.py", "store/bilibili/__init__.py", "LICENSE"]
+    },
+    {
+      "repository": "https://github.com/Moore-developers/moore-wechat-article-downloader",
+      "fixed_commit": "dea919bdd6397e56ad8ec31654fa12b7113db0db",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "MIT; pinned README declares maintenance stopped.",
+      "evidence_paths": ["README.md", "scripts/wechat_downloader.py", "scripts/wechat_exporter.py", "LICENSE"]
+    },
+    {
+      "repository": "https://github.com/qiye45/wechatDownload",
+      "fixed_commit": "4e3ee7cbbdc88816ee8d682253d38df81ae607ae",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "No root LICENSE observed in the pinned tree; downloader core source not acquired.",
+      "evidence_paths": ["README.md", "skills/wechat-article-downloader/SKILL.md"]
+    },
+    {
+      "repository": "https://github.com/3441293738/creatorhub",
+      "fixed_commit": "037f8b39387a715ef7ef7a28a22a66770e22fd67",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "No project root LICENSE observed in the pinned tree.",
+      "evidence_paths": ["README.md", "app/browser/channels_fetcher.py"]
+    },
+    {
+      "repository": "https://github.com/dsxksss/wx_video_sdk",
+      "fixed_commit": "8e9f2f77fca17600d2272bd78e2e5c04455b18df",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "No root LICENSE observed in the pinned tree; read-only integration not validated.",
+      "evidence_paths": ["wx_video_sdk/client.py", "wx_video_sdk/models.py"]
+    },
+    {
+      "repository": "https://github.com/Nemo2011/bilibili-api",
+      "fixed_commit": "3798d3b3bd3c3a93678d5a0367637a19262303ef",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "Pinned tree contains a shutdown README only; excluded as a new core dependency.",
+      "evidence_paths": ["README.md"]
+    },
+    {
+      "repository": "https://github.com/MaartenGr/BERTopic",
+      "fixed_commit": "9036123c97aaa9a6cc4bec4a6db1a7caf9209df6",
+      "reviewed_on": "2026-10-11",
+      "license_observation": "MIT; topic clustering is not factual verification or validated comment-value scoring.",
+      "evidence_paths": ["README.md", "pyproject.toml", "LICENSE"]
+    }
+  ],
+  "evidence_policy": "Historical outcomes are summarized without redistributing captured content. External source freshness, platform availability and product integration must be revalidated at implementation time."
+}

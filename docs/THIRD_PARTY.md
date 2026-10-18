@@ -13,5 +13,8 @@ This inventory records evidence, not a blanket redistribution clearance.
 | Gradle wrapper | Wrapper JAR, pinned distribution URL and `gradle/wrapper/LICENSE` | Retain the upstream Apache 2.0 notice with the wrapper. |
 | iOS SDK frameworks | `collector/mobile/ios/project.yml` | Requires the builder's Apple toolchain/account; no Apple SDK binaries are exported. |
 | Product and UI artwork | `collector/brand/`, derived client PNG/ICO files | Owner confirmed the existing app icon for InspiraiNest; bytes remain unchanged. Artwork is separate from the MIT code license; see RIGHTS.md. |
+| WeChat article example skill | `collector/examples/skills/lingnest-wechat-archive/SKILL.md`, adjacent `LICENSE` | Adapted from Yui-cx/wechat-article-to-md-skill at `41f1ed58a9c74e8c61ffbe8f3290c0d13e5ff759`; retain its MIT copyright and permission notice. |
 
 There are no personal collection entries in the public export allowlist. No conclusion about licenses of archived source material is implied.
+
+[Plugin development references](plugin-development/README.md) describe additional external tools without importing their code, packages or collected content. Their pinned source and license observations are recorded in [the research manifest](plugin-development/sources.json); this does not grant redistribution rights. In particular, the locally installed `wechat-article-spider` package has no license file at its root, and several comment tools have restrictions or unresolved licensing. Review the actual version before adopting any dependency.
