@@ -14,4 +14,6 @@ The desktop Worker supports in-app Windows/macOS update checks against public Gi
 
 The planned Windows WeChat share-target integration is tracked in the [implementation plan](docs/WINDOWS_WECHAT_SHARE_TARGET_PLAN.md). Implementation and Windows/WeChat acceptance are pending.
 
+The [comment collection research and validation report](docs/COMMENT_COLLECTION_RESEARCH.md) records the CatBus prototype, Bilibili results, WeChat session limitations and follow-up acceptance criteria. It is a development reference; comment collection is not integrated into InspiraiNest.
+
 The iOS App Store build and submission checklist is in [iOS release instructions](docs/IOS_APP_STORE_RELEASE.md).
