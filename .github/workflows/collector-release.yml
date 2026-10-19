@@ -398,8 +398,12 @@ jobs:
           test -n "$ANDROID_SIGNING_STORE" || { echo 'Missing ANDROID_SIGNING_STORE' >&2; exit 1; }
           test -n "$LIBRARY_SIGNING_PASSWORD" || { echo 'Missing ANDROID_SIGNING_PASSWORD' >&2; exit 1; }
           node -e 'const fs=require("fs");fs.writeFileSync(process.env.LIBRARY_SIGNING_STORE,Buffer.from(process.env.ANDROID_SIGNING_STORE,"base64"),{mode:0o600})'
-          bash ./gradlew --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
+          bash ./gradlew --no-daemon -PandroidTestBuildType=release :app:assembleRelease :app:assembleReleaseAndroidTest :app:testReleaseUnitTest :app:lintRelease
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/androidTest/release/app-release-androidTest.apk
+          test_cert=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/androidTest/release/app-release-androidTest.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          app_cert=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test -n "$test_cert" && test "$test_cert" = "$app_cert"
           node "$GITHUB_WORKSPACE/public-source/.github/scripts/stage-android-release.mjs"
       - name: Upload verified Android package to private OSS
         working-directory: public-source/collector
