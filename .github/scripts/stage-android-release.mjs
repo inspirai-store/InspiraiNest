@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 const cfg = fs.readFileSync('app/build.gradle', 'utf8');
 const version = /versionName '([^']+)'/.exec(cfg)?.[1], versionCode = Number(/versionCode (\d+)/.exec(cfg)?.[1]);
 if (!/^\d+\.\d+\.\d+$/.test(version) || !versionCode) throw Error('Invalid Android version');
@@ -17,18 +19,19 @@ const oldResponse = await fetch(url, { redirect: 'error' });
 if (!oldResponse.ok) throw Error('Cannot read previous APK');
 const old = Buffer.from(await oldResponse.arrayBuffer());
 if (hash(old) !== previous.sha256) throw Error('Previous APK checksum mismatch');
-const oldFile = path.join(process.env.RUNNER_TEMP, 'inspirainest-previous-android.apk');
+const oldFile = path.join(process.env.RUNNER_TEMP || tmpdir(), 'inspirainest-previous-android.apk');
 fs.writeFileSync(oldFile, old);
-const signer = path.join(process.env.ANDROID_HOME, 'build-tools/36.0.0/apksigner');
+const signer = path.join(process.env.ANDROID_HOME, 'build-tools/36.0.0/lib/apksigner.jar');
+const java = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
 const certificate = file => {
-  const output = execFileSync(signer, ['verify', '--print-certs', file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const output = execFileSync(java, ['-jar', signer, 'verify', '--print-certs', file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const digests = [...output.matchAll(/Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)/g)].map(m => m[1].toLowerCase()).sort();
   if (!digests.length) throw Error('Missing APK signing certificate');
   return digests.join(',');
 };
 try { if (certificate(apk) !== certificate(oldFile)) throw Error('Android signing identity changed; existing installs cannot upgrade'); }
 finally { fs.rmSync(oldFile, { force: true }); }
-const folder = '../dist', filename = `InspiraiNest-v${version}-Android.apk`, sha256 = hash(bytes);
+const folder = fileURLToPath(new URL('../../collector/mobile/dist/', import.meta.url)), filename = `InspiraiNest-v${version}-Android.apk`, sha256 = hash(bytes);
 fs.mkdirSync(folder, { recursive: true });
 fs.writeFileSync(path.join(folder, filename), bytes);
 fs.writeFileSync(path.join(folder, filename + '.sha256'), sha256 + '\n');
