@@ -17,12 +17,13 @@ android {
         applicationId 'store.inspirai.library'
         minSdk 26
         targetSdk 36
-        versionCode 22
+        versionCode 23
         buildConfigField 'String', 'DEFAULT_SERVER', '"' + collectorServer + '"'
-        versionName '1.4.1'
+        versionName '1.4.2'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     sourceSets { test.resources.srcDir(rootProject.file("../../collector/test/fixtures")); test.resources.srcDir(rootProject.file("../../tests/fixtures")) }
+    testBuildType = providers.gradleProperty('androidTestBuildType').orElse('debug').get()
     buildFeatures { buildConfig true; compose true }
     kotlinOptions { jvmTarget = '17' }
     testOptions {

@@ -173,6 +173,14 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Parse Android signing PowerShell scripts
+        shell: pwsh
+        run: |
+          foreach ($file in @('collector/mobile/scripts/build-release-android.ps1', 'tooling/android/configure-signing-ci.ps1')) {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors)
+            if ($errors.Count) { throw ($errors.Message -join "`n") }
+          }
       - run: npm ci --ignore-scripts
       - name: Test shared React adapters and account isolation
         run: node --experimental-strip-types --test scripts/*.test.mjs
