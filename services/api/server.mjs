@@ -837,7 +837,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(hash(buffer) === draft.id, 'Draft checksum mismatch', 500);
         return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [], linkedTrials:(await store.list('task')).filter(t=>t.trial?.sourceArchiveId===draft.id).map(t=>({id:t.id,state:t.state,title:t.report?.title || t.title})) });
       }
-      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign)$/);
+      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign|supplement)$/);
       if (taskRoute && req.method === 'POST') {
         const [, taskId, action] = taskRoute;
         const input = await body(req);
@@ -860,16 +860,16 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           void readApi.refresh().catch(() => {});
           return send(res, 200, result);
         }
-        if (['retry', 'cancel', 'reassign'].includes(action)) {
+        if (['retry', 'cancel', 'reassign', 'supplement'].includes(action)) {
           owner(device);
           const result = await serialized('claim', () => store.transaction(async tx => {
             const task = await tx.getForUpdate('task', taskId);
             requireValue(task&&!task.deletedAt, 'Task not found', 404);
-            requireValue(action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            requireValue(action === 'supplement' ? ['completed', 'awaiting_review'].includes(task.state) : action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
             if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
             if(action==='cancel' && task.codexTrial)for(const child of await tx.list('task'))if(child.trial?.parentTaskId===task.id && !['completed','cancelled'].includes(child.state))await saveTask({...child,assignmentId:id()},'cancelled','原采集任务已取消',tx);
             if(action==='retry' && task.actionRequired?.conditionKey)await tx.delete('processing-preference','condition-'+hash(task.actionRequired.conditionKey).slice(0,32));
-            const next = action === 'retry' ? { ...task,actionRequired:null, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
+            const next = action === 'supplement' ? { ...task, supplementRevision: (task.supplementRevision || 0) + 1, assignmentId: task.assignmentId ? id() : null } : action === 'retry' ? { ...task,actionRequired:null, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
             return saveTask(next, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑', tx);
           }));
           return send(res, 200, result);
