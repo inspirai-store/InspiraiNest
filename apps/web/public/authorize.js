@@ -163,6 +163,11 @@
       $('#client-name').textContent = request.name;
       $('#confirmation-code').textContent = code;
       show('consent', true);
+      const diagnostic=request.scope==='diagnostics:read';
+      $('#page-description').textContent=diagnostic?'授权读取采集、写作任务的执行记录与脱敏诊断证据。':'确认连接信息，为你的工具开启资料库只读访问。';
+      const labels=diagnostic?['查看任务状态与各客户端执行记录','读取失败原因和脱敏证据','查看能力检测与恢复条件']:['检索全部远端资料','阅读摘要、正文和转录','下载已上传附件'];
+      document.querySelectorAll('.permission-list li span').forEach((node,index)=>node.textContent=labels[index]);
+      $('.restriction span').textContent=diagnostic?'无法重试任务、修改权限或控制页面。':'无法采集、上传、修改或删除资料。';
       tick();
       timer = setInterval(tick, 1000);
     } catch (error) { if (current === generation) failure(error); }

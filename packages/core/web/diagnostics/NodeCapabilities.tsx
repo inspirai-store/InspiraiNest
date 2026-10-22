@@ -1,0 +1,12 @@
+import {useMemo,useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {Action,Badge} from '../../../ui-react/src/Controls';
+import {useLibrarySession} from '../library/LibraryProvider';
+import {diagnosticClient,capabilityLabels,verificationLabels} from './task-client';
+import styles from './TaskExecution.module.css';
+export function NodeCapabilities({deviceId,onHistory,onConfigure}:{deviceId:string;onHistory:()=>void;onConfigure:()=>void}){
+ const {session}=useLibrarySession(),client=useMemo(diagnosticClient,[session]),[checking,setChecking]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
+ const query=useQuery({queryKey:['node-capabilities',session,deviceId],queryFn:()=>client.capabilities(deviceId),retry:false,refetchOnWindowFocus:false,refetchInterval:10000});
+ const check=async()=>{setChecking(true);setNotice('');setError('');try{await client.check(deviceId);setNotice('检测已提交，等待节点执行');await query.refetch();}catch(e){setError(e instanceof Error?e.message:'检测失败');}finally{setChecking(false);}};
+ return <div className={styles.capabilities} aria-label="采集与写作能力">{query.isPending?<span>正在读取能力</span>:query.isError?<Action onClick={()=>void query.refetch()}>重试能力检测</Action>:['capture','writing'].map(group=><section key={group}><h4>{group==='capture'?'采集':'写作'}</h4>{query.data?.capabilities.filter(c=>c.id.startsWith(group+'.')).map(c=><details key={c.id} className={styles.capability}><summary><strong>{c.label}</strong><Badge kind={['authorization','configuration'].includes(c.state)?'warning':'neutral'}>{capabilityLabels[c.state]||c.state}</Badge><span>{verificationLabels[c.verification]||c.verification}</span></summary>{c.agent&&<p>{c.agent} · {c.skill||'内置执行流程'}</p>}{c.reasons.map(r=><p key={r.code+r.message}>{r.message}</p>)}{c.routes?.length>1&&c.routes.map(r=><p key={r.agent}>{r.agent} · {capabilityLabels[r.state]} · {verificationLabels[r.verification]}</p>)}{c.checkedAt&&<p>检测时间 {new Date(c.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}</p>}<Action compact onClick={onConfigure}>配置</Action></details>)}</section>)}<div className={styles.capabilityActions}><Action disabled={checking||query.isPending||query.isError} onClick={()=>void check()}>检测能力</Action><Action onClick={onHistory}>查看执行记录</Action></div>{notice&&<p role="status" className={styles.checkStatus}>{notice}</p>}{error&&<p role="alert">{error}</p>}</div>;
+}

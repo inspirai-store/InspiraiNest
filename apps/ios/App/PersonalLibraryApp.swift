@@ -153,6 +153,7 @@ struct TaskDetailView: View {
             if let task = model.snapshot?.tasks.first(where: { $0.id == taskID }) {
                 List {
                     Section(task.stateLabel) { Text(verbatim: task.title).textSelection(.enabled) }
+                    NavigationLink("执行记录与证据") { TaskDiagnosticsView(taskID: taskID) }
                     Section("处理进度") {
                         ForEach(Array((task.events ?? []).enumerated()), id: \.offset) { _, event in
                             VStack(alignment: .leading) {
@@ -270,7 +271,7 @@ struct SettingsView: View {
                             if let version = device.deviceInfo?.client.version { Text("版本 \(version)").font(.caption).foregroundStyle(.secondary) }
                             if let identity = device.identity { Text("\(identity.sourceName) \(identity.shortId)").font(.caption).foregroundStyle(.secondary) }
                             if let seen = device.lastSeen { Text("最近活动：\(seen)").font(.caption).foregroundStyle(.secondary) }
-                            if device.canDispatch && model.plugins?.supports("ai-assistant") == true { NavigationLink("Agent") { NodeAgentsView(device: device) }; NavigationLink("节点技能") { NodeSkillsView(device: device) } }
+                            if device.canDispatch && model.plugins?.supports("ai-assistant") == true { NavigationLink("采集与写作能力") { NodeCapabilitiesView(device: device) }; NavigationLink("高级配置 · Agent") { NodeAgentsView(device: device) }; NavigationLink("节点技能") { NodeSkillsView(device: device) } }
                             if let expires = device.browserExpiresAt { Text("有效至：\(expires)").font(.caption).foregroundStyle(.secondary) }
                             if device.canDispatch { Text("Agent：\(device.agents?.joined(separator: " / ") ?? "无可用 Agent")").font(.caption).foregroundStyle(.secondary) }
                             if device.revokedAt == nil { Button("撤销设备", role: .destructive) { revoking = device }.disabled(model.busy) }

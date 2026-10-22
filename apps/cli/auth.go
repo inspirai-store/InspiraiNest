@@ -30,7 +30,7 @@ func safeURL(raw, server string) (string, error) {
 
 func (a *app) login(ctx context.Context, c *client, o options) (map[string]any, error) {
 	// One secure-store slot per origin: never silently replace a live authorization.
-	cr, existingErr := a.store.Get(c.origin)
+	cr, existingErr := a.store.Get(credentialKey(c))
 	if existingErr != nil && errorCode(existingErr) != "not_logged_in" {
 		return nil, existingErr
 	}
@@ -51,7 +51,7 @@ func (a *app) login(ctx context.Context, c *client, o options) (map[string]any, 
 		}
 	}
 	start := a.now()
-	form := url.Values{"client_id": {"lingnest-cli"}, "scope": {"library:read"}, "name": {o.name}}
+	form := url.Values{"client_id": {"lingnest-cli"}, "scope": {c.scope}, "name": {o.name}}
 	d, e := c.json(ctx, "POST", "/oauth/device_authorization", nil, []byte(form.Encode()), "application/x-www-form-urlencoded", false)
 	if e != nil {
 		return nil, e
@@ -116,11 +116,11 @@ func (a *app) login(ctx context.Context, c *client, o options) (map[string]any, 
 		access := stringField(token, "access_token")
 		ttl := integer(token, "expires_in")
 		scope := strings.Fields(stringField(token, "scope"))
-		if !strings.EqualFold(stringField(token, "token_type"), "Bearer") || !validToken(access) || ttl <= 0 || len(scope) != 1 || scope[0] != "library:read" {
+		if !strings.EqualFold(stringField(token, "token_type"), "Bearer") || !validToken(access) || ttl <= 0 || len(scope) != 1 || scope[0] != c.scope {
 			return nil, fail(exitAPI, "invalid_token_response", "invalid token type, expiry or read-only scope")
 		}
-		saved := credential{Token: access, Origin: c.origin, ExpiresAt: a.now().Add(time.Duration(ttl) * time.Second)}
-		if e = a.store.Set(c.origin, saved); e != nil {
+		saved := credential{Scope: c.scope, Token: access, Origin: c.origin, ExpiresAt: a.now().Add(time.Duration(ttl) * time.Second)}
+		if e = a.store.Set(credentialKey(c), saved); e != nil {
 			c.token = access
 			_, revokeErr := c.json(ctx, "POST", "/api/read/v1/logout", nil, []byte("{}"), "application/json", true)
 			if revokeErr != nil {
@@ -128,7 +128,7 @@ func (a *app) login(ctx context.Context, c *client, o options) (map[string]any, 
 			}
 			return nil, e
 		}
-		return map[string]any{"schema_version": 1, "authenticated": true, "server": c.origin, "expires_at": saved.ExpiresAt, "scope": "library:read"}, nil
+		return map[string]any{"schema_version": 1, "authenticated": true, "server": c.origin, "expires_at": saved.ExpiresAt, "scope": c.scope}, nil
 	}
 }
 func validToken(s string) bool {
@@ -144,7 +144,7 @@ func validToken(s string) bool {
 }
 
 func (a *app) authorize(c *client, allowExpired bool) error {
-	cr, e := a.store.Get(c.origin)
+	cr, e := a.store.Get(credentialKey(c))
 	if e != nil {
 		return e
 	}
@@ -169,7 +169,7 @@ func (a *app) logout(ctx context.Context, c *client) (map[string]any, error) {
 	if e != nil && errorCode(e) != "invalid_token" && errorCode(e) != "unauthorized" && errorCode(e) != "expired_token" {
 		return nil, e
 	}
-	if e = a.store.Delete(c.origin); e != nil {
+	if e = a.store.Delete(credentialKey(c)); e != nil {
 		return nil, e
 	}
 	return map[string]any{"schema_version": 1, "authenticated": false, "server": c.origin}, nil

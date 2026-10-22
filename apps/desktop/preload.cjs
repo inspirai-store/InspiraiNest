@@ -26,7 +26,7 @@ contextBridge.exposeInMainWorld('worker', {
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
   'plugins','status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','taskFile','task','task-action',
-  'draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
+  'taskDiagnostics','capabilities','checkCapabilities','draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
 ].map(name => [name === 'task-action' ? 'taskAction' : name === 'cancel-login' ? 'cancelLogin' : name, input => invoke(`library:${name}`, input)])),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('library:changed', listener); return () => ipcRenderer.removeListener('library:changed', listener); },
 });

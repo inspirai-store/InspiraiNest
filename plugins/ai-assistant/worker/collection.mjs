@@ -44,7 +44,7 @@ export async function processCollection(config, task, available, signal, onProgr
       // Only failure to start can fall back automatically. Do not repeat a partially executed task on another agent.
       if (unavailableBeforeWork(result)) { await progress('running', `${name} 启动不可用，尝试已配置的候选 Agent`, name, { code: 'AGENT_START', details: { agent: name, exitCode: result.code, spawnError: result.spawnError || null } }); continue; }
       if (result.timedOut) { await progress('waiting_action', '采集程序执行超时，成果已保留。请展开执行详情检查后继续。', name, { code: 'AGENT_TIMEOUT', details: { timeoutMs: config.taskTimeoutMs || 60 * 60 * 1000 } }); return; }
-      if (result.code !== 0) { const diagnostic = describeAgentFailure(name, result); await progress('waiting_action', diagnostic.message, name, diagnostic); return; }
+      if (result.code !== 0 || result.applicationError) { const diagnostic = describeAgentFailure(name, result); await progress('waiting_action', diagnostic.message, name, diagnostic); return; }
       break;
     }
   }

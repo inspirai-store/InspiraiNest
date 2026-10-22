@@ -103,6 +103,9 @@ export class OwnerClient {
   agents(input){return remoteOperations.agents.call(this,input);}
   market(input){return remoteOperations.market.call(this,input);}
   skills(input){return remoteOperations.skills.call(this,input);}
+  taskDiagnostics(value){return this.api('/api/read/v1/tasks/'+taskId(value)+'/diagnostics');}
+  capabilities(value){return this.api('/api/devices/'+taskId(value)+'/capabilities');}
+  checkCapabilities(value){return this.api('/api/devices/'+taskId(value)+'/capabilities/check','POST',{});}
   async syncIdentity() {
     if (this.identitySync) return this.identitySync;
     this.identitySync = this.updateIdentity().finally(() => { this.identitySync = null; });

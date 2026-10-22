@@ -1,3 +1,4 @@
+import {TaskExecution} from '../diagnostics/TaskExecution';
 import {useContentActions} from '../content/ContentActions';
 import {useTaskCreation} from '../content/TaskCreate';
 import {useCommandSurface} from '../interactions/InteractionProvider';
@@ -39,11 +40,12 @@ export function TasksPage(){
  useEffect(()=>{if(previousSession.current!==session&&params.id)navigate('/tasks'+location.search);previousSession.current=session;},[session,params.id,navigate,location.search]);
  useEffect(()=>{setConfirmation(null);setActionError(false);setBusy(false);},[session]);
  useEffect(()=>{if(actionError&&!busy){const frame=requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('[data-overlay="任务操作确认"] [data-initial-cancel]')?.focus());return()=>cancelAnimationFrame(frame);}},[actionError,busy]);
- const tasks=(state.data?.tasks??[]).filter(task=>(ui.filter==='全部状态'||taskLabels[task.state]===ui.filter)&&taskTitle(task).toLowerCase().includes(ui.query.trim().toLowerCase()));
+ const deviceFilter=new URLSearchParams(location.search).get('deviceId');
+ const tasks=(state.data?.tasks??[]).filter(task=>(!deviceFilter||(task.deviceId===deviceFilter||task.executionDeviceIds?.includes(deviceFilter)))&&(ui.filter==='全部状态'||taskLabels[task.state]===ui.filter)&&taskTitle(task).toLowerCase().includes(ui.query.trim().toLowerCase()));
  const task=tasks.find(t=>t.id===(params.id??ui.selected))??tasks[0];
  const entryId=task?taskEntryId(task,state.data):null;
  const hasPreview=!!task&&(task.state==='awaiting_review'||task.state==='completed'&&!!entryId);
- const currentTab=hasPreview?(ui.tabs[task!.id]??'结果预览'):'过程记录';
+ const currentTab=hasPreview?(ui.tabs[task!.id]??'结果预览'):'执行记录';
  const approving=busy&&confirmation?.action==='approve'&&confirmation.id===task?.id;
  const preview=useQuery({queryKey:['desktop-tasks',session,'draft',task?.id,task?.state,entryId],queryFn:async()=>{
   if(task!.state==='awaiting_review')return client.draft(task!.id);
@@ -89,9 +91,9 @@ export function TasksPage(){
       {task.writingSessionId&&<Action onClick={()=>go("/writing/"+task.writingSessionId)}>继续写作</Action>}
       {primary&&<Action kind="primary" icon={primary==='阅读资料'?BookOpen:primary==='确认归档'?Check:primary==='继续任务'?Play:RotateCcw} disabled={busy} onClick={e=>primary==='阅读资料'?openLibrary():confirmAction(primary==='确认归档'?'approve':'retry',e.currentTarget)}>{primary}</Action>}
       <MenuButton label="任务操作" icon={Ellipsis} iconOnly compact kind="ghost" width={160} align="end" disabled={busy} options={[...taskCommands(task).filter(c=>c.id==='task.delete').map(c=>({label:c.label,icon:c.icon,danger:c.danger,opensDialog:true,select:()=>c.run()})),...allowed.filter(a=>a==='reassign'||a==='cancel').map(action=>({label:action==='reassign'?'更换节点':'取消任务',icon:action==='reassign'?RotateCcw:X,danger:action==='cancel',opensDialog:true,select:(invoker:HTMLElement)=>confirmAction(action,invoker)}))]}/>
-     </SourceActions></div><ChoiceBar label="任务内容" options={['结果预览','过程记录']} disabledOptions={hasPreview?[]:['结果预览']} value={currentTab} onChange={setTab} tabs idPrefix="task-reader"/>
+     </SourceActions></div><ChoiceBar label="任务内容" options={['结果预览','执行记录','过程记录']} disabledOptions={hasPreview?[]:['结果预览']} value={currentTab} onChange={setTab} tabs idPrefix="task-reader"/>
      <div className={styles.readerViewport} role="tabpanel" id="reader-panel" aria-labelledby={'task-reader-'+currentTab} tabIndex={0} onKeyDown={e=>scrollReader(e,reader.current)} data-region="任务阅读区">
-      {currentTab==='结果预览'&&(approving||preview.isFetching)?<ContentSkeleton reader/>:currentTab==='结果预览'&&preview.isError?<StatePanel kind="error" title="结果加载失败" action="重试" onAction={()=>void reloadPreview()} region="任务结果状态"/>:<div ref={reader} className={styles.readerScroll} data-region="任务正文滚动" onScroll={remember}>{currentTab==='结果预览'?<LibraryMarkdown content={preview.data?.summary??''}/>:<div className={taskStyles.timeline}>{[...(task.events??[])].reverse().map((event,index)=><section key={index}><time>{taskEventLabel(event.at)} · {taskLabels[event.state]}</time><p>{event.message}</p></section>)}</div>}</div>}
+      {currentTab==='执行记录'?<TaskExecution key={task.id} taskId={task.id} onConfigure={deviceId=>go('/settings/agents/'+encodeURIComponent(deviceId))}/>:currentTab==='结果预览'&&(approving||preview.isFetching)?<ContentSkeleton reader/>:currentTab==='结果预览'&&preview.isError?<StatePanel kind="error" title="结果加载失败" action="重试" onAction={()=>void reloadPreview()} region="任务结果状态"/>:<div ref={reader} className={styles.readerScroll} data-region="任务正文滚动" onScroll={remember}>{currentTab==='结果预览'?<LibraryMarkdown content={preview.data?.summary??''}/>:<div className={taskStyles.timeline}>{[...(task.events??[])].reverse().map((event,index)=><section key={index}><time>{taskEventLabel(event.at)} · {taskLabels[event.state]}</time><p>{event.message}</p></section>)}</div>}</div>}
      </div></>:state.isPending?<ContentSkeleton reader/>:state.isError?null:<StatePanel kind="library-empty" icon={ListChecks} title="暂无任务" region="任务详情状态"/>}
     </ContentPane>
    </SplitPane>

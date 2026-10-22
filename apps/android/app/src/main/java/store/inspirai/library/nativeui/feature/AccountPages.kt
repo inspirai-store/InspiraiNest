@@ -91,6 +91,7 @@ import store.inspirai.library.nativeui.design.*
                     if(id!=null) {
                         Text("授权时间 ${item.optString("createdAt")}")
                         item.optJSONObject("deviceInfo")?.optString("model")?.let { Text(it) }
+                        if(DevicePresentation.dispatchable(item))NodeCapabilitiesPanel(model.repository,id,item.optString("name"))
                         if(DevicePresentation.dispatchable(item))OutlinedButton(onClick={open("agents:$id")}) { Text("Agent 环境") }
                         if(DevicePresentation.dispatchable(item))OutlinedButton(onClick={open("skills:$id")}) { Text("节点技能") }
                         TextButton(onClick={revoke=true}) { Text("撤销设备") }

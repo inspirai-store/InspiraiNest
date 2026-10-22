@@ -3,6 +3,7 @@ import { hash, secret, id, now, requireValue, text, remoteURL } from '../../../p
 
 const CLIENT = 'lingnest-cli';
 const SCOPE = 'library:read';
+const SCOPES = [SCOPE,'diagnostics:read'];
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const lifetime = 30 * 86400;
 const publicReader = ({ tokenHash, ownerTokenHash, ...device }) => device;
@@ -45,7 +46,7 @@ export function readerAuthorization({ store, authenticate, serialized, publicUrl
       limit(req, 'start', 10);
       const input = await body(req);
       if (input.client_id !== CLIENT) { oauthError(res, 'invalid_client'); return true; }
-      if (input.scope !== SCOPE) { oauthError(res, 'invalid_scope'); return true; }
+      if (!SCOPES.includes(input.scope)) { oauthError(res, 'invalid_scope'); return true; }
       const base = origin(req);
       const name = text(input.name || 'InspiraiNest CLI', 'client name', 100);
       const deviceCode = secret();
@@ -54,7 +55,7 @@ export function readerAuthorization({ store, authenticate, serialized, publicUrl
       await store.transaction(async tx => {
         for (const old of await tx.list('reader_grant')) if (Date.parse(old.expiresAt) <= Date.now()) await tx.delete('reader_grant', old.id);
         await tx.put('reader_grant', { id: hash(deviceCode), userCodeHash: hash(rawCode), clientId: CLIENT, name,
-          scope: SCOPE, state: 'pending', createdAt: now(), expiresAt: new Date(Date.now() + 600000).toISOString(), interval: 5, lastPoll: 0 });
+          scope: input.scope, state: 'pending', createdAt: now(), expiresAt: new Date(Date.now() + 600000).toISOString(), interval: 5, lastPoll: 0 });
       });
       send(res, 200, { device_code: deviceCode, user_code: userCode, verification_uri: `${base}/authorize`,
         verification_uri_complete: `${base}/authorize#code=${userCode}`, expires_in: 600, interval: 5 });
@@ -84,11 +85,11 @@ export function readerAuthorization({ store, authenticate, serialized, publicUrl
           if (!canIssue(issuer) || issuer.revokedAt) return { error: 'access_denied' };
           if (Date.parse(grant.expiresAt) <= Date.now()) return { error: 'expired_token' };
           const token = secret();
-          await tx.put('device', { id: id(), name: grant.name, role: 'reader', scope: SCOPE, tokenHash: hash(token),
+          await tx.put('device', { id: id(), name: grant.name, role: 'reader', scope: grant.scope, tokenHash: hash(token),
             createdAt: now(), lastSeen: now(), expiresAt: new Date(Date.now() + lifetime * 1000).toISOString(), revokedAt: null,
             platform: 'cli', system: 'InspiraiNest CLI', capabilities: [], agents: [] });
           await tx.put('reader_grant', { ...grant, state: 'consumed' });
-          return { access_token: token, token_type: 'Bearer', expires_in: lifetime, scope: SCOPE };
+          return { access_token: token, token_type: 'Bearer', expires_in: lifetime, scope: grant.scope };
         });
         send(res, result.error ? 400 : 200, result);
       });

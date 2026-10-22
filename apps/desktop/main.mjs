@@ -237,6 +237,7 @@ function registerIPC() {
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
+    taskDiagnostics:id=>owner.taskDiagnostics(id),capabilities:id=>owner.capabilities(id),checkCapabilities:id=>owner.checkCapabilities(id),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id), renameNode: input => owner.renameNode(input),
     trash: () => owner.trash(), remove: id => owner.removeArchive(id), restore: id => owner.restoreArchive(id),
     download: async input => {

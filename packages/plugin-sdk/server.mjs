@@ -61,6 +61,8 @@ export function createPluginHost({store, serialized, owner, body, send, definiti
 }
 // Explicit host collection adapter preserves existing IDs and transactions during migration.
 // No plugin imports a database driver or obtains the raw database connection.
+const collectionAdapters=new WeakSet();
+export const isCollectionAccess=value=>collectionAdapters.has(value);
 export function collectionAccess(store, allowed, beforePut) {
   const allow = new Set(allowed);
   const adapter = {};
@@ -70,5 +72,6 @@ export function collectionAccess(store, allowed, beforePut) {
     return store[method](kind,...args);
   };
   adapter.transaction = work => store.transaction(tx => work(collectionAccess(tx,allowed,beforePut)));
+  collectionAdapters.add(adapter);
   return Object.freeze(adapter);
 }

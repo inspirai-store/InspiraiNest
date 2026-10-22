@@ -1,3 +1,5 @@
+import {createDiagnosticOutbox,checkpointEvidence} from '../../packages/core/node/task-diagnostics.mjs';
+import {capabilityFacts,runCapabilityProbe,probeCapabilityTools,observeTaskPermission} from '../../packages/core/node/capability-probe.mjs';
 import {workerRegistry} from '../../plugins/registry.worker.mjs';
 import {sourcePath,repositoryRoot} from '../../tooling/layout.mjs';
 import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
@@ -25,6 +27,8 @@ import { createAgentRuntime } from '../../plugins/ai-assistant/worker/agent-runt
 import { nodeFailureCodes } from '../../packages/core/node/task-routing.mjs';
 import { runningClient, desktopUpdateWake } from '../../packages/core/node/client-update-wake.mjs';
 
+
+const executionRuntimeHash=hash(Buffer.concat([fs.readFileSync(new URL('./worker.mjs',import.meta.url)),fs.readFileSync(new URL('../../plugins/ai-assistant/worker/collection.mjs',import.meta.url)),fs.readFileSync(new URL('../../plugins/writing/worker/selection-writing-worker.mjs',import.meta.url))]));
 const project = collectorRoot;
 const library = path.resolve(process.env.COLLECTOR_LIBRARY_ROOT || repositoryRoot);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -136,6 +140,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
   }
   fs.writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
   const journal = createWorkerEvents(dataDir, { token: config.token });
+  const diagnostics=createDiagnosticOutbox(dataDir,{deviceId:config.deviceId,token:config.token,runId:journal.runId,api:(...args)=>api(config,...args)});
+  let capabilityChecks=[],capabilityProofs=[];
+  const diagnosticFlush=()=>diagnostics.flush().catch(()=>{});
   const fault = (key, error, message, taskId) => journal.fault(key, { code: error.code || 'INTERNAL', message: message || error.message,
     taskId, details: errorDetails(error) });
   let control;
@@ -151,6 +158,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let forbidden = false;
   let available = {};
   let lastProbe = 0;
+  let capabilityTools={};
   let lastSync = 0;
   let heartbeatPending = false;
   let lastHeartbeatAttempt = 0;
@@ -199,7 +207,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
       try{pluginState=await api(config,'/api/plugins');}catch(error){if(error.status!==404)throw error;}
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
       if(pluginState.enabled['agent-lab']&&Date.now()-trialProbedAt>30000){trialStatus=await probeTrialEnvironment({...config,dataDir});trialProbedAt=Date.now();}
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, trialEnvironment:trialStatus, selectionWritingProtocol:1, writingProtocol:1, writingSkills:writingCapabilities(), inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, trialEnvironment:trialStatus, selectionWritingProtocol:1, writingProtocol:1, writingSkills:writingCapabilities(), inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilityFacts:capabilityFacts(config,available,{version:runningClient().version,tools:capabilityTools,runtime:executionRuntimeHash,skills:{'writing.materials':writingCapabilities().at(-1)?.hash},observations:readJsonIfPresent(path.join(dataDir,'capability-observations.json')),enabled:{'writing.materials':pluginState.enabled.writing,'writing.selection':pluginState.enabled.writing}}), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      void diagnosticFlush();
+      capabilityChecks=result.capabilityChecks||[];capabilityProofs=result.capabilityProofs||[];
       wakeUpdater(result.clientUpdates);
       clientUpdateBarrier=Array.isArray(result.clientUpdates) && result.clientUpdates.some(o=>['waiting_worker','installing'].includes(o.state));
       control.update({ workerVersion:runningClient().version });
@@ -237,12 +247,13 @@ export async function runWorker(config, { once = false, signal, paused = false }
       try {
         control.readCommand();
         if (control.state.mode === 'draining') break;
-        if (Date.now() - lastProbe > 60000) { available = await detectAgents(config.agents); lastProbe = Date.now(); control.update({ agents: available }); }
+        if (Date.now() - lastProbe > 60000) { available = await detectAgents(config.agents); capabilityTools=await probeCapabilityTools(execute); lastProbe = Date.now(); control.update({ agents: available }); }
         await heartbeat();
         if(clientUpdateBarrier){await sleep(250);continue;}
         if(agentOperations.length){if(skillTick)await skillTick;await updateAgents(true);if(!forbidden)available=await detectAgents(config.agents);}
         else void updateAgents(false);
         if(agentRuntime.operationLock){await sleep(250);continue;}
+        for(const check of capabilityChecks){const result=await runCapabilityProbe(config,check.agent,runAgent,{signal,mode:check.mode});await api(config,'/api/capability-checks/'+check.id+'/result','POST',result);}capabilityChecks=[];
         if(skillOperations.length)await updateSkills(true);
         else void updateSkills(false);
         if (forbidden || signal?.aborted) break;
@@ -257,11 +268,16 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (task !== null && (!task || typeof task !== 'object' || !/^[a-zA-Z0-9-]{1,100}$/.test(task.id))) throw Object.assign(new Error('领取任务结构异常'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
         journal.recover('poll', '任务领取接口已恢复');
         if (task) {
+          diagnostics.record(task,{state:'assigned',stage:'preparing',message:'开始本次执行',code:'ATTEMPT_STARTED'});
           current = { id: task.id, assignmentId: task.assignmentId, controller: new AbortController() };
-          const displayTask = { id: task.id, title: String(task.content || task.url || task.id).slice(0, 400), state: task.state, agent: task.agent || null, message: '准备任务工作目录' };
+          const displayTask = { id: task.id, attemptId:task.attemptId, title: String(task.content || task.url || task.id).slice(0, 400), state: task.state, agent: task.agent || null, message: '准备任务工作目录' };
           control.update({ phase: 'working', current: displayTask });
           journal.event({ taskId: task.id, code: 'TASK_CLAIMED', stage: 'preparing', message: '已领取任务，准备本机采集目录' });
           const progress = ({ diagnostic, logStage, level, ...patch }) => {
+            diagnostics.record(task,{...patch,diagnostic,logStage});
+            if(diagnostic?.code==='AGENT_PERMISSION')observeTaskPermission({...config,dataDir},task,patch.agent||displayTask.agent,{blocked:true});
+            if(['completed','awaiting_review'].includes(patch.state))observeTaskPermission({...config,dataDir},task,patch.agent||displayTask.agent,{passed:true});
+            void diagnosticFlush();
             Object.assign(displayTask, patch, { errorDomain: diagnostic ? 'system' : null });
             control.update({ current: displayTask, lastTask: { ...displayTask } });
             if (diagnostic) journal.fault(`task:${task.id}:${diagnostic.code}`, { ...diagnostic, taskId: task.id, stage: patch.state, message: patch.message });
@@ -271,7 +287,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
               ...(logStage ? { stage: logStage, reportedBy: 'agent' } : {}),
               ...(patch.agent ? { agent: patch.agent } : {}) });
           };
-          try { await processTask(config, task, available, current.controller.signal, progress); }
+          try { await processTask({...config,executionCapabilities:{proofs:capabilityProofs,facts:capabilityFacts(config,available,{version:runningClient().version,tools:capabilityTools,runtime:executionRuntimeHash,skills:{'writing.materials':writingCapabilities().at(-1)?.hash},observations:readJsonIfPresent(path.join(dataDir,'capability-observations.json'))})}}, task, available, current.controller.signal, progress); }
           catch (error) {
             if ([403,409].includes(error.status) && ['/progress','/result'].some(s => error.route?.endsWith(s))) {
               current.reassigned = true;
@@ -285,6 +301,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
             }
             if (!current.reassigned) {
               if (!['waiting_action', 'queued'].includes(displayTask.state)) Object.assign(displayTask, { state: 'interrupted', message: '系统问题中断采集，本机成果已保留；服务恢复后可继续', errorDomain: 'system' });
+              diagnostics.record(task,{state:displayTask.state,message:error.message,diagnostic:{code:error.code||'EXECUTION_ERROR',details:errorDetails(error)}});
               fault(`task:${task.id}:execution`, error, '采集管线发生系统错误，本机成果已保留', task.id);
               journal.event({ taskId: task.id, code: 'TASK_SYSTEM_BLOCKED', stage: 'waiting_action', level: 'warn', message: '采集中断于系统问题，成果保留本机；请查看系统诊断' });
             }
@@ -296,6 +313,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
             if (['completed', 'awaiting_review'].includes(displayTask.state)) {
               for (const code of ['AGENT_START', 'AGENT_TIMEOUT', 'AGENT_EXIT', 'AGENT_MODEL', 'AGENT_LOGIN', 'AGENT_RESULT', 'AGENT_PERMISSION', 'AGENT_ENVIRONMENT', 'STEP_LOG_READ', 'STEP_ENCODING', 'ARCHIVE_ENCODING', 'execution']) journal.recover(`task:${task.id}:${code}`, '本次采集已完成，执行问题不再阻塞');
             }
+            diagnostics.record(task,{state:displayTask.state,message:'本次执行记录已保存',code:'ATTEMPT_FINISHED',artifacts:(()=>{try{return checkpointEvidence(dataDir,task);}catch{return [];}})()});
+            await diagnosticFlush();
             current = null; control.update({ current: null, lastTask: { ...displayTask }, phase: 'idle' });
           }
         }
@@ -379,3 +398,5 @@ async function main() {
   await runWorker(config, { once: command === 'once', signal: controller.signal, paused: process.argv.includes('--paused') });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+
+function readJsonIfPresent(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return {};}}

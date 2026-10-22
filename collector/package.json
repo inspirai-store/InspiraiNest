@@ -1,6 +1,6 @@
 {
   "name": "inspirainest-collector",
-  "version": "0.2.14",
+  "version": "0.2.24",
   "private": true,
   "type": "module",
   "main": "../apps/desktop/main.mjs",
