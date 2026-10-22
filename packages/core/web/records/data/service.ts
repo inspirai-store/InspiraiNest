@@ -43,8 +43,8 @@ export class RecordsService {
     const scoped=new AccountRecordStore(this.baseStore,status);await this.serial(()=>scoped.migrate(status,()=>this.assertSession(session.epoch)));this.assertSession(session.epoch);this.store=scoped;return session;
   }
   private assertSession(epoch: number) { if (epoch !== this.epoch) throw new Error('登录状态已改变，记录仍保存在本机'); }
-  async load() { const session=await this.status();const all = await this.store.all();this.assertSession(session.epoch);let draft=all.find(i=>i.id==='draft') as LocalDraft|undefined;if(!draft)draft=await this.serial(async()=>{let stored=await this.store.get('draft') as LocalDraft|undefined;if(!stored){stored={...newDraft(),accountScope:recordScope(session)};await this.store.put(stored);}return stored;});const sync=await this.store.get('__record-sync__');return {draft,lastCheckedAt:sync?.checkedAt as string|undefined,taskCount:this.activeTaskCount,recoveries:all.filter(i=>i.id!=='draft'&&((i as LocalRecord).recoveryDrafts as LocalDraft[]|undefined)?.length) as LocalRecord[],records:all.filter(i=>i.id!=='draft'&&!(i as LocalRecord).deletedAt) as LocalRecord[]}; }
-  async trash(){await this.status();return (await this.store.all()).filter(i=>i.id!=='draft'&&(i as LocalRecord).deletedAt&&(i as LocalRecord).deletedAt!=='restored-draft') as LocalRecord[];}
+  async load() { const session=await this.status();const all = await this.store.all();this.assertSession(session.epoch);let draft=all.find(i=>i.id==='draft') as LocalDraft|undefined;if(!draft)draft=await this.serial(async()=>{let stored=await this.store.get('draft') as LocalDraft|undefined;if(!stored){stored={...newDraft(),accountScope:recordScope(session)};await this.store.put(stored);}return stored;});const sync=await this.store.get('__record-sync__');return {draft,lastCheckedAt:sync?.checkedAt as string|undefined,taskCount:this.activeTaskCount,recoveries:all.filter(i=>i.id!=='draft'&&((i as LocalRecord).recoveryDrafts as LocalDraft[]|undefined)?.length) as LocalRecord[],records:all.filter(i=>i.id!=='draft'&&(i as LocalRecord).origin!=='collection_input'&&!(i as LocalRecord).deletedAt) as LocalRecord[]}; }
+  async trash(){await this.status();return (await this.store.all()).filter(i=>i.id!=='draft'&&(i as LocalRecord).origin!=='collection_input'&&(i as LocalRecord).deletedAt&&(i as LocalRecord).deletedAt!=='restored-draft') as LocalRecord[];}
   async setDeleted(id:string,deleted:boolean){
     const session=await this.status(),store=this.store;
     return this.serial(async()=>{this.assertSession(session.epoch);const item=await store.get(id) as LocalRecord|undefined;if(!item)throw Error('记录不存在');
@@ -93,7 +93,7 @@ export class RecordsService {
       if(previous?.deletedAt)throw Error('记录已删除，请从回收站恢复');
       if (previous && (previous.sync==='syncing'||previous.sync==='conflict'&&snapshot.resolvingVersion===undefined)) throw new Error(previous.sync === 'conflict' ? '请先比较冲突内容' : '正在同步，请稍后补充');
       if(snapshot.resolvingVersion!==undefined){const remote=await this.remoteRecord(snapshot.editingId!,session);this.assertSession(session.epoch);if(remote.version!==snapshot.resolvingVersion)throw new Error('云端再次更新，合并草稿已保存在本机，请重新比较');}
-      const item: LocalRecord = {...previous,accountScope:recordScope(session),id:snapshot.editingId ?? snapshot.recordId,text:snapshot.text,document:snapshot.document,attachments:snapshot.attachments,createdAt:previous?.createdAt ?? new Date().toISOString(),version:previous?.version ?? 1,remoteVersion:snapshot.baseVersion ?? previous?.remoteVersion ?? 0,server:previous?.server ?? (this.connection.server || null),sync:'pending',error:''};
+      const item: LocalRecord = {...previous,origin:previous?.origin??'user',accountScope:recordScope(session),id:snapshot.editingId ?? snapshot.recordId,text:snapshot.text,document:snapshot.document,attachments:snapshot.attachments,createdAt:previous?.createdAt ?? new Date().toISOString(),version:previous?.version ?? 1,remoteVersion:snapshot.baseVersion ?? previous?.remoteVersion ?? 0,server:previous?.server ?? (this.connection.server || null),sync:'pending',error:''};
       delete item.payload;
       delete item.repair;
       item.baseSnapshot=snapshot.baseSnapshot??previous?.baseSnapshot;item.errorCode=undefined;
@@ -216,16 +216,17 @@ export class RecordsService {
     for(;;){
       const meta=await store.get('__record-sync__'),cursor=meta?.cursor as string|undefined;
       const route=incremental?'/api/records/changes?'+(cursor&&!full?'cursor='+encodeURIComponent(cursor)+'&':'')+'wait='+wait+'&limit=200':'/api/records';
-      const data=await requestJson<{mode?:string;cursor?:string;hasMore?:boolean;checkedAt?:string;records?:LocalRecord[];deleted?:Partial<LocalRecord>[];changes?:{seq:number;record:LocalRecord}[]}>(this.transport,{route,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
+      const data=await requestJson<{mode?:string;cursor?:string;hasMore?:boolean;checkedAt?:string;records?:LocalRecord[];excluded?:{id:string;origin:'collection_input'}[];deleted?:Partial<LocalRecord>[];changes?:{seq:number;record:LocalRecord}[]}>(this.transport,{route,server:session.server,deviceId:session.deviceId});this.assertSession(session.epoch);
       await this.serial(async()=>{
         this.assertSession(session.epoch);
         const latest=await store.get('__record-sync__'),current=latest?.cursor as string|undefined;
         if(data.cursor&&current&&data.cursor!==current){const [epoch,sequence]=data.cursor.split(':'),[currentEpoch,currentSequence]=current.split(':');if(epoch===currentEpoch&&Number(sequence)<Number(currentSequence)||epoch!==currentEpoch&&current!==cursor)return;}
         const updates=new Map<string,import('./types.ts').StoredItem>();
         const get=async(id:string)=>(updates.get(id)??await store.get(id)) as LocalRecord|undefined;
+        for(const excluded of data.excluded??[]){if(excluded.origin!=='collection_input')continue;const existing=await get(excluded.id);if(existing)updates.set(existing.id,{...existing,origin:'collection_input'});}
         const remoteRows=data.changes?data.changes.map(change=>({...change.record,changeSeq:change.seq})):[...(data.deleted??[]),...(data.records??[])];
         for(const value of remoteRows){const remote=value as LocalRecord;if(!remote.id)throw Error('服务端返回了无效的记录变化');const existing=await get(remote.id);
-          if(existing?.deletionQueue?.length||existing?.discardedDraft)continue;
+          if(existing?.origin==='collection_input'||existing?.deletionQueue?.length||existing?.discardedDraft)continue;
           const remoteTrash=Number(remote.trashVersion??0),localTrash=Number(existing?.trashVersion??0);
           if(remoteTrash<localTrash||existing?.changeSeq&&remote.changeSeq&&Number(remote.changeSeq)<Number(existing.changeSeq))continue;
           if(remote.deletedAt){
@@ -248,7 +249,7 @@ export class RecordsService {
         updates.set('__record-sync__',{id:'__record-sync__',...latest,...(data.cursor?{cursor:data.cursor}:{}),checkedAt:data.checkedAt??new Date().toISOString()} as unknown as import('./types.ts').StoredItem);
         this.assertSession(session.epoch);await store.putMany!([...updates.values()]);
       });
-      this.activeTaskCount=(await store.all()).filter(r=>r.id!=='draft'&&!(r as LocalRecord).deletedAt).flatMap(record=>(record as LocalRecord).tasks??[]).filter(task=>!['completed','cancelled','failed'].includes(task.state)).length;
+      this.activeTaskCount=(await store.all()).filter(r=>r.id!=='draft'&&(r as LocalRecord).origin!=='collection_input'&&!(r as LocalRecord).deletedAt).flatMap(record=>(record as LocalRecord).tasks??[]).filter(task=>!['completed','cancelled','failed'].includes(task.state)).length;
       if(!incremental||!data.hasMore)return;wait=0;
     }
   }

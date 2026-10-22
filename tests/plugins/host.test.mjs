@@ -57,7 +57,7 @@ test('all extensions off: legacy sharing saves raw links and attachments, sync a
  const shared=await request('/api/tasks','POST',input);assert.equal(shared.status,201);assert.equal(shared.body.state,'completed');assert.equal(shared.body.pluginId,null);
  const record=await request('/api/records/'+shared.body.sourceRecordId);assert.equal(record.status,200);assert.equal(record.body.text,input.url);assert.deepEqual(record.body.tasks,[]);
  assert.equal((await request('/api/tasks','POST',input)).body.id,shared.body.id);
- const changes=await request('/api/records/changes');assert.ok(changes.body.records.some(r=>r.id===record.body.id));
+ const changes=await request('/api/records/changes');assert.ok(!changes.body.records.some(r=>r.id===record.body.id));assert.ok(changes.body.excluded.some(r=>r.id===record.body.id&&r.origin==='collection_input'));
  const process=await request('/api/records/'+record.body.id+'/process','POST',{requestId:crypto.randomUUID(),baseVersion:1,preset:'summary'});assert.equal(process.body.code,'plugin_disabled');
  const saved=await app.store.get('capture',record.body.id);assert.equal(saved.text,input.url);
  const exported=await request('/api/records/'+record.body.id+'/export');assert.equal(exported.status,200);assert.equal(exported.body.record.text,input.url);assert.equal(exported.body.kind,'inspirainest-record');assert.equal(exported.body.files[0].sha256,sha);assert.deepEqual(Buffer.from(exported.body.files[0].body,'base64'),bytes);

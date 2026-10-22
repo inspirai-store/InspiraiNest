@@ -10,6 +10,8 @@ import { hash,secret } from '../../packages/core/node/common.mjs';
 import { prepareRecordInput,recordPrompt } from '../../packages/core/node/record-input.mjs';
 import { mysqlFixture } from './mysql-fixture.mjs';
 import { captureRequest } from '../../apps/desktop/capture-client.mjs';
+import {classifyCollectionInputs} from '../../packages/core/server/classify-collection-inputs.mjs';
+import {canonicalJson} from '../../packages/core/node/common.mjs';
 
 async function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'capture-tests-')),key=secret();
@@ -22,6 +24,57 @@ async function fixture(t) {
   const input=(extra={})=>({requestId:crypto.randomUUID(),baseVersion:0,text:'一条原始记录',attachments:[],createdAt:'2026-10-09T12:34:56+08:00',...extra});
   return {app,root,owner,server,request,worker,input};
 }
+
+test('collection tasks retain originals and task links without adding personal records',async t=>{
+ const {request,input,app}=await fixture(t),personalId=crypto.randomUUID();
+ await request('/api/records/'+personalId,'PUT',input({text:'我亲手写的碎片'}));
+ const submitted=await request('/api/tasks','POST',{submissionId:crypto.randomUUID(),content:'https://example.invalid/article',autoArchive:false});
+ assert.equal(submitted.status,201);
+ const task=submitted.value,source=await app.store.get('capture',task.sourceRecordId);
+ assert.equal(source.origin,'collection_input');assert.equal(source.text,task.content);
+ assert.equal((await app.store.get('capture-submission',task.submissionId)).recordId,source.id);
+ assert.deepEqual((await request('/api/records')).value.records.map(r=>r.id),[personalId]);
+ assert.deepEqual((await request('/api/records')).value.excluded,[{id:source.id,origin:'collection_input'}]);
+ assert.equal((await request('/api/records/'+source.id)).value.text,source.text);
+ const snapshot=(await request('/api/records/changes?wait=0')).value;
+ assert.deepEqual(snapshot.records.map(r=>r.id),[personalId]);assert.deepEqual(snapshot.excluded,[{id:source.id,origin:'collection_input'}]);
+ assert.equal((await request('/api/records/'+personalId)).value.origin,'user');
+});
+
+test('reviewed inputs are reclassified atomically without changing originals, history or other records',async t=>{
+ const {request,input,app}=await fixture(t),personalId=crypto.randomUUID();
+ await request('/api/records/'+personalId,'PUT',input({text:'保留我原来的碎片'}));
+ const legacyPersonal=await app.store.get('capture',personalId);delete legacyPersonal.origin;await app.store.put('capture',legacyPersonal);
+ const originals=[];
+ for(let index=0;index<2;index++){
+  const task=(await request('/api/tasks','POST',{submissionId:crypto.randomUUID(),content:'https://example.invalid/'+index,autoArchive:false})).value;
+  const record=await app.store.get('capture',task.sourceRecordId);delete record.origin;await app.store.put('capture',record);originals.push(record);
+ }
+ const manifest=originals.map(record=>({id:record.id,sha256:hash(canonicalJson(record))}));
+ const before={versions:await app.store.list('capture-version'),tasks:await app.store.list('task'),submissions:await app.store.list('capture-submission')};
+ const cursor=(await request('/api/records/changes?wait=0')).value.cursor;
+ const result=await app.store.transaction(tx=>classifyCollectionInputs(tx,manifest));
+ assert.equal(result.classifiedIds.length,2);
+ for(const original of originals){const current=await app.store.get('capture',original.id);assert.equal(current.origin,'collection_input');delete current.origin;assert.deepEqual(current,original);}
+ assert.deepEqual(await app.store.get('capture',personalId),legacyPersonal);
+ assert.deepEqual(await app.store.list('capture-version'),before.versions);assert.deepEqual(await app.store.list('task'),before.tasks);assert.deepEqual(await app.store.list('capture-submission'),before.submissions);
+ const listing=(await request('/api/records')).value;assert.deepEqual(listing.records.map(r=>r.id),[personalId]);assert.equal(listing.excluded.length,2);assert.equal(listing.deleted.length,0);
+ const started=Date.now(),delta=(await request('/api/records/changes?cursor='+encodeURIComponent(cursor)+'&wait=3')).value;
+ assert.equal(delta.changes.length,0);assert.equal(delta.excluded.length,2);assert.notEqual(delta.cursor,cursor);assert.ok(Date.now()-started<1500);
+});
+
+test('classification refuses changed or unproven inputs and leaves every record untouched',async t=>{
+ const {request,app}=await fixture(t),originals=[];
+ for(let index=0;index<2;index++){
+  const task=(await request('/api/tasks','POST',{submissionId:crypto.randomUUID(),content:'https://example.invalid/review/'+index})).value;
+  const record=await app.store.get('capture',task.sourceRecordId);delete record.origin;await app.store.put('capture',record);originals.push(record);
+ }
+ const manifest=originals.map(record=>({id:record.id,sha256:hash(canonicalJson(record))}));
+ await app.store.put('capture',{...originals[1],text:'用户已经修改'});
+ const before=await app.store.list('capture');
+ await assert.rejects(app.store.transaction(tx=>classifyCollectionInputs(tx,manifest)),/changed since review/);
+ assert.deepEqual(await app.store.list('capture'),before);
+});
 test('sending a record creates no task; retry is idempotent even with reordered JSON keys',async t=>{
   const {request,input,owner}=await fixture(t),id=crypto.randomUUID(),payload=input();
   const first=await request('/api/records/'+id,'PUT',payload);assert.equal(first.status,200);assert.equal(first.value.version,1);

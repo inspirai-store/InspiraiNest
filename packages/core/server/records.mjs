@@ -99,7 +99,8 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
     }
     if (route === '/api/records' && req.method === 'GET') {
       const tasks=await store.list('task');
-      send(res,200,{deleted:(await store.list('capture')).filter(r=>r.deletedAt).map(({id,version,deletedAt,trashVersion})=>({id,version,deletedAt,trashVersion})),records:(await store.list('capture')).filter(r=>!r.deletedAt).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map(record=>({...record,tasks:tasks.filter(task=>task.recordId===record.id).map(({id,state,recordVersion,createdAt,events})=>({id,state,recordVersion,createdAt,events:events.slice(-1)}))}))}); return true;
+      const rows=await store.list('capture');
+      send(res,200,{excluded:rows.filter(r=>r.origin==='collection_input').map(({id,origin})=>({id,origin})),deleted:rows.filter(r=>r.origin!=='collection_input'&&r.deletedAt).map(({id,version,deletedAt,trashVersion})=>({id,version,deletedAt,trashVersion})),records:rows.filter(r=>r.origin!=='collection_input'&&!r.deletedAt).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map(record=>({...record,tasks:tasks.filter(task=>task.recordId===record.id).map(({id,state,recordVersion,createdAt,events})=>({id,state,recordVersion,createdAt,events:events.slice(-1)}))}))}); return true;
     }
     const recordRoute = route.match(/^\/api\/records\/([^/]+)(\/process)?$/);
     requireValue(recordRoute,'Not found',404);
@@ -152,7 +153,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         const createdAt = current?.createdAt || input.createdAt || now();
         requireValue(typeof createdAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(createdAt) && /(Z|[+-]\d{2}:\d{2})$/.test(createdAt) && Number.isFinite(Date.parse(createdAt)),'Invalid creation time');
         if(input.document!==undefined)validateDocument(input.document,attachments);
-        result = {id:recordId,text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,trashVersion:current?.trashVersion??0,createdAt,updatedAt:now()};
+        result = {id:recordId,...(current?current.origin?{origin:current.origin}:{}:{origin:'user'}),text:input.text,...(input.document?{document:input.document}:{}),attachments,version:input.baseVersion+1,trashVersion:current?.trashVersion??0,createdAt,updatedAt:now()};
         await tx.put('capture-version',{...result,id:`${recordId}:${result.version}`,recordId}); await tx.put('capture',result);
         await appendRecordChange(tx,result,syncState);
       }
