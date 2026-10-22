@@ -37,7 +37,9 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
       const attempt=await tx.get('task-attempt',task.attemptId);
       if(attempt){const device=await tx.get('device',attempt.deviceId)||{},agent=task.agent||attempt.agent;
         const fact=device.capabilityFacts?.find(f=>f.id===attempt.capabilityId&&f.agent===agent);
-        await tx.put('task-attempt',{...attempt,state:state==='queued'?attempt.state:state,...(state==='queued'?{endedAt:now()}:{}),agent,capabilityFingerprint:fact?.fingerprint||attempt.capabilityFingerprint||null,...(['completed','awaiting_review'].includes(state)?{resultValidatedAt:now()}:{}),updatedAt:now()});
+        const matchesSkill=!task.writingSessionId||task.writingSnapshot?.skill?.hash===fact?.skill;
+        const skillVersions=(task.executionSkills?.length?task.executionSkills:task.selectedSkills||[]).map(({name,hash,versionId,agent})=>({name,hash,versionId,agent}));
+        await tx.put('task-attempt',{...attempt,state:state==='queued'?attempt.state:state,...(state==='queued'?{endedAt:now()}:{}),agent,skillVersions,capabilityFingerprint:matchesSkill?(fact?.fingerprint||attempt.capabilityFingerprint||null):null,...(['completed','awaiting_review'].includes(state)?{resultValidatedAt:now()}:{}),updatedAt:now()});
         await tx.put('task-diagnostic',{id:id(),taskId:task.id,attemptId:attempt.id,deviceId:attempt.deviceId,at:now(),state,stage:state,code:'TASK_'+state.toUpperCase(),category:diagnosticCategory('',state),reportedBy:'server',message:diagnosticText(message),details:{}});}
     }
   }

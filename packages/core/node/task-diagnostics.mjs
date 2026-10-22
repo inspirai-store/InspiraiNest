@@ -73,7 +73,7 @@ export function checkpointEvidence(dataDir,task){
       artifacts.push({path:diagnosticText(relative,300),bytes:stat.size,state:'saved',sha256:stat.size<=16*1024*1024?hash(fs.readFileSync(real)):null});
     }catch{}
   }
-  for(const file of ['collector-result.json','writing-result.json','.capture-input/page.json','.capture-input/initial.txt'])inspect(file);
+  for(const file of ['collector-result.json','writing-result.json','.capture-input/page.json','.capture-input/initial.txt','.capture-runtime/capture-cli.mjs','.capture-runtime/manifest.json','.capture-runtime/toolchain.json'])inspect(file);
   try{const checkpoint=read(task.writingSessionId||task.purpose==='selection-writing'?'writing-result.json':'collector-result.json');
     if(typeof checkpoint.entry==='string'&&!path.isAbsolute(checkpoint.entry)&&!checkpoint.entry.split(/[\\/]/).includes('..')){
       const meta=read(path.join(checkpoint.entry,'source.json'));
