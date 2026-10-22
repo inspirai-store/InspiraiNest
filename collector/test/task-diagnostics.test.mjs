@@ -51,7 +51,7 @@ test('diagnostics scope is independent and cannot modify tasks or read library c
  const request=await api(owner,'/api/reader-authorizations?code='+grant.user_code);assert.equal(request.scope,'diagnostics:read');
  await api(owner,'/api/reader-authorizations/decision','POST',{code:grant.user_code,decision:'allow'});
  const credential=await api({server},'/oauth/token','POST',{client_id:'lingnest-cli',grant_type:'urn:ietf:params:oauth:grant-type:device_code',device_code:grant.device_code});assert.equal(credential.scope,'diagnostics:read');
- const d=(await app.store.list('device')).find(d=>d.tokenHash===hash(diagnosticToken));await app.store.put('device',{...d,revokedAt:new Date().toISOString()});await assert.rejects(api(diag,`/api/read/v1/tasks/${task.id}`),{status:401});
+ const d=(await app.store.list('device')).find(d=>d.tokenHash===hash(diagnosticToken));await app.store.put('device',{...d,revokedAt:new Date().toISOString()});await assert.rejects(api(diag,`/api/read/v1/tasks/${task.id}`),{status:401});await app.store.put('device',{...d,revokedAt:null,expiresAt:'2000-01-01T00:00:00Z'});await assert.rejects(api(diag,`/api/read/v1/tasks/${task.id}`),{status:401});
 });
 
 test('outbox retains offline diagnostics across restart and excludes prompts, private text and credentials',async t=>{
