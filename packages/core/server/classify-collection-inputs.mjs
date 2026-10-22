@@ -1,10 +1,11 @@
 import {canonicalJson, hash, requireValue} from '../node/common.mjs';
-import {appendRecordChange} from '../node/record-changes.mjs';
+import {appendRecordChange,lockRecordChanges} from '../node/record-changes.mjs';
 
 // Run inside one transaction, against an explicitly reviewed manifest. Only
 // provenance is changed; content versions, task links and timestamps stay intact.
 export async function classifyCollectionInputs(tx, manifest) {
   requireValue(Array.isArray(manifest) && manifest.length > 0 && new Set(manifest.map(row=>row.id)).size === manifest.length, 'Invalid classification manifest');
+  await lockRecordChanges(tx);
   const submissions=await tx.list('capture-submission'),tasks=await tx.list('task');
   const records=[];
   for(const item of manifest){
