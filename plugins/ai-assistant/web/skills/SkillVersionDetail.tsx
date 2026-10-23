@@ -19,6 +19,6 @@ export function SkillVersionDetail({version,target,back,compare,verify,busy=fals
  <div className={detail.info}><p>版本　{versionLabel(version)}</p><p>适用 Agent　{version.policy.agents.map(agent=>agentNames[agent]).join(' · ')}</p><p className={detail.path}>适用系统　{version.policy.systems.map(system=>systemNames[system]).join(' · ')}</p></div>
  {version.description&&<p className={detail.description}>{version.description}</p>}
  {!!version.files?.length&&<><h3>文件</h3><FileRows items={version.files.map(file=>({id:file.path,label:file.path,value:fileBytes(file.bytes)}))}/></>}
- {target}<h3 className={controls.label}>目标 Agent</h3><div className={controls.choices}>{skillAgents.map(agent=><CheckboxField key={agent} disabled={busy||!version.policy.agents.includes(agent)} checked={agents.includes(agent)} onChange={event=>{const checked=event.currentTarget.checked;setAgents(current=>checked?[...current,agent]:current.filter(value=>value!==agent));}}>{agentNames[agent]}</CheckboxField>)}</div>
+ {target}<h3 className={controls.label}>目标 Agent</h3><div className={controls.choices}>{skillAgents.filter(agent=>agent!=='codebuddy').map(agent=><CheckboxField key={agent} disabled={busy||!version.policy.agents.includes(agent)} checked={agents.includes(agent)} onChange={event=>{const checked=event.currentTarget.checked;setAgents(current=>checked?[...current,agent]:current.filter(value=>value!==agent));}}>{agentNames[agent]}</CheckboxField>)}</div>
  <Action kind="primary" disabled={busy||!agents.length} onClick={()=>compare(agents)}>比较目标</Action></ModuleContent>;
 }
