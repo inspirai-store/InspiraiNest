@@ -15,10 +15,21 @@ import store.inspirai.library.nativeui.data.*
 import store.inspirai.library.nativeui.design.NestTheme
 
 open class NativeActivity: ComponentActivity() {
+    private var incoming by mutableStateOf(Intent())
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent);setIntent(intent);incoming=shareRequest(intent)
+    }
+    private fun shareRequest(value: Intent)=Intent(value).apply {
+        if(action in listOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE) && !hasExtra("draftId"))putExtra("draftId",java.util.UUID.randomUUID().toString())
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        incoming.getStringExtra("draftId")?.let { outState.putString("shareDraftId",it) };super.onSaveInstanceState(outState)
+    }
     private var migration: LegacyMigration?=null
     override fun onCreate(state: Bundle?) {
         setTheme(if(Appearance.dark(this))store.inspirai.library.R.style.AppTheme_Dark else store.inspirai.library.R.style.AppTheme)
         super.onCreate(state);enableEdgeToEdge()
+        incoming=shareRequest(intent).apply { state?.getString("shareDraftId")?.let { putExtra("draftId",it) } }
         val repository=NestDependencies.repository(this)
         setContent {
             var mode by remember { mutableStateOf(Appearance.mode(this)) }
@@ -30,8 +41,8 @@ open class NativeActivity: ComponentActivity() {
                 migration!!.start();onDispose { migration?.close() }
             }
             NestTheme(mode) {
-                NativeApp(repository,ready,message,onRetryMigration={migration?.start()},onTheme={mode=it;Appearance.set(this,it)},theme=mode,
-                    initialIntent=intent,onFinish={finish()},onConnectionChanged={ready=false;message="检查资料空间…";migration?.start()})
+                key(incoming.getStringExtra("draftId")) { NativeApp(repository,ready,message,onRetryMigration={migration?.start()},onTheme={mode=it;Appearance.set(this,it)},theme=mode,
+                    initialIntent=incoming,onFinish={finish()},onConnectionChanged={ready=false;message="检查资料空间…";migration?.start()}) }
             }
             LaunchedEffect(ready) { if(ready)runCatching { RecordAudioStore.recover(this@NativeActivity,repository);repository.syncRecords() } }
         }
