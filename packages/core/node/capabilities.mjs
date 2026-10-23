@@ -1,3 +1,4 @@
+import {isExecutionAgent} from '../shared/execution-policy.mjs';
 // Shared by task routing and presentation; capabilities are supplied as facts,
 // without importing any concrete plugin implementation.
 export function taskCapabilityId(task){return task.creationSessionId?'writing.creation':task.purpose==='selection-writing'?'writing.selection':task.writingSessionId?'writing.materials':task.capture?.kind==='page'?'capture.browser':task.type==='video'?'capture.media':'capture.article';}
@@ -17,7 +18,7 @@ export function evaluateCapability(device,capability,{online=true,busy=false,pro
 export function capabilityBlock(task,device){
   const id=taskCapabilityId(task),facts=device.capabilityFacts;
   if(!Array.isArray(facts))return null; // Older clients retain their existing protocol.
-  const match=facts.filter(f=>f.id===id&&(!task.preferredAgent||f.agent===task.preferredAgent));
+  const match=facts.filter(f=>isExecutionAgent(f.agent)&&f.id===id&&(!task.preferredAgent||f.agent===task.preferredAgent));
   if(!match.length)return 'NOT_REPORTED';
   if(id==='capture.browser'&&match.length&&match.every(f=>f.connected!==true))return 'BROWSER_NOT_CONNECTED';
   if(match.some(f=>f.enabled!==false&&f.available===true&&f.permission!=='blocked'&&!f.missing?.length))return null;
@@ -26,7 +27,7 @@ export function capabilityBlock(task,device){
 
 export function rankExecutionAgents(task,names,{facts=[],proofs=[]}={}){
   const id=taskCapabilityId(task);
-  const eligible=names.filter(agent=>{const f=facts.find(f=>f.id===id&&f.agent===agent);return !f||f.enabled!==false&&f.available===true&&f.permission!=='blocked'&&!f.missing?.length;});
+  const eligible=names.filter(agent=>{if(!isExecutionAgent(agent))return false;const f=facts.find(f=>f.id===id&&f.agent===agent);return !f||f.enabled!==false&&f.available===true&&f.permission!=='blocked'&&!f.missing?.length;});
   if(task.agent||task.preferredAgent)return eligible;
   return eligible.map((agent,index)=>{const f=facts.find(f=>f.id===id&&f.agent===agent);const verified=proofs.some(p=>p.capabilityId===id&&p.agent===agent&&p.fingerprint===f?.fingerprint&&p.passed===true);return {agent,index,verified};}).sort((a,b)=>Number(b.verified)-Number(a.verified)||a.index-b.index).map(x=>x.agent);
 }

@@ -1,3 +1,4 @@
+import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../shared/execution-policy.mjs';
 import { hash, id, now, requireValue } from '../node/common.mjs';
 import { workerAuthorized } from '../node/device-metadata.mjs';
 import { documentExtensions, validDocument } from '../node/input-attachments.mjs';
@@ -132,7 +133,7 @@ export function createRecords({store,storage,serialized,authenticate,owner,assig
         const instructions = input.instructions || ''; requireValue(typeof instructions === 'string' && instructions.length <= 10000,'Invalid instructions');
         requireValue(input.preset !== 'custom' || instructions.trim(),'请填写自定义加工要求');
         if (input.deviceId) requireValue(workerAuthorized(await tx.get('device',input.deviceId)),'Invalid dispatch device');
-        requireValue(!input.agent || ['codex','codebuddy'].includes(input.agent),'Unknown agent');
+        assertExecutionAgent(input.agent);
         const task = {id:id(),submissionId:`record:${operationId}`,recordId,recordVersion:snapshot.version,recordSnapshot:{...snapshot,id:recordId},processing:{preset:input.preset,instructions},content:snapshot.text || '整理这条媒体记录',url:null,type:'note',autoArchive:false,tags:[],scenario:null,preferredDeviceId:input.deviceId || null,preferredAgent:input.agent || null,deviceId:null,archiveId:null,createdAt:now()};
         result = await saveTask(task,'queued','等待可用电脑加工记录',tx);
       } else {

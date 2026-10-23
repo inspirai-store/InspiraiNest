@@ -379,7 +379,7 @@ async function main() {
     const device = await computerMetadata({ server, dataDir: path.dirname(identityFile), installationId, clientType: 'worker', allowChange: true });
     const result = await api({ server }, '/api/pair', 'POST', { key, name: process.env.COLLECTOR_DEVICE_NAME || os.hostname(), ...device });
     requireValue(result.device.role === 'worker', 'Generate a new universal device pairing key');
-    atomicJson(file, { capabilities: ['article', 'webpage'], defaultAgent: 'codex', fallbackAgents: ['codebuddy'], byType: {}, agents: defaults, ...config, installationId, server, token: result.token, deviceId: result.device.id });
+    atomicJson(file, { capabilities: ['article', 'webpage'], defaultAgent: 'codex', fallbackAgents: [], byType: {}, agents: defaults, ...config, installationId, server, token: result.token, deviceId: result.device.id });
     console.log(`Paired ${result.device.name}; credentials stored in ${file}`);
     return;
   }

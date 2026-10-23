@@ -93,13 +93,13 @@ test('permission probe requires a real result file and keeps writing input out o
 test('confirmed permission failures are local to execution mode and automatic routing prefers matching verified paths',t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'capability-observation-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const config={dataDir:root,agents:{codebuddy:{command:'fixture'},codex:{command:'fixture'}}},available={codebuddy:{available:true},codex:{available:true}};
- observeTaskPermission(config,{id:'task'},'codebuddy',{blocked:true});
+ observeTaskPermission(config,{id:'task'},'codex',{blocked:true});
  const observations=JSON.parse(fs.readFileSync(path.join(root,'capability-observations.json')));const facts=capabilityFacts(config,available,{observations});
- assert.equal(facts.find(f=>f.agent==='codebuddy'&&f.id==='capture.article').permission,'blocked');
- assert.equal(facts.find(f=>f.agent==='codebuddy'&&f.id==='writing.materials').permission,'unknown');
- assert.deepEqual(rankExecutionAgents({type:'article'},['codebuddy','codex'],{facts}),['codex']);
- observeTaskPermission(config,{id:'task'},'codebuddy',{passed:true});const refreshed=capabilityFacts(config,available,{observations:JSON.parse(fs.readFileSync(path.join(root,'capability-observations.json')))});
- const f=refreshed.find(f=>f.agent==='codebuddy'&&f.id==='capture.article');assert.deepEqual(rankExecutionAgents({type:'article'},['codex','codebuddy'],{facts:refreshed,proofs:[{agent:'codebuddy',capabilityId:f.id,fingerprint:f.fingerprint,passed:true}]}),['codebuddy','codex']);
+ assert.equal(facts.find(f=>f.agent==='codex'&&f.id==='capture.article').permission,'blocked');
+ assert.equal(facts.find(f=>f.agent==='codex'&&f.id==='writing.materials').permission,'unknown');
+ assert.deepEqual(rankExecutionAgents({type:'article'},['codebuddy','codex'],{facts}),[]);
+ observeTaskPermission(config,{id:'task'},'codex',{passed:true});const refreshed=capabilityFacts(config,available,{observations:JSON.parse(fs.readFileSync(path.join(root,'capability-observations.json')))});
+ const f=refreshed.find(f=>f.agent==='codex'&&f.id==='capture.article');assert.deepEqual(rankExecutionAgents({type:'article'},['codebuddy','codex'],{facts:refreshed,proofs:[{agent:'codex',capabilityId:f.id,fingerprint:f.fingerprint,passed:true}]}),['codex']);
 });
 
 test('control transitions remain events in one task and evidence stays readable after execution device goes offline',async t=>{

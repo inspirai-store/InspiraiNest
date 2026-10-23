@@ -1,3 +1,4 @@
+import {isExecutionAgent,assertExecutionAgent} from '../../../packages/core/shared/execution-policy.mjs';
 import {rankExecutionAgents} from '../../../packages/core/node/capabilities.mjs';
 import spawn from 'cross-spawn';
 import fs from 'node:fs';
@@ -7,7 +8,6 @@ import { resolveAgentProfile, commandEnvironment, agentVersion } from './agent-p
 
 export const defaults = {
   codex: { command: 'codex', args: ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"', '-'] },
-  codebuddy: { enabled: false, command: 'codebuddy', args: ['-p', '--output-format', 'stream-json', '--verbose'] },
 };
 
 export function agentProfile(name, profiles = {}, options) {
@@ -145,10 +145,11 @@ export async function detectAgents(profiles = {}) {
 }
 
 export function agentOrder(config, task, available) {
+  if (task.agent && !isExecutionAgent(task.agent) || task.preferredAgent && !isExecutionAgent(task.preferredAgent)) return [];
   if (task.agent) return available[task.agent]?.available ? [task.agent] : [];
   if (task.preferredAgent) return available[task.preferredAgent]?.available ? [task.preferredAgent] : [];
   const preferred = task.selectedSkills?.length ? task.selectedSkills.map(s => s.agent) : config.byType?.[task.type] || [];
-  return rankExecutionAgents(task,[...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || ['codebuddy'])])].filter(name => available[name]?.available),config.executionCapabilities);
+  return rankExecutionAgents(task,[...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || [])])].filter(name => isExecutionAgent(name) && available[name]?.available),config.executionCapabilities);
 }
 
 export function writingRoundArgs(name,args,reasoningEffort){
@@ -159,6 +160,7 @@ export function writingRoundArgs(name,args,reasoningEffort){
 }
 // Ordinary collection and trials share command resolution, environment and argument handling.
 export function agentExecution(name, profiles, {reasoningEffort, extraArgs=[]}={}) {
+  assertExecutionAgent(name);
   const profile = agentProfile(name, profiles);
   const args=writingRoundArgs(name,profile.args,reasoningEffort), index=args.at(-1)==='-'?args.length-1:args.length;
   return {profile,command:profile.command,args:[...args.slice(0,index),...extraArgs,...args.slice(index)],env:commandEnvironment(profile,agentEnvironment())};

@@ -1,3 +1,4 @@
+import {desktopVersion,updateChannel} from '../shared/desktop-release.mjs';
 import { requireValue, text, hash } from './common.mjs';
 
 export const identitySources = ['smbios', 'ioplatform', 'android-id', 'keychain', 'browser-profile', 'local'];
@@ -93,9 +94,9 @@ export function publicDevices(devices, clock = Date.now()) {
 
 export function clientRuntime(input) {
   if (input === undefined) return undefined;
-  requireValue(input && input.schemaVersion === 1 && /^\d+\.\d+\.\d+$/.test(input.version)
+  requireValue(input && input.schemaVersion === 1 && desktopVersion(input.version)
     && ['win32','darwin','linux'].includes(input.platform) && ['x64','arm64'].includes(input.arch)
     && typeof input.remoteUpdate === 'boolean', 'Invalid client runtime');
   return { schemaVersion:1, version:input.version, platform:input.platform, arch:input.arch,
-    remoteUpdate:input.remoteUpdate && ['win32','darwin'].includes(input.platform) };
+    channel:updateChannel(input.channel), remoteUpdate:input.remoteUpdate && ['win32','darwin'].includes(input.platform) };
 }

@@ -16,6 +16,7 @@ export function diagnosticDetails(value={}){
   return Object.fromEntries(safeKeys.filter(k=>['string','number','boolean'].includes(typeof value?.[k])).map(k=>[k,typeof value[k]==='string'?diagnosticText(value[k],300):value[k]]));
 }
 export function diagnosticCategory(code='',state=''){
+  if(code==='AGENT_DISABLED')return 'environment';
   if(code==='BROWSER_WAITING')return 'manual';
   if(/LOGIN|PERMISSION|AUTH/.test(code))return /SOURCE/.test(code)?'source':'authorization';
   if(/BROWSER|PAGE/.test(code))return 'browser';

@@ -1,3 +1,4 @@
+import {assertExecutionAgent} from '../../../packages/core/shared/execution-policy.mjs';
 import { id, hash, canonicalJson, requireValue } from '../../../packages/core/node/common.mjs';
 import { AGENT_CATALOG, agentDefinition, createAgentCatalog } from './agent-catalog.mjs';
 import { workerAuthorized } from '../../../packages/core/node/device-metadata.mjs';
@@ -66,7 +67,7 @@ export function createAgentService({ store, serialized, owner, worker, body, sen
       send(res, 200, { operations: list.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100) }); return true;
     }
     if (route === '/api/agents/operations' && req.method === 'POST') {
-      owner(device); const input = await body(req);
+      owner(device); const input = await body(req); if(input.agent==='codebuddy')assertExecutionAgent(input.agent);
       requireValue(['install', 'update', 'refresh','uninstall'].includes(input.action) && /^[\w-]{1,100}$/.test(input.requestId || ''), 'Agent 操作无效');
       const definition = input.action === 'refresh' ? null : agentDefinition(input.agent);
       if(input.action==='uninstall')requireValue(Array.isArray(input.cancelTaskIds)&&input.cancelTaskIds.every(x=>typeof x==='string'),'请确认关联任务');

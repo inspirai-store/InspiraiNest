@@ -15,7 +15,7 @@ import controls from './SkillPublishPreview.module.css';
 const systemNames={darwin:'macOS',win32:'Windows',linux:'Linux'};
 export function SkillVersionDetail({version,target,back,compare,verify,busy=false}:{version:SkillVersion;target:ReactNode;back:()=>void;compare:(agents:SkillAgent[])=>void;verify:()=>void;busy?:boolean}){
  const [agents,setAgents]=useState<SkillAgent[]>(()=>version.policy.agents.slice(0,1));
- return <ModuleContent className={detail.content} data-region="技能版本详情"><ModuleHeader className={detail.header} title={version.name} actions={<> <ModuleActions><Action disabled={busy||!version.policy.agents.some(agent=>['codex','codebuddy'].includes(agent))} onClick={verify}>验证</Action><Action icon={ArrowLeft} onClick={back}>返回</Action></ModuleActions> </>}/>
+ return <ModuleContent className={detail.content} data-region="技能版本详情"><ModuleHeader className={detail.header} title={version.name} actions={<> <ModuleActions><Action disabled={busy||!version.policy.agents.some(agent=>['codex'].includes(agent))} onClick={verify}>验证</Action><Action icon={ArrowLeft} onClick={back}>返回</Action></ModuleActions> </>}/>
  <div className={detail.info}><p>版本　{versionLabel(version)}</p><p>适用 Agent　{version.policy.agents.map(agent=>agentNames[agent]).join(' · ')}</p><p className={detail.path}>适用系统　{version.policy.systems.map(system=>systemNames[system]).join(' · ')}</p></div>
  {version.description&&<p className={detail.description}>{version.description}</p>}
  {!!version.files?.length&&<><h3>文件</h3><FileRows items={version.files.map(file=>({id:file.path,label:file.path,value:fileBytes(file.bytes)}))}/></>}

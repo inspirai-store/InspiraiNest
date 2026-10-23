@@ -1,0 +1,1 @@
+[{"version":"0.2.31","channel":"stable","publishedAt":null,"releaseNotes":"采集与写作停用 CodeBuddy 新执行路径，保留历史。\n新增正式版和 Beta 更新通道、中文更新日志与独立更新记录。\n展示真实增量下载和完整包回退状态，安装前检查写作恢复副本。"}]

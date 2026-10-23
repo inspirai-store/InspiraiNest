@@ -1,3 +1,4 @@
+import {createUpdatePreparation} from './update-safety.mjs';
 import {scanAgents} from '../../plugins/ai-assistant/worker/agent-install.mjs';
 import {createInventoryScanner} from '../../plugins/ai-assistant/worker/skill-scan.mjs';
 import {trialLoginAction} from './trial-login.mjs';
@@ -52,6 +53,7 @@ const ownsLock = app.requestSingleInstanceLock();
 const credentialEncryption = process.env.COLLECTOR_DESKTOP_TEST === '1' && process.env.COLLECTOR_DESKTOP_STORAGE_FIXTURE === '1'
   ? { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('fixture:' + value), decryptString: value => value.toString().slice(8) }
   : safeStorage;
+let updatePreparation;
 let owner, updates, remoteUpdates, remoteUpdateTimer, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
 let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
@@ -268,8 +270,8 @@ function registerIPC() {
   for (const [name, fn] of Object.entries(library)) ipcMain.handle(`library:${name}`, async (event, argument) => { trustedMain(event); return fn(argument); });
   for (const [name, fn] of Object.entries({
     status: () => updates.snapshot(), check: () => updates.check(),
-    download: () => updates.download(), install: () => updates.install(),
-  })) ipcMain.handle(`updates:${name}`, async event => { trusted(event); if (event.sender !== main?.webContents) throw new Error('请在主窗口管理客户端更新'); return fn(); });
+    download: input => updates.download(input), install: () => updates.install(), setChannel: input=>updates.setChannel(input), notes:()=>updates.notes(), records:()=>updates.records(),
+  })) ipcMain.handle(`updates:${name}`, async (event,input) => { trusted(event); if (event.sender !== main?.webContents) throw new Error('请在主窗口管理客户端更新'); return fn(input); });
 }
 async function menuAction(action) {
   try { await perform(action); }
@@ -330,7 +332,7 @@ else {
     workerSession?.observe();
     remoteUpdates?.dispose();clearInterval(remoteUpdateTimer);
     if (isMac && !quitting && !endingSession && updates?.snapshot().phase !== 'installing') { event.preventDefault(); void menuAction('quit-after'); return; }
-    quitting = true; managerRevision++; loginController?.abort(); panelController?.dispose(); clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
+    quitting = true; managerRevision++; loginController?.abort(); panelController?.dispose(); clearInterval(updateTimer); clearTimeout(initialUpdateTimer); updates?.dispose();updatePreparation?.dispose(); settings?.dispose(); clearInterval(refreshTimer); clearTimeout(clickTimer); clearTimeout(dockHideTimer);
   });
   app.whenReady().then(() => {
     loginItem = new DesktopLoginItem({ app, test: process.env.COLLECTOR_DESKTOP_TEST === '1' });
@@ -338,8 +340,8 @@ else {
     workerSession = new WorkerSession({ file: path.join(app.getPath('userData'), 'desktop-worker-state.json'), manager });
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', workerConfiguration: () => manager.configuration(), encryption: credentialEncryption, identityDir: manager.dataDir });
-    updates = new DesktopUpdater({ app, version:app.isPackaged?app.getVersion():appVersion(), manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
-      beforeInstall:()=>remoteUpdates?.beforeInstall() });
+    updates = new DesktopUpdater({ app, version:app.isPackaged?app.getVersion():appVersion(), stateFile:path.join(app.getPath('userData'),'desktop-updates.json'),releaseNotes:JSON.parse(fs.readFileSync(new URL('./release-notes.json',import.meta.url),'utf8')), manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
+      beforePrepare:()=>updatePreparation.prepare(), beforeInstall:()=>remoteUpdates?.beforeInstall() });
     remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:updates.snapshot().version,updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),
       request:async(route,method='GET',value)=>{
         if(!/^\/api\/client-updates\/(runtime|inbox|operations\/[a-f0-9]{64}\/result)$/.test(route))throw new Error('更新请求无效');
@@ -348,6 +350,7 @@ else {
         const result=await response.json();if(!response.ok)throw Object.assign(new Error('远程更新请求失败'),{status:response.status});return result;
       } });
     main = makeWindow(); popover = makeWindow(true);
+    updatePreparation=createUpdatePreparation({ipcMain,windows:()=>BrowserWindow.getAllWindows().filter(w=>[main,popover].includes(w)||w.webContents.getURL().includes('/desktop/frontend/dist/'))});
     settings.on('changed', value => {
       for (const window of [main, popover]) if (window && !window.isDestroyed()) {
         window.setBackgroundColor(settings.background());

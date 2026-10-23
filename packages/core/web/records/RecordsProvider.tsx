@@ -1,3 +1,4 @@
+import {registerUpdateGuard} from '../shared/update-safety';
 import {useUiState} from '../workspace/UiState';
 import {errorMessage} from '../shared/errors.ts';
 import {createContext,useContext,useEffect,useMemo,useRef,useState} from 'react';
@@ -34,6 +35,7 @@ export function RecordsProvider({children}:{children:ReactNode}) {
   const unsubscribe=window.library?.onChanged?.(changed);
   return()=>{active=false;stop();service.invalidateSession();unsubscribe?.();};
  },[service,client,pages]);
+ useEffect(()=>registerUpdateGuard(async()=>{if(mediaStatus!=='idle')throw Error('请先完成录音');if(optimisticDraft.current)await saveDraft(optimisticDraft.current);else if(draftStatus==='error')throw Error('草稿未保存');await service.flushLocal();}),[service,mediaStatus,draftStatus,session]);
  const taskCount=query.data?.taskCount??0;
  return <Context.Provider value={{recoveries:query.data?.recoveries??[],lastCheckedAt:query.data?.lastCheckedAt,taskCount,mediaStatus,setMediaStatus,draftStatus,saveDraft,saveRecord,ui,updateUi,service,reload,session,draft:query.data?.draft,records:query.data?.records??[],loading:query.isPending,error:query.error instanceof Error?query.error.message:error,setError}}>{children}</Context.Provider>;
 }

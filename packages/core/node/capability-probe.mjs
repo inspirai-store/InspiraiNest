@@ -1,9 +1,10 @@
+import {isExecutionAgent,assertExecutionAgent} from '../shared/execution-policy.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {hash,atomicJson} from './common.mjs';
 export function capabilityFacts(config,available,{version='unknown',skills={},tools={},observations={},enabled={},browser={},runtime=null}={}){
   const checkedAt=new Date().toISOString(),result=[];
-  for(const [agent,probe]of Object.entries(available))for(const id of ['capture.article','capture.media','capture.browser','writing.materials','writing.selection','writing.creation']){
+  for(const [agent,probe]of Object.entries(available).filter(([agent])=>isExecutionAgent(agent)))for(const id of ['capture.article','capture.media','capture.browser','writing.materials','writing.selection','writing.creation']){
     if(id==='writing.creation'&&agent!=='codex')continue;
     const fingerprint=hash(JSON.stringify({agent,profile:config.agents?.[agent]||null,version,agentVersion:probe.version||null,skill:skills[id]||null,platform:process.platform,runtime,tools:id==='capture.media'?tools:null}));
     const observed=observations[agent+':'+(id.startsWith('capture.')?'capture':'writing')],matching=observed?.profileHash===hash(JSON.stringify(config.agents?.[agent]||null));
@@ -20,7 +21,7 @@ export async function probeCapabilityTools(run){
   }));return Object.fromEntries(values);
 }
 export async function runCapabilityProbe(config,agent,run,{signal,mode='capture'}={}){
-  if(!['codex','codebuddy'].includes(agent))throw Error('Unsupported execution tool');
+  assertExecutionAgent(agent);
   const workspace=fs.mkdtempSync(path.join(config.dataDir,'capability-probe-'));
   fs.writeFileSync(path.join(workspace,'AGENTS.md'),'仅在本目录完成权限样例。不得访问其他文件、联网、读取凭据或创建后台任务。\n');
   const output=path.join(workspace,'capability-ready.json');
@@ -31,7 +32,7 @@ export async function runCapabilityProbe(config,agent,run,{signal,mode='capture'
 }
 
 export function observeTaskPermission(config,task,agent,{blocked=false,passed=false}={}){
-  if(!['codex','codebuddy'].includes(agent)||!blocked&&!passed)return;
+  if(!isExecutionAgent(agent)||!blocked&&!passed)return;
   const file=path.join(config.dataDir,'capability-observations.json'),mode=task.writingSessionId||task.purpose==='selection-writing'?'writing':'capture';
   let old={};try{old=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
   try{atomicJson(file,{...old,[agent+':'+mode]:{agent,mode,profileHash:hash(JSON.stringify(config.agents?.[agent]||null)),permission:blocked?'blocked':'ready',code:blocked?'AGENT_PERMISSION':'TASK_PASSED',at:new Date().toISOString()}});}catch{}

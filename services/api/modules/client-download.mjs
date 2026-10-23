@@ -1,3 +1,4 @@
+import {desktopReleases} from './desktop-releases.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -5,6 +6,8 @@ import QRCode from 'qrcode';
 
 // Only this versioned, checksummed release is exposed; never serve the build directory.
 export function clientDownload({ releaseDir, publicUrl }) {
+  const desktop=desktopReleases(releaseDir);
+  const verified=new Map();
   const brandedNames = (version, suffix) => ['InspiraiNest', 'LingNest'].map(brand => `${brand}-v${version}-${suffix}`);
   function release() {
     try {
@@ -20,10 +23,12 @@ export function clientDownload({ releaseDir, publicUrl }) {
         aliases: brandedNames(meta.version, 'Android.apk').map(name => '/downloads/' + name) };
     } catch { return null; }
   }
-  function workerReleases() {
+  function workerReleases(channel='stable') {
+    const modern=desktop.platformReleases(channel);
+
     try {
       const manifest = JSON.parse(fs.readFileSync(path.join(releaseDir, 'worker-release.json'), 'utf8'));
-      return Object.fromEntries(['windows_x64', 'macos_x64', 'macos_arm64', 'macos_x64_dmg', 'macos_arm64_dmg'].map(platform => {
+      const legacy=Object.fromEntries(['windows_x64', 'macos_x64', 'macos_arm64', 'macos_x64_dmg', 'macos_arm64_dmg'].map(platform => {
         try {
         const meta = manifest[platform];
         const extension = platform.endsWith('_dmg') ? 'dmg' : 'zip';
@@ -37,7 +42,8 @@ export function clientDownload({ releaseDir, publicUrl }) {
           legacyUrl: `/downloads/personal-library-worker-${meta.version}-${platform.replaceAll('_', '-')}.${platform === 'windows_x64' ? 'exe' : extension}` }];
         } catch { return [platform, null]; }
       }));
-    } catch { return { windows_x64: null, macos_x64: null, macos_arm64: null, macos_x64_dmg: null, macos_arm64_dmg: null }; }
+      return {...legacy,...Object.fromEntries(Object.entries(modern).filter(([,value])=>value))};
+    } catch { return { windows_x64:null,macos_x64:null,macos_arm64:null,macos_x64_dmg:null,macos_arm64_dmg:null,...modern }; }
   }
   function readerReleases() {
     const empty = { cli: {}, skill: null, checksums: null };
@@ -72,7 +78,7 @@ export function clientDownload({ releaseDir, publicUrl }) {
     } catch { return []; }
   }
   const handler = async (req, res, route) => {
-    if (!['/client-release.json', '/download/qr.svg'].includes(route) && !route.startsWith('/downloads/') && !route.startsWith('/updates/macos/')) return false;
+    if (!['/client-release.json', '/download/qr.svg'].includes(route) && !route.startsWith('/downloads/') && !route.startsWith('/updates/macos/') && !route.startsWith('/updates/windows/')) return false;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return true; }
     const meta = release();
     const workers = workerReleases();
@@ -80,7 +86,7 @@ export function clientDownload({ releaseDir, publicUrl }) {
     if (route === '/client-release.json') {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ android: meta, ios: null, worker: workers, reader })); return true;
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ android: meta, ios: null, worker: workers, reader,desktop:desktop.publicIndex() })); return true;
     }
     if (route === '/download/qr.svg') {
       const scheme = req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https' ? 'https:' : 'http:';
@@ -88,14 +94,25 @@ export function clientDownload({ releaseDir, publicUrl }) {
       const svg = await QRCode.toString(origin + '/download', { type: 'svg', margin: 2, width: 168, color: { dark: '#176f5b', light: '#ffffff' } });
       res.setHeader('Content-Type', 'image/svg+xml'); res.end(req.method === 'HEAD' ? undefined : svg); return true;
     }
-    const selected = [meta, ...Object.values(workers), ...Object.values(reader.cli), reader.skill, reader.checksums, ...macUpdates(workers)].find(item => item &&
+    const feedRoute=route.match(/^\/updates\/(macos|windows)\/(latest|beta)(-mac)?\.yml$/);
+    if(feedRoute){
+      const [,platform,channel,suffix]=feedRoute;
+      if((platform==='macos')===Boolean(suffix)){
+        const value=desktop.feed(platform,channel==='latest'?'stable':'beta');
+        if(value){res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','text/yaml; charset=utf-8');res.setHeader('Content-Length',Buffer.byteLength(value));res.end(req.method==='HEAD'?undefined:value);return true;}
+      }
+    }
+    const selected = [meta, ...Object.values(workers), ...Object.values(reader.cli), reader.skill, reader.checksums, ...macUpdates(workers),...desktop.assetList()].find(item => item &&
       (item.url === route || item.browserUrl === route || item.legacyUrl === route || item.aliases?.includes(route)));
     if (!selected) { res.writeHead(404); res.end('Release not available'); return true; }
     const file = path.join(releaseDir, selected.filename);
-    const digest = createHash('sha256');
-    for await (const chunk of fs.createReadStream(file)) digest.update(chunk);
-    if (digest.digest('hex') !== selected.sha256) { res.writeHead(503); res.end('Release verification failed'); return true; }
-    if (route.startsWith('/updates/macos/')) res.setHeader('Cache-Control', 'no-store');
+    const stat=fs.statSync(file),cacheKey=selected.sha256+':'+stat.size+':'+stat.mtimeMs;
+    if(verified.get(file)!==cacheKey){
+      const digest=createHash('sha256');for await(const chunk of fs.createReadStream(file))digest.update(chunk);
+      if(digest.digest('hex')!==selected.sha256){res.writeHead(503);res.end('Release verification failed');return true;}
+      verified.set(file,cacheKey);
+    }
+    if (route.startsWith('/updates/')) res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', selected.filename.endsWith('.apk') ? 'application/vnd.android.package-archive' : selected.filename.endsWith('.yml') ? 'text/yaml; charset=utf-8' : 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${selected.filename}"`);
     res.setHeader('Accept-Ranges', 'bytes');

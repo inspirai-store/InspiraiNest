@@ -7,6 +7,7 @@ directories:
 files:
   - package.json
   - LICENSE
+  - apps/desktop/release-notes.json
   - apps/desktop/*.mjs
   - apps/desktop/*.cjs
   - apps/desktop/*.js
@@ -35,6 +36,10 @@ extraResources:
 win:
   icon: apps/desktop/icon.ico
   target: nsis
+  publish:
+    provider: generic
+    url: https://library.inspirai.store/updates/windows
+    useMultipleRangeRequest: false
   artifactName: InspiraiNest-v${version}-Windows-${arch}.${ext}
 nsis:
   oneClick: true

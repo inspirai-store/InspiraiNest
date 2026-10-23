@@ -34,8 +34,15 @@ contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
 contextBridge.exposeInMainWorld('updates', {
   status: () => invoke('updates:status'),
   check: () => invoke('updates:check'),
-  download: () => invoke('updates:download'),
+  download: input => invoke('updates:download',input),
+  setChannel: input=>invoke('updates:setChannel',input), notes:()=>invoke('updates:notes'), records:()=>invoke('updates:records'),
   install: () => invoke('updates:install'),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('updates:changed', listener); return () => ipcRenderer.removeListener('updates:changed', listener); },
   onOpen: callback => { const listener = () => callback(); ipcRenderer.on('updates:open', listener); return () => ipcRenderer.removeListener('updates:open', listener); },
 });
+
+const updateGuards=new Set();
+contextBridge.exposeInMainWorld('desktopUpdateSafety',{register:callback=>{updateGuards.add(callback);return()=>updateGuards.delete(callback);}});
+let updateComposing=false;
+window.addEventListener('compositionstart',()=>{updateComposing=true;});window.addEventListener('compositionend',()=>{updateComposing=false;});
+ipcRenderer.on('updates:prepare',async(_event,input)=>{let ok=false;try{if(updateComposing)throw Error('正在输入');await Promise.all([...updateGuards].map(callback=>callback()));ok=true;}catch{}ipcRenderer.send('updates:prepared',{requestId:input.requestId,ok});});

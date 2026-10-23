@@ -2,7 +2,6 @@ import { requireValue } from '../../../packages/core/node/common.mjs';
 
 export const AGENT_CATALOG = Object.freeze([
   { id: 'codex', name: 'Codex', package: '@openai/codex', command: 'codex' },
-  { id: 'codebuddy', name: 'CodeBuddy', package: '@tencent-ai/codebuddy-code', command: 'codebuddy' },
   { id: 'claude', name: 'Claude Code', package: '@anthropic-ai/claude-code', command: 'claude' },
   { id: 'gemini', name: 'Gemini CLI', package: '@google/gemini-cli', command: 'gemini' },
   { id: 'opencode', name: 'OpenCode', package: 'opencode-ai', command: 'opencode' },

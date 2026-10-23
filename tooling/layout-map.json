@@ -865,5 +865,7 @@
   "collector/desktop/frontend/src/creation/CreationWorkbench.tsx": "plugins/writing/web/creation/CreationWorkbench.tsx",
   "collector/src/creation-diagnostics.mjs": "plugins/writing/protocol/creation-diagnostics.mjs",
   "collector/src/lingnest-tools.mjs": "packages/core/node/lingnest-tools.mjs",
-  "collector/desktop/frontend/src/diagnostics/ExecutionRecords.tsx": "packages/core/web/diagnostics/ExecutionRecords.tsx"
+  "collector/desktop/frontend/src/diagnostics/ExecutionRecords.tsx": "packages/core/web/diagnostics/ExecutionRecords.tsx",
+  "collector/src/execution-policy.mjs": "packages/core/shared/execution-policy.mjs",
+  "collector/src/desktop-release.mjs": "packages/core/shared/desktop-release.mjs"
 }

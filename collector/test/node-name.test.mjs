@@ -53,6 +53,6 @@ for (const mysql of [false,true]) {
     assert.ok(results.every(r=>r.status===200));
     assert.equal((await f.rename({name:'最终名称'})).status,200); assert.equal((await heartbeat()).status,200);
     const result = await f.app.store.get('device',f.node.device.id);
-    assert.equal(result.name,'最终名称'); assert.deepEqual(result.capabilities,['video']); assert.deepEqual(result.agents,['codebuddy']); assert.equal(result.id,f.node.device.id);
+    assert.equal(result.name,'最终名称'); assert.deepEqual(result.capabilities,['video']); assert.deepEqual(result.agents,[]); assert.equal(result.id,f.node.device.id);
   });
 }

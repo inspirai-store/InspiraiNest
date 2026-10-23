@@ -34,6 +34,7 @@ export class RecordsService {
   store: RecordStore; private baseStore:RecordStore; readonly transport: RecordTransport;
   constructor(store: RecordStore, transport: RecordTransport) {this.baseStore=store;this.store=new AccountRecordStore(store,this.connection);this.transport=transport;}
   private serial<T>(work: () => Promise<T>): Promise<T> { const result = this.queue.then(work); this.queue = result.catch(() => {}); return result; }
+  async flushLocal(){await this.queue;}
   invalidateSession() { this.activeTaskCount = 0; this.epoch++; this.statusPending=null; this.protocol=null; this.connection = {paired:false,server:''}; }
   private statusPending:Promise<Connection&{epoch:number}>|null=null;
   private status() { if(this.statusPending)return this.statusPending;const pending=this.readStatus();this.statusPending=pending;void pending.finally(()=>{if(this.statusPending===pending)this.statusPending=null;}).catch(()=>{});return pending; }

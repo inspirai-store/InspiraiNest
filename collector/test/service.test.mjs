@@ -280,9 +280,9 @@ test('MySQL waiting tasks release the slot and retries retain original-computer 
 test('Worker continues after a source obstacle and explicit retry reuses the retained workspace', async t => {
   const { owner, root, pairWorker, submit } = await setup(t);
   const worker = await pairWorker();
-  const blocked = await submit({ agent: 'codex' });
+  const blocked = await submit({ agent: 'codex',content:'fixture-source-blocked' });
   const dataDir = path.join(root, 'worker');
-  const agents = { codex: { ...profiles.codex, args: [fixture, '--wait-once'] }, codebuddy: { ...profiles.codex, enabled: true } };
+  const agents = { codex: { ...profiles.codex, args: [fixture, '--wait-once','--wait-match','fixture-source-blocked'] }, codebuddy: { ...profiles.codex, enabled: true } };
   const controller = new AbortController();
   const running = runWorker({ ...worker, dataDir, agents, capabilities: ['article'], pollMs: 1 }, { signal: controller.signal });
   try {
@@ -296,7 +296,7 @@ test('Worker continues after a source obstacle and explicit retry reuses the ret
     assert.equal(state.tasks.find(task => task.id === blocked.id).state, 'waiting_action');
     // Establish the obstacle before enqueueing the next task; equal millisecond
     // timestamps do not imply a stable FIFO order across database engines.
-    const next = await submit({ agent: 'codebuddy' });
+    const next = await submit({ agent: 'codex' });
     const deadline = Date.now() + 15000;
     do {
       state = await api(owner, '/api/state');
@@ -384,10 +384,10 @@ test('manual collection sync establishes a baseline, then uploads changes or exp
 test('routing preference and unsafe paths', () => {
   const available = { codex: { available: true }, codebuddy: { available: true } };
   const config = { defaultAgent: 'codex', fallbackAgents: ['codebuddy'], byType: { video: ['codebuddy'] } };
-  assert.deepEqual(agentOrder(config, { type: 'video' }, available), ['codebuddy', 'codex']);
+  assert.deepEqual(agentOrder(config, { type: 'video' }, available), ['codex']);
   assert.deepEqual(agentOrder(config, { type: 'video', preferredAgent: 'codex' }, available), ['codex']);
   assert.deepEqual(agentOrder(config, { type: 'video', agent: 'codex' }, {codebuddy:{available:true}}), []);
-  assert.deepEqual(agentOrder(config, { type: 'article' }, { codex: { available: false }, codebuddy: { available: true } }), ['codebuddy']);
+  assert.deepEqual(agentOrder(config, { type: 'article' }, { codex: { available: false }, codebuddy: { available: true } }), []);
   for (const candidate of ['../escape', '/etc/passwd', 'C:/foo', 'a\\b', 'a/../b', 'NUL.txt', 'a./b']) assert.throws(() => safePath(candidate));
   const failure = { code: 1, tail: JSON.stringify({ type: 'turn.failed', error: { message: "The 'gpt-6-astra' model requires a newer version of Codex." } }) };
   assert.equal(unavailableBeforeWork(failure), true);

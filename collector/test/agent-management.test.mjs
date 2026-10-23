@@ -71,7 +71,7 @@ test('Agent inventory preserves custom executables and managed runtimes; install
  assert.equal(resolveAgentProfile('codex',{command:'/custom/codex'},{home}).command,'/custom/codex');
  assert.equal(commandEnvironment(profile,{ELECTRON_RUN_AS_NODE:'1',PATH:'/usr/bin'}).ELECTRON_RUN_AS_NODE,undefined);
  const inventory=await scanAgents({}, {home,env:{PATH:''},probe:async()=>({code:0,tail:'codex 1.2.3'})});
- assert.equal(inventory.agents.length,5);assert.equal(inventory.agents[0].source,'managed');assert.equal(inventory.agents[0].installed,true);
+ assert.equal(inventory.agents.length,4);assert.equal(inventory.agents.some(a=>a.id==='codebuddy'),false);assert.equal(inventory.agents[0].source,'managed');assert.equal(inventory.agents[0].installed,true);
  const clean=installerEnvironment({HOME:home,PATH:'/bin',OPENAI_API_KEY:'secret',NPM_TOKEN:'secret',COLLECTOR_CONFIG:'secret',ELECTRON_RUN_AS_NODE:'1'});
  assert.deepEqual(clean,{HOME:home,PATH:'/bin'});
  assert.throws(()=>validateRelease({...release('codex'),tarball:'https://example.com/a'},'codex'),/来源/);

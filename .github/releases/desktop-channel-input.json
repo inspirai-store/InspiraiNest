@@ -1,0 +1,10 @@
+{
+  "tag": "desktop-updates-031-reviewed-source",
+  "sha256": "ce19cba0977ac309a16dfad54fd07074b6f32c35b78734c6dbd6b2055c65cb61",
+  "versions": [
+    "0.2.31-beta.1",
+    "0.2.31"
+  ],
+  "baseline": "0.2.30",
+  "notes": "Compatible installed runtime source; writing, capture and evidence preserved. No user profile, task workspaces or credentials included."
+}

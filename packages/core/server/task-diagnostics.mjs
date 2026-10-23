@@ -1,3 +1,4 @@
+import {isExecutionAgent} from '../shared/execution-policy.mjs';
 import {id,now,hash,requireValue} from '../node/common.mjs';
 import {workerAuthorized,workerOnline} from '../node/device-metadata.mjs';
 import {diagnosticScope,diagnosticText,diagnosticDetails,diagnosticCategory,capabilityKey} from '../node/task-diagnostics.mjs';
@@ -7,6 +8,7 @@ import {capabilityBlock} from '../node/capabilities.mjs';
 const capabilityNames={'capture.article':'网页正文与配图','capture.media':'音视频分析','capture.browser':'外部浏览器','writing.materials':'资料写作','writing.selection':'选区改写','writing.creation':'文稿创作'};
 
 function recoveryCondition(code){
+  if(code==='AGENT_DISABLED')return {code,action:'在原任务中确认改用 Codex，沿用 taskId；旧执行记录与成果保留',same_task:true};
  const action=code==='BROWSER_WAITING'?'在采集页交还页面控制后继续原任务':/PERMISSION/.test(code)?'在对应客户端完成执行工具授权并检测能力，再继续原任务':/VERSION|PROTOCOL/.test(code)?'在原节点安装兼容的客户端和固定技能版本后继续原任务':/NETWORK|UPLOAD|HTTP|REMOTE/.test(code)?'恢复对应执行工具或服务连接后，复用已保存成果继续原任务':/SOURCE|LOGIN|CHALLENGE/.test(code)?'查看原来源页面，完成所需登录或验证后继续原任务':/QUALITY|COVERAGE|MISSING|VALIDAT|RESULT/.test(code)?'按本次证据补齐缺失内容或修复结果，再继续原任务':/BROWSER|PAGE/.test(code)?'恢复原来源页面连接后继续原任务':/TIMEOUT/.test(code)?'检查本机执行日志与保留成果，处理超时条件后继续原任务':'核对本次证据并处理已确认的阻塞条件，再继续原任务';
  return {code,action,same_task:true};
 }
@@ -52,13 +54,14 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
         skillVersions:(task.selectedSkills||[]).map(({name,hash,versionId,agent})=>({name,hash,versionId,agent})),writingSkill:task.writingSnapshot?.skill?{hash:task.writingSnapshot.skill.hash,version:task.writingSnapshot.protocolVersion}:null,
         environmentDigest:task.environmentDigest||device.environment?.digest||null,capabilityId:capabilityKey(task),state});
     }
+    if(state==='waiting_action'&&task.actionRequired?.kind==='agent_disabled')await tx.put('task-diagnostic',{id:id(),taskId:task.id,attemptId:task.attemptId||null,deviceId:task.deviceId||null,at:now(),state,stage:'routing',code:'AGENT_DISABLED',category:'environment',reportedBy:'server',message:'CodeBuddy 执行方式已停用，原任务与成果保留；请确认改用 Codex',details:{}});
     if(task.attemptId){
       const attempt=await tx.get('task-attempt',task.attemptId);
       if(attempt){const device=await tx.get('device',attempt.deviceId)||{},agent=task.agent||attempt.agent;
         const fact=device.capabilityFacts?.find(f=>f.id===attempt.capabilityId&&f.agent===agent);
         const matchesSkill=!task.writingSessionId||task.writingSnapshot?.skill?.hash===fact?.skill;
         const skillVersions=(task.executionSkills?.length?task.executionSkills:task.selectedSkills||[]).map(({name,hash,versionId,agent})=>({name,hash,versionId,agent}));
-        await tx.put('task-attempt',{...attempt,state:state==='queued'?attempt.state:state,...(state==='queued'?{endedAt:now()}:{}),agent,skillVersions,capabilityFingerprint:matchesSkill?(fact?.fingerprint||attempt.capabilityFingerprint||null):null,...(['completed','awaiting_review'].includes(state)?{resultValidatedAt:now()}:{}),updatedAt:now()});
+        await tx.put('task-attempt',(state==='queued'||task.actionRequired?.kind==='agent_disabled')?{...attempt,endedAt:attempt.endedAt||now(),updatedAt:now()}:{...attempt,state:state==='queued'?attempt.state:state,...(state==='queued'?{endedAt:now()}:{}),agent,skillVersions,capabilityFingerprint:matchesSkill?(fact?.fingerprint||attempt.capabilityFingerprint||null):null,...(['completed','awaiting_review'].includes(state)?{resultValidatedAt:now()}:{}),updatedAt:now()});
         await tx.put('task-diagnostic',{id:id(),taskId:task.id,attemptId:attempt.id,deviceId:attempt.deviceId,at:now(),state,stage:state,code:'TASK_'+state.toUpperCase(),category:diagnosticCategory('',state),reportedBy:'server',message:diagnosticText(message),details:{}});}
     }
   }
@@ -78,13 +81,13 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
   }
   async function routingEvaluations(task,target=store){
     const devices=(await target.list('device')).filter(workerAuthorized);
-    return devices.map(d=>{let reason=null;if(task.preferredDeviceId&&task.preferredDeviceId!==d.id)reason='OTHER_NODE_SELECTED';else if(!workerOnline(d,clock()))reason='NODE_OFFLINE';else if(task.preferredAgent&&!d.agents?.includes(task.preferredAgent))reason='AGENT_UNAVAILABLE';else if(task.writingSnapshot?.skill&&!d.writingSkills?.some(s=>s.hash===task.writingSnapshot.skill.hash))reason='SKILL_VERSION_MISMATCH';else if(!d.agents?.length)reason='AGENT_UNAVAILABLE';
+    return devices.map(d=>{let reason=null;if(task.preferredAgent&&!isExecutionAgent(task.preferredAgent))reason='AGENT_DISABLED';else if(task.preferredDeviceId&&task.preferredDeviceId!==d.id)reason='OTHER_NODE_SELECTED';else if(!workerOnline(d,clock()))reason='NODE_OFFLINE';else if(task.preferredAgent&&!d.agents?.includes(task.preferredAgent))reason='AGENT_UNAVAILABLE';else if(task.writingSnapshot?.skill&&!d.writingSkills?.some(s=>s.hash===task.writingSnapshot.skill.hash))reason='SKILL_VERSION_MISMATCH';else if(!d.agents?.length)reason='AGENT_UNAVAILABLE';
       reason ||= capabilityBlock(task,d);
       return {device_id:d.id,device_name:d.name,eligible:!reason,reason,evaluated_at:new Date(clock()).toISOString()};});
   }
   async function capabilities(deviceId){
     const device=await store.get('device',deviceId);requireValue(device&&!device.revokedAt,'Device not found',404);
-    const attempts=(await store.list('task-attempt')).filter(a=>a.deviceId===deviceId),facts=device.capabilityFacts||[];
+    const attempts=(await store.list('task-attempt')).filter(a=>a.deviceId===deviceId),facts=(device.capabilityFacts||[]).filter(f=>isExecutionAgent(f.agent));
     const proofs=attempts.filter(a=>a.resultValidatedAt).map(a=>({capabilityId:a.capabilityId,fingerprint:a.capabilityFingerprint,passed:true}));
     return {schema_version:1,device_id:deviceId,online:workerOnline(device,clock()),execution_role:workerAuthorized(device)?'local':'dispatch',tooling:device.lingnestTools||null,checks:(await store.list('capability-check')).filter(c=>c.deviceId===deviceId).slice(-10),capabilities:Object.entries(capabilityNames).map(([key,label])=>{
       const routes=facts.filter(f=>f.id===key).map(f=>evaluateCapability(device,key,{online:workerOnline(device,clock()),busy:device.skillRuntime?.idle===false,proofs,facts:[f]}));
@@ -98,7 +101,7 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
       requireValue(device.role==='owner','Owner permission required',403);const target=await store.get('device',check[1]);requireValue(target&&workerAuthorized(target),'Worker not found',404);
       const input=await body(req);requireValue(!input.action||['probe','install-tools'].includes(input.action),'Invalid capability action');
       if(input.action==='install-tools'){const checks=[await store.put('capability-check',{id:id(),deviceId:target.id,agent:'codex',mode:'writing',action:'install-tools',state:'queued',createdAt:now()})];send(res,200,{checks});return true;}
-      const queued=[];await serialized('capability-check:'+target.id,async()=>{for(const agent of target.agents||[])for(const mode of ['capture','writing']){const previous=(await store.list('capability-check')).find(c=>c.deviceId===target.id&&c.agent===agent&&c.mode===mode&&c.state==='queued');queued.push(previous||await store.put('capability-check',{id:id(),deviceId:target.id,agent,mode,state:'queued',createdAt:now()}));}});
+      const queued=[];await serialized('capability-check:'+target.id,async()=>{for(const agent of (target.agents||[]).filter(isExecutionAgent))for(const mode of ['capture','writing']){const previous=(await store.list('capability-check')).find(c=>c.deviceId===target.id&&c.agent===agent&&c.mode===mode&&c.state==='queued');queued.push(previous||await store.put('capability-check',{id:id(),deviceId:target.id,agent,mode,state:'queued',createdAt:now()}));}});
       send(res,200,{checks:queued});return true;
     }
     const checkResult=route.match(/^\/api\/capability-checks\/([\w-]+)\/result$/);

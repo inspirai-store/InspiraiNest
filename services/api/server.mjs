@@ -1,3 +1,4 @@
+import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../packages/core/shared/execution-policy.mjs';
 import {repositoryRoot,collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import {createPluginHost,collectionAccess,isCollectionAccess} from '../../packages/plugin-sdk/server.mjs';
 import {definitions} from '../../plugins/registry.mjs';
@@ -250,6 +251,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function recoverUnavailableTasks() {
     return serialized('claim', async () => {
       for (const candidate of await store.list('task')) {
+        if (['queued','failed','waiting_action'].includes(candidate.state) && (candidate.preferredAgent==='codebuddy'||candidate.agent==='codebuddy') && candidate.actionRequired?.kind!=='agent_disabled') {
+          await store.transaction(async tx=>{const live=await tx.getForUpdate('task',candidate.id);if(!live||!['queued','failed','waiting_action'].includes(live.state))return;await saveTask({...live,actionRequired:{kind:'agent_disabled',label:'改用 Codex',code:'AGENT_DISABLED'}},'waiting_action','CodeBuddy 执行方式已停用，原任务与成果保留；请确认改用 Codex',tx);});
+          continue;
+        }
         if (!['assigned', 'running'].includes(candidate.state) || !candidate.deviceId) continue;
         const node = await store.get('device', candidate.deviceId);
         // Older clients cannot fence a previous attempt. Leave their offline work
@@ -750,7 +755,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const reported = clientRuntime(input.clientRuntime);
         requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
         const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
-        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
@@ -769,7 +774,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const tags = input.tags ?? [];
         requireValue(Array.isArray(tags) && tags.length <= 20 && tags.every(tag => typeof tag === 'string' && tag.trim().length > 0 && tag.length <= 60), 'Invalid tags');
         const preferredDeviceId = input.deviceId || null;
-        requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
+        assertExecutionAgent(input.agent);
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {
@@ -854,7 +859,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(hash(buffer) === draft.id, 'Draft checksum mismatch', 500);
         return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [], linkedTrials:(await store.list('task')).filter(t=>t.trial?.sourceArchiveId===draft.id).map(t=>({id:t.id,state:t.state,title:t.report?.title || t.title})) });
       }
-      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign|supplement)$/);
+      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign|supplement|use-codex)$/);
       if (taskRoute && req.method === 'POST') {
         const [, taskId, action] = taskRoute;
         const input = await body(req);
@@ -877,12 +882,17 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           void readApi.refresh().catch(() => {});
           return send(res, 200, result);
         }
-        if (['retry', 'cancel', 'reassign', 'supplement'].includes(action)) {
+        if (['retry', 'cancel', 'reassign', 'supplement','use-codex'].includes(action)) {
           owner(device);
           const result = await serialized('claim', () => store.transaction(async tx => {
             const task = await tx.getForUpdate('task', taskId);
             requireValue(task&&!task.deletedAt, 'Task not found', 404);
             requireValue(action === 'supplement' ? ['completed', 'awaiting_review'].includes(task.state) : action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            if(action==='use-codex') {
+              requireValue(task.preferredAgent==='codebuddy'||task.agent==='codebuddy','此任务无需切换执行方式',409);
+              return saveTask({...task,preferredAgent:'codex',agent:null,selectedSkills:[],executionSkills:[],environmentDigest:null,actionRequired:null,failedDeviceIds:[],failover:null,assignmentId:task.assignmentId?id():null},'queued','用户确认改用 Codex，沿用原任务；旧执行档案与成果保留',tx);
+            }
+            if(action==='retry'&&(task.preferredAgent==='codebuddy'||task.agent==='codebuddy'))assertExecutionAgent('codebuddy');
             if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
             if(action==='cancel' && task.codexTrial)for(const child of await tx.list('task'))if(child.trial?.parentTaskId===task.id && !['completed','cancelled'].includes(child.state))await saveTask({...child,assignmentId:id()},'cancelled','原采集任务已取消',tx);
             if(action==='retry' && task.actionRequired?.conditionKey)await tx.delete('processing-preference','condition-'+hash(task.actionRequired.conditionKey).slice(0,32));

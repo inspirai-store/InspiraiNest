@@ -1,12 +1,10 @@
+import {newerDesktopVersion,desktopVersion,updateChannel} from '../../../packages/core/shared/desktop-release.mjs';
 import { hash, requireValue } from '../../../packages/core/node/common.mjs';
 import { workerAuthorized, clientRuntime } from '../../../packages/core/node/device-metadata.mjs';
 
 export const updatePending = op => ['queued','checking','downloading','waiting_worker','installing'].includes(op.state);
 export const updateBlocksTasks = op => ['waiting_worker','installing'].includes(op.state);
-export const newerVersion = (a,b) => {
-  if (!/^\d+\.\d+\.\d+$/.test(a || '') || !/^\d+\.\d+\.\d+$/.test(b || '')) return false;
-  const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]>y[i];return false;
-};
+export const newerVersion = newerDesktopVersion;
 export function createClientUpdateService({store,serialized,worker,owner,body,send,clock,releases}) {
   const at=()=>new Date(clock()).toISOString();
   const key='client-update';
@@ -41,26 +39,27 @@ export function createClientUpdateService({store,serialized,worker,owner,body,se
       if(route==='/api/client-updates/operations' && req.method==='GET') {
         owner(actor);const deviceId=new URL(req.url,'http://localhost').searchParams.get('deviceId');
         const d=await store.get('device',deviceId);requireValue(d && workerAuthorized(d),'工作节点不存在',404);
-        const release=(await releases())[platformKey(d)];
+        const release=(await releases(updateChannel(d.clientRuntime?.channel)))[platformKey(d)];
         return respond(200,{runtime:d.clientRuntime || null,target:release?{version:release.version,sha256:release.sha256,size:release.size}:null,operations:(await operations(deviceId)).slice(0,20).map(publicOp)});
       }
       if(route==='/api/client-updates/operations' && req.method==='POST') {
         owner(actor);const input=await body(req);
-        requireValue(input && Object.keys(input).every(k=>['deviceId','requestId','targetVersion'].includes(k)) && typeof input.deviceId==='string'
-          && /^[a-f0-9-]{36}$/i.test(input.requestId || '') && /^\d+\.\d+\.\d+$/.test(input.targetVersion || ''),'更新请求无效');
+        requireValue(input && Object.keys(input).every(k=>['deviceId','requestId','targetVersion','channel'].includes(k)) && typeof input.deviceId==='string'
+          && /^[a-f0-9-]{36}$/i.test(input.requestId || '') && desktopVersion(input.targetVersion),'更新请求无效');
         const opId=hash(`${actor.credentialId || actor.id}:${input.requestId}`),fingerprint=hash(JSON.stringify([input.deviceId,input.targetVersion]));
         await settle(input.deviceId);
         const op=await serialized(`device:${input.deviceId}`,()=>store.transaction(async tx=>{
           const d=await tx.getForUpdate('device',input.deviceId);requireValue(d && workerAuthorized(d),'工作节点不存在或授权已撤销',404);
           const existing=await tx.getForUpdate(key,opId);if(existing){requireValue(existing.fingerprint===fingerprint,'请求编号已用于另一次更新',409);return existing;}
           requireValue(d.clientRuntime?.remoteUpdate,'该节点需先在本机升级一次，才能启用远程更新',409);
-          const release=(await releases())[platformKey(d)];
+          requireValue(!input.channel||input.channel===updateChannel(d.clientRuntime.channel),'节点更新通道已变化，请刷新',409);
+          const release=(await releases(updateChannel(d.clientRuntime?.channel)))[platformKey(d)];
           requireValue(release && release.version===input.targetVersion && /^[a-f0-9]{64}$/.test(release.sha256) && Number.isSafeInteger(release.size),'该平台尚无对应正式更新包',409);
           requireValue(newerVersion(release.version,d.clientRuntime.version),'节点已是此版本或更高版本',409);
           requireValue(!(await tx.list(key)).some(o=>o.deviceId===d.id && updatePending(o)),'该节点已有更新任务',409);
           return tx.put(key,{id:opId,fingerprint,deviceId:d.id,creatorId:actor.id,requestId:input.requestId,state:'queued',
             fromVersion:d.clientRuntime.version,targetVersion:release.version,sha256:release.sha256,size:release.size,
-            platform:d.clientRuntime.platform,arch:d.clientRuntime.arch,progress:0,message:'等待节点接收更新',createdAt:at(),updatedAt:at()});
+            channel:updateChannel(d.clientRuntime.channel),platform:d.clientRuntime.platform,arch:d.clientRuntime.arch,progress:0,message:'等待节点接收更新',createdAt:at(),updatedAt:at()});
         }));return respond(201,publicOp(op));
       }
       const match=route.match(/^\/api\/client-updates\/operations\/([a-f0-9]{64})\/(cancel|result)$/);

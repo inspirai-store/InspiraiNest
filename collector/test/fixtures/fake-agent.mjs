@@ -5,7 +5,7 @@ if (process.argv.includes('--version')) { console.log('fixture-agent 1.0'); proc
 let prompt = '';
 for await (const chunk of process.stdin) prompt += chunk;
 fs.writeFileSync('received-prompt.txt', prompt);
-if (process.argv.includes('--wait-once')) {
+if (process.argv.includes('--wait-once') && (!process.argv.includes('--wait-match') || prompt.includes(process.argv[process.argv.indexOf('--wait-match')+1]))) {
   const marker = 'retained-source.txt';
   if (!fs.existsSync(marker)) {
     fs.writeFileSync(marker, 'source retained for explicit retry');

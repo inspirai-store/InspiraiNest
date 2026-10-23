@@ -23,7 +23,7 @@ export class RemoteClientUpdate {
     };
     updater.on('changed',this.progressListener);
   }
-  runtime(){return {schemaVersion:1,version:this.version,platform:this.platform,arch:this.arch,remoteUpdate:this.updater.supported};}
+  runtime(){return {schemaVersion:1,version:this.version,platform:this.platform,arch:this.arch,channel:this.updater.snapshot().channel,remoteUpdate:this.updater.supported};}
   bind(){const c=this.configuration();return createHash('sha256').update(`${c.server}:${c.deviceId}`).digest('hex');}
   async result(state,extra={}) {
     if(!this.op || this.binding!==this.bind())throw new Error('节点连接已改变');
@@ -67,6 +67,7 @@ export class RemoteClientUpdate {
         if(this.version===op.targetVersion) {await this.result('succeeded',{version:this.version});fs.rmSync(this.file,{force:true});this.receipt=null;this.op=null;}
         else await this.fail('RESTART_MISMATCH');return;
       }
+      if((op.channel||'stable')!==this.updater.snapshot().channel){await this.fail('VERSION_CHANGED');return;}
       if(op.platform!==this.platform || op.arch!==this.arch || op.fromVersion!==this.version){await this.fail('VERSION_CHANGED');return;}
       if(op.state==='installing'){if(this.updater.snapshot().phase==='downloaded' && this.updater.snapshot().error)await this.fail();return;}
       if(op.state==='queued' || op.state==='checking') {

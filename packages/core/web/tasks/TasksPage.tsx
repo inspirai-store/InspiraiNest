@@ -63,7 +63,7 @@ export function TasksPage(){
  const taskCommands=(t:import('./model').Task)=>[{id:'task.open',label:'打开',run:()=>go('/tasks/'+encodeURIComponent(t.id))},{id:'task.delete',label:'删除',icon:Trash2,danger:true,opensDialog:true,run:()=>contentActions.remove({type:'task',id:t.id,title:taskTitle(t),version:0,trashVersion:t.trashVersion??0},[t,...(state.data?.tasks??[]).filter(child=>child.trial?.parentTaskId===t.id)].filter(task=>!['completed','cancelled','failed','interrupted'].includes(task.state)).map(taskTitle),()=>{if(task?.id===t.id){const index=tasks.findIndex(item=>item.id===t.id),next=tasks[index+1]??tasks[index-1];update({selected:next?.id??null});go(next?'/tasks/'+next.id:'/tasks');}})}];
  useCommandSurface(root,{commands:()=>task?taskCommands(task):[],newRecord:()=>go('/records/new'),search:()=>root.current?.querySelector<HTMLInputElement>('[aria-label="搜索任务"]')?.focus()});
  const allowed=task?taskActions(task):[];
- const primary=task?.state==='completed'&&entryId?'阅读资料':allowed.includes('approve')?'确认归档':allowed.includes('retry')?task?.state==='failed'?'重试任务':'继续任务':null;
+ const primary=task?.state==='completed'&&entryId?'阅读资料':allowed.includes('approve')?'确认归档':allowed.includes('use-codex')?'改用 Codex':allowed.includes('retry')?task?.state==='failed'?'重试任务':'继续任务':null;
  const node=state.data?.devices.find(d=>d.id===task?.deviceId)?.name;
  const confirmAction=(action:TaskAction,invoker:HTMLElement)=>{if(task){setActionError(false);setConfirmation({id:task.id,title:taskTitle(task),action,invoker});}};
  const submitAction=async()=>{
@@ -72,8 +72,8 @@ export function TasksPage(){
   catch{if(liveSession.current===started)setActionError(true);}
   finally{if(liveSession.current===started)setBusy(false);}
  };
- const confirmationTitle=confirmation?.action==='approve'?'确认归档':confirmation?.action==='reassign'?'更换节点':confirmation?.action==='retry'?'继续任务':'取消任务';
- const question=confirmation?.action==='approve'?`将「${confirmation.title}」归档到资料库？`:confirmation?.action==='reassign'?`将「${confirmation.title}」改派至其他节点？`:confirmation?.action==='retry'?`继续「${confirmation.title}」？`:`取消「${confirmation?.title}」？`;
+ const confirmationTitle=confirmation?.action==='use-codex'?'改用 Codex':confirmation?.action==='approve'?'确认归档':confirmation?.action==='reassign'?'更换节点':confirmation?.action==='retry'?'继续任务':'取消任务';
+ const question=confirmation?.action==='use-codex'?`将「${confirmation.title}」改用 Codex 继续，保留原任务和成果？`:confirmation?.action==='approve'?`将「${confirmation.title}」归档到资料库？`:confirmation?.action==='reassign'?`将「${confirmation.title}」改派至其他节点？`:confirmation?.action==='retry'?`继续「${confirmation.title}」？`:`取消「${confirmation?.title}」？`;
  const openLibrary=()=>{setState(s=>({...s,liveLibrary:{...s.liveLibrary,query:'',type:'全部类型',status:'全部状态',favoritesOnly:false,tags:[],selected:entryId}}));go('/library/'+encodeURIComponent(entryId!));};
  const clear=()=>update({query:'',filter:'全部状态',selected:null});
  const reloadList=async()=>{const started=session;const result=await state.refetch();if(liveSession.current===started&&result.isSuccess)requestAnimationFrame(()=>requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>('button[data-row][aria-pressed="true"]')?.focus()));};
@@ -89,7 +89,7 @@ export function TasksPage(){
     <ContentPane label="任务详情" backLabel="任务列表" onBack={()=>go('/tasks')}>
      {task?<><ContentHeader title={taskTitle(task)} reader actions={null}/><div className={taskStyles.actions}><SourceActions source={[taskLabels[task.state],node,taskAgentLabel(task.preferredAgent)].filter(Boolean).join(' · ')}>
       {task.writingSessionId&&<Action onClick={()=>go("/writing/"+task.writingSessionId)}>继续写作</Action>}
-      {primary&&<Action kind="primary" icon={primary==='阅读资料'?BookOpen:primary==='确认归档'?Check:primary==='继续任务'?Play:RotateCcw} disabled={busy} onClick={e=>primary==='阅读资料'?openLibrary():confirmAction(primary==='确认归档'?'approve':'retry',e.currentTarget)}>{primary}</Action>}
+      {primary&&<Action kind="primary" icon={primary==='阅读资料'?BookOpen:primary==='确认归档'?Check:primary==='继续任务'?Play:RotateCcw} disabled={busy} onClick={e=>primary==='阅读资料'?openLibrary():confirmAction(primary==='确认归档'?'approve':primary==='改用 Codex'?'use-codex':'retry',e.currentTarget)}>{primary}</Action>}
       <MenuButton label="任务操作" icon={Ellipsis} iconOnly compact kind="ghost" width={160} align="end" disabled={busy} options={[...taskCommands(task).filter(c=>c.id==='task.delete').map(c=>({label:c.label,icon:c.icon,danger:c.danger,opensDialog:true,select:()=>c.run()})),...allowed.filter(a=>a==='reassign'||a==='cancel').map(action=>({label:action==='reassign'?'更换节点':'取消任务',icon:action==='reassign'?RotateCcw:X,danger:action==='cancel',opensDialog:true,select:(invoker:HTMLElement)=>confirmAction(action,invoker)}))]}/>
      </SourceActions></div><ChoiceBar label="任务内容" options={['结果预览','执行记录','过程记录']} disabledOptions={hasPreview?[]:['结果预览']} value={currentTab} onChange={setTab} tabs idPrefix="task-reader"/>
      <div className={styles.readerViewport} role="tabpanel" id="reader-panel" aria-labelledby={'task-reader-'+currentTab} tabIndex={0} onKeyDown={e=>scrollReader(e,reader.current)} data-region="任务阅读区">

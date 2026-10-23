@@ -20,13 +20,13 @@ for(const autoArchive of [true,false])test(`supplement preserves task identity a
  const owner={server,...await api({server},'/api/pair','POST',{key,name:'fixture-owner'})};
  const pairing=await api(owner,'/api/pairings','POST',{role:'worker'});
  const worker={server,...await api({server},'/api/pair','POST',{key:pairing.key,name:'fixture-worker',platform:'darwin'})};
- await api(worker,'/api/heartbeat','POST',{capabilities:['article'],agents:['codebuddy']});
- const original=await api(owner,'/api/tasks','POST',{content:'隔离补齐测试',type:'article',submissionId:randomUUID(),deviceId:worker.device.id,agent:'codebuddy',autoArchive});
+ await api(worker,'/api/heartbeat','POST',{capabilities:['article'],agents:['codex']});
+ const original=await api(owner,'/api/tasks','POST',{content:'隔离补齐测试',type:'article',submissionId:randomUUID(),deviceId:worker.device.id,agent:'codex',autoArchive});
  const claim=async()=>(await api(worker,'/api/claim','POST',{assignmentProtocol:1})).task;
  const first=await claim();const old=await api(worker,`/api/tasks/${first.id}/result`,'POST',bundle('旧结果'),first.assignmentId);
  await assert.rejects(api(worker,`/api/tasks/${first.id}/supplement`,'POST',{}),{status:403});
  const resumed=await api(owner,`/api/tasks/${first.id}/supplement`,'POST',{});
- assert.equal(resumed.id,original.id);assert.equal(resumed.submissionId,original.submissionId);assert.equal(resumed.deviceId,worker.device.id);assert.equal(resumed.preferredAgent,'codebuddy');assert.equal(resumed.supplementRevision,1);assert.equal(resumed.state,'queued');assert.notEqual(resumed.assignmentId,first.assignmentId);
+ assert.equal(resumed.id,original.id);assert.equal(resumed.submissionId,original.submissionId);assert.equal(resumed.deviceId,worker.device.id);assert.equal(resumed.preferredAgent,'codex');assert.equal(resumed.supplementRevision,1);assert.equal(resumed.state,'queued');assert.notEqual(resumed.assignmentId,first.assignmentId);
  await assert.rejects(api(owner,`/api/tasks/${first.id}/supplement`,'POST',{}),{status:409});
  const next=await claim();assert.equal(next.id,first.id);assert.equal(next.supplementRevision,1);
  await assert.rejects(api(worker,`/api/tasks/${first.id}/result`,'POST',bundle('过期写入'),first.assignmentId),{status:409});

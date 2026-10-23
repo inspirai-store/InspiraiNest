@@ -1,3 +1,4 @@
+import {isExecutionAgent} from '../shared/execution-policy.mjs';
 import {capabilityBlock} from './capabilities.mjs';
 import { workerAuthorized } from './device-metadata.mjs';
 
@@ -14,8 +15,9 @@ export function supportsWritingTask(task, device) {
 // A specified computer is preferred on the first attempt. Once it cannot finish,
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
+  if(task.preferredAgent && !isExecutionAgent(task.preferredAgent)) return false;
   if(task.purpose==='codex-trial')return workerAuthorized(device) && device.id===task.trial?.deviceId && device.trialEnvironment?.protocol===1 && device.agents?.includes('codex');
-  return workerAuthorized(device) && !capabilityBlock(task,device) && Boolean(device.agents?.length)
+  return workerAuthorized(device) && !capabilityBlock(task,device) && Boolean(device.agents?.some(isExecutionAgent))
     && (task.purpose!=='selection-writing'||device.selectionWritingProtocol===1)
     && (!task.recordId || device.recordProtocol === 1)
     && supportsWritingTask(task, device)

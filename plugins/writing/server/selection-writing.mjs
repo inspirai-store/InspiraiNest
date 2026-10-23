@@ -1,3 +1,4 @@
+import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../../packages/core/shared/execution-policy.mjs';
 import {canonicalJson,id,now,requireValue} from '../../../packages/core/node/common.mjs';
 export const writingOperations=['polish','shorten','expand','translate','custom'];
 export function writingInput(input){
@@ -9,7 +10,7 @@ export function writingInput(input){
   const result={operation:input.operation,text:string(input.text,100000,true),instructions:string(input.instructions??'',10000),language:string(input.language??'中文',100,true),deviceId:input.deviceId||null,agent:input.agent||null};
   if(input.fullText!==undefined)result.fullText=string(input.fullText,200000);
   requireValue(!result.deviceId||typeof result.deviceId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(result.deviceId),'节点无效');
-  requireValue(!result.agent||['codex','codebuddy'].includes(result.agent),'Agent 无效');
+  assertExecutionAgent(result.agent);
   requireValue(result.operation!=='custom'||result.instructions.trim(),'请输入要求');
   return {requestId,value:result};
 }
