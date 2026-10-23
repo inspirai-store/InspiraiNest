@@ -171,7 +171,7 @@ export function createSkillService({ store, storage, serialized, updateDevice, o
         requireValue(!op.expectedTargets.some(t=>t.sharedAgents?.length > 1) || op.confirmShared,'Confirm all shared Agents',409);
       }
       if (action === 'verify') {
-        requireValue(['codex','codebuddy'].includes(input.agent) && op.policy.agents.includes(input.agent),'Unsupported verification Agent');
+        requireValue(['codex'].includes(input.agent) && op.policy.agents.includes(input.agent),'Unsupported verification Agent');
         let sample; try { sample=new URL(input.sample); } catch {}
         requireValue(sample?.protocol === 'https:' && sample.hostname === 'mp.weixin.qq.com' && !sample.username && !sample.password,'Provide a public WeChat sample');
         requireValue(typeof input.expectedText === 'string' && input.expectedText.trim().length >= 20 && input.expectedText.length <= 1000, 'Provide expected article text (20-1000 characters)');

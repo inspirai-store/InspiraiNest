@@ -6,18 +6,20 @@ import { hash, now, requireValue } from '../../../packages/core/node/common.mjs'
 export const writingSkillRoot = fileURLToPath(new URL('../../../resources/skills/writing-workshop/', import.meta.url));
 export const legacyWritingSkillRoot = fileURLToPath(new URL('../../../resources/skills/writing-workshop-v1/', import.meta.url));
 export const previousWritingSkillRoot = fileURLToPath(new URL('../../../resources/skills/writing-workshop-v2-025/', import.meta.url));
+export const diagnosticPreviousWritingSkillRoot = fileURLToPath(new URL('../../../resources/skills/writing-workshop-v2-023/',import.meta.url));
 export function writingSkill(root = writingSkillRoot, version = 2) {
   const files = ['SKILL.md', 'references/interview.md', 'references/style.md', 'references/protocol.md'];
+  if(fs.existsSync(path.join(root,'references/diagnostics.md')))files.push('references/diagnostics.md');
   const contents = files.map(name => ({ path:name, text:fs.readFileSync(path.join(root,name),'utf8').replace(/\r\n?/g,'\n') }));
   return { version, hash:hash(JSON.stringify(contents)), files:contents };
 }
 export const skillForVersion = version => { requireValue(version===1||version===2,'不支持的写作协议');return writingSkill(version===1?legacyWritingSkillRoot:writingSkillRoot,version); };
 export function skillForSnapshot(snapshot){
   const version=snapshot.protocolVersion||snapshot.skill?.version||1;
-  const candidates=[skillForVersion(version),...(version===2?[writingSkill(previousWritingSkillRoot,2)]:[])];
-  const skill=candidates.find(skill=>skill.hash===snapshot.skill?.hash);requireValue(skill,'请升级 Worker：写作技能版本与本次任务不一致');return skill;
+  const candidates=[skillForVersion(version),...(version===2?[writingSkill(previousWritingSkillRoot,2),writingSkill(diagnosticPreviousWritingSkillRoot,2)]:[])];
+  const skill=candidates.find(skill=>skill.hash===snapshot.skill?.hash);if(!skill)throw Object.assign(Error('请升级 Worker：写作技能版本与本次任务不一致'),{code:'SKILL_VERSION_MISMATCH'});return skill;
 }
-export const writingCapabilities = () => [skillForVersion(1),writingSkill(previousWritingSkillRoot,2),skillForVersion(2)].map(({version,hash})=>({version,hash}));
+export const writingCapabilities = () => [skillForVersion(1),writingSkill(previousWritingSkillRoot,2),writingSkill(diagnosticPreviousWritingSkillRoot,2),skillForVersion(2)].map(({version,hash})=>({version,hash}));
 export const fastWritingRound = task => task.writingMode==='round'&&task.writingSnapshot.skill.hash===skillForVersion(2).hash;
 export function defaultWritingStyle(createdAt=now()) {
   return {id:'builtin-editorial-v1',version:1,parentId:null,origin:'builtin',name:'默认编辑规则',appliesTo:'尚未指定个人风格时的中文文章编辑，不代表作者个人风格',createdAt,sample:'',sources:[],rules:[

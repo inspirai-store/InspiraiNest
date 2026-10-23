@@ -5,6 +5,7 @@
 ```sh
 lingnest auth login
 lingnest auth status --json
+lingnest auth status --scope diagnostics:read --json
 lingnest list --type article --limit 20 --offset 0 --json
 lingnest search "角色卡 世界书" --json
 lingnest show "video:BVexample" --json
@@ -24,3 +25,5 @@ lingnest auth logout
 浏览器打开资料使用浏览器自己的登录，CLI 不把令牌塞进 URL。Linux 需要可用的 Secret Service；无安全存储时 CLI 明确报错，不能通过写明文 token 绕过。
 
 系统安全存储绑定执行账户／会话。某些 Windows AI 沙箱使用另一账户，可能返回 `not_logged_in` 或 `keyring_write_failed`。使用工具提供的、用户允许的同账户执行方式；没有该方式时说明环境限制并停止，不复制主账户令牌、不调整全局沙箱权限。终端调用权限由 AI 工具管理，skill 本身不授予执行权限。
+
+采集和写作任务执行记录使用独立的 `diagnostics:read` 授权，命令与证据约定见 [diagnostics.md](diagnostics.md)。`auth login/status/logout --scope diagnostics:read` 只影响诊断授权；原资料命令和旧安全存储保持兼容。

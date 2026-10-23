@@ -1,3 +1,5 @@
+import {isExecutionAgent,assertExecutionAgent} from '../../../packages/core/shared/execution-policy.mjs';
+import {rankExecutionAgents} from '../../../packages/core/node/capabilities.mjs';
 import spawn from 'cross-spawn';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +8,6 @@ import { resolveAgentProfile, commandEnvironment, agentVersion } from './agent-p
 
 export const defaults = {
   codex: { command: 'codex', args: ['exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"', '-'] },
-  codebuddy: { enabled: false, command: 'codebuddy', args: ['-p', '--output-format', 'stream-json', '--verbose'] },
 };
 
 export function agentProfile(name, profiles = {}, options) {
@@ -46,7 +47,7 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
     let toolActivity = false;
     let permissionBlocked = false;
     let pendingLine = '';
-    let finalMessage = '';
+    let finalMessage = '',applicationError='';
     const stdoutDecoder=new StringDecoder('utf8');
     const log = logFile ? fs.createWriteStream(logFile, { flags: 'a', mode: 0o600 }) : null;
     const collect = chunk => {
@@ -62,6 +63,7 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
       for (const line of lines) {
         try {
           const event = JSON.parse(line);
+          if(event.type==='result'&&event.is_error===true)applicationError=String(event.result||(event.errors||[]).join('\n')||'Execution error').slice(-2000);
           if(event.type==='item.completed'&&event.item?.type==='agent_message')finalMessage=String(event.item.text||'').slice(-200000);
           if(event.type==='assistant'&&Array.isArray(event.message?.content))finalMessage=event.message.content.filter(part=>part.type==='text').map(part=>part.text||'').join('\n').slice(-200000);
           const toolTypes=['command_execution','file_change','mcp_tool_call','web_search','function_call'];
@@ -90,7 +92,7 @@ export function execute(command, args, { cwd, input = '', logFile, timeoutMs = 3
       clearTimeout(forceTimer);
       signal?.removeEventListener('abort', abort);
       log?.end();
-      resolve({ code, tail, spawnError, timedOut, aborted, toolActivity, permissionBlocked, finalMessage });
+      resolve({ code, tail, spawnError, timedOut, aborted, toolActivity, permissionBlocked, finalMessage,applicationError });
     });
     if (aborted) stop();
     else child.stdin.end(input);
@@ -103,6 +105,7 @@ export function unavailableBeforeWork(result) {
   return result.tail.split('\n').some(line => {
     try {
       const event = JSON.parse(line);
+          if(event.type==='result'&&event.is_error===true)applicationError=String(event.result||(event.errors||[]).join('\n')||'Execution error').slice(-2000);
       return event.type === 'turn.failed' && /model requires a newer version of Codex/.test(event.error?.message || '');
     } catch { return false; }
   });
@@ -113,6 +116,7 @@ export function describeAgentFailure(name, result) {
   for (const line of result.tail.split('\n')) {
     try {
       const event = JSON.parse(line);
+          if(event.type==='result'&&event.is_error===true)applicationError=String(event.result||(event.errors||[]).join('\n')||'Execution error').slice(-2000);
       if (event.type === 'turn.failed' || event.type === 'error') {
         let value = event.error?.message || event.message || '';
         try { const nested = JSON.parse(value); value = nested.error?.message || nested.message || value; } catch {}
@@ -121,6 +125,7 @@ export function describeAgentFailure(name, result) {
     } catch {}
   }
   const details = { agent: name, exitCode: result.code, ...(error ? { error } : {}) };
+  if (/EHOSTUNREACH|ENETUNREACH|ENOTFOUND|ECONNREFUSED|network unreachable|网络不可达/i.test(error)) return {code:'AGENT_NETWORK',message:`${name} 无法连接执行服务，已有成果已保留；请检查该执行工具的网络连接后继续原任务`,details:{...details,code:error.match(/EHOSTUNREACH|ENETUNREACH|ENOTFOUND|ECONNREFUSED/i)?.[0]||'NETWORK_UNREACHABLE'}};
   if (/model.+(?:not supported|requires a newer version)|unsupported model/i.test(error)) return {
     code: 'AGENT_MODEL', message: '本机采集程序配置的模型不可用，请更换当前账号支持的模型后继续', details };
   if (/authentication|not logged in|sign in|\b401\b|expired.{0,30}token/i.test(error)) return {
@@ -140,10 +145,11 @@ export async function detectAgents(profiles = {}) {
 }
 
 export function agentOrder(config, task, available) {
+  if (task.agent && !isExecutionAgent(task.agent) || task.preferredAgent && !isExecutionAgent(task.preferredAgent)) return [];
   if (task.agent) return available[task.agent]?.available ? [task.agent] : [];
   if (task.preferredAgent) return available[task.preferredAgent]?.available ? [task.preferredAgent] : [];
   const preferred = task.selectedSkills?.length ? task.selectedSkills.map(s => s.agent) : config.byType?.[task.type] || [];
-  return [...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || ['codebuddy'])])].filter(name => available[name]?.available);
+  return rankExecutionAgents(task,[...new Set([...preferred, config.defaultAgent || 'codex', ...(config.fallbackAgents || [])])].filter(name => isExecutionAgent(name) && available[name]?.available),config.executionCapabilities);
 }
 
 export function writingRoundArgs(name,args,reasoningEffort){
@@ -154,6 +160,7 @@ export function writingRoundArgs(name,args,reasoningEffort){
 }
 // Ordinary collection and trials share command resolution, environment and argument handling.
 export function agentExecution(name, profiles, {reasoningEffort, extraArgs=[]}={}) {
+  assertExecutionAgent(name);
   const profile = agentProfile(name, profiles);
   const args=writingRoundArgs(name,profile.args,reasoningEffort), index=args.at(-1)==='-'?args.length-1:args.length;
   return {profile,command:profile.command,args:[...args.slice(0,index),...extraArgs,...args.slice(index)],env:commandEnvironment(profile,agentEnvironment())};

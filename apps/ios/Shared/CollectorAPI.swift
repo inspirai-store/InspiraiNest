@@ -130,6 +130,8 @@ final class CollectorAPI: @unchecked Sendable {
         guard id.range(of:"^[a-z][a-z0-9-]+$",options:.regularExpression) != nil else { throw CollectorError.message("插件编号无效") }
         return try await decoded(ProductPluginSnapshot.self,path:"/api/plugins/"+id,method:"PUT",body:JSONSerialization.data(withJSONObject:["enabled":enabled,"revision":revision]))
     }
+    func taskDiagnostics(taskID: String) async throws -> TaskDiagnosticReport { try await decoded(TaskDiagnosticReport.self, path: "/api/read/v1/tasks/\(identifier(taskID))/diagnostics") }
+    func nodeCapabilities(deviceID: String) async throws -> NodeCapabilityReport { try await decoded(NodeCapabilityReport.self, path: "/api/devices/\(identifier(deviceID))/capabilities") }
     func state() async throws -> ServerState { try await decoded(ServerState.self, path: "/api/state") }
     func submit(_ submission: Submission) async throws -> LibraryTask {
         try submission.validateForSending()

@@ -23,7 +23,7 @@ test('progress stores server timestamps and completed phases, never invented per
 });
 test('previous v2 snapshots remain executable with their frozen Skill after current Skill update',()=>{
  const skill=writingSkill(previousWritingSkillRoot,2);assert.equal(skill.hash,'418919847d23a626c63deb4e092e7305941e8ccd8ce49d81a90a0e5ea47ba4d9');assert.deepEqual(skillForSnapshot({protocolVersion:2,skill}),skill);
- assert.equal(new Set(writingCapabilities().map(s=>s.version+':'+s.hash)).size,3);assert.throws(()=>skillForSnapshot({protocolVersion:2,skill:{hash:'0'.repeat(64)}}));
+ assert.equal(new Set(writingCapabilities().map(s=>s.version+':'+s.hash)).size,4);assert.throws(()=>skillForSnapshot({protocolVersion:2,skill:{hash:'0'.repeat(64)}}));
 });
 test('new round accepts final JSON without filesystem tool calls, persists real phases and creates no draft',async t=>{
  const f=await fixture(t),created=await f.create({protocolVersion:2,brief:'连续学习、连续思考',sources:[]}),node=await v2Worker(f),task=await f.claim(node),fake=path.join(f.root,'direct-round.mjs');

@@ -1,3 +1,4 @@
+import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../../packages/core/shared/execution-policy.mjs';
 import path from 'node:path';
 import { hash,id,now,requireValue,canonicalJson } from '../../../packages/core/node/common.mjs';
 import { validateArchive } from '../../../packages/core/node/archive.mjs';
@@ -75,7 +76,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
       let session;
       if(action==='create') {
         requireValue(material.some(s=>s.role==='material')||creatingV2&&input.brief?.trim(),'请说一句写作想法或选择已有材料');
-        requireValue(!input.agent||['codex','codebuddy'].includes(input.agent),'未知 Agent');
+        assertExecutionAgent(input.agent);
         session={id:id(),version:1,protocolVersion:creatingV2?2:1,brief:creatingV2?(input.brief||''):'',titleSource:input.title?'user':'assistant',title:String(input.title||input.brief?.trim().split('\n')[0]||material[0]?.label||'新文章').slice(0,200),createdAt:now(),updatedAt:now(),context:{audience:'技术实践者',language:'zh-CN',outputs:['illustrated-article','offline-html','markdown','assets']},sources:material,answers:[],turns:[],rounds:[],runs:[],workingPlan:null,plan:null,planVersion:0,style:creatingV2?defaultWritingStyle():null,styleCandidates:[],ready:false,deviceId:input.deviceId||null,agent:input.agent||null};
         await queue(session,'round',tx);
       } else {

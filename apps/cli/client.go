@@ -70,12 +70,13 @@ func origin(raw string) (string, error) {
 }
 
 type client struct {
+	scope         string
 	origin, token string
 	http          *http.Client
 }
 
 func newClient(server string) *client {
-	return &client{origin: server, http: &http.Client{Timeout: 30 * time.Second,
+	return &client{origin: server, scope: "library:read", http: &http.Client{Timeout: 30 * time.Second,
 		// Reject every redirect: also prevents same-origin POST rewrites or credential replay.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}

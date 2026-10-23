@@ -52,6 +52,7 @@ test('device grant requires explicit owner consent, hashes secrets and can be re
   assert.equal(result.value.expires_in, 30 * 86400);
   assert.equal((await poll(grant)).value.error, 'invalid_grant');
   const me = await request('/api/read/v1/me', 'GET', undefined, result.value.access_token);
+  assert.equal(me.value.device.credentialTokenHash,undefined);assert.equal(me.value.device.credentialId,undefined);assert.equal(me.value.device.tokenHash,undefined);
   assert.equal(me.value.device.role, 'reader'); assert.equal(me.value.device.tokenHash, undefined);
   assert.ok(!JSON.stringify(await app.store.list('device')).includes(result.value.access_token));
 });

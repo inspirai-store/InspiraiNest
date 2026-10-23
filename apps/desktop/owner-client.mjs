@@ -103,6 +103,10 @@ export class OwnerClient {
   agents(input){return remoteOperations.agents.call(this,input);}
   market(input){return remoteOperations.market.call(this,input);}
   skills(input){return remoteOperations.skills.call(this,input);}
+  diagnosticTasks(input={}){const q=new URLSearchParams({cursor:input.cursor||'0',limit:'50'});if(input.deviceId)q.set('device',taskId(input.deviceId));return this.api('/api/read/v1/tasks?'+q);}
+  taskDiagnostics(value){return this.api('/api/read/v1/tasks/'+taskId(value)+'/diagnostics');}
+  capabilities(value){return this.api('/api/devices/'+taskId(value)+'/capabilities');}
+  checkCapabilities(value){return this.api('/api/devices/'+taskId(typeof value==='string'?value:value.deviceId)+'/capabilities/check','POST',typeof value==='string'?{}:{action:value.action});}
   async syncIdentity() {
     if (this.identitySync) return this.identitySync;
     this.identitySync = this.updateIdentity().finally(() => { this.identitySync = null; });
@@ -178,7 +182,7 @@ export class OwnerClient {
     return this.api('/api/tasks', 'POST', payload);
   }
   taskAction({ id, action }) {
-    if (!['retry', 'cancel', 'approve', 'reassign'].includes(action)) throw new Error('不支持的任务操作');
+    if (!['retry', 'cancel', 'approve', 'reassign','use-codex'].includes(action)) throw new Error('不支持的任务操作');
     return this.api(`/api/tasks/${taskId(id)}/${action}`, 'POST', {});
   }
   async draft(id) {

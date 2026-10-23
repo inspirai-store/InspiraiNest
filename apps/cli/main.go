@@ -19,16 +19,16 @@ import (
 var version = "dev"
 
 type options struct {
-	server, name, output  string
-	json, noBrowser, help bool
-	command               string
-	args                  []string
-	query                 url.Values
+	server, name, output, scope string
+	json, noBrowser, help       bool
+	command                     string
+	args                        []string
+	query                       url.Values
 }
 
 const usage = `InspiraiNest read-only CLI
 Usage: lingnest [--server ORIGIN] [--json] COMMAND
-  auth login [--name NAME] [--no-browser]
+  auth login [--scope library:read|diagnostics:read] [--name NAME] [--no-browser]
   auth status | auth logout
   list [--type TYPE] [--tag TAG] [--status STATUS] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit 1..100] [--offset N]
   search QUERY [same filters as list]
@@ -36,6 +36,10 @@ Usage: lingnest [--server ORIGIN] [--json] COMMAND
   read ID [--file PATH] [--start-line N] [--max-lines 1..1000] [--start-column N]
   download ID --file PATH --output LOCAL_PATH
   open ID
+  tasks list [--state STATE] [--limit N] [--cursor CURSOR]
+  tasks show TASK_ID | tasks diagnose TASK_ID
+  tasks events TASK_ID [--attempt ATTEMPT_ID] [--limit N] [--cursor CURSOR]
+  tasks evidence TASK_ID --id EVIDENCE_ID
   version
 Flags may appear before or after positional arguments. Use -- before positional values starting with -.
 JSON successes go to stdout; diagnostics and JSON errors go to stderr.
@@ -51,7 +55,7 @@ func parse(args []string) (options, error) {
 	if server == "" {
 		server = defaultServer
 	}
-	o := options{server: server, name: host, query: url.Values{}}
+	o := options{server: server, name: host, scope: "library:read", query: url.Values{}}
 	var pos []string
 	seen := map[string]bool{}
 	for i := 0; i < len(args); i++ {
@@ -89,7 +93,7 @@ func parse(args []string) (options, error) {
 				o.help = true
 			}
 			continue
-		case "server", "name", "output", "file", "type", "tag", "status", "from", "to", "limit", "offset", "start-line", "max-lines", "start-column":
+		case "server", "name", "output", "file", "type", "tag", "status", "from", "to", "limit", "offset", "start-line", "max-lines", "start-column", "scope", "state", "attempt", "cursor", "id":
 		default:
 			return o, fail(exitUsage, "invalid_argument", "unknown option: --"+key)
 		}
@@ -108,6 +112,8 @@ func parse(args []string) (options, error) {
 			o.server = val
 		case "name":
 			o.name = val
+		case "scope":
+			o.scope = val
 		case "output":
 			o.output = val
 		default:
@@ -122,7 +128,7 @@ func parse(args []string) (options, error) {
 	}
 	o.command = pos[0]
 	o.args = pos[1:]
-	if o.command == "auth" {
+	if o.command == "auth" || o.command == "tasks" {
 		if len(o.args) == 0 {
 			return o, fail(exitUsage, "invalid_argument", "auth requires login, status or logout")
 		}
@@ -133,8 +139,20 @@ func parse(args []string) (options, error) {
 	want := 0
 	switch o.command {
 	case "auth login":
-		allowed += " name no-browser"
-	case "auth status", "auth logout", "version":
+		allowed += " name no-browser scope"
+	case "auth status", "auth logout":
+		allowed += " scope"
+	case "version":
+	case "tasks list":
+		allowed += " state limit cursor"
+	case "tasks show", "tasks diagnose":
+		want = 1
+	case "tasks events":
+		want = 1
+		allowed += " attempt limit cursor"
+	case "tasks evidence":
+		want = 1
+		allowed += " id"
 	case "list", "search":
 		allowed += " type tag status from to limit offset"
 		if o.command == "search" {
@@ -204,6 +222,15 @@ func parse(args []string) (options, error) {
 		if !seen["max-lines"] {
 			o.query.Set("max_lines", "200")
 		}
+	}
+	if o.scope != "library:read" && o.scope != "diagnostics:read" {
+		return o, fail(exitUsage, "invalid_scope", "unsupported read-only scope")
+	}
+	if strings.HasPrefix(o.command, "tasks ") {
+		o.scope = "diagnostics:read"
+	}
+	if o.command == "tasks evidence" && o.query.Get("id") == "" {
+		return o, fail(exitUsage, "invalid_argument", "evidence requires --id")
 	}
 	var e error
 	o.server, e = origin(o.server)
@@ -281,6 +308,7 @@ func (a *app) execute(ctx context.Context, o options) (map[string]any, error) {
 		return map[string]any{"schema_version": 1, "version": version}, nil
 	}
 	c := newClient(o.server)
+	c.scope = o.scope
 	if o.command == "auth login" {
 		return a.login(ctx, c, o)
 	}
@@ -294,6 +322,24 @@ func (a *app) execute(ctx context.Context, o options) (map[string]any, error) {
 	switch o.command {
 	case "auth status":
 		return c.get(ctx, "me", nil)
+	case "tasks list":
+		return c.get(ctx, "tasks", q)
+	case "tasks show", "tasks diagnose", "tasks events", "tasks evidence":
+		for _, value := range append([]string{o.args[0]}, q.Get("id"), q.Get("attempt")) {
+			if value != "" && strings.ContainsAny(value, "/\\?#") {
+				return nil, fail(exitUsage, "invalid_argument", "invalid task or evidence identifier")
+			}
+		}
+		route := "tasks/" + url.PathEscape(o.args[0])
+		switch o.command {
+		case "tasks diagnose":
+			route += "/diagnostics"
+		case "tasks events":
+			route += "/events"
+		case "tasks evidence":
+			route += "/evidence/" + url.PathEscape(q.Get("id"))
+		}
+		return c.get(ctx, route, q)
 	case "list":
 		return c.get(ctx, "entries", q)
 	case "search":

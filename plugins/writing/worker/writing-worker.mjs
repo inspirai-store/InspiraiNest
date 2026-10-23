@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { atomicJson,readJson,hash,requireValue,safePath,contained,remoteURL } from '../../../packages/core/node/common.mjs';
-import { agentOrder,runAgent,unavailableBeforeWork,execute } from '../../ai-assistant/api/agents.mjs';
+import { agentOrder,runAgent,unavailableBeforeWork,execute,describeAgentFailure } from '../../ai-assistant/api/agents.mjs';
 import { packageEntry } from '../../../packages/core/node/archive.mjs';
 import { validatePublicationImages } from '../server/writing-images.mjs';
 import { skillForSnapshot,fastWritingRound,writingPrompt,validateRound,validateWritingCoverage } from '../protocol/writing-protocol.mjs';
@@ -31,8 +31,8 @@ export async function processWritingTask({config,task,available,signal,onProgres
   let toolCount=0,preparedFiles=0,phase='preparing',chosen=task.agent;
   const sourceCount=task.writingSnapshot.sources.length,fileCount=task.writingSnapshot.sources.reduce((n,s)=>n+s.files.length,0);
   let pending=Promise.resolve(),lastActivityReport=0,progressError;
-  const progress=(state,message,agent=chosen)=>{
-    const writingProgress={phase,sourceCount,fileCount,preparedFiles,toolCount};onProgress({state,message,agent});
+  const progress=(state,message,agent=chosen,diagnostic)=>{
+    const writingProgress={phase,sourceCount,fileCount,preparedFiles,toolCount};onProgress({state,message,agent,...(diagnostic?{diagnostic}:{})});
     const next=pending.then(()=>api(config,`/api/tasks/${task.id}/progress`,'POST',{state,message,agent,writingProgress},task.assignmentId));
     pending=next.catch(error=>{progressError=error;});return next;
   };
@@ -52,7 +52,7 @@ export async function processWritingTask({config,task,available,signal,onProgres
     await pending;
     if(result.aborted)return;
     if(unavailableBeforeWork(result))continue;
-    if(result.code!==0||result.timedOut||result.permissionBlocked){await progress('waiting_action',result.permissionBlocked?'写作工具需要本机授权':result.timedOut?'本轮处理超时，材料与已有结果保留':'本轮处理失败，材料与已有结果保留',name);return;}
+    if(result.code!==0||result.timedOut||result.permissionBlocked||result.applicationError){const diagnostic=describeAgentFailure(name,result);await progress('waiting_action',diagnostic.message,name,diagnostic);return;}
     if(fast&&!fs.existsSync(checkpoint)&&result.finalMessage){
       const text=result.finalMessage.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,'$1');
       let output;try{output=JSON.parse(text);}catch{throw Error('AI 未返回有效的讨论结果，已有材料保留，可重试这一轮');}
@@ -63,7 +63,7 @@ export async function processWritingTask({config,task,available,signal,onProgres
   if(progressError&&signal?.aborted)return;
   phase='validating';await progress('running','本轮结果已返回，正在校验');
   requireValue(fs.existsSync(checkpoint),'写作工具未生成轮次结果，已有材料保留');const result=readJson(checkpoint);
-  if(result.kind==='blocked'){await progress('waiting_action',String(result.message||'材料尚未完整读取').slice(0,1000),chosen);return;}
+  if(result.kind==='blocked'){await progress('waiting_action',String(result.message||'材料尚未完整读取').slice(0,1000),chosen,{code:'SOURCE_MATERIAL_BLOCKED',reportedBy:'agent'});return;}
   requireValue(task.writingMode==='round'?result.kind==='round':result.kind==='draft'||task.writingMode==='revision'&&result.kind==='round'&&result.ready===false,'写作结果类型与本轮模式不符');
   let payload;
   try {
@@ -81,7 +81,7 @@ export async function processWritingTask({config,task,available,signal,onProgres
       const bundle=packageEntry(entryRoot);if(task.writingSnapshot.protocolVersion===2)validatePublicationImages(bundle);
       payload={kind:'draft',bundle,coverage:result.coverage};
     }
-  }catch(error){fs.renameSync(checkpoint,checkpoint+'.invalid.'+Date.now());throw error;}
+  }catch(error){error.code ||= 'RESULT_VALIDATION';fs.renameSync(checkpoint,checkpoint+'.invalid.'+Date.now());throw error;}
   phase='saving';await progress('uploading',result.kind==='round'?'正在保存问题与写作上下文':'正在保存稿件与图文素材',chosen);
   await api(config,`/api/writing/tasks/${task.id}/result`,'POST',{...payload,skillHash:task.writingSnapshot.skill.hash},task.assignmentId);
   atomicJson(path.join(workspace,'..','uploaded.json'),{writingSessionId:task.writingSessionId,kind:result.kind,digest:hash(JSON.stringify(payload))});

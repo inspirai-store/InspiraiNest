@@ -15,5 +15,5 @@ test('writing Skill contents and version are stable across Windows and Unix line
 
 test('legacy Skill remains frozen while current capability advertises v2 separately',()=>{
  assert.equal(skillForVersion(1).hash,'385f6d5137c0b19f5cb946322c0d6a5d117d2fd8293ad04fc2c225ce86870b4b');
- assert.notEqual(skillForVersion(2).hash,skillForVersion(1).hash);assert.deepEqual(writingCapabilities().map(s=>s.version),[1,2,2]);
+ assert.notEqual(skillForVersion(2).hash,skillForVersion(1).hash);assert.deepEqual(writingCapabilities().map(s=>s.version),[1,2,2,2]);
 });

@@ -32,13 +32,14 @@ export async function readRecordChanges({store,req,res,authenticate}) {
       if(!match||match[1]!==state.epoch||!Number.isSafeInteger(position)||position>state.seq){
         const rows=await tx.list('capture'),tasks=await tx.list('task');
         return {protocol:1,mode:'snapshot',cursor:cursorOf(state),hasMore:false,
-          records:rows.filter(r=>!r.deletedAt).map(r=>withTasks(r,tasks)),
-          deleted:rows.filter(r=>r.deletedAt).map(({id,version,trashVersion,deletedAt})=>({id,version,trashVersion:trashVersion??0,deletedAt}))};
+          records:rows.filter(r=>r.origin!=='collection_input'&&!r.deletedAt).map(r=>withTasks(r,tasks)),
+          excluded:rows.filter(r=>r.origin==='collection_input').map(({id,origin})=>({id,origin})),
+          deleted:rows.filter(r=>r.origin!=='collection_input'&&r.deletedAt).map(({id,version,trashVersion,deletedAt})=>({id,version,trashVersion:trashVersion??0,deletedAt}))};
       }
       const events=await tx.listAfter('record-change',eventId(position),limit+1),page=events.slice(0,limit),tasks=page.length?await tx.list('task'):[];
-      return {protocol:1,mode:'delta',changes:page.map(event=>({...event,record:withTasks(event.record,tasks)})),cursor:cursorOf({...state,seq:page.at(-1)?.seq??position}),hasMore:events.length>limit};
+      return {protocol:1,mode:'delta',changes:page.filter(event=>event.record.origin!=='collection_input').map(event=>({...event,record:withTasks(event.record,tasks)})),excluded:page.filter(event=>event.record.origin==='collection_input').map(({record:{id,origin}})=>({id,origin})),cursor:cursorOf({...state,seq:page.at(-1)?.seq??position}),hasMore:events.length>limit};
     });
-    if(result.mode==='snapshot'||result.changes.length||Date.now()>=end){
+    if(result.mode==='snapshot'||result.changes.length||result.excluded.length||Date.now()>=end){
       await authenticate(req);
       if(!res.destroyed){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify({...result,checkedAt:now()}));}
       return;

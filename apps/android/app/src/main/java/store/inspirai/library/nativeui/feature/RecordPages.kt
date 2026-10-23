@@ -136,7 +136,7 @@ fun processingLabel(value: JSONObject): String = when {
                 OptionMenu("加工方式",preset,listOf("summary" to "总结","extract" to "整理要点","actions" to "提取待办","custom" to "自定义")){preset=it}
                 OutlinedTextField(instruction,{instruction=it},Modifier.fillMaxWidth(),label={Text("补充要求")})
                 OptionMenu("电脑",device,listOf("" to "自动")+devices.map { it.getString("id") to it.optString("name") }){device=it}
-                OptionMenu("Agent",agent,listOf("" to "自动","codex" to "Codex","codebuddy" to "CodeBuddy")){agent=it}
+                OptionMenu("Agent",agent,listOf("" to "自动","codex" to "Codex")){agent=it}
                 Button(onClick={model.action { repository.processRecord(repository.credentials.server(),id,preset,instruction,device,agent);process=false;repository.syncRecords() }},Modifier.fillMaxWidth()) { Text("交给后台") }
             }
         }

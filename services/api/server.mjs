@@ -1,5 +1,6 @@
+import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../packages/core/shared/execution-policy.mjs';
 import {repositoryRoot,collectorRoot,collectorPath} from '../../tooling/layout.mjs';
-import {createPluginHost,collectionAccess} from '../../packages/plugin-sdk/server.mjs';
+import {createPluginHost,collectionAccess,isCollectionAccess} from '../../packages/plugin-sdk/server.mjs';
 import {definitions} from '../../plugins/registry.mjs';
 import {collectOriginal} from '../../packages/core/server/collect.mjs';
 import {createContentTrash} from './modules/content-trash.mjs';
@@ -21,7 +22,9 @@ import { validateArchive, requireReadableMetadata } from '../../packages/core/no
 import { libraryBrowser } from '../../packages/core/server/library-browser.mjs';
 import { clientDownload } from './modules/client-download.mjs';
 import { readerAuthorization } from './modules/reader-auth.mjs';
+import {createCreation} from '../../plugins/writing/server/creation.mjs';
 import { createReadApi } from '../../packages/core/server/read-api.mjs';
+import {createTaskDiagnostics,cleanCapabilityFacts} from '../../packages/core/server/task-diagnostics.mjs';
 import { deviceMetadata, publicDeviceMetadata, publicDevices, clientRuntime, deviceCategory, workerAuthorized, workerOnline } from '../../packages/core/node/device-metadata.mjs';
 import { createClientUpdateService, updateBlocksTasks } from './modules/client-update-service.mjs';
 import { browserSessions, browserCookie, browserValid } from './modules/browser-session.mjs';
@@ -52,12 +55,13 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   requireValue(masterKey?.length >= 32, 'Master key must contain at least 32 characters');
   requireValue(!reviewExpiresAt || Number.isFinite(Date.parse(reviewExpiresAt)), 'Invalid review expiry');
   const attempts = new Map();
+  const taskStore=allowed=>collectionAccess(store,allowed,async(kind,value,target)=>{if(kind==='task')await taskDiagnostics.recordState(value,value.state,value.events?.at(-1)?.message||'',target);});
   const contentTrash=createContentTrash({store,serialized,owner,authenticate,body,send,saveTask,refreshLibrary:()=>readApi.refresh()});
   const records = createRecords({store,storage,serialized,authenticate,owner,assigned,body,send,saveTask});
-  const writing = createWriting({store:collectionAccess(store,["archive", "capture", "capture-version", "device", "record-media", "task", "trash", "writing-history", "writing-receipt", "writing-session", "writing-style", "draft", "setting"]),storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
-  const selectionWriting=createSelectionWriting({store:collectionAccess(store,["device", "task", "setting"]),serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment});
+  const writing = createWriting({store:taskStore(["archive", "capture", "capture-version", "device", "record-media", "task", "trash", "writing-history", "writing-receipt", "writing-session", "writing-style", "draft", "setting"]),storage,serialized,authenticate,owner,assigned,body,send,saveTask,publish});
+  const selectionWriting=createSelectionWriting({store:taskStore(["device", "task", "setting"]),serialized,owner,assigned,authenticate,body,send,saveTask,checkAssignment});
   const processingCenter=createProcessingCenter({store,serialized,owner,body,send});
-  const codexTrials=createCodexTrials({store:collectionAccess(store,["device", "task", "setting"]),serialized,saveTask,owner,assigned,body,send,authenticate});
+  const codexTrials=createCodexTrials({store:taskStore(["device", "task", "setting"]),serialized,saveTask,owner,assigned,body,send,authenticate});
   const locks = new Map();
   const plugins = createPluginHost({store,serialized,owner,body,send,definitions,profile:pluginProfile});
   async function serialized(key, work) {
@@ -77,7 +81,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const download = clientDownload({ releaseDir, publicUrl });
   const clientUpdates = createClientUpdateService({ store, serialized, owner, worker, body, send, clock, releases:download.workerReleases });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
+  const creation = createCreation({store:collectionAccess(store,['creation-session','creation-document','creation-document-version','creation-event','creation-turn','creation-publication','creation-receipt','creation-agent-save','capture','capture-version','device','record-media'],async(kind,t,tx)=>{
+    if(kind!=='creation-turn')return;
+    const old=await tx.get('creation-turn',t.id);
+    if(t.state==='running'&&t.assignmentId!==old?.assignmentId){const session=await tx.get('creation-session',t.sessionId),device=await tx.get('device',session.executorDeviceId);await taskDiagnostics.creationClaim(t,session,device,tx);}
+    else if(old?.state!==t.state)await taskDiagnostics.creationEvent(t,t.state,tx);
+  }),storage,serialized,authenticate,owner,worker,body,send,readApi,clock});
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
+  const taskDiagnostics=createTaskDiagnostics({store,body,send,serialized,clock});
   const skills = createSkillService({ store:plugins.access('ai-assistant',["client-update","device","skill-environment","skill-operation","skill-stage","skill-version","task"]), storage, serialized, updateDevice, owner, worker, body, send, clock });
   const skillMarket = createSkillMarketService({ store:plugins.access('ai-assistant',["device","skill-environment","skill-import","skill-version"]), storage, skillHub, serialized, owner, body, send, clock, fetcher:skillMarketFetch });
   const agents = createAgentService({ store:plugins.access('ai-assistant',["agent-environment","agent-operation","client-update","device","task"]), serialized, owner, worker, body, send, clock, catalog: agentCatalog, deploymentId: async () => (await identityPolicy()).namespace });
@@ -170,6 +181,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     Object.assign(task,await plugins.guardJob(task,state,target));
     task.state = state;
     task.updatedAt = now();
+    if(!isCollectionAccess(target))await taskDiagnostics.recordState(task,state,message,target);
     task.events = [...(task.events || []), { at: task.updatedAt, state, message }].slice(-100);
     return target.put('task', task);
   }
@@ -179,7 +191,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const token = explicit !== undefined ? explicit.match(/^Bearer (\S+)$/)?.[1] : cookie
       || (req.method === 'GET' && req.url.startsWith('/library/') && req.headers.cookie?.match(/(?:^|;\s*)library_session=([^;]+)/)?.[1]);
     let device = token && (await store.list('device')).find(d => (d.tokenHash === hash(token) || d.ownerTokenHash === hash(token)) && !d.revokedAt
-      && (d.role !== 'reader' || (d.scope === 'library:read' && Date.parse(d.expiresAt) > Date.now())));
+      && (d.role !== 'reader' || (['library:read','diagnostics:read'].includes(d.scope) && Date.parse(d.expiresAt) > Date.now())));
     let credential;
     if (device?.canonicalDeviceId) {
       credential = device;
@@ -198,7 +210,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     if (device.role === 'reader' && Date.now() - Date.parse(device.lastSeen) > 60000) {
       await store.touchDevice(device.id, now());
       device = await store.get('device', device.id);
-      requireValue(device && !device.revokedAt && device.role === 'reader' && device.scope === 'library:read'
+      requireValue(device && !device.revokedAt && device.role === 'reader' && ['library:read','diagnostics:read'].includes(device.scope)
         && Date.parse(device.expiresAt) > Date.now() && device.tokenHash === hash(token), 'Device authorization required', 401);
     }
     const actor = { ...device, credentialId: credential?.id || device.id, credentialTokenHash: hash(token) };
@@ -239,6 +251,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function recoverUnavailableTasks() {
     return serialized('claim', async () => {
       for (const candidate of await store.list('task')) {
+        if (['queued','assigned','failed','waiting_action'].includes(candidate.state) && (candidate.preferredAgent==='codebuddy'||candidate.agent==='codebuddy') && candidate.actionRequired?.kind!=='agent_disabled') {
+          await store.transaction(async tx=>{const live=await tx.getForUpdate('task',candidate.id);if(!live||!['queued','assigned','failed','waiting_action'].includes(live.state))return;await saveTask({...live,actionRequired:{kind:'agent_disabled',label:'改用 Codex',code:'AGENT_DISABLED'}},'waiting_action','CodeBuddy 执行方式已停用，原任务与成果保留；请确认改用 Codex',tx);});
+          continue;
+        }
         if (!['assigned', 'running'].includes(candidate.state) || !candidate.deviceId) continue;
         const node = await store.get('device', candidate.deviceId);
         // Older clients cannot fence a previous attempt. Leave their offline work
@@ -291,7 +307,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function body(req) {
     let size = 0;
     const chunks = [];
-    const limit = /\/(result|archives)$/.test(new URL(req.url, 'http://localhost').pathname) ? 58 * 1024 * 1024 : 96 * 1024;
+    const limit = /\/(result|archives)$/.test(new URL(req.url, 'http://localhost').pathname) ? 58 * 1024 * 1024 : req.url.startsWith('/api/creation/v1/') ? 2*1024*1024 : 96 * 1024;
     for await (const chunk of req) {
       size += chunk.length;
       requireValue(size <= limit, 'Request too large', 413);
@@ -598,11 +614,15 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       if (route.startsWith('/api/read/v1/')) {
         requireValue(['reader', 'owner'].includes(device.role), 'Reader permission required', 403);
+        if(await taskDiagnostics.handle(req,res,url,device))return;
+        requireValue(device.role==='owner'||device.scope==='library:read','Library read permission required',403);
         if (await readApi.handle(req, res, url, device)) return;
         fail('Not found', 404);
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if(await creation.handle(req,res,url,device))return;
+      if(await taskDiagnostics.handle(req,res,url,device))return;
       if (await contentTrash.handle(req,res,route,device)) return;
       if (await records.handle(req,res,route,device)) return;
       if (await selectionWriting.handle(req,res,route,device)) return;
@@ -725,7 +745,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(Array.isArray(input.agents) && input.agents.every(x => ['codex', 'codebuddy'].includes(x)), 'Invalid agents');
         requireValue(input.recordProtocol === undefined || input.recordProtocol === 1, 'Invalid record protocol');
         requireValue(input.writingProtocol === undefined || input.writingProtocol === 1, 'Invalid writing protocol');
-        requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 3 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>`${s.version}:${s.hash}`)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
+        requireValue(input.writingSkills === undefined || Array.isArray(input.writingSkills) && input.writingSkills.length <= 4 && input.writingSkills.every(s => s && [1,2].includes(s.version) && /^[a-f0-9]{64}$/.test(s.hash)) && new Set(input.writingSkills.map(s=>`${s.version}:${s.hash}`)).size === input.writingSkills.length, 'Invalid writing skill capabilities');
         requireValue(input.selectionWritingProtocol === undefined || input.selectionWritingProtocol === 1, 'Invalid selection writing protocol');
         requireValue(input.inputAttachmentProtocol === undefined || input.inputAttachmentProtocol === 1, 'Invalid input attachment protocol');
         const runtime = input.skillRuntime;
@@ -733,8 +753,10 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
-        await updateDevice(device, input, { trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
-        return send(res, 200, { tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
+        requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
+        const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
         owner(device);
@@ -752,7 +774,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const tags = input.tags ?? [];
         requireValue(Array.isArray(tags) && tags.length <= 20 && tags.every(tag => typeof tag === 'string' && tag.trim().length > 0 && tag.length <= 60), 'Invalid tags');
         const preferredDeviceId = input.deviceId || null;
-        requireValue(!input.agent || ['codex', 'codebuddy'].includes(input.agent), 'Unknown agent');
+        assertExecutionAgent(input.agent);
         requireValue(!input.scenario || (typeof input.scenario === 'string' && input.scenario.length <= 10000), 'Invalid scenario');
         const submissionId = text(input.submissionId, 'submission ID', 100);
         return await serialized(`submission:${submissionId}`, async () => {
@@ -816,7 +838,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
-                return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
+                return saveTask({ ...pending, agent:pending.preferredAgent||activeExecutionAgents(live.agents)[0], deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });
               break;
             }
@@ -837,7 +859,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(hash(buffer) === draft.id, 'Draft checksum mismatch', 500);
         return send(res, 200, { ...JSON.parse(buffer), inputAttachments: draft.inputAttachments || [], linkedTrials:(await store.list('task')).filter(t=>t.trial?.sourceArchiveId===draft.id).map(t=>({id:t.id,state:t.state,title:t.report?.title || t.title})) });
       }
-      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign)$/);
+      const taskRoute = route.match(/^\/api\/tasks\/([^/]+)\/(progress|result|retry|cancel|approve|reassign|supplement|use-codex)$/);
       if (taskRoute && req.method === 'POST') {
         const [, taskId, action] = taskRoute;
         const input = await body(req);
@@ -860,16 +882,21 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
           void readApi.refresh().catch(() => {});
           return send(res, 200, result);
         }
-        if (['retry', 'cancel', 'reassign'].includes(action)) {
+        if (['retry', 'cancel', 'reassign', 'supplement','use-codex'].includes(action)) {
           owner(device);
           const result = await serialized('claim', () => store.transaction(async tx => {
             const task = await tx.getForUpdate('task', taskId);
             requireValue(task&&!task.deletedAt, 'Task not found', 404);
-            requireValue(action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            requireValue(action === 'supplement' ? ['completed', 'awaiting_review'].includes(task.state) : action === 'cancel' ? task.state !== 'completed' : action === 'reassign' ? ['queued', ...active, 'waiting_action', 'failed'].includes(task.state) && Boolean(task.deviceId) : ['waiting_action', 'failed'].includes(task.state), 'Invalid task transition', 409);
+            if(action==='use-codex') {
+              requireValue(task.preferredAgent==='codebuddy'||task.agent==='codebuddy','此任务无需切换执行方式',409);
+              return saveTask({...task,preferredAgent:'codex',agent:null,selectedSkills:[],executionSkills:[],environmentDigest:null,actionRequired:null,failedDeviceIds:[],failover:null,assignmentId:task.assignmentId?id():null},'queued','用户确认改用 Codex，沿用原任务；旧执行档案与成果保留',tx);
+            }
+            if(action==='retry'&&(task.preferredAgent==='codebuddy'||task.agent==='codebuddy'))assertExecutionAgent('codebuddy');
             if (action === 'reassign') return reroute(task, 'USER_SWITCH', '用户切换到其他工作节点', tx, { manual: true });
             if(action==='cancel' && task.codexTrial)for(const child of await tx.list('task'))if(child.trial?.parentTaskId===task.id && !['completed','cancelled'].includes(child.state))await saveTask({...child,assignmentId:id()},'cancelled','原采集任务已取消',tx);
             if(action==='retry' && task.actionRequired?.conditionKey)await tx.delete('processing-preference','condition-'+hash(task.actionRequired.conditionKey).slice(0,32));
-            const next = action === 'retry' ? { ...task,actionRequired:null, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
+            const next = action === 'supplement' ? { ...task, supplementRevision: (task.supplementRevision || 0) + 1, assignmentId: task.assignmentId ? id() : null } : action === 'retry' ? { ...task,actionRequired:null, failedDeviceIds: [], failover: null, assignmentId: task.assignmentId ? id() : null } : task;
             return saveTask(next, action === 'cancel' ? 'cancelled' : 'queued', action === 'cancel' ? '用户取消' : task.deviceId ? '等待原电脑继续' : '等待可用电脑', tx);
           }));
           return send(res, 200, result);

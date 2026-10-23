@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/zalando/go-keyring"
 )
 
 type credential struct {
+	Scope     string    `json:"scope,omitempty"`
 	Token     string    `json:"token"`
 	Origin    string    `json:"origin"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -29,7 +31,7 @@ func (s secureStore) Get(server string) (credential, error) {
 		return credential{}, fail(exitKeyring, "keyring_unavailable", "OS secure credential store is unavailable or locked")
 	}
 	var c credential
-	if json.Unmarshal([]byte(raw), &c) != nil || c.Origin != server || c.Token == "" {
+	if json.Unmarshal([]byte(raw), &c) != nil || c.Origin != strings.SplitN(server, "#", 2)[0] || c.Token == "" {
 		return credential{}, fail(exitKeyring, "invalid_credential", "invalid origin-bound credential in OS secure store")
 	}
 	return c, nil
@@ -49,4 +51,11 @@ func (s secureStore) Delete(server string) error {
 		return fail(exitKeyring, "keyring_delete_failed", "cannot remove credential from OS secure store")
 	}
 	return nil
+}
+
+func credentialKey(c *client) string {
+	if c.scope == "diagnostics:read" {
+		return c.origin + "#diagnostics:read"
+	}
+	return c.origin
 }

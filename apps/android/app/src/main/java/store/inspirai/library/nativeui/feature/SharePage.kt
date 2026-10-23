@@ -144,7 +144,7 @@ import java.util.UUID
                         OutlinedTextField(current.optString("tags"),{update("tags",it)},Modifier.fillMaxWidth(),label={Text("标签")})
                         Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(current.optBoolean("autoArchive",true),{update("autoArchive",it)});Text("自动归档") }
                         OptionMenu("电脑",current.optString("deviceId"),listOf("" to "自动")+devices.map { it.getString("id") to it.optString("name") }) { update("deviceId",it) }
-                        OptionMenu("Agent",current.optString("agent"),listOf("" to "自动","codex" to "Codex","codebuddy" to "CodeBuddy")) { update("agent",it) }
+                        OptionMenu("Agent",current.optString("agent"),listOf("" to "自动","codex" to "Codex")) { update("agent",it) }
                     }
                 }
             }

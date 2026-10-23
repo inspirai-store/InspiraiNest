@@ -110,6 +110,7 @@ import store.inspirai.library.nativeui.design.*
                     }
                 }
                 items(value.optJSONArray("inputAttachments").objects()) { file -> AttachmentRow(file) { model.action { openNativeFile(context,repository,"/api/tasks/$id/input-files/${file.getString("sha256")}",file) } } }
+                item { TaskDiagnosticsPanel(repository,id) }
                 item { Text("进度",style=MaterialTheme.typography.titleLarge) }
                 items(value.optJSONArray("events").objects().asReversed()) { event -> Column { Text(event.optString("at").replace('T',' ').take(16),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant);Text(event.optString("message"),Modifier.padding(top=8.dp));HorizontalDivider(Modifier.padding(top=16.dp)) } }
             }

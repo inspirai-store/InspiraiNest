@@ -1,0 +1,52 @@
+name: Package reviewed desktop channel increment
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-macos:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true'
+    environment: signed-release
+    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    timeout-minutes: 120
+    concurrency:
+      group: inspirainest-macos-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+      - name: Fetch and verify reviewed compatibility source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p input
+          tag=$(node -p "require('./.github/releases/desktop-channel-input.json').tag")
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern desktop-channel-source.zip --dir input
+          node -e 'const fs=require("fs"),crypto=require("crypto"),pin=require("./.github/releases/desktop-channel-input.json");if(crypto.createHash("sha256").update(fs.readFileSync("input/desktop-channel-source.zip")).digest("hex")!==pin.sha256)throw Error("Reviewed source checksum mismatch")'
+          ditto -x -k input/desktop-channel-source.zip input
+          test -f input/payload/app/desktop/main.mjs
+          test -f input/payload/app/desktop/updater.mjs
+      - run: npm ci --ignore-scripts
+      - name: Build signed and notarized channel packages
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: node .github/scripts/package-reviewed-channels.mjs
+      - name: Upload verified signed packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-desktop-channels
+          path: channel-output/verified/*
+          if-no-files-found: error
