@@ -13,6 +13,8 @@ shutil.copytree(frontend,dst/'desktop/frontend',dirs_exist_ok=True,symlinks=True
 for p,target in [(dst/'node_modules',base/'node_modules'),(dst/'desktop/frontend/node_modules',frontend/'node_modules')]:
  if p.is_symlink():p.unlink()
  p.symlink_to(target.resolve(),target_is_directory=True)
+for rel in ['index.html', 'download.html', 'agent-manager.js', 'skill-manager.js', 'skill-market-install.js', 'capture/index.html', 'capture/capture.js']:
+ target=dst/'public'/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/'apps/web/public'/rel,target)
 mapping=json.loads((root/'tooling/layout-map.json').read_text())
 reverse={v:k.removeprefix('collector/') for k,v in mapping.items() if k.startswith('collector/')}
 reverse.update({**{'packages/core/node/'+n+'.mjs':'src/'+n+'.mjs' for n in ['capabilities','capability-probe','task-diagnostics']},**{'packages/core/web/diagnostics/'+n:'desktop/frontend/src/diagnostics/'+n for n in ['NodeCapabilities.tsx','TaskExecution.tsx','TaskExecution.module.css','task-client.ts','ExecutionRecords.tsx']},'packages/core/server/task-diagnostics.mjs':'src/task-diagnostics-service.mjs','packages/core/web/shared/update-safety.ts':'desktop/frontend/src/shared/update-safety.ts','apps/desktop/update-safety.mjs':'desktop/update-safety.mjs','services/api/modules/desktop-releases.mjs':'src/desktop-releases.mjs'})
