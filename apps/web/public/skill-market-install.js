@@ -29,7 +29,7 @@
       try{
         const value=await skills({kind:'environment',deviceId:node,offset:0});if(!valid(revision))return;
         const agents=new Map((value.agents || []).map(a=>[a.name,a]));
-        $('[data-install-agents]').innerHTML='<legend>目标 Agent · 当前用户</legend>'+Object.entries(names).map(([name,title])=>{
+        $('[data-install-agents]').innerHTML='<legend>目标 Agent · 当前用户</legend>'+Object.entries(names).filter(([name])=>name!=='codebuddy').map(([name,title])=>{
           const agent=agents.get(name),available=agent?.installed===true;
           return '<label class="market-agent-plan"><span><input type="checkbox" data-install-agent value="'+name+'" data-available="'+available+'" '+(available&&name==='codex'?'checked':'')+' '+(!available?'disabled':'')+'>'+title+' <small>'+esc(agent?.version || (agent?'未安装':'未上报'))+'</small></span><code>'+esc(agent?.skillRoot || ({codex:'~/.agents/skills',codebuddy:'~/.codebuddy/skills',claude:'~/.claude/skills',gemini:'~/.gemini/skills',opencode:'~/.config/opencode/skills'}[name]))+'</code><small>链接入口 · 唯一源 '+esc(agent?.sharedSkillRoot || '未上报；需要升级节点')+'</small><small>'+esc(agent?.loadMethod || '方案目录；实际位置在预览中确认')+'</small></label>';
         }).join('');

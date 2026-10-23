@@ -95,7 +95,8 @@ struct Submission: Codable, Equatable, Sendable {
         guard tags.count <= 20, tags.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.utf16.count <= 60 }) else {
             throw CollectorError.message("最多 20 个标签，每个最多 60 UTF-16 单元。")
         }
-        guard agent == nil || ["codex", "codebuddy"].contains(agent!) else { throw CollectorError.message("Agent 设置无效。") }
+        if agent == "codebuddy" { throw CollectorError.message("CodeBuddy 执行方式已停用。原提交仍保留，请选择 Codex 后继续。") }
+        guard agent == nil || ["codex"].contains(agent!) else { throw CollectorError.message("Agent 设置无效。") }
         guard try JSONEncoder().encode(self).count <= 96 * 1024 else { throw CollectorError.message("请求超过服务端 96 KiB 限制；完整内容仍在本地。") }
     }
     static func tags(from input: String) -> [String] {

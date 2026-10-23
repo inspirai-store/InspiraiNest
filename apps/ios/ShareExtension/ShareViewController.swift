@@ -145,7 +145,6 @@ struct ShareView: View {
                             Picker("Agent", selection: $model.agent) {
                                 Text("自动").tag("")
                                 Text("Codex").tag("codex")
-                                Text("CodeBuddy").tag("codebuddy")
                             }
                             Text(model.dispatchNotice).font(.caption).foregroundStyle(.secondary)
                             Button(model.loadingDevices ? "刷新中…" : "刷新电脑列表") { Task { await model.loadDevices() } }

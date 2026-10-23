@@ -13,7 +13,7 @@
     const error=message=>{$('[data-agent-error]').textContent=String(message || '').replace(/^Error invoking remote method '[^']+': Error: /,'');};
     dialog.innerHTML='<header><h2 data-agent-title>Agent</h2><button type="button" data-agent-close aria-label="关闭">×</button></header><div class="agent-toolbar"><button type="button" data-agent-refresh>刷新</button><button type="button" data-refresh-cancel hidden>取消刷新</button><span data-refresh-state></span><time data-agent-time></time></div><div role="status" data-agent-error></div><div class="agent-table"><table><thead><tr><th>名称</th><th>版本</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div>';
     const rows=new Map();
-    for(const [id,name] of Object.entries(names)){
+    for(const [id,name] of Object.entries(names).filter(([id])=>id!=='codebuddy')){
       const row=document.createElement('tr');row.dataset.agent=id;
       row.innerHTML=`<td>${name}</td><td data-agent-version></td><td><span data-agent-state></span><div role="status" data-agent-row-error></div></td><td><button type="button" data-agent-install>安装</button><button type="button" data-agent-cancel hidden>取消</button></td>`;
       row.querySelector('[data-agent-install]').onclick=()=>openInstall(id);

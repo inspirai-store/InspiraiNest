@@ -11,7 +11,7 @@ struct NodeAgentsView: View {
     @State private var error: String?
     @State private var busy = false
     @State private var loadedSession: UUID?
-    private let ids = ["codex", "codebuddy", "claude", "gemini", "opencode"]
+    private let ids = ["codex", "claude", "gemini", "opencode"]
     private var supported: Bool { device.agentRuntime?.schemaVersion == 1 }
     var body: some View {
         List {
