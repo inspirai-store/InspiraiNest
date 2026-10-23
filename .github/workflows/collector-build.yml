@@ -408,6 +408,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -416,6 +418,9 @@ jobs:
         with:
           node-version: '22'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - run: npm ci --ignore-scripts
       - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
