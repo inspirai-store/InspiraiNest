@@ -353,7 +353,7 @@ jobs:
   signed-android:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_android
     environment: signed-release
-    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
       group: inspirainest-android-release
@@ -405,6 +405,17 @@ jobs:
           app_cert=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
           test -n "$test_cert" && test "$test_cert" = "$app_cert"
           node "$GITHUB_WORKSPACE/public-source/.github/scripts/stage-android-release.mjs"
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - name: Verify signed in-place upgrade and repeat sharing
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          working-directory: public-source
+          script: bash .github/scripts/verify-android-upgrade.sh
       - name: Upload verified Android package to private OSS
         working-directory: public-source/collector
         env:
