@@ -23,12 +23,10 @@ export function clientDownload({ releaseDir, publicUrl }) {
         aliases: brandedNames(meta.version, 'Android.apk').map(name => '/downloads/' + name) };
     } catch { return null; }
   }
-  function workerReleases(channel='stable') {
-    const modern=desktop.platformReleases(channel);
-
+  function legacyWorkerReleases() {
     try {
       const manifest = JSON.parse(fs.readFileSync(path.join(releaseDir, 'worker-release.json'), 'utf8'));
-      const legacy=Object.fromEntries(['windows_x64', 'macos_x64', 'macos_arm64', 'macos_x64_dmg', 'macos_arm64_dmg'].map(platform => {
+      return Object.fromEntries(['windows_x64', 'macos_x64', 'macos_arm64', 'macos_x64_dmg', 'macos_arm64_dmg'].map(platform => {
         try {
         const meta = manifest[platform];
         const extension = platform.endsWith('_dmg') ? 'dmg' : 'zip';
@@ -42,8 +40,18 @@ export function clientDownload({ releaseDir, publicUrl }) {
           legacyUrl: `/downloads/personal-library-worker-${meta.version}-${platform.replaceAll('_', '-')}.${platform === 'windows_x64' ? 'exe' : extension}` }];
         } catch { return [platform, null]; }
       }));
-      return {...legacy,...Object.fromEntries(Object.entries(modern).filter(([,value])=>value))};
-    } catch { return { windows_x64:null,macos_x64:null,macos_arm64:null,macos_x64_dmg:null,macos_arm64_dmg:null,...modern }; }
+    } catch { return { windows_x64:null,macos_x64:null,macos_arm64:null,macos_x64_dmg:null,macos_arm64_dmg:null }; }
+  }
+  function workerReleases(channel='stable') {
+    const legacy=legacyWorkerReleases();
+    return Object.fromEntries(Object.entries(desktop.platformReleases(channel)).map(([platform,modern])=>{
+      if(!modern)return [platform,legacy[platform]||null];
+      const extension=platform.endsWith('_dmg')?'dmg':platform==='windows_x64'?'exe':'zip';
+      const suffix=platform==='windows_x64'?'Windows-x64.exe':`macOS-${platform.split('_')[1]}.${extension}`;
+      return [platform,{...(legacy[platform]?.version===modern.version?legacy[platform]:{}),...modern,
+        aliases:brandedNames(modern.version,suffix).map(name=>'/downloads/'+name),
+        legacyUrl:`/downloads/personal-library-worker-${modern.version}-${platform.replaceAll('_','-')}.${extension}`}];
+    }));
   }
   function readerReleases() {
     const empty = { cli: {}, skill: null, checksums: null };
@@ -82,6 +90,7 @@ export function clientDownload({ releaseDir, publicUrl }) {
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return true; }
     const meta = release();
     const workers = workerReleases();
+    const legacyWorkers = legacyWorkerReleases();
     const reader = readerReleases();
     if (route === '/client-release.json') {
       res.setHeader('Cache-Control', 'no-store');
@@ -102,7 +111,7 @@ export function clientDownload({ releaseDir, publicUrl }) {
         if(value){res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','text/yaml; charset=utf-8');res.setHeader('Content-Length',Buffer.byteLength(value));res.end(req.method==='HEAD'?undefined:value);return true;}
       }
     }
-    const selected = [meta, ...Object.values(workers), ...Object.values(reader.cli), reader.skill, reader.checksums, ...macUpdates(workers),...desktop.assetList()].find(item => item &&
+    const selected = [meta, ...Object.values(workers), ...Object.values(legacyWorkers), ...Object.values(reader.cli), reader.skill, reader.checksums, ...macUpdates(legacyWorkers),...desktop.assetList()].find(item => item &&
       (item.url === route || item.browserUrl === route || item.legacyUrl === route || item.aliases?.includes(route)));
     if (!selected) { res.writeHead(404); res.end('Release not available'); return true; }
     const file = path.join(releaseDir, selected.filename);
