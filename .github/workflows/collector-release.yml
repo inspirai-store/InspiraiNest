@@ -353,7 +353,7 @@ jobs:
   signed-android:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_android
     environment: signed-release
-    runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
       group: inspirainest-android-release
