@@ -48,7 +48,8 @@ export function clientDownload({ releaseDir, publicUrl }) {
       if(!modern)return [platform,legacy[platform]||null];
       const extension=platform.endsWith('_dmg')?'dmg':platform==='windows_x64'?'exe':'zip';
       const suffix=platform==='windows_x64'?'Windows-x64.exe':`macOS-${platform.split('_')[1]}.${extension}`;
-      return [platform,{...(legacy[platform]?.version===modern.version?legacy[platform]:{}),...modern,
+      const previous=legacy[platform]?.version===modern.version?legacy[platform]:{};
+      return [platform,{...previous,...modern,...(previous.publishedAt?{publishedAt:previous.publishedAt}:{}),
         aliases:brandedNames(modern.version,suffix).map(name=>'/downloads/'+name),
         legacyUrl:`/downloads/personal-library-worker-${modern.version}-${platform.replaceAll('_','-')}.${extension}`}];
     }));
