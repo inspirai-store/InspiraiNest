@@ -251,8 +251,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function recoverUnavailableTasks() {
     return serialized('claim', async () => {
       for (const candidate of await store.list('task')) {
-        if (['queued','failed','waiting_action'].includes(candidate.state) && (candidate.preferredAgent==='codebuddy'||candidate.agent==='codebuddy') && candidate.actionRequired?.kind!=='agent_disabled') {
-          await store.transaction(async tx=>{const live=await tx.getForUpdate('task',candidate.id);if(!live||!['queued','failed','waiting_action'].includes(live.state))return;await saveTask({...live,actionRequired:{kind:'agent_disabled',label:'改用 Codex',code:'AGENT_DISABLED'}},'waiting_action','CodeBuddy 执行方式已停用，原任务与成果保留；请确认改用 Codex',tx);});
+        if (['queued','assigned','failed','waiting_action'].includes(candidate.state) && (candidate.preferredAgent==='codebuddy'||candidate.agent==='codebuddy') && candidate.actionRequired?.kind!=='agent_disabled') {
+          await store.transaction(async tx=>{const live=await tx.getForUpdate('task',candidate.id);if(!live||!['queued','assigned','failed','waiting_action'].includes(live.state))return;await saveTask({...live,actionRequired:{kind:'agent_disabled',label:'改用 Codex',code:'AGENT_DISABLED'}},'waiting_action','CodeBuddy 执行方式已停用，原任务与成果保留；请确认改用 Codex',tx);});
           continue;
         }
         if (!['assigned', 'running'].includes(candidate.state) || !candidate.deviceId) continue;
@@ -838,7 +838,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
-                return saveTask({ ...pending, deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
+                return saveTask({ ...pending, agent:pending.preferredAgent||activeExecutionAgents(live.agents)[0], deviceId: device.id, assignmentId: input.assignmentProtocol === 1 || pending.assignmentId ? id() : null, selectedSkills:selected.selectedSkills, environmentDigest:selected.environmentDigest || pending.environmentDigest || null }, 'assigned', `已分配给 ${device.name}`, tx);
               });
               break;
             }

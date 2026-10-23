@@ -58,6 +58,7 @@ modern=(root/'services/api/server.mjs').read_text();start=modern.index("        
 s=s.replace("for (const candidate of await store.list('task')) {\n", "for (const candidate of await store.list('task')) {\n"+modern[start:end],1)
 s=s.replace('approve|reassign|supplement)', 'approve|reassign|supplement|use-codex)');s=s.replace("['retry', 'cancel', 'reassign', 'supplement'].includes(action)","['retry', 'cancel', 'reassign', 'supplement','use-codex'].includes(action)")
 start=modern.index("            if(action==='use-codex')");end=modern.index("            if (action === 'reassign')",start);s=s.replace("            if (action === 'reassign')",modern[start:end]+"            if (action === 'reassign')",1);p.write_text(s);changed.append('src/server.mjs')
+ch('src/server.mjs','return saveTask({ ...pending, deviceId: device.id, assignmentId:', 'return saveTask({ ...pending, agent:pending.preferredAgent||activeExecutionAgents(live.agents)[0], deviceId: device.id, assignmentId:')
 # Target the current main process, retaining browser extension and independent capture windows.
 ch('desktop/main.mjs',"import { DesktopUpdater }", "import {createUpdatePreparation} from './update-safety.mjs';\nimport { DesktopUpdater }")
 ch('desktop/main.mjs','let owner, captureBrowser, updates,','let updatePreparation;\nlet owner, captureBrowser, updates,')
