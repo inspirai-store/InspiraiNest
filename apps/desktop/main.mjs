@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createWorkerStatePublisher } from './runtime-events.mjs';
 import { WorkerManager } from './manager.mjs';
+import {DesktopCreation} from './creation-client.mjs';
 import { OwnerClient } from './owner-client.mjs';
 import { logoutOwnerSession, pairOwnerSession } from './account-session.mjs';
 import { captureRequest } from './capture-client.mjs';
@@ -237,7 +238,7 @@ function registerIPC() {
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
-    taskDiagnostics:id=>owner.taskDiagnostics(id),capabilities:id=>owner.capabilities(id),checkCapabilities:id=>owner.checkCapabilities(id),
+    diagnosticTasks:input=>owner.diagnosticTasks(input),taskDiagnostics:id=>owner.taskDiagnostics(id),capabilities:id=>owner.capabilities(id),checkCapabilities:id=>owner.checkCapabilities(id),
     draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id), renameNode: input => owner.renameNode(input),
     trash: () => owner.trash(), remove: id => owner.removeArchive(id), restore: id => owner.restoreArchive(id),
     download: async input => {
@@ -261,6 +262,9 @@ function registerIPC() {
       await shell.openExternal(url.href);
     },
   };
+  const creation=new DesktopCreation({owner,configuration:()=>manager.configuration(),openExternal:url=>shell.openExternal(url)});
+  app.on('will-quit',()=>creation.close());
+  for(const name of ['account','login','cancel','request'])ipcMain.handle('creation:'+name,async(event,input)=>{trustedMain(event);return creation[name](input);});
   for (const [name, fn] of Object.entries(library)) ipcMain.handle(`library:${name}`, async (event, argument) => { trustedMain(event); return fn(argument); });
   for (const [name, fn] of Object.entries({
     status: () => updates.snapshot(), check: () => updates.check(),

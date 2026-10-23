@@ -1,3 +1,4 @@
+import {creationRoute} from './creation-contract.mjs';
 import { requireValue } from './common.mjs';
 export function captureBinaryRead({route,method='GET'}) {
   return method==='GET'&&(/^\/api\/records\/media\/[a-f0-9]{64}$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}(?:\/files\/[a-f0-9-]{36}|\/drafts\/[a-f0-9-]{36}\/files\/[a-f0-9]{64})$/.test(route));
@@ -12,7 +13,7 @@ export function validateCaptureRequest(input) {
   const writingPost=method==='POST'&&(/^\/api\/writing\/sessions$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}\/(answers|turns|materials|discuss|start|style|revise)$/.test(route));
   const contentTrash=method==='GET'&&(route==='/api/content-trash'||/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+$/.test(route))||method==='POST'&&/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+\/(delete|restore)$/.test(route);
   const recordChanges=method==='GET'&&/^\/api\/records\/changes\?(?:cursor=[a-f0-9%:-]+&)?wait=(?:[0-9]|1[0-9]|2[0-5])(?:&limit=(?:[1-9][0-9]?|1[0-9]{2}|200))?$/i.test(route);
-  requireValue(allowed||writingGet||writingPost||contentTrash||recordChanges,'Capture route not allowed',403);
+  requireValue(allowed||writingGet||writingPost||contentTrash||recordChanges||creationRoute(route,method),'Capture route not allowed',403);
   if (input.bytes !== undefined) requireValue(typeof input.bytes === 'string' && input.bytes.length <= 44739244 && method === 'PUT' && route.includes('/media/'),'Invalid media body');
   return input;
 }

@@ -1,9 +1,11 @@
+import {lingnestToolsStatus,installLingnestTools} from '../../packages/core/node/lingnest-tools.mjs';
 import {createDiagnosticOutbox,checkpointEvidence} from '../../packages/core/node/task-diagnostics.mjs';
 import {capabilityFacts,runCapabilityProbe,probeCapabilityTools,observeTaskPermission} from '../../packages/core/node/capability-probe.mjs';
 import {workerRegistry} from '../../plugins/registry.worker.mjs';
 import {sourcePath,repositoryRoot} from '../../tooling/layout.mjs';
 import {collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import { processCodexTrial, probeTrialEnvironment, loginTrial } from '../../plugins/agent-lab/worker/codex-trial-worker.mjs';
+import {CreationWorker} from '../../plugins/writing/worker/creation-worker.mjs';
 import fs from 'node:fs';
 import { prepareRecordInput, recordPrompt, preserveRecordOriginal } from '../../packages/core/node/record-input.mjs';
 import { writingCapabilities } from '../../plugins/writing/protocol/writing-protocol.mjs';
@@ -170,6 +172,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
   let skillOperations = [];
   let skillRuntime;
   const agentRuntime = createAgentRuntime({...config,dataDir},{api:(...args)=>api(config,...args),signal});
+  const creationWorker = new CreationWorker({...config,dataDir},{api:(...args)=>api(config,...args),diagnostics});
   let agentOperations = [], agentTick;
   const updateAgents = (idle=false) => {
     if(!pluginState.enabled['ai-assistant'])return Promise.resolve();
@@ -207,7 +210,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
       try{pluginState=await api(config,'/api/plugins');}catch(error){if(error.status!==404)throw error;}
       deviceMetadata ||= await computerMetadata({ server: remoteURL(config.server), dataDir, installationId: config.installationId, clientType: config.clientType || 'worker' });
       if(pluginState.enabled['agent-lab']&&Date.now()-trialProbedAt>30000){trialStatus=await probeTrialEnvironment({...config,dataDir});trialProbedAt=Date.now();}
-      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, trialEnvironment:trialStatus, selectionWritingProtocol:1, writingProtocol:1, writingSkills:writingCapabilities(), inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilityFacts:capabilityFacts(config,available,{version:runningClient().version,tools:capabilityTools,runtime:executionRuntimeHash,skills:{'writing.materials':writingCapabilities().at(-1)?.hash},observations:readJsonIfPresent(path.join(dataDir,'capability-observations.json')),enabled:{'writing.materials':pluginState.enabled.writing,'writing.selection':pluginState.enabled.writing}}), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
+      const result = await api(config, '/api/heartbeat', 'POST', { ...deviceMetadata, creationRuntime:{version:1,account:creationWorker.account,fingerprint:creationWorker.fingerprint},lingnestTools:lingnestToolsStatus(), trialEnvironment:trialStatus, selectionWritingProtocol:1, writingProtocol:1, writingSkills:writingCapabilities(), inputAttachmentProtocol:1, recordProtocol:1, clientRuntime:runningClient(), capabilityFacts:capabilityFacts(config,available,{version:runningClient().version,tools:capabilityTools,runtime:executionRuntimeHash,skills:{'writing.materials':writingCapabilities().at(-1)?.hash,'writing.creation':hash(fs.readFileSync(new URL('../../plugins/writing/worker/creation-worker.mjs',import.meta.url)))},observations:readJsonIfPresent(path.join(dataDir,'capability-observations.json')),enabled:{'writing.materials':pluginState.enabled.writing,'writing.selection':pluginState.enabled.writing}}), capabilities: [...new Set([...(config.capabilities || ['article', 'webpage']), 'note'])], agents: Object.keys(available).filter(key => available[key].available), skillRuntime:{schemaVersion:1,mode:control.state.mode,idle:!current && !creationWorker.busy && !skillTick && !agentRuntime.busy}, agentRuntime:{schemaVersion:1,busy:agentRuntime.busy}, environmentDigest:skillRuntime.inventory?.digest || null });
       void diagnosticFlush();
       capabilityChecks=result.capabilityChecks||[];capabilityProofs=result.capabilityProofs||[];
       wakeUpdater(result.clientUpdates);
@@ -217,6 +220,8 @@ export async function runWorker(config, { once = false, signal, paused = false }
       agentOperations = Array.isArray(result.agentOperations) ? result.agentOperations : [];
       if (!Array.isArray(result.tasks)) throw Object.assign(new Error('心跳响应缺少任务列表，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
       if (!result.tasks.every(task => task && typeof task.id === 'string')) throw Object.assign(new Error('心跳任务列表结构异常'), { code: 'REMOTE_FORMAT', route: '/api/heartbeat' });
+      control.readCommand();
+      if(control.state.mode==='draining')creationWorker.interrupt();
       if (current) {
         const assignment = result.tasks.find(task => task.id === current.id);
         if (!assignment || assignment.state === 'cancelled' || current.assignmentId && assignment.assignmentId !== current.assignmentId) {
@@ -253,7 +258,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if(agentOperations.length){if(skillTick)await skillTick;await updateAgents(true);if(!forbidden)available=await detectAgents(config.agents);}
         else void updateAgents(false);
         if(agentRuntime.operationLock){await sleep(250);continue;}
-        for(const check of capabilityChecks){const result=await runCapabilityProbe(config,check.agent,runAgent,{signal,mode:check.mode});await api(config,'/api/capability-checks/'+check.id+'/result','POST',result);}capabilityChecks=[];
+        for(const check of capabilityChecks){let result;if(check.action==='install-tools'){try{installLingnestTools({bundle:project});result={agent:check.agent,mode:check.mode,permission:'unknown',passed:true,code:'TOOLS_INSTALLED'};}catch{result={agent:check.agent,mode:check.mode,permission:'unknown',passed:false,code:'TOOLS_INSTALL_FAILED'};}}else result=await runCapabilityProbe(config,check.agent,runAgent,{signal,mode:check.mode});await api(config,'/api/capability-checks/'+check.id+'/result','POST',result);}capabilityChecks=[];
         if(skillOperations.length)await updateSkills(true);
         else void updateSkills(false);
         if (forbidden || signal?.aborted) break;
@@ -261,6 +266,9 @@ export async function runWorker(config, { once = false, signal, paused = false }
         if (control.state.mode === 'draining') break;
         if (control.state.mode === 'paused') { if (control.state.phase !== 'paused') control.update({ phase: 'paused' }); await sleep(250); continue; }
         if(!pluginState.enabled['ai-assistant']){await sleep(1000);continue;}
+        await creationWorker.tick({signal}).catch(error=>{if(error.status!==404)fault('creation',error,'创作服务暂不可用，文稿保留');});
+        control.readCommand();
+        if(control.state.mode==='draining')break;
         control.update({ phase: 'claiming' });
         const claimed = await api(config, '/api/claim', 'POST', { assignmentProtocol: 1 });
         if (!Object.hasOwn(claimed, 'task')) throw Object.assign(new Error('领取响应缺少任务字段，请检查服务版本'), { code: 'REMOTE_FORMAT', route: '/api/claim' });
@@ -339,6 +347,7 @@ export async function runWorker(config, { once = false, signal, paused = false }
   } finally {
     clearInterval(timer);
     skillRuntime.close();
+    creationWorker.close();
     agentRuntime.close();
     if(agentTick)await agentTick;
     if (skillTick) await skillTick;

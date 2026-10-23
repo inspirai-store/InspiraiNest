@@ -1,3 +1,5 @@
+import {ExecutionRecords} from '../../packages/core/web/diagnostics/ExecutionRecords';
+import {CreationPage,CreationSidebar} from '../../plugins/writing/web/creation/CreationPage';
 import {webPlugins} from '../../plugins/registry.web';
 import {PluginViewsProvider,usePluginViews} from '../../packages/plugin-sdk/views';
 import {PluginProvider,usePlugins} from '../../packages/plugin-sdk/react';
@@ -124,7 +126,7 @@ export function App() {
     <Route path="/settings/*" element={<SettingsPage/>}/>
     <Route path="/status" element={<StatusPanel/>} />
     {webPlugins.flatMap(plugin=>(plugin.routes??[]).map(route=><Route key={plugin.id+route.path} path={route.path} element={<PluginRoute pluginId={plugin.id} Component={route.Component}/>}/>))}
-    <Route path="/tasks" element={<TasksPage/>} />
+    <Route path="/executions" element={<ExecutionRecords/>}/><Route path="/creation" element={<CreationPage/>}/><Route path="/tasks" element={<TasksPage/>} />
     <Route path="/tasks/:id" element={<TasksPage/>} />
     {import.meta.env.DEV&&<Route path="/components" element={<ComponentsShowcase />} />}
     {import.meta.env.DEV&&<Route path="/controls" element={<ControlsShowcase />} />}
@@ -135,5 +137,5 @@ export function App() {
     <Route path="/library/demo" element={<LibraryRoute view="detail" />} />
     <Route path="/library/:id" element={<LibraryRoute view="detail" />} />
     <Route path="*" element={<Navigate to="/records/new" replace />} />
-  </Routes></InteractionProvider></PluginProviders></PluginViewsProvider></PluginProvider></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
+  </Routes><CreationSidebar/></InteractionProvider></PluginProviders></PluginViewsProvider></PluginProvider></SessionRoutes></SettingsProvider></UiStateProvider></QueryClientProvider>;
 }

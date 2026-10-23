@@ -6,6 +6,7 @@ const invoke = async (channel, ...args) => {
     throw new Error(/^(?:fetch failed|Failed to fetch|net::ERR_CONNECTION_REFUSED)$/i.test(message) ? '连接失败，请重试' : message || '操作失败');
   }
 };
+contextBridge.exposeInMainWorld('creation',Object.fromEntries(['account','login','cancel','request'].map(name=>[name,input=>invoke('creation:'+name,input)])));
 contextBridge.exposeInMainWorld('desktopEditing', {perform: action => invoke('desktop-editing:perform', action)});
 contextBridge.exposeInMainWorld('desktopSettings', {
   get: () => invoke('desktop-settings:get'),
@@ -26,7 +27,7 @@ contextBridge.exposeInMainWorld('worker', {
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
   'plugins','status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','taskFile','task','task-action',
-  'taskDiagnostics','capabilities','checkCapabilities','draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
+  'diagnosticTasks','taskDiagnostics','capabilities','checkCapabilities','draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
 ].map(name => [name === 'task-action' ? 'taskAction' : name === 'cancel-login' ? 'cancelLogin' : name, input => invoke(`library:${name}`, input)])),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('library:changed', listener); return () => ipcRenderer.removeListener('library:changed', listener); },
 });

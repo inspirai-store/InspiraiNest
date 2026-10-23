@@ -59,7 +59,7 @@ export function createDiagnosticOutbox(dataDir,{deviceId,token,runId=randomUUID(
   return {runId,record,flush(){if(!flushing)flushing=(async()=>{let result;do{result=await sendPending();}while(result.pending>0);return result;})().finally(()=>{flushing=null;});return flushing;}};
 }
 
-export function capabilityKey(task){return task.purpose==='selection-writing'?'writing.selection':task.writingSessionId?'writing.materials':task.capture?.kind==='page'?'capture.browser':task.type==='video'?'capture.media':'capture.article';}
+export function capabilityKey(task){return task.creationSessionId?'writing.creation':task.purpose==='selection-writing'?'writing.selection':task.writingSessionId?'writing.materials':task.capture?.kind==='page'?'capture.browser':task.type==='video'?'capture.media':'capture.article';}
 export function taskEnvironmentFingerprint(device,agent,skillHash){return hash(JSON.stringify({version:device.clientRuntime?.version,platform:device.platform,agent,environment:device.environment?.digest,skillHash}));}
 
 export function checkpointEvidence(dataDir,task){

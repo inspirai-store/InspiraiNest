@@ -25,7 +25,7 @@ export function AppShell({ area, go, children, onAction, favoritesOnly, onFavori
   return <>
     <header className={styles.topbar} data-region="应用顶栏">
       <div className={styles.brand} data-region="品牌"><img src={brand} alt="" /><span>灵藏</span></div>
-      <div className={styles.topActions} data-region="顶栏操作">
+      <div className={styles.topActions} data-region="顶栏操作"><Action onClick={()=>window.dispatchEvent(new CustomEvent('creation:open'))}>创作</Action><Action onClick={()=>go('/settings/nodes')} data-region="能力入口">能力</Action><Action onClick={()=>go('/executions')}>执行记录</Action>
         <MenuButton label="我的资料空间" icon={UserRound} className={styles.space} triggerRegion="资料空间" triggerContent={<><i/><span>我的资料空间</span><ChevronDown size={16}/></>} width={160} align="end" region="资料空间菜单" options={[{label:"账号",icon:UserRound,select:()=>go("/settings/account")}]} />
         <button className={styles.tasks} data-region="任务入口" onClick={()=>go('/tasks')}><ListChecks size={16} /><span>任务</span><Badge kind="warning">{currentTaskCount}</Badge></button>
       </div>

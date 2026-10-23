@@ -21,7 +21,7 @@ import type {SettingsSnapshot,SettingsPatch} from './client';
 import workbench from '../../../ui-react/src/Workbench.module.css';
 import styles from './SettingsPage.module.css';
 
-const sections=[['plugins','插件',Puzzle],['general','通用',Settings2],['account','账号',UserRound],['nodes','节点',Monitor],['updates','更新',Download],['diagnostics','诊断',Activity]] as const;
+const sections=[['plugins','插件',Puzzle],['general','通用',Settings2],['account','账号',UserRound],['nodes','节点与能力',Monitor],['updates','更新',Download],['diagnostics','诊断',Activity]] as const;
 export function SettingsPage(){
  const extensions=usePluginViews();
 

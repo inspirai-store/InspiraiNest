@@ -6,7 +6,7 @@ const SCOPE = 'library:read';
 const SCOPES = [SCOPE,'diagnostics:read'];
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const lifetime = 30 * 86400;
-const publicReader = ({ tokenHash, ownerTokenHash, ...device }) => device;
+const publicReader = ({id,name,role,scope,platform,system,createdAt,expiresAt,revokedAt}) => ({id,name,role,scope,platform,system,createdAt,expiresAt,revokedAt});
 const canIssue = device => device && (device.role === 'owner' || (device.role === 'worker' && device.clientType === 'desktop' && device.ownerTokenHash));
 
 // Opaque grants and tokens are hashed at rest. Browser consent never sees device_code.

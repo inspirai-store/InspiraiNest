@@ -3,7 +3,8 @@ import path from 'node:path';
 import {hash,atomicJson} from './common.mjs';
 export function capabilityFacts(config,available,{version='unknown',skills={},tools={},observations={},enabled={},browser={},runtime=null}={}){
   const checkedAt=new Date().toISOString(),result=[];
-  for(const [agent,probe]of Object.entries(available))for(const id of ['capture.article','capture.media','capture.browser','writing.materials','writing.selection']){
+  for(const [agent,probe]of Object.entries(available))for(const id of ['capture.article','capture.media','capture.browser','writing.materials','writing.selection','writing.creation']){
+    if(id==='writing.creation'&&agent!=='codex')continue;
     const fingerprint=hash(JSON.stringify({agent,profile:config.agents?.[agent]||null,version,agentVersion:probe.version||null,skill:skills[id]||null,platform:process.platform,runtime,tools:id==='capture.media'?tools:null}));
     const observed=observations[agent+':'+(id.startsWith('capture.')?'capture':'writing')],matching=observed?.profileHash===hash(JSON.stringify(config.agents?.[agent]||null));
     const missing=id==='capture.media'?['ffmpeg','yt-dlp','whisper'].filter(name=>tools[name]!==true):[];

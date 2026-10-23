@@ -4,7 +4,7 @@ import {diagnosticScope,diagnosticText,diagnosticDetails,diagnosticCategory,capa
 import {evaluateCapability} from '../node/capabilities.mjs';
 import {capabilityBlock} from '../node/capabilities.mjs';
 
-const capabilityNames={'capture.article':'网页正文与配图','capture.media':'音视频分析','capture.browser':'外部浏览器','writing.materials':'资料写作','writing.selection':'选区改写'};
+const capabilityNames={'capture.article':'网页正文与配图','capture.media':'音视频分析','capture.browser':'外部浏览器','writing.materials':'资料写作','writing.selection':'选区改写','writing.creation':'文稿创作'};
 
 function recoveryCondition(code){
  const action=code==='BROWSER_WAITING'?'在采集页交还页面控制后继续原任务':/PERMISSION/.test(code)?'在对应客户端完成执行工具授权并检测能力，再继续原任务':/VERSION|PROTOCOL/.test(code)?'在原节点安装兼容的客户端和固定技能版本后继续原任务':/NETWORK|UPLOAD|HTTP|REMOTE/.test(code)?'恢复对应执行工具或服务连接后，复用已保存成果继续原任务':/SOURCE|LOGIN|CHALLENGE/.test(code)?'查看原来源页面，完成所需登录或验证后继续原任务':/QUALITY|COVERAGE|MISSING|VALIDAT|RESULT/.test(code)?'按本次证据补齐缺失内容或修复结果，再继续原任务':/BROWSER|PAGE/.test(code)?'恢复原来源页面连接后继续原任务':/TIMEOUT/.test(code)?'检查本机执行日志与保留成果，处理超时条件后继续原任务':'核对本次证据并处理已确认的阻塞条件，再继续原任务';
@@ -18,10 +18,29 @@ export function cleanCapabilityFacts(input){
   return input.map(f=>{requireValue(f&&capabilityNames[f.id]&&['codex','codebuddy'].includes(f.agent)&&typeof f.available==='boolean'&&/^[a-f0-9]{64}$/.test(f.fingerprint)&&Number.isFinite(Date.parse(f.checkedAt)),'Invalid capability fact');
     return {id:f.id,agent:f.agent,available:f.available,enabled:f.enabled!==false,permission:['ready','blocked'].includes(f.permission)?f.permission:'unknown',missing:Array.isArray(f.missing)?f.missing.slice(0,20).map(x=>diagnosticText(x,120)):[],connected:f.connected===true,fingerprint:f.fingerprint,skill:diagnosticText(f.skill,120),checkedAt:f.checkedAt};});
 }
-const publicTask=t=>({id:t.id,state:t.state,created_at:t.createdAt,updated_at:t.updatedAt,device_id:t.deviceId||null,attempt_id:t.attemptId||null,kind:t.writingSessionId||t.purpose==='selection-writing'?'writing':'collection',has_result:Boolean(t.archiveId||t.draftId)});
+const publicTask=t=>({id:t.id,state:t.state,created_at:t.createdAt,updated_at:t.updatedAt,device_id:t.deviceId||null,attempt_id:t.attemptId||null,session_id:t.creationSessionId||null,kind:t.creationSessionId||t.writingSessionId||t.purpose==='selection-writing'?'writing':'collection',has_result:Boolean(t.archiveId||t.draftId)});
 export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now}){
   const readable=d=>requireValue(d.role==='owner'||d.role==='reader'&&d.scope===diagnosticScope,'Diagnostics read permission required',403);
-  async function taskFor(taskId){requireValue(validId(taskId),'Invalid task ID');const t=await store.get('task',taskId);requireValue(t&&!t.deletedAt,'Task not found',404);return t;}
+  async function taskFor(taskId){requireValue(validId(taskId),'Invalid task ID');let t=await store.get('task',taskId);if(!t){const turn=await store.get('creation-turn',taskId);if(turn)t=await creationTask(turn);}requireValue(t&&!t.deletedAt,'Task not found',404);return t;}
+  async function creationTask(turn,target=store){
+    const session=await target.get('creation-session',turn.sessionId)||{};
+    return {id:turn.id,creationSessionId:turn.sessionId,state:turn.state==='interrupted'?'cancelled':turn.state,createdAt:turn.createdAt,updatedAt:turn.updatedAt||turn.createdAt,deviceId:turn.deviceId||session.executorDeviceId,attemptId:turn.attemptId||null,executionDeviceIds:turn.executionDeviceIds||[],draftId:turn.state==='completed'?turn.sessionId:null,events:[]};
+  }
+  async function creationClaim(turn,session,device,tx){
+    const previous=turn.attemptId,task=await creationTask(turn,tx);
+    task.agent='codex';task.preferredAgent='codex';task.selectedSkills=[{name:'lingnest-creation',hash:device.creationRuntime?.fingerprint||null,versionId:'creation-v1',agent:'codex'}];
+    await recordState(task,'assigned','创作轮次开始执行',tx);
+    Object.assign(turn,{attemptId:task.attemptId,deviceId:device.id,executionDeviceIds:task.executionDeviceIds,updatedAt:now()});
+    const attempt=await tx.get('task-attempt',task.attemptId);
+    await tx.put('task-attempt',{...attempt,state:'running',runId:turn.runtimeId,parentAttemptId:previous||null,capabilityId:'writing.creation'});
+  }
+  async function creationEvent(turn,type,tx){
+    if(!turn.attemptId)return;
+    const task=await creationTask(turn,tx);
+    if(['completed','failed','interrupted'].includes(type)){
+      await recordState(task,type==='interrupted'?'cancelled':type,type==='completed'?'本轮创作已完成':type==='interrupted'?'用户停止本轮创作':'创作执行失败，查看程序证据',tx);
+    }
+  }
   async function recordState(task,state,message,tx){
     if(state==='queued')await tx.put('task-routing',{id:id(),taskId:task.id,at:now(),evaluations:await routingEvaluations(task,tx)});
     if(state==='assigned'){
@@ -67,7 +86,7 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
     const device=await store.get('device',deviceId);requireValue(device&&!device.revokedAt,'Device not found',404);
     const attempts=(await store.list('task-attempt')).filter(a=>a.deviceId===deviceId),facts=device.capabilityFacts||[];
     const proofs=attempts.filter(a=>a.resultValidatedAt).map(a=>({capabilityId:a.capabilityId,fingerprint:a.capabilityFingerprint,passed:true}));
-    return {schema_version:1,device_id:deviceId,online:workerOnline(device,clock()),execution_role:workerAuthorized(device)?'local':'dispatch',capabilities:Object.entries(capabilityNames).map(([key,label])=>{
+    return {schema_version:1,device_id:deviceId,online:workerOnline(device,clock()),execution_role:workerAuthorized(device)?'local':'dispatch',tooling:device.lingnestTools||null,checks:(await store.list('capability-check')).filter(c=>c.deviceId===deviceId).slice(-10),capabilities:Object.entries(capabilityNames).map(([key,label])=>{
       const routes=facts.filter(f=>f.id===key).map(f=>evaluateCapability(device,key,{online:workerOnline(device,clock()),busy:device.skillRuntime?.idle===false,proofs,facts:[f]}));
       const rank=['ready','queued','connection','authorization','configuration','offline','unknown','disabled'];
       const best=routes.toSorted((a,b)=>rank.indexOf(a.state)-rank.indexOf(b.state))[0]||evaluateCapability(device,key,{facts:[],proofs});return {...best,label,routes};})};
@@ -77,6 +96,8 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
     const check=route.match(/^\/api\/devices\/([\w-]+)\/capabilities\/check$/);
     if(check&&req.method==='POST'){
       requireValue(device.role==='owner','Owner permission required',403);const target=await store.get('device',check[1]);requireValue(target&&workerAuthorized(target),'Worker not found',404);
+      const input=await body(req);requireValue(!input.action||['probe','install-tools'].includes(input.action),'Invalid capability action');
+      if(input.action==='install-tools'){const checks=[await store.put('capability-check',{id:id(),deviceId:target.id,agent:'codex',mode:'writing',action:'install-tools',state:'queued',createdAt:now()})];send(res,200,{checks});return true;}
       const queued=[];await serialized('capability-check:'+target.id,async()=>{for(const agent of target.agents||[])for(const mode of ['capture','writing']){const previous=(await store.list('capability-check')).find(c=>c.deviceId===target.id&&c.agent===agent&&c.mode===mode&&c.state==='queued');queued.push(previous||await store.put('capability-check',{id:id(),deviceId:target.id,agent,mode,state:'queued',createdAt:now()}));}});
       send(res,200,{checks:queued});return true;
     }
@@ -103,7 +124,8 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
     if(!route.startsWith('/api/read/v1/tasks'))return false;
     readable(device);requireValue(req.method==='GET','Read-only diagnostics',403);
     if(route==='/api/read/v1/tasks'){
-      const items=(await store.list('task')).filter(t=>!t.deletedAt&&(!url.searchParams.get('state')||t.state===url.searchParams.get('state'))&&(!url.searchParams.get('device')||t.deviceId===url.searchParams.get('device')||t.executionDeviceIds?.includes(url.searchParams.get('device')))).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id)).map(publicTask);
+      const tasks=[...await store.list('task'),...await Promise.all((await store.list('creation-turn')).map(t=>creationTask(t)))];
+      const items=tasks.filter(t=>!t.deletedAt&&(!url.searchParams.get('state')||t.state===url.searchParams.get('state'))&&(!url.searchParams.get('device')||t.deviceId===url.searchParams.get('device')||t.executionDeviceIds?.includes(url.searchParams.get('device')))).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id)).map(publicTask);
       send(res,200,page(items,url));return true;
     }
     const m=route.match(/^\/api\/read\/v1\/tasks\/([\w-]+)(?:\/(diagnostics|events|evidence)(?:\/([\w-]+))?)?$/);requireValue(m,'Not found',404);
@@ -115,5 +137,5 @@ export function createTaskDiagnostics({store,body,send,serialized,clock=Date.now
   }
   function page(items,url){const raw=url.searchParams.get('limit')||'50',cursor=url.searchParams.get('cursor')||'0';requireValue(/^\d+$/.test(raw)&&/^\d+$/.test(cursor)&&Number(raw)>=1&&Number(raw)<=100&&Number.isSafeInteger(Number(cursor)),'Invalid pagination');const offset=Number(cursor),limit=Number(raw);return {schema_version:1,items:items.slice(offset,offset+limit),next_cursor:offset+limit<items.length?String(offset+limit):null,complete:offset+limit>=items.length};}
   async function workerProofs(deviceId){return (await store.list('task-attempt')).filter(a=>a.deviceId===deviceId&&a.resultValidatedAt&&a.capabilityFingerprint&&a.agent).map(a=>({capabilityId:a.capabilityId,fingerprint:a.capabilityFingerprint,agent:a.agent,passed:true}));}
-  return {handle,recordState,capabilities,data,workerProofs};
+  return {handle,recordState,capabilities,data,workerProofs,creationClaim,creationEvent};
 }

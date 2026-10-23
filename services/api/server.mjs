@@ -21,6 +21,7 @@ import { validateArchive, requireReadableMetadata } from '../../packages/core/no
 import { libraryBrowser } from '../../packages/core/server/library-browser.mjs';
 import { clientDownload } from './modules/client-download.mjs';
 import { readerAuthorization } from './modules/reader-auth.mjs';
+import {createCreation} from '../../plugins/writing/server/creation.mjs';
 import { createReadApi } from '../../packages/core/server/read-api.mjs';
 import {createTaskDiagnostics,cleanCapabilityFacts} from '../../packages/core/server/task-diagnostics.mjs';
 import { deviceMetadata, publicDeviceMetadata, publicDevices, clientRuntime, deviceCategory, workerAuthorized, workerOnline } from '../../packages/core/node/device-metadata.mjs';
@@ -79,6 +80,12 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   const download = clientDownload({ releaseDir, publicUrl });
   const clientUpdates = createClientUpdateService({ store, serialized, owner, worker, body, send, clock, releases:download.workerReleases });
   const readApi = createReadApi({ dataDir, store, browser, publicUrl, authenticate, send });
+  const creation = createCreation({store:collectionAccess(store,['creation-session','creation-document','creation-document-version','creation-event','creation-turn','creation-publication','creation-receipt','creation-agent-save','capture','capture-version','device','record-media'],async(kind,t,tx)=>{
+    if(kind!=='creation-turn')return;
+    const old=await tx.get('creation-turn',t.id);
+    if(t.state==='running'&&t.assignmentId!==old?.assignmentId){const session=await tx.get('creation-session',t.sessionId),device=await tx.get('device',session.executorDeviceId);await taskDiagnostics.creationClaim(t,session,device,tx);}
+    else if(old?.state!==t.state)await taskDiagnostics.creationEvent(t,t.state,tx);
+  }),storage,serialized,authenticate,owner,worker,body,send,readApi,clock});
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const taskDiagnostics=createTaskDiagnostics({store,body,send,serialized,clock});
   const skills = createSkillService({ store:plugins.access('ai-assistant',["client-update","device","skill-environment","skill-operation","skill-stage","skill-version","task"]), storage, serialized, updateDevice, owner, worker, body, send, clock });
@@ -295,7 +302,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function body(req) {
     let size = 0;
     const chunks = [];
-    const limit = /\/(result|archives)$/.test(new URL(req.url, 'http://localhost').pathname) ? 58 * 1024 * 1024 : 96 * 1024;
+    const limit = /\/(result|archives)$/.test(new URL(req.url, 'http://localhost').pathname) ? 58 * 1024 * 1024 : req.url.startsWith('/api/creation/v1/') ? 2*1024*1024 : 96 * 1024;
     for await (const chunk of req) {
       size += chunk.length;
       requireValue(size <= limit, 'Request too large', 413);
@@ -609,6 +616,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if(await creation.handle(req,res,url,device))return;
       if(await taskDiagnostics.handle(req,res,url,device))return;
       if (await contentTrash.handle(req,res,route,device)) return;
       if (await records.handle(req,res,route,device)) return;
@@ -740,8 +748,9 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(agentRuntime === undefined || agentRuntime && agentRuntime.schemaVersion === 1 && typeof agentRuntime.busy === 'boolean', 'Invalid Agent runtime');
         requireValue(runtime === undefined || runtime && runtime.schemaVersion === 1 && ['running','paused','draining'].includes(runtime.mode) && typeof runtime.idle === 'boolean', 'Invalid skill runtime');
         const reported = clientRuntime(input.clientRuntime);
+        requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
         const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
-        await updateDevice(device, input, { ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(input.agents)], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {

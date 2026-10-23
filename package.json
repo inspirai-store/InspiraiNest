@@ -1,6 +1,6 @@
 {
   "name": "inspirainest",
-  "version": "0.2.24",
+  "version": "0.2.27",
   "private": true,
   "type": "module",
   "main": "apps/desktop/main.mjs",

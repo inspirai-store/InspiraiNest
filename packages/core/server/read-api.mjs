@@ -399,5 +399,35 @@ export function createReadApi({ dataDir, store, browser, publicUrl, authenticate
     return closePromise;
   }
   void refresh().catch(() => {});
-  return { handle, refresh, close };
+  // Internal callers perform their own owner/session authorization. Reuse the
+  // same visibility, normalization and immutable archive positions as readers.
+  async function searchForCreation(queries, limit = 30) {
+    await synchronize();
+    const index = indexState(), items = new Map();
+    for (const query of queries) {
+      const selection = select(new URLSearchParams({q:query,limit:String(limit)}), true);
+      for (const row of selection.rows) {
+        const meta = JSON.parse(row.metadata);
+        items.set(row.id, {...meta, archive_id:row.archive_id, matches:matches(row.id,selection.terms)});
+      }
+    }
+    return {items:[...items.values()].slice(0,limit),index};
+  }
+  async function readForCreation(input) {
+    const latest = await synchronize(), current = latest.get(input.id);
+    requireValue(current,'资料不可见',404);
+    const archive=input.archiveId&&input.archiveId!==current.id?(await store.list('archive')).find(a=>a.id===input.archiveId&&a.entryId===input.id):current;
+    requireValue(archive,'归档版本不存在',404);
+    const prepared=await browser.prepare(archive),prefix=`files/${archive.id}/`;
+    const textFiles=prepared.entry.files.filter(f=>typeof prepared.documents[f.path]==='string');
+    const preferred=textFiles.find(f=>['original','source'].includes(f.role))||textFiles.find(f=>f.role==='summary')||textFiles[0];
+    const file=input.file||preferred?.path.slice(prefix.length),text=prepared.documents[prefix+file];
+    requireValue(typeof text==='string','此附件尚无可检索文字',415);
+    const metadata=prepared.entry;
+    const visibleNow=await visible();
+    requireValue(visibleNow.has(input.id),'资料已不可见',404);
+    const params = new URLSearchParams({start_line:String(input.startLine||1),start_column:String(input.startColumn||0),max_lines:'200'});
+    return {id:input.id,archiveId:archive.id,title:metadata.title,file,...sliceContent(text,params),sourceUrl:metadata.canonical_url||metadata.source_url,coverage_note:metadata.coverage_note,verification_status:metadata.verification_status,omitted:metadata.omitted||[]};
+  }
+  return { handle, refresh, close, searchForCreation, readForCreation };
 }

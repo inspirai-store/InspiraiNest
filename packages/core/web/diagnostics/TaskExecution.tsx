@@ -8,7 +8,7 @@ import type {ExecutionEvent} from './task-client';
 import {taskLabels} from '../tasks/model';
 import type {TaskState} from '../tasks/model';
 import styles from './TaskExecution.module.css';
-const stageNames:Record<string,string>={preparing:'准备材料',extracting:'提取正文',processing:'内容分析',validating:'校验结果',uploading:'上传',running:'处理中',assigned:'开始执行',waiting_action:'待操作',completed:'完成',awaiting_review:'待确认',interrupted:'中断'};
+const stageNames:Record<string,string>={starting:'启动执行工具',searching:'联查材料',reading:'读取材料',saving:'保存文稿',failed:'失败',preparing:'准备材料',extracting:'提取正文',processing:'内容分析',validating:'校验结果',uploading:'上传',running:'处理中',assigned:'开始执行',waiting_action:'待操作',completed:'完成',awaiting_review:'待确认',interrupted:'中断'};
 const routingReasons:Record<string,string>={OTHER_NODE_SELECTED:'已选择其他节点',NODE_OFFLINE:'节点离线',AGENT_UNAVAILABLE:'执行工具不可用',SKILL_VERSION_MISMATCH:'技能版本不匹配',AGENT_PERMISSION:'执行权限不足',CAPABILITY_UNAVAILABLE:'能力未就绪',NOT_REPORTED:'尚未上报能力',BROWSER_NOT_CONNECTED:'任务页面未连接'};
 const origins:Record<string,string>={worker:'程序记录',server:'服务端记录',agent:'Agent 上报',legacy:'历史记录'};
 const time=(value:string)=>new Date(value).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
@@ -30,7 +30,7 @@ export function TaskExecution({taskId,onConfigure}:{taskId:string;onConfigure:(d
    {!!report?.routing_evaluations.length&&<details><summary>派发评估</summary>{report.routing_evaluations.map(r=><section key={r.id}><time>{time(r.at)}</time>{r.evaluations.map(e=><p key={e.device_id}>{e.device_name} · {routingReasons[e.reason||'']||e.reason||'满足派发条件'}</p>)}</section>)}</details>}
   </nav>
   <div className={styles.detail} ref={scroller} onScroll={e=>scrolls.current.set(selected?.id||'',e.currentTarget.scrollTop)}>
-   <header><h3>{selected?.deviceName||'历史执行'}</h3><Badge>{taskLabels[(selected?.state||report?.task.state) as TaskState]||'状态待确认'}</Badge></header>
+   <header><Action compact onClick={()=>void navigator.clipboard.writeText(taskId).catch(()=>setCopyError('复制失败'))}>复制 taskId</Action><h3>{selected?.deviceName||'历史执行'}</h3><Badge>{taskLabels[(selected?.state||report?.task.state) as TaskState]||'状态待确认'}</Badge></header>
    {selected&&<p>{[selected.agent,selected.clientVersion].filter(Boolean).join(' · ')}</p>}
    {cause?.reason&&<div className={styles.cause}><strong>{cause.reason}</strong><code>{cause.code}</code>{selected?.id===report?.task.attempt_id&&report?.diagnosis.recovery_conditions?.map(r=><p key={r.code}>{r.action}</p>)}{selected&&cause.category==='authorization'&&<Action onClick={()=>onConfigure(selected.deviceId)}>处理权限</Action>}</div>}
    {report?.completeness.local_evidence_may_be_pending&&<Badge>部分证据待同步</Badge>}{report?.completeness.truncated&&<Badge kind="warning">执行历史存在缺口</Badge>}

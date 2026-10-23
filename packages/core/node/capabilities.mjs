@@ -1,6 +1,6 @@
 // Shared by task routing and presentation; capabilities are supplied as facts,
 // without importing any concrete plugin implementation.
-export function taskCapabilityId(task){return task.purpose==='selection-writing'?'writing.selection':task.writingSessionId?'writing.materials':task.capture?.kind==='page'?'capture.browser':task.type==='video'?'capture.media':'capture.article';}
+export function taskCapabilityId(task){return task.creationSessionId?'writing.creation':task.purpose==='selection-writing'?'writing.selection':task.writingSessionId?'writing.materials':task.capture?.kind==='page'?'capture.browser':task.type==='video'?'capture.media':'capture.article';}
 export function evaluateCapability(device,capability,{online=true,busy=false,proofs=[],facts=[]}={}){
   const fact=facts.find(f=>f.id===capability),reasons=[];
   if(!fact)reasons.push({code:'NOT_REPORTED',message:'客户端未上报检测结果'});
