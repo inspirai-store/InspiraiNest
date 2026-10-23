@@ -89,7 +89,7 @@ class NativeComposeFlowTest {
     @Test fun continuousSharesReadNewContentAndKeepPreviousDraft() {
         val first="first-${UUID.randomUUID()}";val second="second-${UUID.randomUUID()}"
         launch(externalShare(first));awaitShare(first)
-        instrumentation.runOnMainSync { instrumentation.callActivityOnNewIntent(activity,externalShare(second)) }
+        instrumentation.runOnMainSync { context.startActivity(externalShare(second).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         awaitShare(second);compose.onAllNodesWithText(first).assertCountEquals(0)
         val drafts=Drafts(context).list()
         val originals=(0 until drafts.length()).map { drafts.getJSONObject(it).optString("original") }

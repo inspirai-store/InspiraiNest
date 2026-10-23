@@ -12,7 +12,7 @@
         <activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize|uiMode" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ShareActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".nativeui.NativeActivity" android:exported="true" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".nativeui.NativeShareActivity" android:exported="true" android:label="保存到灵藏" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.SEND" /><action android:name="android.intent.action.SEND_MULTIPLE" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="*/*" /></intent-filter></activity>
+        <activity android:name=".nativeui.NativeShareActivity" android:launchMode="singleTop" android:exported="true" android:label="保存到灵藏" android:windowSoftInputMode="adjustResize"><intent-filter><action android:name="android.intent.action.SEND" /><action android:name="android.intent.action.SEND_MULTIPLE" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="*/*" /></intent-filter></activity>
         <activity android:name=".nativeui.NativePreviewActivity" android:exported="false" />
         <activity android:name=".ReaderActivity" android:exported="false" android:configChanges="orientation|screenSize|uiMode" />
         <activity android:name=".PendingActivity" android:exported="false" />
