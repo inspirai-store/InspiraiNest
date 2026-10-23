@@ -402,3 +402,35 @@ jobs:
         run: node scripts/test-agent-installation.mjs
         working-directory: collector
     timeout-minutes: 60
+
+  android-share-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci --ignore-scripts
+      - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          working-directory: apps/android
+          script: bash ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=store.inspirai.library.NativeComposeFlowTest#continuousSharesReadNewContentAndKeepPreviousDraft,store.inspirai.library.NativeComposeFlowTest#shareAfterReturningClosesOldActivityAndOpensNewShare
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-share-regression
+          path: apps/android/app/build/reports/androidTests/

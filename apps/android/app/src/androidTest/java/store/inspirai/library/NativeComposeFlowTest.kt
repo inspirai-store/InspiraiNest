@@ -81,6 +81,27 @@ class NativeComposeFlowTest {
         assertTrue(local.getString("localPath").contains("record-media/"));assertEquals(file.readText(),File(local.getString("localPath")).readText())
         assertEquals(document.getJSONArray("attachments").getJSONObject(0).getString("id"),local.getString("id"))
     }
+    private fun externalShare(text: String)=Intent(context,NativeShareActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text)
+    private fun awaitShare(text: String) {
+        compose.waitUntil(20000){compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("保存分享").assertIsDisplayed()
+    }
+    @Test fun continuousSharesReadNewContentAndKeepPreviousDraft() {
+        val first="first-${UUID.randomUUID()}";val second="second-${UUID.randomUUID()}"
+        launch(externalShare(first));awaitShare(first)
+        instrumentation.runOnMainSync { instrumentation.callActivityOnNewIntent(activity,externalShare(second)) }
+        awaitShare(second);compose.onAllNodesWithText(first).assertCountEquals(0)
+        val drafts=Drafts(context).list()
+        val originals=(0 until drafts.length()).map { drafts.getJSONObject(it).optString("original") }
+        assertTrue(originals.contains(first));assertTrue(originals.contains(second))
+    }
+    @Test fun shareAfterReturningClosesOldActivityAndOpensNewShare() {
+        val first="first-${UUID.randomUUID()}";val second="second-${UUID.randomUUID()}"
+        launch(externalShare(first));awaitShare(first);val previous=activity
+        compose.onNodeWithContentDescription("返回").performClick();instrumentation.waitForIdleSync()
+        assertTrue(previous.isFinishing || previous.isDestroyed)
+        launch(externalShare(second));awaitShare(second);compose.onAllNodesWithText(first).assertCountEquals(0)
+    }
     @Test fun nativeEditorKeepsChineseTextAndFormattingInVersionOneDocument()=runBlocking {
         launch(Intent(context,NativeActivity::class.java).putExtra("tab","records"))
         compose.waitUntil(15000){compose.onAllNodesWithContentDescription("新建记录").fetchSemanticsNodes().isNotEmpty()}

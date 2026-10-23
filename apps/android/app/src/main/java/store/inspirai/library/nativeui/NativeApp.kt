@@ -60,7 +60,7 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
     }
     fun finishInput() { focus.clearFocus(force=true);keyboard?.hide() }
     fun open(target: String) { finishInput();stack.add(target) }
-    fun back() { finishInput();if(stack.isNotEmpty())stack.removeAt(stack.lastIndex) else onFinish() }
+    fun back() { finishInput();if(shared && stack.size==1 && stack.last().startsWith("share:")){onFinish();return};if(stack.isNotEmpty())stack.removeAt(stack.lastIndex) else onFinish() }
     fun selectRoot(target: String) { finishInput();tab=target;stack.clear() }
     BackHandler(stack.isNotEmpty()) { back() }
     val stateHolder=rememberSaveableStateHolder()
