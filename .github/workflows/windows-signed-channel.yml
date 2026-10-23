@@ -1,0 +1,22 @@
+name: Windows signature release gate
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-signed-channel.yml'
+      - '.github/workflows/desktop-channel-package.yml'
+      - '.github/scripts/package-reviewed-windows.mjs'
+      - 'tooling/releases/*windows-signatures.ps1'
+permissions:
+  contents: read
+jobs:
+  signature-gate:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject unsigned files and unexpected publishers
+        shell: pwsh
+        run: ./tooling/releases/test-windows-signatures.ps1

@@ -1,11 +1,17 @@
 name: Package reviewed desktop channel increment
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Reviewed signed package platform
+        type: choice
+        default: macos
+        options: [macos, windows, both]
 permissions:
   contents: read
 jobs:
   signed-macos:
-    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true'
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.platforms != 'windows'
     environment: signed-release
     runs-on: [self-hosted, macOS, ARM64, inspirainest-macos]
     timeout-minutes: 120
@@ -49,4 +55,52 @@ jobs:
         with:
           name: signed-desktop-channels
           path: channel-output/verified/*
+          if-no-files-found: error
+  signed-windows:
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.platforms != 'macos'
+    environment: signed-release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
+    steps:
+      - name: Require configured Windows signing identity
+        shell: pwsh
+        run: |
+          foreach ($name in @('WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD', 'WINDOWS_PUBLISHER_NAME')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing signing setting: $name" }
+          }
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+      - name: Download checksum-pinned reviewed compatibility source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $pin = Get-Content .github/releases/desktop-channel-input.json -Raw | ConvertFrom-Json
+          New-Item -ItemType Directory input | Out-Null
+          gh release download $pin.tag --repo $env:GITHUB_REPOSITORY --pattern desktop-channel-source.zip --dir input
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed source download failed' }
+          if ((Get-FileHash input/desktop-channel-source.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $pin.sha256) { throw 'Reviewed source checksum mismatch' }
+          Expand-Archive input/desktop-channel-source.zip input
+      - run: npm ci --ignore-scripts
+      - name: Sign and verify app, CLI and NSIS installer
+        run: node .github/scripts/package-reviewed-windows.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-signed-windows-channel
+          path: |
+            windows-channel-output/InspiraiNest-*.exe
+            windows-channel-output/InspiraiNest-*.exe.blockmap
+            windows-channel-output/latest.yml
+            windows-channel-output/verified-windows-package.json
           if-no-files-found: error
