@@ -49,4 +49,5 @@ test('计划中的网址不能让无关链接排在 REA 原文前面',()=>{
  const noise=Array.from({length:12},(_,i)=>({kind:'record',sourceId:'r'+i,title:'https://mp.weixin.qq.com/s/other'+i,text:'https://mp.weixin.qq.com/s/other'+i}));
  const original={kind:'entry',sourceId:'rea-case',title:'DeepSeek 搭配 Hermes 使用 REA 逆向智能音箱实现家庭助理贾维斯',text:'REA 分析固件及调用链。',sourceUrl:'https://mp.weixin.qq.com/s/case'};
  assert.equal(rankSources(b,[...noise,original])[0].sourceId,'rea-case');
+ b.collectionPlan[0].external.push('https://[invalid','https://example.org/%zz');assert.doesNotThrow(()=>rankSources(b,[original]));
 });

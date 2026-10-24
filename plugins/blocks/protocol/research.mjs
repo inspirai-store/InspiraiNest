@@ -2,9 +2,11 @@
 export function rankSources(block,sources,{part,preferred=[]}={}){
  const seedUrls=[];
  const query=[block.title,...block.goals.flatMap(g=>[g.title,...g.parts.map(p=>p.title)]),part?.title,...(block.collectionPlan||[]).flatMap(p=>[...p.existing,...p.external])].filter(Boolean).join(' ').replace(/https?:\/\/[^\s<>"，。；、（）()]+/gi,url=>{
-  const parsed=new URL(url);seedUrls.push(parsed.href);
-  // URL paths can name the subject; protocols and host suffixes are not topics.
-  return decodeURIComponent(parsed.pathname).replace(/[^a-z0-9_\u3400-\u9fff-]+/gi,' ');
+  try{
+   const parsed=new URL(url);seedUrls.push(parsed.href);
+   // URL paths can name the subject; protocols and host suffixes are not topics.
+   return decodeURIComponent(parsed.pathname).replace(/[^a-z0-9_\u3400-\u9fff-]+/gi,' ');
+  }catch{return ' ';}
  });
  const terms=[...new Set((query.match(/[a-z][a-z0-9_-]{2,}|[\u3400-\u9fff]{2,}/gi)||[]).map(s=>s.toLowerCase()))];
  const score=source=>{
