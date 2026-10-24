@@ -1,3 +1,7 @@
+import {localCaptureTask} from '../../../packages/core/node/capture-local.mjs';
+import {prepareCaptureInput,attachCaptureBrowser,cleanCaptureCache} from '../../../packages/core/node/capture-input.mjs';
+import {checkEvidence} from '../../../packages/core/node/capture-cli.mjs';
+import {validateCaptureReport} from '../../../packages/core/node/capture-report.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {atomicJson,readJson,requireValue,hash,id,safePath,contained} from '../../../packages/core/node/common.mjs';
@@ -12,7 +16,10 @@ import {taskSkillSnapshots} from './skill-runtime.mjs';
 import {fixedSkillProfiles} from '../server/skill-inventory.mjs';
 export async function processCollection(config, task, available, signal, onProgress, {api,prepareWorkspace,taskPrompt,extensions=[]}) {
   const dataDir = path.resolve(config.dataDir);
+  task=localCaptureTask(task,dataDir,config.deviceId);
   const workspace = prepareWorkspace(task,dataDir);
+  const captureInstructions=prepareCaptureInput(task,workspace,dataDir);
+  await attachCaptureBrowser(task,workspace,dataDir,config.deviceId);
   await prepareRecordInput(config,task,workspace,signal);
   await prepareTaskInput(config,task,workspace,signal);
   const skillSnapshots = await taskSkillSnapshots(task, workspace, (...args) => api(config, ...args));
@@ -28,12 +35,15 @@ export async function processCollection(config, task, available, signal, onProgr
   if (fs.existsSync(checkpoint) && readJson(checkpoint).status !== 'ready') {
     fs.renameSync(checkpoint, path.join(workspace, `collector-result.${id()}.json`));
   }
+  const revisionFile=path.join(workspace,'.capture-revision.json');
+  const previousRevision=fs.existsSync(revisionFile)?readJson(revisionFile).revision:0;
+  if((task.supplementRevision||0)>previousRevision){if(fs.existsSync(checkpoint))fs.renameSync(checkpoint,path.join(workspace,'collector-result.'+id()+'.json'));atomicJson(revisionFile,{revision:task.supplementRevision});}
   let chosen = task.agent;
   if (!fs.existsSync(checkpoint)) {
     for (const name of agentOrder(config, task, available)) {
       chosen = name;
       await progress('running', `使用 ${name} 采集；本机保留中间成果`, name);
-      const instructions = [...extensions.map(extension=>extension.collectionInstructions?.(task)), config.instructions, config.agents?.[name]?.instructions, ...skillSnapshots.filter(s => s.agent === name).map(s => `本任务必须使用固定技能 ${s.path}/SKILL.md，版本 ${s.versionId}，包哈希 ${s.hash}；先读取该文件，不使用其他目录中的同名版本。`)].filter(Boolean).join('\n');
+      const instructions = [captureInstructions,...extensions.map(extension=>extension.collectionInstructions?.(task)), config.instructions, config.agents?.[name]?.instructions, ...skillSnapshots.filter(s => s.agent === name).map(s => `本任务必须使用固定技能 ${s.path}/SKILL.md，版本 ${s.versionId}，包哈希 ${s.hash}；先读取该文件，不使用其他目录中的同名版本。`)].filter(Boolean).join('\n');
       const stopSteps = watchCollectionSteps(workspace, step => onProgress({ state: 'running', agent: name, ...step }), error => onProgress({ state: 'running', agent: name,
         message: error.code === 'STEP_ENCODING' ? '采集程序的阶段记录存在乱码，请改用 UTF-8 写入；执行继续，上传前再次校验' : '采集进度文件暂时不可读，执行仍在继续', diagnostic: { code: error.code === 'STEP_ENCODING' ? 'STEP_ENCODING' : 'STEP_LOG_READ', details: errorDetails(error) } }));
       let result;
@@ -56,6 +66,7 @@ export async function processCollection(config, task, available, signal, onProgr
   safePath(result.entry);
   const entryRoot = fs.realpathSync(path.join(workspace, result.entry));
   requireValue(contained(fs.realpathSync(workspace), entryRoot), 'Result outside task workspace');
+  if(fs.readdirSync(entryRoot).some(f=>/^capture-audit-.*\.json$/.test(f)))try{checkEvidence(path.join(entryRoot,'source.json'));}catch(error){throw Object.assign(error,{code:'CAPTURE_QUALITY'});}
   preserveRecordOriginal(task,entryRoot);
   try { verifyInputCoverage(task,workspace,entryRoot); }
   catch(error) {
@@ -75,10 +86,13 @@ export async function processCollection(config, task, available, signal, onProgr
       { code: 'ARCHIVE_ENCODING', details: { field: error.field, file: path.join(result.entry, 'source.json'), message: '中文已被问号或替换字符破坏，需要从原始内容恢复，单纯更改读取编码不能还原' } });
     return;
   }
+  if(task.capture)requireValue(bundle.meta.coverage?.items?.length>0,'页面或文件采集缺少证据覆盖记录，请补齐 source.json 后继续');
+  if(task.capture||bundle.meta.coverage)validateCaptureReport(bundle);
   requireValue(typeof bundle.meta.collected_at === 'string' && bundle.meta.collected_at.includes('T'), 'New collections require second-resolution timestamps');
   await progress('uploading', '轻量资料校验通过，正在上传', chosen);
   for(const extension of extensions)await extension.afterCollect?.({config,task,workspace,api});
-  await api(config, `/api/tasks/${task.id}/result`, 'POST', bundle, task.assignmentId);
+  const receipt=await api(config, `/api/tasks/${task.id}/result`, 'POST', bundle, task.assignmentId);
+  if(task.capture)cleanCaptureCache(workspace,bundle,receipt.id??task.id);
   atomicJson(path.join(workspace, '..', 'uploaded.json'), { entry: result.entry, digest: hash(JSON.stringify(bundle)) });
   onProgress({ state: task.autoArchive === false ? 'awaiting_review' : 'completed', message: task.autoArchive === false ? '轻量包已上传，等待远端确认归档' : '归档上传完成；原媒体保留本机', agent: chosen });
 }

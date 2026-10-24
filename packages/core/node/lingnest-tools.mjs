@@ -16,7 +16,7 @@ export function installLingnestTools({bundle,home=os.homedir(),platform=process.
  const stamp=new Date().toISOString().replace(/[:.]/g,'-'),backups=[];
  const install=(source,target)=>{fs.mkdirSync(path.dirname(target),{recursive:true});const temp=target+'.install-'+stamp;fs.cpSync(source,temp,{recursive:true,dereference:false});if(fs.existsSync(target)){const backup=target+'.backup-'+stamp;fs.renameSync(target,backup);backups.push(backup);}fs.renameSync(temp,target);};
  install(binary,targets.binary);if(platform!=='win32')fs.chmodSync(targets.binary,0o755);
- for(const target of targets.skills.slice(0,1)){install(skill,target);for(const name of ['lingnest-collect','writing-workshop']){const source=path.join(bundle,'skills',name);if(fs.existsSync(path.join(source,'SKILL.md')))install(source,path.join(path.dirname(target),name));}}
+ for(const target of targets.skills.slice(0,1)){install(skill,target);for(const name of ['lingnest-collect','writing-workshop']){const legacy=path.join(bundle,'skills',name),source=fs.existsSync(legacy)?legacy:path.join(bundle,'resources','skills',name);if(fs.existsSync(path.join(source,'SKILL.md')))install(source,path.join(path.dirname(target),name));}}
  // Windows cmd entry lives alongside the signed executable; no PATH mutation.
  if(platform==='win32')fs.writeFileSync(path.join(path.dirname(targets.binary),'lingnest.cmd'),'@echo off\r\n"%~dp0lingnest.exe" %*\r\n');
  return {...lingnestToolsStatus({home,platform}),sha256:hash(fs.readFileSync(targets.binary)),backups:backups.length};

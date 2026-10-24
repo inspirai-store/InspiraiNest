@@ -1,4 +1,5 @@
 import {creationFailure} from '../protocol/creation-diagnostics.mjs';
+import {runOutline} from './creation-outline-worker.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -11,14 +12,14 @@ const instructions=`你是灵藏中的创作伙伴。用中文帮助用户找回
 
 export class CreationWorker {
   constructor(config,{api,runtime,blog,diagnostics}={}){
-    this.config=config;this.api=api;this.diagnostics=diagnostics;this.runtimeId=diagnostics?.runId||randomUUID();this.fingerprint=hash(fs.readFileSync(new URL('./creation-worker.mjs',import.meta.url))); this.directory=path.join(config.dataDir,'creation',hash(config.server).slice(0,16));fs.mkdirSync(this.directory,{recursive:true,mode:0o700});
+    this.config=config;this.api=api;this.diagnostics=diagnostics;this.runtimeId=diagnostics?.runId||randomUUID();this.fingerprint=hash(Buffer.concat(['creation-worker.mjs','creation-outline-worker.mjs','../server/creation-workflow.mjs','codex-app-server.mjs'].map(name=>fs.readFileSync(new URL('./'+name,import.meta.url))))); this.directory=path.join(config.dataDir,'creation',hash(config.server).slice(0,16));fs.mkdirSync(this.directory,{recursive:true,mode:0o700});
     this.runtime=runtime||new CodexAppServer({profile:{command:config.agents?.codex?.command||'codex'}});this.blog=blog||new CreationBlog({directory:path.join(this.directory,'blog'),skillDirectory:config.blogSkillDirectory});this.account=null;this.busy=false;
   }
   async tick({signal}={}){
     if(this.busy||signal?.aborted)return;this.busy=true;
     try {
       const job=await this.api('/api/creation/v1/worker/claim','POST',{runtimeId:this.runtimeId});
-      if(job.turn)await this.run(job,signal);else if(job.publication)await this.publication(job);
+      if(job.turn)await (job.turn.kind==='outline'?runOutline(this,job,signal):this.run(job,signal));else if(job.publication)await this.publication(job);
     }finally{this.busy=false;}
   }
   async publication({publication:p,session}){

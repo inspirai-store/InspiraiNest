@@ -36,7 +36,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-@Composable fun RecordsPage(model: RecordsModel,open: (String)->Unit,create: ()->Unit,writing: ()->Unit) {
+@Composable fun RecordsPage(model: RecordsModel,open: (String)->Unit,create: ()->Unit,writing: ()->Unit,blocks: ()->Unit={}) {
     var query by rememberSaveable { mutableStateOf("") };var filter by rememberSaveable { mutableStateOf("全部") };var more by remember { mutableStateOf(false) }
     val rows by model.rows.collectAsStateWithLifecycle();val state by model.status.collectAsStateWithLifecycle()
     val server=model.repository.credentials.server()
@@ -48,7 +48,7 @@ import java.util.UUID
     }
     Column(Modifier.fillMaxSize().padding(horizontal=NestSpace.page)) {
         NestPageHeader("记录") {
-            Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) { if(pluginEnabled("writing"))DropdownMenuItem(text={Text("写作工作台")},onClick={more=false;writing()});DropdownMenuItem(text={Text("同步记录")},onClick={more=false;model.refresh()}) } }
+            Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) { if(pluginEnabled("blocks"))DropdownMenuItem(text={Text("积木")},onClick={more=false;blocks()});if(pluginEnabled("writing"))DropdownMenuItem(text={Text("写作工作台")},onClick={more=false;writing()});DropdownMenuItem(text={Text("同步记录")},onClick={more=false;model.refresh()}) } }
             IconButton(onClick=create) { Icon(Icons.Outlined.Add,"新建记录") }
         }
         NestSearch(query,"搜索记录"){query=it}
@@ -93,6 +93,7 @@ fun processingLabel(value: JSONObject): String = when {
         IconButton(enabled=value?.isNull("deletedAt")!=false,onClick={open("edit:$id")}) { Icon(Icons.Outlined.Edit,"编辑记录") }
         Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) {
             if(pluginEnabled("ai-assistant"))DropdownMenuItem(enabled=value?.isNull("deletedAt")!=false,text={Text("交给 Agent 加工")},onClick={more=false;process=true})
+            if(pluginEnabled("blocks"))DropdownMenuItem(enabled=value?.optString("sync")=="synced",text={Text("加入积木")},onClick={more=false;open("join:record:$id")})
             DropdownMenuItem(text={Text("同步")},onClick={more=false;model.refresh()})
             DropdownMenuItem(enabled=value?.isNull("deletedAt")!=false,text={Text("删除")},onClick={more=false;confirm="delete"})
         } }

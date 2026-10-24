@@ -3,5 +3,3 @@
 .creation-media{display:flex;gap:10px;flex-direction:column;padding:12px 0}.creation-media img,.creation-media video{max-width:100%;max-height:400px;object-fit:contain}.creation-media audio{max-width:100%}
 
 .creation-mobile{color:var(--fg);background:var(--bg)}.creation-workbench{color-scheme:light}[data-theme="dark"] .creation-workbench{color-scheme:dark}
-
-.creation-scroll > section[aria-label="任务执行记录"]{min-height:420px;height:100%}.creation-toolbar select{max-width:100%;min-width:0}.creation-workbench [aria-label="文稿视图"]{flex-wrap:wrap;}

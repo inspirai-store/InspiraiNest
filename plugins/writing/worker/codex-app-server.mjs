@@ -1,7 +1,7 @@
 import {EventEmitter} from 'node:events';
 import readline from 'node:readline';
 import spawn from 'cross-spawn';
-import {resolveAgentProfile,commandEnvironment} from '../../ai-assistant/api/agent-paths.mjs';
+import {resolveAgentProfile,commandEnvironment} from '../../ai-assistant/api/agents.mjs';
 import {agentEnvironment} from '../../ai-assistant/api/agents.mjs';
 
 /** One local app-server transport. Credentials remain owned by Codex. */
@@ -37,14 +37,15 @@ export class CodexAppServer extends EventEmitter {
   async turn(threadId,text,{schema,signal,onDelta=()=>{}}={}){
     await this.start();if(signal?.aborted)throw new Error('已停止');
     return new Promise((resolve,reject)=>{
-      let turnId,output='',done=false;
+      let turnId,output='',finalOutput='',lastMessage='',done=false;
       const cleanup=()=>{this.off('notification',listen);this.off('disconnected',disconnect);signal?.removeEventListener('abort',abort);};
       const finish=(error,result)=>{if(done)return;done=true;cleanup();error?reject(error):resolve(result);};
       const disconnect=error=>finish(error);
       const abort=()=>{if(turnId)void this.request('turn/interrupt',{threadId,turnId}).catch(()=>{});finish(new Error('已停止'));};
       const listen=msg=>{const p=msg.params||{};if(p.threadId!==threadId)return;
         if(msg.method==='item/agentMessage/delta'){output+=p.delta||'';onDelta(p.delta||'');}
-        if(msg.method==='turn/completed'){const t=p.turn;finish(t?.status==='completed'?null:new Error(t?.error?.message||'Codex 轮次'+(t?.status||'失败')),output);}
+        if(msg.method==='item/completed'&&p.item?.type==='agentMessage'){lastMessage=p.item.text||'';if(p.item.phase==='final_answer')finalOutput=lastMessage;}
+        if(msg.method==='turn/completed'){const t=p.turn;finish(t?.status==='completed'?null:new Error(t?.error?.message||'Codex 轮次'+(t?.status||'失败')),finalOutput||lastMessage||output);}
       };
       this.on('notification',listen);this.on('disconnected',disconnect);signal?.addEventListener('abort',abort,{once:true});
       this.request('turn/start',{threadId,input:[{type:'text',text}],...(schema?{outputSchema:schema}:{})}).then(result=>{turnId=result.turn.id;if(signal?.aborted)abort();}).catch(e=>finish(e));

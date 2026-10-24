@@ -4,7 +4,7 @@
   const esc=v=>String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const uid=()=>crypto.randomUUID(),date=v=>new Date(v).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
   let detailSignature='',pluginSnapshot=null;
-  function applyPlugins(){const enabled=id=>pluginSnapshot?.plugins?.some(p=>p.id===id&&p.enabled)===true;$('#process').hidden=!enabled('ai-assistant');document.querySelectorAll('[data-native="writing"]').forEach(el=>el.hidden=!enabled('writing'));}
+  function applyPlugins(){const enabled=id=>pluginSnapshot?.plugins?.some(p=>p.id===id&&p.enabled)===true;$('#process').hidden=!enabled('ai-assistant');$('#join-block').hidden=!enabled('blocks');$('#browse-blocks').hidden=!enabled('blocks');document.querySelectorAll('[data-native="writing"]').forEach(el=>el.hidden=!enabled('writing'));}
   async function refreshPlugins(){const key='plugins:'+JSON.stringify([status.server,status.deviceId]);try{pluginSnapshot=JSON.parse(localStorage.getItem(key)||'null');}catch{pluginSnapshot=null;}applyPlugins();if(!status.paired)return;try{const before=JSON.stringify([status.server,status.deviceId]),value=await api('/api/plugins');if(before!==JSON.stringify([status.server,status.deviceId]))return;pluginSnapshot=value;localStorage.setItem(key,JSON.stringify(value));applyPlugins();}catch{}}
 
   const supported=new Set(['image/jpeg','image/png','image/webp','image/gif','audio/mp4','audio/aac','audio/mpeg','audio/wav','audio/x-wav','audio/webm','audio/ogg','audio/flac']);
@@ -33,7 +33,7 @@
   function renderLists(){const sorted=items.toSorted((a,b)=>b.createdAt.localeCompare(a.createdAt));$('.recent').hidden=!sorted.length;patchList($('#recent-list'),sorted.slice(0,3).map(row).join('')||'');patchList($('#inbox-list'),sorted.filter(item=>filter==='all'||filter==='pending'&&item.sync!=='synced'||filter==='unprocessed'&&!item.tasks?.length||filter==='review'&&item.tasks?.some(t=>t.state==='awaiting_review')).map(row).join('')||'<p class="empty">这里暂时没有记录。</p>');}
   function navigate(target){page=target;document.querySelectorAll('.screen').forEach(s=>s.hidden=s.id!==target+'-screen');$('#page-title').textContent={record:'记录',inbox:'收件箱',detail:'记录详情'}[target];document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===target));renderLists();if(target==='detail')void renderDetail();window.scrollTo(0,0);}
   window.captureNavigate=navigate;
-  async function reloadItems(){const rows=await store.all();items=rows.filter(item=>item.id!=='draft'&&!item.id.startsWith('__record-')&&!item.deletedAt);if(rows.find(row=>row.id==='draft')?.remoteDeleted&&draft.editingId){draft.remoteDeleted=true;}$('#deleted-draft').hidden=!draft.remoteDeleted;const recoveryHTML=rows.filter(row=>row.recoveryDrafts?.length).flatMap(row=>row.recoveryDrafts.map((recovered,index)=>`<button data-recovery="${esc(row.id)}" data-index="${index}">恢复草稿 · ${esc(title(recovered))}</button>`)).join('');if($('#recovery-list').innerHTML!==recoveryHTML)$('#recovery-list').innerHTML=recoveryHTML;renderLists();}
+  async function reloadItems(){const rows=await store.all();items=rows.filter(item=>item.id!=='draft'&&!item.id.startsWith('__record-')&&!item.id.startsWith('account-records-v1:')&&!item.deletedAt);if(rows.find(row=>row.id==='draft')?.remoteDeleted&&draft.editingId){draft.remoteDeleted=true;}$('#deleted-draft').hidden=!draft.remoteDeleted;const recoveryHTML=rows.filter(row=>row.recoveryDrafts?.length).flatMap(row=>row.recoveryDrafts.map((recovered,index)=>`<button data-recovery="${esc(row.id)}" data-index="${index}">恢复草稿 · ${esc(title(recovered))}</button>`)).join('');if($('#recovery-list').innerHTML!==recoveryHTML)$('#recovery-list').innerHTML=recoveryHTML;renderLists();}
   async function resumeRestores(){for(const row of await store.all())if(row.id.startsWith('__record-restore__:'+scopeKey()+':')){await api('/api/content-trash/record/'+row.id.split(':').at(-1)+'/restore','POST',row.payload);await store.remove(row.id);}}
   const engine=new window.RecordSyncEngine({store,api,status:()=>status,changed:async()=>{await reloadItems();if(page==='detail')await renderDetail();}});
   async function refresh(full=false){if(refreshing)return;refreshing=true;try{await updateStatus();await engine.pull(0,full);$('#inbox-notice').textContent='';}catch(error){$('#inbox-notice').textContent=error.message;throw error;}finally{refreshing=false;}}
@@ -55,6 +55,27 @@
   async function renderDetail(){const item=items.find(i=>i.id===selected);if(!item){detailSignature='';$('#detail-state').textContent='已在其他设备删除';$('#edit-record').disabled=true;$('#process').disabled=true;return;}$('#edit-record').disabled=false;const signature=JSON.stringify([item.id,item.version,item.text,item.sync,item.error,item.pendingProcess,item.tasks,status.server]);if(signature===detailSignature)return;detailSignature=signature;$('#detail-title').textContent=title(item);$('#detail-date').textContent=date(item.createdAt)+' · 第 '+(item.version||1)+' 版';$('#detail-state').textContent=stateFor(item);$('#detail-body').textContent=item.text;$('#detail-error').textContent=item.error||'';$('#retry-sync').hidden=item.sync==='synced'&&!item.pendingProcess;$('#resolve-conflict').hidden=item.sync!=='conflict';$('#process').disabled=item.sync!=='synced'||Boolean(item.pendingProcess)||item.server!==status.server;
     $('#detail-media').innerHTML=item.attachments.map(a=>`<div class="media-card"><span>${esc(a.name)}</span><button data-media="${a.id}">查看 / 播放</button><div id="media-${a.id}"></div></div>`).join('');
     $('#result-section').innerHTML=(item.tasks||[]).map(t=>`<div class="result"><p class="result-label">第 ${t.recordVersion} 版 · ${esc(t.events?.at(-1)?.message||t.state)}</p><button data-task="${t.id}">查看加工任务</button>${t.state==='awaiting_review'?`<button data-preview="${t.id}">预览加工结果</button><div id="preview-${t.id}"></div>`:''}</div>`).join('');}
+  async function showBlocks(join=false){
+    const dialog=$('#blocks-dialog'),container=$('#blocks-items');dialog.showModal();container.replaceChildren();$('#blocks-error').textContent='';
+    const identity=scopeKey(),item=join?items.find(i=>i.id===selected):null;
+    try{
+      if(join&&(!item||item.sync!=='synced'||item.server!==status.server))throw Error('请先同步记录后再加入');
+      const value=await api('/api/blocks');if(identity!==scopeKey())throw Error('资料空间已切换');
+      for(const block of value.items){
+        const section=document.createElement('section'),h=document.createElement('h3');h.textContent=block.title+(block.paused?' · 已暂停':'');section.append(h);
+        for(const goal of block.goals){const title=document.createElement('h4');title.textContent=goal.title;section.append(title);
+          for(const part of goal.parts){const button=document.createElement('button');button.type='button';button.textContent=part.title;section.append(button);
+            button.onclick=async()=>{try{if(identity!==scopeKey())throw Error('资料空间已切换');
+              if(join){button.disabled=true;await api('/api/blocks/'+block.id+'/join','POST',{revision:block.revision,kind:'record',sourceId:item.id,partId:part.id});dialog.close();toast('已加入积木');}
+              else{const detail=document.createElement('p');const state=block.evaluations?.at(-1)?.parts.find(p=>p.partId===part.id);detail.textContent=(state?.ready?'可搭建':'积累中')+' · '+part.conditions.join('；');button.replaceWith(detail);}
+            }catch(error){$('#blocks-error').textContent=error.message;button.disabled=false;}};
+          }
+        }container.append(section);
+      }
+      if(!value.items.length)container.textContent='暂无积木';
+    }catch(error){$('#blocks-error').textContent=error.message;}
+  }
+  $('#join-block').onclick=()=>void showBlocks(true);$('#browse-blocks').onclick=()=>void showBlocks();$('#close-blocks').onclick=()=>$('#blocks-dialog').close();
   $('#record-text').addEventListener('input',()=>{resize();updateSend();void saveDraft();});
   $('#composer').addEventListener('submit',async event=>{event.preventDefault();if($('#send').disabled)return;sending=true;$('#record-text').disabled=true;updateSend();try{await saveDraft();await saving;await updateStatus();const recoveryParent=draft.remoteDeleted?draft.editingId:null;let previous=draft.editingId?await store.get(draft.editingId):null;if(previous?.deletedAt){if(!draft.remoteDeleted)throw Error('已在其他设备删除，请另存记录');previous=null;draft={...draft,recordId:uid(),editingId:undefined,remoteDeleted:false};}if(previous?.sync==='syncing')throw new Error('正在同步，请稍后补充');
     const item={...previous,id:draft.editingId||draft.recordId,text:draft.text,attachments:structuredClone(draft.attachments),createdAt:previous?.createdAt||new Date().toISOString(),version:draft.editBaseVersion??previous?.version??1,remoteVersion:draft.editBaseVersion??previous?.remoteVersion??0,server:previous?.server||status.server||null,sync:'pending',error:''};delete item.payload;

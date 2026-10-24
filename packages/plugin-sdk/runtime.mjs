@@ -21,7 +21,7 @@ export function createRegistry(manifests) {
   return {
     manifests: [...byId.values()],
     get(id) { const item = byId.get(id); if (!item) throw new PluginError('plugin_not_found','插件不存在',{},404); return item; },
-    defaults(legacy = false) { return Object.fromEntries([...byId.values()].map(p => [p.id,legacy || p.defaultEnabled])); },
+    defaults(legacy = false) { return Object.fromEntries([...byId.values()].map(p => [p.id,(legacy && p.legacyEnabled !== false) || p.defaultEnabled])); },
     resolve(config, id, platform) {
       const item = byId.get(id);
       return !!item && config[id] === true && (!platform || item.platforms.includes(platform))

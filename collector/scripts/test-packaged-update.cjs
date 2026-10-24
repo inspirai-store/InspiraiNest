@@ -48,7 +48,7 @@ const { _electron } = require('playwright');
     await app.firstWindow();
     let page;
     for (let i = 0; i < 100 && !page; i++) {
-      page = app.windows().find(window => window.url().startsWith('file:') && !window.url().includes('compact=1') && !window.url().includes('#/status'));
+      page = app.windows().find(window => window.url().startsWith('file:') && !window.url().includes('compact=1') && !window.url().includes('#/status')&&!window.url().includes('captureWindow=1'));
       if (!page) await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!page) throw new Error('Main application window did not load');

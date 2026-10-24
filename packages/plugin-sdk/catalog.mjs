@@ -61,6 +61,43 @@ export const manifests = [
     }
   },
   {
+    "id": "blocks",
+    "name": "积木",
+    "version": "1.0.0",
+    "hostVersion": 1,
+    "defaultEnabled": false,
+    "dependencies": [
+      "ai-assistant"
+    ],
+    "platforms": [
+      "web",
+      "desktop",
+      "android",
+      "ios",
+      "server",
+      "worker"
+    ],
+    "capabilities": [
+      "blocks.manage"
+    ],
+    "contributes": {
+      "navigation": [
+        {
+          "id": "blocks",
+          "label": "积木",
+          "path": "/blocks",
+          "icon": "Puzzle"
+        }
+      ],
+      "settings": true,
+      "jobs": [
+        "blocks.research",
+        "blocks.match"
+      ]
+    },
+    "legacyEnabled": false
+  },
+  {
     "id": "writing",
     "name": "写作工作台",
     "version": "1.0.0",
@@ -89,6 +126,11 @@ export const manifests = [
           "label": "写作",
           "path": "/writing",
           "icon": "Feather"
+        },
+        {
+          "id": "creation",
+          "label": "文稿",
+          "path": "/creation"
         }
       ],
       "settings": true,

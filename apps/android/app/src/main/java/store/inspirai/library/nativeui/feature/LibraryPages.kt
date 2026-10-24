@@ -1,5 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package store.inspirai.library.nativeui.feature
+import store.inspirai.library.nativeui.plugins.pluginEnabled
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -81,6 +82,7 @@ import store.inspirai.library.nativeui.design.*
     val content=remember(text){MarkdownContent.parse(text)};val list=rememberLazyListState();val scope=rememberCoroutineScope();val context=LocalContext.current
     LaunchedEffect(id,file) { model.load(id,file) }
     DetailScaffold("",back,actions={
+        if(pluginEnabled("blocks"))TextButton(onClick={open("join:entry:$id")}) { Text("加入积木") }
         IconButton(onClick={scope.launch { if(id in favorites)repository.dao.unfavorite(repository.credentials.server(),id) else repository.dao.favorite(Favorite(repository.credentials.server(),id)) }}) { Icon(if(id in favorites)Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,"收藏") }
         Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) {
             listOf("大纲" to "outline","文件与附件" to "files","归档信息" to "info","外观" to "theme").forEach { (label,key)->DropdownMenuItem(text={Text(label)},onClick={panel=key;more=false}) }

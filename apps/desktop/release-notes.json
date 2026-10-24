@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.39",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "新增积木：围绕多个目标长期积累资料与随笔，自动匹配并保留引用证据。\n按条件评价部件，支持手动加入、暂停恢复和成果交接。\n保留当前分屏写作、大纲、局部排版与独立采集窗口，兼容现有资料及授权。"
+  },
+  {
     "version": "0.2.32",
     "channel": "stable",
     "publishedAt": null,

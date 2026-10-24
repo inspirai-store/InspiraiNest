@@ -154,3 +154,33 @@ final class APITests: XCTestCase {
         catch { XCTAssertTrue(safeMessage(error).contains("提交 ID")) }
     }
 }
+
+extension APITests {
+    func testBlocksQuickJoinUsesAuthenticatedOriginAndFrozenRevision() async throws {
+        let id="00000000-0000-4000-8000-000000000001"
+        StubProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField:"Authorization"),"Bearer blocks-fixture")
+            if request.httpMethod == "POST" {
+                XCTAssertEqual(request.url?.path,"/api/blocks/\(id)/join")
+                let bytes=request.httpBody ?? request.httpBodyStream.flatMap { stream -> Data? in stream.open();defer{stream.close()};var data=Data();var buffer=[UInt8](repeating:0,count:4096);while stream.hasBytesAvailable {let n=stream.read(&buffer,maxLength:buffer.count);if n<=0{break};data.append(buffer,count:n)};return data } ?? Data()
+                let input=try JSONSerialization.jsonObject(with:bytes) as! [String:Any]
+                XCTAssertEqual(input["revision"] as? Int,3);XCTAssertEqual(input["sourceId"] as? String,"record");XCTAssertEqual(input["partId"] as? String,"part")
+                return (200,Data("{}".utf8))
+            }
+            return (200,Data("""
+            {"items":[{"id":"\(id)","title":"账号运营","revision":3,"paused":false,"goals":[{"id":"g","title":"流程","parts":[{"id":"part","title":"选题","conditions":["明确流程"]}]}]}]}
+            """.utf8))
+        }
+        let config=URLSessionConfiguration.ephemeral;config.protocolClasses=[StubProtocol.self]
+        let api=CollectorAPI(origin:try ServerOrigin("https://blocks.example.test"),token:"blocks-fixture",configuration:config)
+        let block=try await api.blocks().items[0]
+        try await api.joinBlock(block,partID:"part",material:BlockMaterials.Material(kind:"record",sourceId:"record",title:"想法"))
+    }
+    @MainActor func testCaptureBridgeAllowsOnlyBlocksReadAndQuickJoin() {
+        let bridge=CaptureController(onNavigate:{_ in})
+        XCTAssertTrue(bridge.allowed("/api/blocks","GET"))
+        XCTAssertTrue(bridge.allowed("/api/blocks/00000000-0000-4000-8000-000000000001/join","POST"))
+        XCTAssertFalse(bridge.allowed("/api/blocks/matches/00000000-0000-4000-8000-000000000001","POST"))
+        XCTAssertFalse(bridge.allowed("/api/blocks/00000000-0000-4000-8000-000000000001/structure","POST"))
+    }
+}

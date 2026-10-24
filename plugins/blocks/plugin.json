@@ -1,0 +1,37 @@
+{
+  "id": "blocks",
+  "name": "积木",
+  "version": "1.0.0",
+  "hostVersion": 1,
+  "defaultEnabled": false,
+  "dependencies": [
+    "ai-assistant"
+  ],
+  "platforms": [
+    "web",
+    "desktop",
+    "android",
+    "ios",
+    "server",
+    "worker"
+  ],
+  "capabilities": [
+    "blocks.manage"
+  ],
+  "contributes": {
+    "navigation": [
+      {
+        "id": "blocks",
+        "label": "积木",
+        "path": "/blocks",
+        "icon": "Puzzle"
+      }
+    ],
+    "settings": true,
+    "jobs": [
+      "blocks.research",
+      "blocks.match"
+    ]
+  },
+  "legacyEnabled": false
+}

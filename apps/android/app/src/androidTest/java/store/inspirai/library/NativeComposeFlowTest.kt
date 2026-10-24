@@ -154,6 +154,19 @@ class NativeComposeFlowTest {
         compose.onNodeWithText("长列表资料 700").assertIsDisplayed();capture("light-large-library")
         File(context.getExternalFilesDir(null),"native-qa/large-library.json").writeText(JSONObject().put("entries",1001).put("scrolledToIndex",700).put("returnedPositionPreserved",true).put("elapsedMillis",SystemClock.uptimeMillis()-started).put("frameTimingMeasured",false).toString(2))
     }
+    @Test fun blocksQuickJoinUsesSelectedRecordAndPart() {
+        repository.blocksMode=true
+        launch(Intent(context,NativeActivity::class.java).putExtra("route","record:f537a7a6-5b45-48a9-a1be-1068b7d65881"))
+        compose.waitUntil(15000){compose.onAllNodesWithText("记录原文与加工结果分开保存。").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.waitUntil(15000){compose.onAllNodesWithText("加入积木").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("加入积木").performClick()
+        compose.waitUntil(15000){compose.onAllNodesWithText("运营流程").fetchSemanticsNodes().isNotEmpty()}
+        capture("blocks-picker")
+        compose.onNodeWithText("运营流程").performClick()
+        compose.waitUntil(15000){compose.onAllNodesWithText("已加入积木").fetchSemanticsNodes().isNotEmpty()}
+        assertEquals("record",repository.blockJoin?.getString("kind"));assertEquals("f537a7a6-5b45-48a9-a1be-1068b7d65881",repository.blockJoin?.getString("sourceId"));assertEquals("part-flow",repository.blockJoin?.getString("partId"));capture("blocks-joined")
+    }
     private fun awaitReport(){try{compose.waitUntil(15000){compose.onAllNodesWithText("原生报告关联验收").fetchSemanticsNodes().isNotEmpty()}}catch(error:Throwable){capture("failed-report");File(context.getExternalFilesDir(null),"native-qa/failed-report.txt").writeText(compose.onRoot(useUnmergedTree=true).printToString());throw error}}
     private fun findEditor(view: View): EditText? {
         if(view is EditText)return view
@@ -170,6 +183,8 @@ class NativeComposeFlowTest {
     }
     private class Fixture(val database: NativeDatabase,override val credentials: Credentials): NestRepository {
         override val dao=database.dao();override val records=dao.observeRecords()
+        var blocksMode=false
+        var blockJoin: JSONObject?=null
         var additionalEntries: List<JSONObject> = emptyList()
         private val recordId="f537a7a6-5b45-48a9-a1be-1068b7d65881"
         private val parentId="33ebc3ee-8267-4bb0-81a6-352f8a128ab2"
@@ -183,6 +198,9 @@ class NativeComposeFlowTest {
         private val item=JSONObject().put("id","native-reader-fixture").put("title","真实字体测量与原生阅读").put("summary","中文长标题、代码和表格的组件验收资料").put("status","archived").put("type","article").put("archive_id",archiveId).put("inputAttachments",JSONArray().put(attachment)).put("collected_at","2026-10-17T10:00:00+08:00")
         suspend fun seed(){val value=JSONObject().put("id",recordId).put("server",credentials.server()).put("text","记录原文与加工结果分开保存。").put("createdAt","2026-10-17T08:00:00Z").put("remoteVersion",3).put("sync","synced");dao.put(LocalRecord(credentials.server(),recordId,value.toString(),System.currentTimeMillis()))}
         override suspend fun request(path: String,method: String,body: JSONObject?)=when {
+            blocksMode&&path=="/api/plugins"->JSONObject("""{"protocol":1,"revision":1,"enabled":{"blocks":true},"plugins":[{"id":"blocks","name":"积木","enabled":true,"platforms":["android"]}]}""")
+            blocksMode&&path=="/api/blocks"->JSONObject("""{"items":[{"id":"block-flow","title":"AI 运营 B 站账号","revision":3,"paused":false,"goals":[{"id":"goal-flow","title":"验证独立运营","parts":[{"id":"part-flow","title":"运营流程","conditions":["明确选题、制作、发布三个环节"]}]}]}]}""")
+            blocksMode&&path=="/api/blocks/block-flow/join"->{blockJoin=body;JSONObject().put("saved",true)}
             path.startsWith("/api/read/v1/entry")->item
             path=="/api/processing-center"->JSONObject().put("items",JSONArray().put(JSONObject().put("id","trial:$trialId").put("section","results").put("title","项目插件实测报告").put("taskIds",JSONArray().put(trialId)))).put("counts",JSONObject().put("results",1))
             path=="/api/state"->JSONObject().put("tasks",JSONArray().put(parent).put(trial)).put("devices",JSONArray())

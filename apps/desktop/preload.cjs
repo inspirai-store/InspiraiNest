@@ -1,4 +1,6 @@
+// diagnostics-compat-v1
 const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('creation',Object.fromEntries(['account','login','cancel','request','writing'].map(name=>[name,input=>ipcRenderer.invoke('creation:'+name,input)])));
 const invoke = async (channel, ...args) => {
   try { return await ipcRenderer.invoke(channel, ...args); }
   catch (error) {
@@ -6,14 +8,24 @@ const invoke = async (channel, ...args) => {
     throw new Error(/^(?:fetch failed|Failed to fetch|net::ERR_CONNECTION_REFUSED)$/i.test(message) ? '连接失败，请重试' : message || '操作失败');
   }
 };
-contextBridge.exposeInMainWorld('creation',Object.fromEntries(['account','login','cancel','request'].map(name=>[name,input=>invoke('creation:'+name,input)])));
 contextBridge.exposeInMainWorld('desktopEditing', {perform: action => invoke('desktop-editing:perform', action)});
+let pendingCaptureNavigation;
+const captureNavigationListeners=new Set();
+ipcRenderer.on('capture-window:navigate',(_event,path)=>{if(!captureNavigationListeners.size)pendingCaptureNavigation=path;else for(const listener of captureNavigationListeners)listener(path);});
+contextBridge.exposeInMainWorld('captureBrowser', {
+  openWindow:input=>invoke('capture-window:open',input),
+  openMain:input=>invoke('capture-window:main',input),
+  onNavigate:callback=>{captureNavigationListeners.add(callback);if(pendingCaptureNavigation){const path=pendingCaptureNavigation;pendingCaptureNavigation=undefined;callback(path);}return()=>captureNavigationListeners.delete(callback);},
+  ...Object.fromEntries(['state','add','navigate','close','viewport','take','resume','start','recover','chooseFile','externalPages','pairBrowser','extensionFolder','connect','preview','read','focus'].map(name=>[name,input=>invoke('capture-browser:'+name,input)])),
+  onChanged:callback=>{const listener=(_event,state)=>callback(state);ipcRenderer.on('capture-browser:changed',listener);return()=>ipcRenderer.removeListener('capture-browser:changed',listener);},
+});
 contextBridge.exposeInMainWorld('desktopSettings', {
   get: () => invoke('desktop-settings:get'),
   update: input => invoke('desktop-settings:update', input),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('desktop-settings:changed', listener); return () => ipcRenderer.removeListener('desktop-settings:changed', listener); },
 });
 contextBridge.exposeInMainWorld('worker', {
+  onNavigate:callback=>{const listener=(_event,path)=>callback(path);ipcRenderer.on('workspace:navigate',listener);return()=>ipcRenderer.removeListener('workspace:navigate',listener);},
   snapshot: () => invoke('worker:snapshot'),
   onChanged: callback => { const listener = (_event,state) => callback(state); ipcRenderer.on('worker:changed',listener); return () => ipcRenderer.removeListener('worker:changed',listener); },
   action: action => invoke('worker:action', action),
@@ -27,15 +39,14 @@ contextBridge.exposeInMainWorld('worker', {
 });
 contextBridge.exposeInMainWorld('library', { ...Object.fromEntries([
   'plugins','status','capture','pair','cancel-login','logout','state','entries','entry','content','preview','taskFile','task','task-action',
-  'diagnosticTasks','taskDiagnostics','capabilities','checkCapabilities','draft','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
+  'diagnosticTasks','taskDiagnostics','capabilities','checkCapabilities','draft','evidence','pairing','revoke','removeNode','renameNode','clientUpdates','trash','remove','restore','download','source','openUrl','skills','agents','market',
 ].map(name => [name === 'task-action' ? 'taskAction' : name === 'cancel-login' ? 'cancelLogin' : name, input => invoke(`library:${name}`, input)])),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('library:changed', listener); return () => ipcRenderer.removeListener('library:changed', listener); },
 });
 contextBridge.exposeInMainWorld('updates', {
   status: () => invoke('updates:status'),
   check: () => invoke('updates:check'),
-  download: input => invoke('updates:download',input),
-  setChannel: input=>invoke('updates:setChannel',input), notes:()=>invoke('updates:notes'), records:()=>invoke('updates:records'),
+  download:input=>invoke('updates:download',input),setChannel:input=>invoke('updates:setChannel',input),notes:()=>invoke('updates:notes'),records:()=>invoke('updates:records'),
   install: () => invoke('updates:install'),
   onChanged: callback => { const listener = (_event, state) => callback(state); ipcRenderer.on('updates:changed', listener); return () => ipcRenderer.removeListener('updates:changed', listener); },
   onOpen: callback => { const listener = () => callback(); ipcRenderer.on('updates:open', listener); return () => ipcRenderer.removeListener('updates:open', listener); },
