@@ -35,7 +35,7 @@ name: Collector builds
       - scripts/browser-data.mjs
       - scripts/write-collection-json.mjs
       - templates/**
-      - .github/workflows/collector-build.yml
+      - .github/workflows/**
   pull_request:
     paths:
       - collector/**
@@ -51,7 +51,7 @@ name: Collector builds
       - assets/**
       - index.html
       - scripts/write-collection-json.mjs
-      - .github/workflows/collector-build.yml
+      - .github/workflows/**
 permissions:
   contents: read
 jobs:

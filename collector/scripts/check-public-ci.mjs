@@ -7,12 +7,18 @@ const directory = fileURLToPath(new URL('../../.github/workflows/', import.meta.
 for (const file of fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name))) {
   const source = fs.readFileSync(path.join(directory, file), 'utf8');
   const workflow = yaml.load(source);
-  if (['collector-release.yml','collector-publish-macos.yml','desktop-channel-package.yml'].includes(file)) {
-    if (Object.keys(workflow.on).join() !== 'workflow_dispatch') throw new Error('Release must be manual only');
+  if (['collector-release.yml','collector-publish-macos.yml','desktop-channel-package.yml','desktop-publish.yml'].includes(file)) {
+    const events=Object.keys(workflow.on);
+    if (events.some(event=>!['workflow_dispatch',...(file==='desktop-publish.yml'?['workflow_call']:[])].includes(event)) || !events.includes('workflow_dispatch')) throw new Error('Release must originate from manual dispatch');
     for (const job of Object.values(workflow.jobs)) {
-      if (job.environment !== 'signed-release' || !job.if?.includes("github.ref == 'refs/heads/main'") || !job.if?.includes("vars.ENABLE_SIGNED_RELEASE == 'true'")) throw new Error('Release job lacks explicit enablement, branch or environment guard');
+      const reusable = job.uses === './.github/workflows/desktop-publish.yml';
+      if ((!reusable && job.environment !== 'signed-release') || !job.if?.includes("github.ref == 'refs/heads/main'") || !job.if?.includes("vars.ENABLE_SIGNED_RELEASE == 'true'")) throw new Error('Release job lacks explicit enablement, branch or environment guard');
+      if (file==='desktop-publish.yml' && !job.if.includes("github.event_name == 'workflow_dispatch'")) throw new Error('Reusable publisher must reject non-manual events');
+      const writer = reusable || (file==='desktop-publish.yml' && job===workflow.jobs.synchronize);
+      if (job.permissions && Object.entries(job.permissions).some(([key,value])=>value==='write' && !(writer && key==='contents'))) throw new Error('Only the public synchronizer may write Release contents');
+      for (const step of job.steps || []) if (step.uses?.startsWith('actions/checkout@') && step.with?.['persist-credentials']!==false) throw new Error('Release checkout credentials must not persist');
     }
-    if (workflow.permissions?.contents !== 'read' || /pull_request_target|workflow_run|contents:\s*write|id-token:\s*write/i.test(source)) throw new Error('Release permissions must remain read-only');
+    if (workflow.permissions?.contents !== 'read' || /pull_request_target|workflow_run|id-token:\s*write/i.test(source)) throw new Error('Release default permissions must remain read-only');
     continue;
   }
   if (/secrets\s*(?:\.|\[)|contents:\s*write|id-token:\s*write|pull_request_target|workflow_run|self-hosted/i.test(source)) throw new Error(`Privileged capability in public CI: ${file}`);
@@ -26,4 +32,4 @@ for (const file of fs.readdirSync(directory).filter(name => /\.ya?ml$/.test(name
     }
   }
 }
-console.log('CI boundaries checked: regular workflows are unprivileged; signed releases require manual main-branch enablement.');
+console.log('CI boundaries checked: regular workflows are unprivileged; formal releases require manual main-branch enablement; only the synchronizer can write Release assets.');

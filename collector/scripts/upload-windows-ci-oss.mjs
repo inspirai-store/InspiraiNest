@@ -12,7 +12,13 @@ function gh(args) {
   assert.equal(result.status, 0, 'GitHub verification failed'); return JSON.parse(result.stdout);
 }
 async function validate() {
-  const run = required('WINDOWS_CI_RUN'), commit = required('WINDOWS_SOURCE_COMMIT');
+  const commit = process.env.WINDOWS_SOURCE_COMMIT || required('GITHUB_SHA');
+  let run = process.env.WINDOWS_CI_RUN;
+  if (!run) {
+    const runs = gh(['api', `repos/${required('GITHUB_REPOSITORY')}/actions/workflows/collector-build.yml/runs?branch=main&head_sha=${commit}&status=success&per_page=30`]).workflow_runs;
+    run = String(runs.find(item => item.head_sha === commit && item.head_repository.full_name === process.env.GITHUB_REPOSITORY)?.id || '');
+    assert.ok(run, 'Run normal main-branch CI successfully for this exact commit before a formal release');
+  }
   assert.match(run, /^[0-9]+$/); assert.match(commit, /^[a-f0-9]{40}$/);
   const repository = required('GITHUB_REPOSITORY'), info = gh(['api', `repos/${repository}/actions/runs/${run}`]);
   assert.equal(info.head_branch, 'main'); assert.equal(info.head_sha, commit); assert.equal(info.conclusion, 'success');
@@ -27,6 +33,7 @@ async function validate() {
   assert.ok(artifact); assert.match(artifact.digest, /^sha256:[a-f0-9]{64}$/);
   fs.mkdirSync(dist, { recursive: true });
   fs.writeFileSync(path.join(dist, 'ci-source.json'), JSON.stringify({ version, commit, sourceCI: run, artifactId: artifact.id, artifactDigest: artifact.digest }));
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_run=${run}\nsource_commit=${commit}\n`);
   console.log('Verified main-branch Windows CI source and artifact identity.');
 }
 async function upload() {

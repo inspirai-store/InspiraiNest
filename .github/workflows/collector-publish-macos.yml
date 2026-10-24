@@ -1,4 +1,4 @@
-name: Publish verified macOS client artifact
+name: Archive verified macOS client artifact (OSS only)
 on:
   workflow_dispatch:
     inputs:

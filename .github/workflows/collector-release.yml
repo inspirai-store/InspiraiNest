@@ -1,6 +1,6 @@
-name: InspiraiNest signed client OSS release
+name: Publish InspiraiNest desktop release
 
-# Manual releases use the reviewed main commit and retain verified packages in OSS.
+# The manual main-branch release finishes only after GitHub, downloads and feeds agree.
 
 on:
   workflow_dispatch:
@@ -18,15 +18,15 @@ on:
         type: boolean
         default: false
       include_windows_ci:
-        description: Relay a verified Windows CI artifact to private OSS
+        description: Publish the unsigned Windows CI package together with macOS
         type: boolean
-        default: false
+        default: true
       windows_ci_run:
-        description: Successful main-branch Collector builds run ID
+        description: Successful main-branch CI run (blank selects the exact current commit)
         type: string
         default: ''
       windows_source_commit:
-        description: Exact Windows CI source commit
+        description: Exact Windows CI source commit (blank uses this release commit)
         type: string
         default: ''
       inspect_macos_workspace:
@@ -194,6 +194,7 @@ jobs:
         with:
           node-version: '24'
       - name: Validate the trusted CI source before downloading or exposing OSS credentials
+        id: source
         env:
           GH_TOKEN: ${{ github.token }}
           WINDOWS_CI_RUN: ${{ inputs.windows_ci_run }}
@@ -203,7 +204,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.windows_ci_run }}
+          run-id: ${{ steps.source.outputs.source_run }}
           name: InspiraiNest-Windows-x64
           path: artifacts/desktop
       - run: npm ci --ignore-scripts
@@ -216,6 +217,15 @@ jobs:
           OSS_RELEASE_ACCESS_KEY_SECRET: ${{ secrets.OSS_RELEASE_ACCESS_KEY_SECRET }}
           OSS_RELEASE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: node scripts/upload-windows-ci-oss.mjs upload
+      - name: Retain the exact Windows publication input
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-publication-windows
+          path: |
+            artifacts/desktop/InspiraiNest-v*-Windows-x64.exe*
+            artifacts/desktop/latest.yml
+            artifacts/desktop/ci-source.json
+          if-no-files-found: error
   signed-macos:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_macos
     environment: signed-release
@@ -349,6 +359,41 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/upload-macos-oss.mjs ../artifacts/desktop InspiraiNest
+
+      - name: Retain the verified macOS publication input
+        if: ${{ inputs.publish_macos }}
+        working-directory: public-source
+        run: |
+          node --input-type=module -e 'import fs from "node:fs";fs.writeFileSync("artifacts/desktop/macos-ci-source.json",JSON.stringify({version:JSON.parse(fs.readFileSync("package.json")).version,commit:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID}))'
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.publish_macos }}
+        with:
+          name: desktop-publication-macos
+          path: |
+            public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.zip
+            public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.dmg
+            public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.blockmap
+            public-source/artifacts/desktop/latest-mac.yml
+            public-source/artifacts/desktop/macos-ci-source.json
+          if-no-files-found: error
+
+  publish-desktop:
+    needs: [signed-macos, windows-ci-oss]
+    if: >-
+      always() && github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' &&
+      !inputs.inspect_macos_workspace && !inputs.verify_macos_workspace &&
+      ((inputs.include_macos && inputs.publish_macos) || inputs.include_windows_ci) &&
+      (!inputs.include_macos || needs.signed-macos.result == 'success') &&
+      (!inputs.include_windows_ci || needs.windows-ci-oss.result == 'success')
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/desktop-publish.yml
+    with:
+      source_run: ${{ github.run_id }}
+      include_macos: ${{ inputs.include_macos && inputs.publish_macos }}
+      include_windows: ${{ inputs.include_windows_ci }}
+    secrets: inherit
 
   signed-android:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_SIGNED_RELEASE == 'true' && inputs.include_android
