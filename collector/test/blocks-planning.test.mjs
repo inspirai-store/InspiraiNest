@@ -46,6 +46,7 @@ test('计划结果不得无限追问、捏造材料关联或提交错误依赖',
  assert.throws(()=>validatePlanResult(proposal,{questionCount:0}),/先通过/);assert.throws(()=>validatePlanResult(question,{questionCount:3}),/不再追加/);
  const bad=structuredClone(proposal);bad.proposal.goals[0].parts[0].dependsOn=['p'];assert.throws(()=>validatePlanResult(bad,{questionCount:1}),/成环/);
  const incomplete=structuredClone(proposal);incomplete.proposal.collectionPlan=[];assert.throws(()=>validatePlanResult(incomplete,{questionCount:1}),/每个部件/);
+ const uncertain=structuredClone(question);uncertain.question.options.push({id:'unknown',label:'暂不确定，请推荐'});assert.equal(validatePlanResult(uncertain,{questionCount:0}).question.options.length,2);
  const value=validatePlanResult({...proposal,links:[{relation:'support'}]},{questionCount:1});assert.equal(value.links,undefined);assert.equal(value.proposal.links,undefined);
 });
 test('新规划协议筛选覆盖旧 Worker 与 capture 入口白名单',()=>{
