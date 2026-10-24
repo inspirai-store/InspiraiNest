@@ -1,3 +1,4 @@
+import {createBlockPlanning} from '../../plugins/blocks/server/planning.mjs';
 import {createBlockMatching} from '../../plugins/blocks/server/matching.mjs';
 import {sourceKey} from '../../plugins/blocks/protocol/matching.mjs';
 import {createBlockHandoff} from '../../plugins/blocks/server/handoff.mjs';
@@ -40,7 +41,7 @@ import QRCode from 'qrcode';
 import { createSkillHubClient } from '../../plugins/ai-assistant/server/skillhub.mjs';
 import { createSkillMarketService } from '../../plugins/ai-assistant/server/skill-market-service.mjs';
 import { createAgentService } from '../../plugins/ai-assistant/server/agent-service.mjs';
-import { canRunTask, supportsWritingTask, nodeFailureCodes, releaseTask } from '../../packages/core/node/task-routing.mjs';
+import { canRunTask, supportsWritingTask, supportsBlocksTask, nodeFailureCodes, releaseTask } from '../../packages/core/node/task-routing.mjs';
 import { hash, id, secret, now, text, types, requireValue, fail, sourceURL } from '../../packages/core/node/common.mjs';
 
 const project = collectorRoot;
@@ -110,6 +111,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     return result;
   }
   const blockMatching=createBlockMatching({store:collectionAccess(store,['block','task','setting','capture','archive','device','trash']),plugins,saveTask,readSources:blockSources,assigned,authenticate,checkAssignment,body,send,clock});
+  const blockPlanning=createBlockPlanning({store:collectionAccess(store,['block-plan','block-plan-receipt','block','task','setting','device']),plugins,owner,body,send,serialized,saveTask,assigned,authenticate,checkAssignment,onChanged:()=>setImmediate(advanceBlocks),clock});
   const blocks = createBlocks({store:collectionAccess(store,['block','block-handoff','setting','capture','archive','trash','task']),plugins,owner,body,send,saveTask,onChanged:()=>setImmediate(advanceBlocks)});
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const taskDiagnostics=createTaskDiagnostics({store,body,send,serialized,clock});
@@ -645,6 +647,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if(await blockPlanning.handle(req,res,url,device))return;
       if(await blockMatching.handle(req,res,url,device))return;
       if(await blocks.handle(req,res,url,device))return;
       if(await creation.handle(req,res,url,device))return;
@@ -781,7 +784,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const reported = clientRuntime(input.clientRuntime);
         requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
         const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
-        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,features:Array.isArray(input.creationRuntime.features)?input.creationRuntime.features.filter(x=>x==='outline-workflow-v1'):[],fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, blocksProtocol:input.blocksProtocol===1?1:null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,features:Array.isArray(input.creationRuntime.features)?input.creationRuntime.features.filter(x=>x==='outline-workflow-v1'):[],fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, blocksProtocol:input.blocksProtocol===1?1:null, blocksPlanningProtocol:input.blocksPlanningProtocol===1?1:null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
@@ -836,7 +839,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         if(await plugins.enabled('agent-lab'))await codexTrials.sync();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.pluginId!=='blocks'||device.blocksProtocol===1) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && supportsBlocksTask(t,device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -848,7 +851,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.pluginId!=='blocks'||device.blocksProtocol===1) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && supportsBlocksTask(t,device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
               const selected = ['selection-writing','codex-trial'].includes(candidate.purpose)?{eligible:true,selectedSkills:[]}:await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
@@ -861,7 +864,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
                 if(pending?.purpose==='codex-trial'&&(live.trialEnvironment?.protocol!==1||input.assignmentProtocol!==1))return null;
-                if(pending?.pluginId==='blocks'&&live.blocksProtocol!==1)return null;
+                if(pending&&!supportsBlocksTask(pending,live))return null;
                 if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;

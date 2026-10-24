@@ -13,8 +13,9 @@ export function validateCaptureRequest(input) {
   const writingPost=method==='POST'&&(/^\/api\/writing\/sessions$/.test(route)||/^\/api\/writing\/sessions\/[a-f0-9-]{36}\/(answers|turns|materials|discuss|start|style|revise)$/.test(route));
   const contentTrash=method==='GET'&&(route==='/api/content-trash'||/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+$/.test(route))||method==='POST'&&/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+\/(delete|restore)$/.test(route);
   const recordChanges=method==='GET'&&/^\/api\/records\/changes\?(?:cursor=[a-f0-9%:-]+&)?wait=(?:[0-9]|1[0-9]|2[0-5])(?:&limit=(?:[1-9][0-9]?|1[0-9]{2}|200))?$/i.test(route);
-  const blocksRoute = method==='GET'&&/^\/api\/blocks(?:\/materials|\/[a-f0-9-]{36}(?:\/handoffs)?)?$/.test(route)||method==='POST'&&(route==='/api/blocks'||/^\/api\/blocks\/[a-f0-9-]{36}\/(structure|pause|link|join|exclude|evaluate)$/.test(route));
-  requireValue(blocksRoute||allowed||writingGet||writingPost||contentTrash||recordChanges||creationRoute(route,method),'Capture route not allowed',403);
+  const blocksRoute = method==='GET'&&/^\/api\/blocks(?:\/materials|\/[a-f0-9-]{36}(?:\/handoffs)?)?$/.test(route)||method==='POST'&&(route==='/api/blocks'||/^\/api\/blocks\/[a-f0-9-]{36}\/(structure|pause|research|link|join|exclude|evaluate)$/.test(route));
+  const blockPlans=method==='GET'&&/^\/api\/blocks\/plans(?:\/[a-f0-9-]{36})?$/.test(route)||method==='POST'&&/^\/api\/blocks\/plans(?:\/[a-f0-9-]{36}\/(turns|confirm|retry))?$/.test(route);
+  requireValue(blockPlans||blocksRoute||allowed||writingGet||writingPost||contentTrash||recordChanges||creationRoute(route,method),'Capture route not allowed',403);
   if (input.bytes !== undefined) requireValue(typeof input.bytes === 'string' && input.bytes.length <= 44739244 && method === 'PUT' && route.includes('/media/'),'Invalid media body');
   return input;
 }

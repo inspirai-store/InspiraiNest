@@ -3,7 +3,7 @@ import mysql from 'mysql2/promise';
 import {createHash} from 'node:crypto';
 import {canonicalJson} from '/app/packages/core/node/common.mjs';
 const hash=x=>createHash('sha256').update(canonicalJson(x)).digest('hex');
-const protectedKinds=new Set('capture capture-version capture-submission archive draft writing-session writing-history writing-receipt creation-session creation-turn creation-document creation-document-version creation-agent-save creation-event creation-publication creation-receipt creation-workflow creation-workflow-version creation-run record-media record trash setting block block-handoff'.split(' '));
+const protectedKinds=new Set('capture capture-version capture-submission archive draft writing-session writing-history writing-receipt creation-session creation-turn creation-document creation-document-version creation-agent-save creation-event creation-publication creation-receipt creation-workflow creation-workflow-version creation-run record-media record trash setting block block-handoff block-plan block-plan-receipt'.split(' '));
 const url=new URL(process.env.MYSQL_URL),db=await mysql.createConnection({host:url.hostname,port:Number(url.port||3306),user:decodeURIComponent(url.username),password:decodeURIComponent(url.password),database:decodeURIComponent(url.pathname.slice(1)),timezone:'Z'});
 try{
  await db.query('START TRANSACTION READ ONLY');const[rows]=await db.query('SELECT kind,id,body FROM records ORDER BY kind,id');const records=rows.map(r=>({...r,body:typeof r.body==='string'?JSON.parse(r.body):r.body}));

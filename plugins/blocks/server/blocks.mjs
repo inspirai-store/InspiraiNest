@@ -25,6 +25,7 @@ export function createBlocks({store,plugins,owner,body,send,onChanged=()=>{},sav
    const next=structuredClone(current);
    if(action==='structure'){Object.assign(next,structure(input));const valid=new Set(next.goals.flatMap(g=>g.parts.map(p=>p.id)));next.links=next.links.map(l=>valid.has(l.partId)?l:{...l,excluded:true});}
    else if(action==='pause'){if(typeof input.paused!=='boolean')error('暂停状态错误',400);next.paused=input.paused;}
+   else if(action==='research'){if(typeof input.enabled!=='boolean')error('收集状态错误',400);next.researchEnabled=input.enabled;if(input.enabled)next.nextCheckAt=null;else if(saveTask)for(const task of await tx.list('task'))if(task.blockId===next.id&&task.purpose==='blocks-research'&&task.state==='queued')await saveTask({...task,assignmentId:randomUUID()},'cancelled','已暂停持续收集',tx);}
    else if(action==='join'){
     const part=next.goals.flatMap(g=>g.parts).find(p=>p.id===input.partId);
     if(!part||!['record','entry'].includes(input.kind)||typeof input.sourceId!=='string')error('请选择资料和目标部件',400);
