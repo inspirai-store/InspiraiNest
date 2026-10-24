@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';import yaml from 'js-yaml';
 import {digest,targets,preparePublication,verifyPublic,unsignedPE} from '../desktop-publication.mjs';
+import {githubJson} from '../github-api.mjs';
 import {clientDownload} from '../../../services/api/modules/client-download.mjs';
 function fixture(t,version='0.2.33'){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-publication-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const input=path.join(root,'input');fs.mkdirSync(input);const feeds={windows:[],macos:[]};
@@ -33,4 +34,9 @@ test('the actual release handler serves consistent feeds, packages, hashes and r
  const{args}=fixture(t);const plan=await preparePublication(args),handler=clientDownload({releaseDir:args.overlay});const server=http.createServer(async(req,res)=>{if(req.url==='/download'){res.end('<h2 id="worker-title">Desktop</h2>');return;}if(!await handler(req,res,new URL(req.url,'http://local').pathname)){res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());const fetcher=(url,options)=>fetch('http://127.0.0.1:'+server.address().port+new URL(url).pathname,options);
  const result=await verifyPublic(plan,{fetcher});assert.equal(result.checks.length,10);assert(result.checks.every(c=>c.complete));
  const b=fs.readFileSync(path.join(args.overlay,plan.assets[0].filename));b[b.length-1]^=1;fs.writeFileSync(path.join(args.overlay,plan.assets[0].filename),b);await assert.rejects(verifyPublic(plan,{fetcher}),/503|strictly equal/);
+});
+
+test('transient GitHub EOF retries reads, but exhaustion remains a visible release failure',()=>{
+ let calls=0;const value=githubJson('actions/runs/1',{execute:(exe,args)=>{assert.equal(exe,'gh');assert.deepEqual(args,['api','repos/inspirai-store/InspiraiNest/actions/runs/1']);return ++calls<3?{status:1,stderr:'EOF'}:{status:0,stdout:'{"id":1}'};},pause:()=>{}});assert.equal(calls,3);assert.equal(value.id,1);
+ assert.throws(()=>githubJson('actions/runs/1',{execute:()=>({status:1}),pause:()=>{}}),/three attempts/);
 });

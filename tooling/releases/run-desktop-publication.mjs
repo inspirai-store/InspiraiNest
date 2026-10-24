@@ -4,13 +4,14 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileDigest,origin,targets,preparePublication,readPublic,verifyPublic} from './desktop-publication.mjs';
+import {githubJson} from './github-api.mjs';
 
 const repo='inspirai-store/InspiraiNest',root=path.resolve(import.meta.dirname,'../..');
 const mode=process.argv[2]||'audit',work=path.resolve(process.env.PUBLICATION_WORK||'artifacts/desktop-publication');
 assert(['publish','audit','reconcile'].includes(mode));fs.mkdirSync(work,{recursive:true});
 const save=(name,data)=>fs.writeFileSync(path.join(work,name),JSON.stringify(data,null,2)+'\n');
 function command(exe,args,options={}){const r=spawnSync(exe,args,{cwd:root,encoding:'utf8',timeout:600000,...options});assert.equal(r.status,0,`${exe} ${args[0]} failed${r.stderr?' : '+r.stderr.slice(-1500):''}`);return r.stdout;}
-function gh(route){return JSON.parse(command('gh',['api',`repos/${repo}/${route}`]));}
+function gh(route){return githubJson(route,{repository:repo});}
 const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;assert.match(version,/^\d+\.\d+\.\d+$/,'Formal publication requires a stable version');assert.equal(JSON.parse(fs.readFileSync(path.join(root,'collector/package.json'))).version,version);
 const tag='v'+version,before=await readPublic(),input=path.join(work,'packages');fs.mkdirSync(input,{recursive:true});save('public-before.json',before);
 let platforms,source,base,notes;

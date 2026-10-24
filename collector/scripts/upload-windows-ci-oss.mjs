@@ -3,13 +3,15 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { githubJson } from '../../tooling/releases/github-api.mjs';
 
 const root = path.resolve(import.meta.dirname, '..'), dist = path.resolve(root, '../artifacts/desktop');
 const required = name => { assert.ok(process.env[name], `Missing ${name}`); return process.env[name]; };
 const sha = (bytes, kind = 'sha256', format = 'hex') => createHash(kind).update(bytes).digest(format);
 function gh(args) {
-  const result = spawnSync('gh', args, { encoding: 'utf8', timeout: 30000, windowsHide: true });
-  assert.equal(result.status, 0, 'GitHub verification failed'); return JSON.parse(result.stdout);
+  assert.equal(args[0], 'api');
+  const prefix = `repos/${required('GITHUB_REPOSITORY')}/`; assert.ok(args[1].startsWith(prefix));
+  return githubJson(args[1].slice(prefix.length), { repository: process.env.GITHUB_REPOSITORY });
 }
 async function validate() {
   const commit = process.env.WINDOWS_SOURCE_COMMIT || required('GITHUB_SHA');
