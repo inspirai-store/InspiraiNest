@@ -51,7 +51,7 @@ exports.create=async(executable)=>{
    app=await _electron.launch({executablePath:path.resolve(executable),args:['--use-fake-device-for-media-stream',...extra],env});
    // Existing main-process QA hook replaces only the public metadata provider. IPC, renderer and REST imports remain real.
    await app.evaluate(()=>{globalThis.workerDesktop().skillHub.request=async input=>{const item={slug:'fixture-market',name:'市场示例',description:'隔离服务中的完整技能包',version:'1.0.0',source:'community',owner:'Fixture'};return input.kind==='categories'?{items:[{key:'research',name:'资料整理'}]}:input.kind==='detail'?{item}:{page:1,pageSize:20,total:1,items:[item]};};});
-   await exports.until(()=>{page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('#/status'));compact=app.windows().find(p=>p.url().includes('#/status'));return page&&compact;},'React main and status windows');
+   await exports.until(()=>{page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('#/status')&&!p.url().includes('captureWindow=1'));compact=app.windows().find(p=>p.url().includes('#/status'));return page&&compact;},'React main and status windows');
    page.setDefaultTimeout(25000);page.on('pageerror',e=>errors.push(e.message));compact.on('pageerror',e=>errors.push(e.message));
    await page.getByRole('navigation',{name:'主导航'}).waitFor();
    const prefs=await app.evaluate(()=>globalThis.workerDesktop().main.webContents.getLastWebPreferences());assert.equal(prefs.sandbox,true);assert.equal(prefs.contextIsolation,true);assert.equal(prefs.nodeIntegration,false);

@@ -8,7 +8,7 @@ const {_electron}=require('playwright');
  const executable=process.argv[2]||require('electron');let app;
  try{
   app=await _electron.launch({executablePath:path.resolve(executable),args:process.argv[2]?[]:[path.resolve(__dirname,'../desktop')],env});
-  let page;for(let n=0;n<100&&!page;n++){page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('#/status'));if(!page)await new Promise(r=>setTimeout(r,100));}assert.ok(page);page.setDefaultTimeout(20000);
+  let page;for(let n=0;n<100&&!page;n++){page=app.windows().find(p=>p.url().startsWith('file:')&&!p.url().includes('#/status')&&!p.url().includes('captureWindow=1'));if(!page)await new Promise(r=>setTimeout(r,100));}assert.ok(page);page.setDefaultTimeout(20000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.getByRole('navigation',{name:'主导航'}).waitFor();
   await app.evaluate((_,credential)=>globalThis.workerDesktop().owner.saveCredential(credential),{server:f.server,deviceId:f.owner.device.id,token:f.owner.token});await page.reload();
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'写作',exact:true}).click();await page.getByRole('button',{name:'新文章',exact:true}).first().click();
