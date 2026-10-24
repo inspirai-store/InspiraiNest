@@ -11,7 +11,7 @@ const bundle=(id,related=[])=>{
 };
 for(const mysql of [false,true])test(`${mysql?'MySQL':'SQLite'} 关联条目先上传且不结束主任务，取消阻止迟到提交，文件范围保留来源缺口`,{skip:mysql&&!process.env.MYSQL_URL},async t=>{
  const f=await fixture(t,mysql?{store:await mysqlFixture()}:undefined);const plugins=(await f.request('/api/plugins')).value;await f.request('/api/plugins/blocks','PUT',{revision:plugins.revision,enabled:true});
- const worker=await f.worker();await api(worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksResearchProtocol:2,blocksEvidenceProtocol:1});
+ const worker=await f.worker();await api(worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksResearchProtocol:2,blocksEvidenceProtocol:2});
  const create=async()=>{const id=randomUUID();await f.app.store.put('task',{id,pluginId:'blocks',purpose:'blocks-research',type:'note',url:null,content:'整理有来源的研究清单',autoArchive:true,state:'queued',createdAt:new Date().toISOString(),blockResearchSnapshot:{protocol:2}});const task=await f.claim(worker);assert.equal(task.id,id);return task;};
  const submit=(task,b)=>f.request('/api/blocks/research-sources/'+task.id+'/result','POST',b,worker,task.assignmentId);
  const first=await create(),official=bundle('official');const a=await submit(first,official);assert.equal(a.status,201,JSON.stringify(a.value));assert.equal((await f.app.store.get('task',first.id)).state,'assigned');assert.equal((await submit(first,official)).value.id,a.value.id);assert.equal((await f.app.store.list('archive')).length,1);

@@ -11,7 +11,7 @@ const question={protocol:1,stage:'question',reply:'先确定这件事最重要�
 export const proposal={protocol:1,stage:'proposal',reply:'先明确流程，再逐步补齐证据。',question:null,proposal:{title:'AI 运营账号',goals:[{id:'g',title:'运营方案',output:'product',parts:[{id:'p',title:'运营流程',conditions:['明确选题、制作、发布和复盘流程'],dependsOn:[]}]}],collectionPlan:[{partId:'p',existing:['查找已有运营记录'],external:['补充公开平台规则与案例']}],assumptions:['具体执行频率待验证']}};
 async function setup(t,options){
  const f=await fixture(t,options);let plugin=(await f.request('/api/plugins')).value;await f.request('/api/plugins/blocks','PUT',{revision:plugin.revision,enabled:true});
- const worker=await f.worker();await api(worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksPlanningProtocol:1,blocksEvidenceProtocol:1,recordProtocol:1});
+ const worker=await f.worker();await api(worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksPlanningProtocol:1,blocksEvidenceProtocol:2,recordProtocol:1});
  const create=async(brief='我要做一个 AI 运营 B 站账号的产品',extra={})=>f.request('/api/blocks/plans','POST',{brief,requestId:randomUUID(),...extra});
  const read=async id=>(await f.request('/api/blocks/plans/'+id)).value;
  const change=(p,action,input={})=>f.request(`/api/blocks/plans/${p.id}/${action}`,'POST',{revision:p.revision,requestId:randomUUID(),...input});
@@ -63,7 +63,7 @@ test('真实服务冻结研究正文与计划，新研究协议经心跳后才�
  const wait=async purpose=>{for(let i=0;i<60;i++){const task=(await f.app.store.list('task')).find(t=>t.blockId===id&&t.purpose===purpose);if(task)return task;await new Promise(r=>setTimeout(r,20));}assert.fail('任务未创建：'+purpose);};
  await wait('blocks-match');const match=await f.claim(f.worker);assert.equal(match.purpose,'blocks-match');assert.equal((await f.request('/api/blocks/matches/'+match.id,'POST',{protocol:1,matches:[]},f.worker,match.assignmentId)).status,200);
  await wait('blocks-research');assert.equal(await f.claim(f.worker),null,'旧节点不能吞掉带研究快照的任务');
- await api(f.worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksResearchProtocol:2,blocksEvidenceProtocol:1});
+ await api(f.worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksResearchProtocol:2,blocksEvidenceProtocol:2});
  const research=await f.claim(f.worker);assert.equal(research.purpose,'blocks-research');assert.equal(research.blockResearchSnapshot.sources[0].sourceId,'rea-source');assert.match(research.blockResearchSnapshot.sources[0].text,/原始研究记录/);assert.match(research.blockResearchSnapshot.collectionPlan.external[0],/github.com\/morluto\/rea/);
 });
 test('关闭插件保留计划，拒绝继续规划但可恢复读取',async t=>{
