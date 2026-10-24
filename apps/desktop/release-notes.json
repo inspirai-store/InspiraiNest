@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.40",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "新建积木从一句话开始，通过关键问题与计划预览自动组织目标、部件和资料安排。\n支持自然语言调整、讨论续接和确认创建，先匹配已有资料，外部持续收集由你启动。\n保留原有积木、资料、文稿及自动成果交接。"
+  },
+  {
     "version": "0.2.39",
     "channel": "stable",
     "publishedAt": null,

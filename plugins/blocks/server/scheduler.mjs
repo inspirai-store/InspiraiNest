@@ -19,6 +19,7 @@ export function createBlockScheduler({store,plugins,saveTask,clock=Date.now}){
     b.links.push({id:randomUUID(),partId:task.blockPartId,kind:'entry',sourceId:archive.entryId,version:archive.id,reason:'由此部件的缺口采集任务取得',relation:'lead',coverage:archive.meta?.status==='archived'?'full':'partial',conditions:[],excluded:false,taskId:task.id});changed=true;
    }
    if(changed){b.revision++;b.updatedAt=new Date(time).toISOString();b.evaluations.push(evaluate(b,b.updatedAt));await tx.put('block',b);}
+   if(b.researchEnabled===false)return;
    if(Date.parse(b.nextCheckAt||0)>time||tasks.some(t=>pending.has(t.state)))return;
    const day=dayKey(time),used=tasks.filter(t=>t.purpose==='blocks-research'&&t.createdAt&&dayKey(t.createdAt)===day).length;
    if(used>=(b.dailyLimit||5))return;
