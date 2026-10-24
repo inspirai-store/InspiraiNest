@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {fingerprint,sourceKey,validateMatches} from '../protocol/matching.mjs';
+import {fingerprint,sourceKey,validateMatches,goalsFingerprint,evidenceProtocol} from '../protocol/matching.mjs';
 import {evaluate} from '../protocol/model.mjs';
 import {rankSources} from '../protocol/research.mjs';
 const active=new Set(['queued','assigned','running','uploading','waiting_action']);
@@ -11,14 +11,15 @@ export function createBlockMatching({store,plugins,saveTask,readSources,assigned
   for(const row of blocks)await store.transaction(async tx=>{
    await plugins.assertEnabled('blocks',tx,true);const b=await tx.getForUpdate('block',row.id);if(!b||b.paused)return;
    const keys=new Set(sources.map(s=>s.key));let invalidated=false;
-   for(const l of b.links){const stale=!keys.has(sourceKey(l));if(Boolean(l.stale)!==stale){l.stale=stale;invalidated=true;}}
+   for(const l of b.links){const stale=!keys.has(sourceKey(l))||l.origin==='semantic'&&l.evidenceProtocol!==evidenceProtocol;if(Boolean(l.stale)!==stale){l.stale=stale;invalidated=true;}}
    if(invalidated){b.revision++;b.updatedAt=new Date(clock()).toISOString();b.evaluations.push(evaluate(b,b.updatedAt));await tx.put('block',b);}
-   const goalsHash=fingerprint([b.goals,b.matchEpoch||0]),tasks=(await tx.list('task')).filter(t=>t.blockId===b.id&&t.purpose==='blocks-match');
-   if(tasks.some(t=>active.has(t.state)))return;
+   const goalsHash=goalsFingerprint(b),tasks=(await tx.list('task')).filter(t=>t.blockId===b.id&&t.purpose==='blocks-match');
+   for(const task of tasks.filter(t=>active.has(t.state)&&t.blockSnapshot.goalsHash!==goalsHash))await saveTask({...task,assignmentId:randomUUID()},'cancelled','证据或目标已更新，等待重新判断',tx);
+   if(tasks.some(t=>active.has(t.state)&&t.blockSnapshot.goalsHash===goalsHash))return;
    const done=new Set(tasks.filter(t=>t.state==='completed'&&t.blockSnapshot.goalsHash===goalsHash).flatMap(t=>t.blockSnapshot.sources.map(s=>s.key)));
    const preferred=(await tx.list('task')).filter(t=>t.blockId===b.id&&t.purpose==='blocks-research'&&t.state==='completed'&&t.archiveId).map(t=>t.archiveId);
    const batch=rankSources(b,sources.filter(s=>!done.has(s.key)),{preferred}).slice(0,8);if(!batch.length)return;
-   const task={id:randomUUID(),pluginId:'blocks',purpose:'blocks-match',blockId:b.id,type:'note',url:null,autoArchive:false,createdAt:new Date(clock()).toISOString(),deviceId:null,archiveId:null,content:`积木语义匹配：${b.title}`,blockSnapshot:{goalsHash,goals:b.goals,sources:batch}};
+   const task={id:randomUUID(),pluginId:'blocks',purpose:'blocks-match',blockId:b.id,type:'note',url:null,autoArchive:false,createdAt:new Date(clock()).toISOString(),deviceId:null,archiveId:null,content:`积木语义匹配：${b.title}`,blockSnapshot:{evidenceProtocol,goalsHash,goals:b.goals,sources:batch}};
    await saveTask(task,'queued','等待电脑匹配已有资料与记录',tx);
   });
  }
@@ -31,14 +32,15 @@ export function createBlockMatching({store,plugins,saveTask,readSources,assigned
    if(live.state==='completed'){if(fingerprint(live.blockMatchResult)!==fingerprint(result))throw Object.assign(Error('匹配结果已提交'),{status:409});return;}
    if(live.purpose!=='blocks-match'||!['assigned','running','uploading'].includes(live.state))throw Object.assign(Error('匹配任务已停止'),{status:409});
    const b=await tx.getForUpdate('block',live.blockId);
-   if(!b||b.paused||fingerprint([b.goals,b.matchEpoch||0])!==live.blockSnapshot.goalsHash)throw Object.assign(Error('目标已变化或暂停，请重新匹配'),{status:409});
+   if(!b||b.paused||goalsFingerprint(b)!==live.blockSnapshot.goalsHash)throw Object.assign(Error('目标已变化或暂停，请重新匹配'),{status:409});
    for(const m of result.matches){
     const source=live.blockSnapshot.sources.find(s=>s.key===m.sourceKey);
     const current=await tx.get(source.kind==='record'?'capture':'archive',source.kind==='record'?source.sourceId:source.version);
     if(!current||current.deletedAt||source.kind==='record'&&String(current.version)!==source.version||(await tx.get('trash',source.sourceId))?.deletedAt)continue;
     const existing=b.links.find(l=>l.partId===m.partId&&sourceKey(l)===source.key);
     if(existing?.excluded||existing?.origin==='manual')continue;
-    const link={id:existing?.id||randomUUID(),kind:source.kind,sourceId:source.sourceId,version:source.version,title:source.title,partId:m.partId,reason:m.reason,relation:source.coverage!=='full'&&m.relation==='support'?'lead':m.relation,coverage:source.coverage,conditions:m.evidence.map(e=>e.condition),evidence:m.evidence,origin:'semantic',excluded:false};
+    const fileScope=m.relation==='support'&&Array.isArray(source.units)&&m.evidence.every(e=>e.fileSha256);
+    const link={id:existing?.id||randomUUID(),kind:source.kind,sourceId:source.sourceId,version:source.version,title:source.title,partId:m.partId,reason:m.reason,relation:source.coverage!=='full'&&m.relation==='support'&&!fileScope?'lead':m.relation,coverage:fileScope?'full':source.coverage,sourceCoverage:source.coverage,evidenceScope:fileScope?'file':'source',scopeReason:m.scopeReason||null,limitations:source.limitations||[],coverageNote:source.coverageNote||null,evidenceProtocol,conditions:m.evidence.map(e=>e.condition),evidence:m.evidence,origin:'semantic',excluded:false,stale:false};
     if(existing)Object.assign(existing,link);else b.links.push(link);
    }
    b.revision++;b.updatedAt=new Date(clock()).toISOString();b.evaluations.push(evaluate(b,b.updatedAt));await tx.put('block',b);await saveTask({...live,blockMatchResult:result},'completed','语义关联与评价已更新',tx);

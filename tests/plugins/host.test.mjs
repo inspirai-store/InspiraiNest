@@ -109,7 +109,7 @@ test('手机快速加入与实际 Worker 语义结果更新评价，排除后不
  const code=(await request('/api/pairings','POST',{role:'worker'})).body;
  const pair=await fetch(origin+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:code.key,name:'matcher'})}).then(r=>r.json());
  const job=tasks.filter(t=>t.state==='queued').sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).at(-1),assignment=crypto.randomUUID();await app.store.put('task',{...job,deviceId:pair.device.id,assignmentId:assignment,state:'running'});
- const value={protocol:1,matches:[{sourceKey:job.blockSnapshot.sources[0].key,partId:created.goals[0].parts[0].id,relation:'support',reason:'正文明确列举三个运营环节',evidence:[{condition:'明确运营环节',quote:'先验证选题、制作和发布三个环节'}]}]};
+ const value={protocol:1,matches:[{sourceKey:job.blockSnapshot.sources[0].key,partId:created.goals[0].parts[0].id,relation:'support',reason:'正文明确列举三个运营环节',scopeReason:'完整记录正文列出了用户的运营步骤，不作为外部事实核验',evidence:[{unitId:job.blockSnapshot.sources[0].units[0].id,condition:'明确运营环节',quote:'先验证选题、制作和发布三个环节'}]}]};
  const response=await fetch(origin+'/api/blocks/matches/'+job.id,{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/json','X-Task-Assignment':assignment},body:JSON.stringify(value)});
  assert.equal(response.status,200,await response.text());
  const accepted=await fetch(origin+'/api/blocks/matches/'+job.id,{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/json','X-Task-Assignment':assignment},body:JSON.stringify(value)});assert.equal(accepted.status,200,await accepted.text());

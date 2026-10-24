@@ -2,7 +2,7 @@ import fs from 'node:fs';
 const input=JSON.parse(fs.readFileSync('input.json','utf8'));
 if(input.sources){
  const source=input.sources.find(s=>s.text.includes('选题'));
- fs.writeFileSync('matching-result.json',JSON.stringify({protocol:1,matches:source?[{sourceKey:source.key,partId:input.goals[0].parts[0].id,relation:'support',reason:'来源说明了完整运营流程',evidence:[{condition:input.goals[0].parts[0].conditions[0],quote:source.text}]}]:[]}));
+ fs.writeFileSync('matching-result.json',JSON.stringify({protocol:1,matches:source?[{sourceKey:source.key,partId:input.goals[0].parts[0].id,relation:'support',reason:'来源说明了完整运营流程',scopeReason:'引用完整记录描述用户安排，不作为外部验证',evidence:[{condition:input.goals[0].parts[0].conditions[0],unitId:source.units?.[0]?.id,quote:source.units?.length?source.text.slice(source.units[0].start,source.units[0].end):source.text}]}]:[]}));
 }else if(!input.questionCount){
  fs.writeFileSync('plan-result.json',JSON.stringify({protocol:1,stage:'question',reply:'先确定计划的首要范围。',question:{title:'先验证哪个范围？',options:[{id:'small',label:'最小可用方案'},{id:'full',label:'完整蓝图'}]},proposal:null}));
 }else{

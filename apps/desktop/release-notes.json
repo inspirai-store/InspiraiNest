@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.42",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "积木按完整引用文件判断具体条件，保留来源缺口、适用范围及未验证状态。\n研究任务自动上传关联资料和交付笔记，支持续接既有任务。\n保留原有积木、资料、文稿与授权。"
+  },
+  {
     "version": "0.2.41",
     "channel": "stable",
     "publishedAt": null,
