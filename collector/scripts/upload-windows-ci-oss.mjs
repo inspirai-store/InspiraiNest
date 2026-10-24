@@ -65,5 +65,7 @@ try {
   if (process.argv[2] === 'validate') await validate(); else if (process.argv[2] === 'upload') await upload(); else throw new Error('Specify validate or upload');
 } catch (error) {
   // OSS exceptions can include signed request headers. Return a bounded diagnostic.
-  console.error(`Windows CI relay failed: ${error.code || error.name}`); process.exitCode = 1;
+  console.error(`Windows CI relay failed: ${error.code || error.name}`);
+  if (process.argv[2] === 'validate') console.error(error.message);
+  process.exitCode = 1;
 }
