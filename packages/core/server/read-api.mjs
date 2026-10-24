@@ -427,7 +427,16 @@ export function createReadApi({ dataDir, store, browser, publicUrl, authenticate
     const visibleNow=await visible();
     requireValue(visibleNow.has(input.id),'资料已不可见',404);
     const params = new URLSearchParams({start_line:String(input.startLine||1),start_column:String(input.startColumn||0),max_lines:'200'});
-    return {id:input.id,archiveId:archive.id,title:metadata.title,file,...sliceContent(text,params),sourceUrl:metadata.canonical_url||metadata.source_url,coverage_note:metadata.coverage_note,verification_status:metadata.verification_status,omitted:metadata.omitted||[]};
+    return {id:input.id,archiveId:archive.id,title:metadata.title,file,...sliceContent(text,params),sourceUrl:metadata.canonical_url||metadata.source_url,status:metadata.status,collectedAt:metadata.collected_at,coverage_note:metadata.coverage_note,verification_status:metadata.verification_status,omitted:metadata.omitted||[],images:metadata.files.filter(f=>/\.(png|jpe?g|webp|gif)$/i.test(f.path)).map(f=>({file:f.path.slice(prefix.length),sha256:f.sha256,bytes:f.bytes}))};
   }
-  return { handle, refresh, close, searchForCreation, readForCreation };
+  async function mediaForCreation(input){
+    requireValue(input?.kind==='entry'&&typeof input.file==='string','请选择归档图片');
+    const current=(await synchronize()).get(input.id);requireValue(current,'资料不可见',404);
+    const archive=await store.get('archive',input.archiveId);requireValue(archive?.entryId===input.id,'归档版本不存在',404);
+    const mime=/\.png$/i.test(input.file)?'image/png':/\.jpe?g$/i.test(input.file)?'image/jpeg':/\.webp$/i.test(input.file)?'image/webp':/\.gif$/i.test(input.file)?'image/gif':null;
+    requireValue(mime,'仅支持归档图片',415);const prepared=await browser.prepare(archive),metadata=prepared.entry.files.find(f=>f.path===`files/${archive.id}/${input.file}`);requireValue(metadata,'图片不在对应归档版本',404);const bytes=await browser.file(archive,input.file);requireValue(bytes.length<=32*1024*1024,'图片超过32 MiB');requireValue(!metadata.sha256||hash(bytes)===metadata.sha256,'归档图片校验失败',500);
+    requireValue((await visible()).has(input.id),'资料已不可见',404);
+    return {bytes:bytes.toString('base64'),sha256:hash(bytes),mime,name:input.file.split('/').at(-1),sourceUrl:archive.meta.canonical_url||archive.meta.source_url};
+  }
+  return { handle, refresh, close, searchForCreation, readForCreation, mediaForCreation };
 }

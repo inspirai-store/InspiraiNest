@@ -1,11 +1,15 @@
-import {createUpdatePreparation} from './update-safety.mjs';
+// diagnostics-compat-v1
+import {bindBrowserDiagnostics} from './browser-diagnostics.mjs';
 import {scanAgents} from '../../plugins/ai-assistant/worker/agent-install.mjs';
 import {createInventoryScanner} from '../../plugins/ai-assistant/worker/skill-scan.mjs';
 import {trialLoginAction} from './trial-login.mjs';
 import {performEditing} from './editing.mjs';
 import {desktopFrontend,documentURL,desktopPermission} from './frontend-entry.mjs';
 import {appVersion} from '../../packages/core/node/device-identity.mjs';
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
+import { app, clipboard, BrowserWindow, WebContentsView, session, Tray, Menu, nativeImage, ipcMain, shell, screen, dialog, systemPreferences, safeStorage, nativeTheme, powerMonitor } from 'electron';
+import {CaptureBrowser} from './capture-browser.mjs';
+import {createCaptureWindowController} from './capture-window.mjs';
+import {listExternalPages,connectExternalPage} from './capture-external.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -18,6 +22,7 @@ import { OwnerClient } from './owner-client.mjs';
 import { logoutOwnerSession, pairOwnerSession } from './account-session.mjs';
 import { captureRequest } from './capture-client.mjs';
 import electronUpdater from 'electron-updater';
+import {createUpdatePreparation} from './update-safety.mjs';
 import { DesktopUpdater } from './updater.mjs';
 import { RemoteClientUpdate } from './remote-update.mjs';
 import { DesktopSettings } from './settings.mjs';
@@ -54,12 +59,12 @@ const credentialEncryption = process.env.COLLECTOR_DESKTOP_TEST === '1' && proce
   ? { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('fixture:' + value), decryptString: value => value.toString().slice(8) }
   : safeStorage;
 let updatePreparation;
-let owner, updates, remoteUpdates, remoteUpdateTimer, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
-let main, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
+let owner, captureBrowser, updates, remoteUpdates, remoteUpdateTimer, settings, workerSession, loginItem, endingSession = false, updateTimer, initialUpdateTimer, loginController;
+let main, captureWindow, captureWindowController, popover, tray, trayImage, panelController, refreshTimer, clickTimer, quitting = false, exitWhenStopped = false, openingManager = false, managerRevision = 0, dockHideTimer, lastDockHide = 0;
 // Test-only main-process hook; never exposed to the renderer or normal launches.
 let snapshotForTest;
 if (process.env.COLLECTOR_DESKTOP_TEST === '1') globalThis.workerDesktop = () => ({ main, popover, tray, trayImage, updates, owner,
-  loginItem, skillHub,
+  loginItem, skillHub, captureBrowser, captureWindow, captureWindowController,
   checkNativeLoginItem: () => {
     const item = new DesktopLoginItem({ app, name: 'InspiraiNest-Test-' + process.pid });
     try { item.configure(true); const on = item.snapshot(); item.configure(false, { explicit: true }); return { on, off: item.snapshot() }; }
@@ -86,26 +91,27 @@ const frontend=desktopFrontend({directory:here,test:process.env.COLLECTOR_DESKTO
 const managerPageFile=frontend.file,pageURL=frontend.url,compactPageURL=frontend.url;
 const liveWindow = window => Boolean(window && !window.isDestroyed());
 const exiting = () => quitting || endingSession || updates?.snapshot().phase === 'installing';
-function makeWindow(compact = false) {
+function makeWindow(compact = false, capture = false) {
   const window = new BrowserWindow({ width: compact ? 390 : 1240, height: compact ? 350 : 820,
     minWidth: compact ? 390 : 740, minHeight: compact ? 350 : 580,
-    title: compact ? '灵藏 · 状态' : '灵藏 · 桌面工作台', icon: path.join(here, 'icon.png'), backgroundColor: settings.background(), show: false,
+    title: compact ? '灵藏 · 状态' : capture ? '灵藏 · 采集' : '灵藏 · 桌面工作台', icon: path.join(here, 'icon.png'), backgroundColor: settings.background(), show: false,
     frame: !compact, resizable: !compact, skipTaskbar: compact, alwaysOnTop: compact,
     ...(isMac && compact ? { type: 'panel', fullscreenable: false } : {}),
-    webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, ...(capture?{backgroundThrottling:false}:{}) },
   });
   window.setMenu(null);
+  if(capture)window.webContents.on('page-title-updated',event=>{event.preventDefault();window.setTitle('灵藏 · 采集');});
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
   // Clipboard writes support explicit copy buttons in the trusted local UI.
   // Clipboard reads and requests from embedded or external pages remain denied.
-  const permissionAllowed=(contents,permission,details)=>desktopPermission({permission,url:details.requestingUrl,isMainFrame:details.isMainFrame,main:contents===main?.webContents,urlAllowed:pageURL});
+  const permissionAllowed=(contents,permission,details)=>desktopPermission({permission,url:details.requestingUrl,isMainFrame:details.isMainFrame,main:contents===main?.webContents||permission==='clipboard-sanitized-write'&&contents===captureWindow?.webContents,urlAllowed:pageURL});
   window.webContents.session.setPermissionCheckHandler((contents,permission,_origin,details)=>permissionAllowed(contents,permission,details));
   window.webContents.session.setPermissionRequestHandler(async(contents,permission,callback,details)=>{
     if(!permissionAllowed(contents,permission,details)){callback(false);return;}
     try{if(permission==='media'&&isMac)for(const type of details.mediaTypes||[])if(['audio','video'].includes(type)&&!await systemPreferences.askForMediaAccess(type==='audio'?'microphone':'camera')){callback(false);return;}callback(true);}catch{callback(false);}
   });
-  void window.loadFile(managerPageFile,{query:{...(compact?{compact:'1'}:{}),...(isMac?{platform:'darwin'}:{})},hash:compact?frontend.compactRoute:frontend.route});
+  void window.loadFile(managerPageFile,{query:{...(compact?{compact:'1'}:{}),...(capture?{captureWindow:'1'}:{}),...(isMac?{platform:'darwin'}:{})},hash:compact?frontend.compactRoute:capture?'/capture?data=local':frontend.route});
   return window;
 }
 function hideStatus() { if (panelController) panelController.hide(); else if (!exiting() && liveWindow(popover)) popover.hide(); }
@@ -125,7 +131,7 @@ async function openManager() {
   } finally { openingManager = false; }
 }
 function hideDock() {
-  if (!isMac || exiting() || !liveWindow(main)) return;
+  if (!isMac || exiting() || !liveWindow(main) || liveWindow(captureWindow)&&captureWindow.isVisible()) return;
   clearTimeout(dockHideTimer);
   // Electron/macOS can ignore two dock.hide() calls less than a second apart.
   const delay = Math.max(0, lastDockHide + 1100 - Date.now());
@@ -182,11 +188,18 @@ async function perform(action) {
 function trusted(event) {
   const sender = event.senderFrame?.url;
   const expected = event.sender === popover?.webContents ? compactPageURL : pageURL;
-  if (![main?.webContents, popover?.webContents].includes(event.sender) || !sender || documentURL(sender) !== expected || event.senderFrame !== event.sender.mainFrame) throw new Error('不允许的页面');
+  if (![main?.webContents, captureWindow?.webContents, popover?.webContents].includes(event.sender) || !sender || documentURL(sender) !== expected || event.senderFrame !== event.sender.mainFrame) throw new Error('不允许的页面');
 }
 function trustedMain(event) {
   trusted(event);
   if (event.sender !== main?.webContents) throw new Error('此功能只允许在主窗口使用');
+}
+function trustedWorkspace(event) {
+  trusted(event);
+  if(![main?.webContents,captureWindow?.webContents].includes(event.sender))throw Error('此功能只允许在工作窗口使用');
+}
+function publishLibrary(state) {
+  for(const window of [main,captureWindow])if(liveWindow(window))window.webContents.send('library:changed',state);
 }
 async function pairDesktop(input) {
   clientOrigin(input.server);
@@ -196,14 +209,22 @@ async function pairDesktop(input) {
   try {
     return await pairOwnerSession({ input, owner, manager, controller,
       current: () => loginController === controller && !controller.signal.aborted,
-      publish: state => main.webContents.send('library:changed', state) });
+      publish: publishLibrary });
   } catch (error) {
     return { loginError: { code: error.code || '', status: error.status || 0,
       message: controller.signal.aborted ? '登录已取消' : error.message } };
   } finally { if (loginController === controller) loginController = null; }
 }
 function registerIPC() {
-  ipcMain.handle('desktop-editing:perform',(event,action)=>{trustedMain(event);performEditing(main.webContents,action);});
+  ipcMain.handle('desktop-editing:perform',(event,action)=>{trustedWorkspace(event);performEditing(event.sender,action);});
+  ipcMain.handle('capture-window:open',async(event,input)=>{trustedWorkspace(event);await captureWindowController.open(input);});
+  ipcMain.handle('capture-window:main',async(event,input)=>{
+    trustedWorkspace(event);
+    if(event.sender!==captureWindow.webContents||typeof input?.path!=='string'||!/^\/(?:records|writing|settings|blocks|library|creation|executions|tasks)(?:\/[a-zA-Z0-9%_-]+)*$/.test(input.path))throw Error('工作页面无效');
+    main.webContents.send('workspace:navigate',input.path+'?data=local');await openManager();
+  });
+  const captureHandlers={state:()=>captureBrowser.snapshot(),recover:id=>captureBrowser.recover(id),add:url=>captureBrowser.add(url),navigate:input=>captureBrowser.navigate(input),close:id=>captureBrowser.close(id),viewport:input=>captureBrowser.viewport(input),take:id=>captureBrowser.take(id),resume:id=>captureBrowser.resume(id),start:input=>captureBrowser.createTask(input),chooseFile:()=>captureBrowser.chooseFile(),pairBrowser:async()=>{const pairing=await captureBrowser.extension.pairing();clipboard.writeText(pairing.code);return {expiresAt:pairing.expiresAt};},extensionFolder:()=>shell.openPath(path.resolve(here,'../browser-extension')),externalPages:input=>input.endpoint==='extension'?captureBrowser.extension.pages():listExternalPages(input.endpoint),connect:input=>input.endpoint==='extension'?captureBrowser.extension.connect(input):connectExternalPage(captureBrowser,input),preview:id=>captureBrowser.preview(id),read:id=>captureBrowser.read(captureBrowser.page(id)),focus:id=>{const page=captureBrowser.page(id);if(!page.external?.focus)throw Error('浏览器连接已断开');return page.external.focus();}};
+  for(const [name,fn]of Object.entries(captureHandlers))ipcMain.handle('capture-browser:'+name,async(event,input)=>{trusted(event);if(event.sender!==captureWindow.webContents)throw Error('请在独立采集窗口操作');await captureBrowser.syncScope();return fn(input);});
   ipcMain.handle('desktop-settings:get', event => { trusted(event); return settings.snapshot(); });
   ipcMain.handle('desktop-settings:update', (event, input) => { trustedMain(event); return settings.update(input); });
   for (const [name, fn] of Object.entries({
@@ -234,18 +255,18 @@ function registerIPC() {
     capture: input => captureRequest(owner,input),
     status: () => owner.status(), pair: async input => { const result = await pairDesktop(input); return result.loginError ? result : owner.status(); },
     'cancel-login': () => { loginController?.abort(); return true; },
-    logout: () => logoutOwnerSession({ owner, cancelLogin: () => loginController?.abort(), publish: state => main.webContents.send('library:changed', state) }),
-    taskFile: input=>owner.taskFile(input),state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
+    logout: async () => {await captureBrowser.reset();return logoutOwnerSession({ owner, cancelLogin: () => loginController?.abort(), publish: publishLibrary });},
+    taskFile:input=>owner.taskFile(input),state: () => owner.state(), entries: input => owner.entries(input), entry: id => owner.entry(id),
     clientUpdates: input => owner.clientUpdates(input),
     skills: input => owner.skills(input), agents: input => owner.agents(input), market: input => (!input?.provider || input.provider==='skillhub') && ['search','detail','categories'].includes(input?.kind) ? skillHub.request(input) : owner.market(input),
     content: input => owner.content(input), preview: input => owner.preview(input),
     task: input => owner.createTask(input), 'task-action': input => owner.taskAction(input),
     diagnosticTasks:input=>owner.diagnosticTasks(input),taskDiagnostics:id=>owner.taskDiagnostics(id),capabilities:id=>owner.capabilities(id),checkCapabilities:id=>owner.checkCapabilities(id),
-    draft: id => owner.draft(id), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id), renameNode: input => owner.renameNode(input),
+    draft: id => owner.draft(id), evidence:input=>owner.evidence(input), pairing: () => owner.pairing(), revoke: id => owner.revoke(id), removeNode: id => owner.removeNode(id), renameNode: input => owner.renameNode(input),
     trash: () => owner.trash(), remove: id => owner.removeArchive(id), restore: id => owner.restoreArchive(id),
-    download: async input => {
+    download: async (input,event) => {
       const file = await owner.fileBytes(input);
-      const saved = await dialog.showSaveDialog(main, { defaultPath: file.name });
+      const saved = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), { defaultPath: file.name });
       if (saved.canceled || !saved.filePath) return { saved: false };
       fs.writeFileSync(saved.filePath, file.bytes);
       return { saved: true, path: saved.filePath };
@@ -264,14 +285,14 @@ function registerIPC() {
       await shell.openExternal(url.href);
     },
   };
-  const creation=new DesktopCreation({owner,configuration:()=>manager.configuration(),openExternal:url=>shell.openExternal(url)});
+  const creation=new DesktopCreation({owner,configuration:()=>manager.configuration(),openExternal:url=>shell.openExternal(url),writingDirectory:path.join(app.getPath('userData'),'writing'),encryption:credentialEncryption});
   app.on('will-quit',()=>creation.close());
-  for(const name of ['account','login','cancel','request'])ipcMain.handle('creation:'+name,async(event,input)=>{trustedMain(event);return creation[name](input);});
-  for (const [name, fn] of Object.entries(library)) ipcMain.handle(`library:${name}`, async (event, argument) => { trustedMain(event); return fn(argument); });
+  for(const name of ['account','login','cancel','request','writing'])ipcMain.handle('creation:'+name,async(event,input)=>{trustedMain(event);return creation[name](input);});
+  for (const [name, fn] of Object.entries(library)) ipcMain.handle(`library:${name}`, async (event, argument) => { ['pair','cancel-login','logout'].includes(name)?trustedMain(event):trustedWorkspace(event); return fn(argument,event); });
   for (const [name, fn] of Object.entries({
     status: () => updates.snapshot(), check: () => updates.check(),
-    download: input => updates.download(input), install: () => updates.install(), setChannel: input=>updates.setChannel(input), notes:()=>updates.notes(), records:()=>updates.records(),
-  })) ipcMain.handle(`updates:${name}`, async (event,input) => { trusted(event); if (event.sender !== main?.webContents) throw new Error('请在主窗口管理客户端更新'); return fn(input); });
+    download: input=>updates.download(input), install:()=>updates.install(),setChannel:input=>updates.setChannel(input),notes:()=>updates.notes(),records:()=>updates.records(),
+  })) ipcMain.handle(`updates:${name}`, async (event,input)=>{trusted(event);if(event.sender!==main?.webContents)throw new Error('请在主窗口管理客户端更新');return fn(input); });
 }
 async function menuAction(action) {
   try { await perform(action); }
@@ -280,7 +301,7 @@ async function menuAction(action) {
     await dialog.showMessageBox(main, { type: 'info', message: error.message });
   }
 }
-const publishWorkerState=createWorkerStatePublisher(()=>[main,popover]);
+const publishWorkerState=createWorkerStatePublisher(()=>[main,captureWindow,popover]);
 function refreshTray() {
   if (!tray || quitting) return;
   if (!snapshotForTest) workerSession?.observe();
@@ -325,6 +346,7 @@ else {
   app.on('second-instance', (_event, argv) => { if(argv.includes('--remote-update'))void remoteUpdates?.tick();else if (!argv.includes('--startup')) openManager(); });
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
+    if(liveWindow(captureWindow)&&captureWindow.isVisible()&&captureWindow.isFocused())return;
     // A status panel may activate this accessory app without requesting its manager.
     if (!exiting() && !openingManager && (!isMac || !liveWindow(popover) || !popover.isVisible())) openManager();
   });
@@ -341,7 +363,7 @@ else {
     owner = new OwnerClient({ file: path.join(app.getPath('userData'), 'owner-auth.json'),
       workerServer: () => manager.snapshot().paired ? manager.snapshot().server : '', workerConfiguration: () => manager.configuration(), encryption: credentialEncryption, identityDir: manager.dataDir });
     updates = new DesktopUpdater({ app, version:app.isPackaged?app.getVersion():appVersion(), stateFile:path.join(app.getPath('userData'),'desktop-updates.json'),releaseNotes:JSON.parse(fs.readFileSync(new URL('./release-notes.json',import.meta.url),'utf8')), manager: { snapshot: () => manager.snapshot(), control: () => workerSession.drainForUpdate() }, updater: electronUpdater.autoUpdater,
-      beforePrepare:()=>updatePreparation.prepare(), beforeInstall:()=>remoteUpdates?.beforeInstall() });
+      beforePrepare:()=>updatePreparation.prepare(),beforeInstall:()=>remoteUpdates?.beforeInstall() });
     remoteUpdates = new RemoteClientUpdate({file:path.join(app.getPath('userData'),'remote-client-update.json'),version:updates.snapshot().version,updater:updates,configuration:()=>manager.configuration(),recoverWorker:()=>workerSession.recoverUpdate(),
       request:async(route,method='GET',value)=>{
         if(!/^\/api\/client-updates\/(runtime|inbox|operations\/[a-f0-9]{64}\/result)$/.test(route))throw new Error('更新请求无效');
@@ -349,10 +371,14 @@ else {
         const response=await fetch(clientOrigin(config.server)+route,{method,headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'},body:value===undefined?undefined:JSON.stringify(value),redirect:'error',signal:AbortSignal.timeout(8000)});
         const result=await response.json();if(!response.ok)throw Object.assign(new Error('远程更新请求失败'),{status:response.status});return result;
       } });
-    main = makeWindow(); popover = makeWindow(true);
-    updatePreparation=createUpdatePreparation({ipcMain,windows:()=>BrowserWindow.getAllWindows().filter(w=>[main,popover].includes(w)||w.webContents.getURL().includes('/desktop/frontend/dist/'))});
+    main = makeWindow(); popover = makeWindow(true);updatePreparation=createUpdatePreparation({ipcMain,windows:()=>BrowserWindow.getAllWindows().filter(w=>[main,popover].includes(w)||w.webContents.getURL().includes('/desktop/frontend/dist/'))}); captureWindow=makeWindow(false,true);
+    captureWindowController=createCaptureWindowController({window:captureWindow,exiting});
+    captureWindow.on('hide',()=>{if(!liveWindow(main)||!main.isVisible())hideDock();});
+    captureBrowser=new CaptureBrowser({window:captureWindow,WebContentsView,session,dataDir:manager.dataDir,owner,configuration:()=>manager.configuration(),dialog});
+    bindBrowserDiagnostics(captureBrowser,manager);
+    captureBrowser.on('changed',state=>{if(liveWindow(captureWindow))captureWindow.webContents.send('capture-browser:changed',state);});
     settings.on('changed', value => {
-      for (const window of [main, popover]) if (window && !window.isDestroyed()) {
+      for (const window of [main, captureWindow, popover]) if (window && !window.isDestroyed()) {
         window.setBackgroundColor(settings.background());
         window.webContents.send('desktop-settings:changed', value);
       }

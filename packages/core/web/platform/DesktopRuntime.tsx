@@ -7,7 +7,7 @@ import type {TaskBridge} from '../tasks/client';
 import {useWorkerState} from './useWorkerState';
 import type {WorkerSnapshot} from './worker-subscription';
 export type {WorkerSnapshot} from './worker-subscription';
-declare global {interface Window {worker?:{snapshot():Promise<WorkerSnapshot>;onChanged?(callback:(state:WorkerSnapshot)=>void):()=>void;action?(action:string):Promise<unknown>;resourceLocation?(input:{kind:'agent';agent:string}|{kind:'skill';skillId:string}):Promise<unknown>;skillConfig?(agent:string):Promise<unknown>;trial?(action:'status'|'login'):Promise<{login?:string;opened?:boolean;executionMode?:'local-agent';reason?:string}>};}}
+declare global {interface Window {worker?:{onNavigate?(callback:(path:string)=>void):()=>void;snapshot():Promise<WorkerSnapshot>;onChanged?(callback:(state:WorkerSnapshot)=>void):()=>void;action?(action:string):Promise<unknown>;resourceLocation?(input:{kind:'agent';agent:string}|{kind:'skill';skillId:string}):Promise<unknown>;skillConfig?(agent:string):Promise<unknown>;trial?(action:'status'|'login'):Promise<{login?:string;opened?:boolean;executionMode?:'local-agent';reason?:string}>};}}
 function useRuntimeData(){
  const {session}=useLibrarySession(),cache=useQueryClient(),bridge=window.library as typeof window.library&Partial<TaskBridge>;
  const client=useMemo(()=>new TaskClient({status:()=>bridge?.status()??Promise.resolve({paired:false,server:''}),state:()=>{if(!bridge?.state)throw Error('任务接口不可用');return bridge.state();},draft:id=>{if(!bridge?.draft)throw Error('任务预览接口不可用');return bridge.draft(id);},taskAction:input=>{if(!bridge?.taskAction)throw Error('任务操作接口不可用');return bridge.taskAction(input);}}),[bridge,session]);

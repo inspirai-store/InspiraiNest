@@ -4,9 +4,9 @@ export const normalizeCreation=value=>String(value??'').normalize('NFKC').toLowe
 export function creationRoute(route,method='GET') {
   if(typeof route!=='string'||route.includes('#')||route.includes('..'))return false;
   const pathname=route.split('?')[0],root='/api/creation/v1';
-  if(method==='GET')return [root+'/sessions',root+'/nodes'].includes(pathname)||/^\/api\/creation\/v1\/sessions\/[a-f0-9-]{36}(?:\/(?:events|search|source|versions))?$/.test(pathname);
+  if(method==='GET')return [root+'/sessions',root+'/nodes'].includes(pathname)||/^\/api\/creation\/v1\/sessions\/[a-f0-9-]{36}(?:\/(?:events|search|source|source-media|versions|workflow|runs))?$/.test(pathname);
   if(method==='POST')return pathname===root+'/sessions'||/^\/api\/creation\/v1\/sessions\/[a-f0-9-]{36}\/(?:turns|stop|move|prepare|approve|retry-publication)$/.test(pathname);
-  return method==='PUT'&&/^\/api\/creation\/v1\/sessions\/[a-f0-9-]{36}\/document$/.test(pathname);
+  return method==='PUT'&&/^\/api\/creation\/v1\/sessions\/[a-f0-9-]{36}\/(?:document|workflow)$/.test(pathname);
 }
 export function creationText(value,label,max=100000) {
   requireValue(typeof value==='string'&&value.length<=max,`${label}无效或过长`);return value;

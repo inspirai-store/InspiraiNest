@@ -1,3 +1,4 @@
+import {CapturePage} from '../../packages/core/web/capture/CapturePage';
 import {ExecutionRecords} from '../../packages/core/web/diagnostics/ExecutionRecords';
 import {CreationPage,CreationSidebar} from '../../plugins/writing/web/creation/CreationPage';
 import {webPlugins} from '../../plugins/registry.web';
@@ -119,11 +120,14 @@ function SessionRoutes({children}:{children:import('react').ReactNode}){return <
 export function App() {
   const updateNavigate=useNavigate(),updateLocation=useLocation(),updateSearch=useRef(updateLocation.search);updateSearch.current=updateLocation.search;
   useEffect(()=>updateBridge()?.onOpen?.(()=>updateNavigate('/settings/updates'+updateSearch.current,{state:{settingsFocus:'content',updateCheckRequest:Date.now()}})),[updateNavigate]);
+  useEffect(()=>window.worker?.onNavigate?.(path=>updateNavigate(path)),[updateNavigate]);
+  useEffect(()=>window.captureBrowser?.onNavigate?.(path=>updateNavigate(path)),[updateNavigate]);
   return <QueryClientProvider client={queryClient}><UiStateProvider><SettingsProvider><SessionRoutes><PluginProvider><PluginViewsProvider value={webPlugins}><PluginProviders><InteractionProvider><Routes>
     <Route path="/settings/nodes/:nodeId" element={<SettingsPage/>}/>
     <Route path="/settings/updates/:updateNodeId" element={<SettingsPage/>}/>
     {webPlugins.flatMap(plugin=>(plugin.settings??[]).filter(item=>item.path).map(item=><Route key={plugin.id+item.id} path={'/settings/'+item.path} element={<SettingsPage/>}/>))}
     <Route path="/settings/*" element={<SettingsPage/>}/>
+    <Route path="/capture" element={<CapturePage/>} />
     <Route path="/status" element={<StatusPanel/>} />
     {webPlugins.flatMap(plugin=>(plugin.routes??[]).map(route=><Route key={plugin.id+route.path} path={route.path} element={<PluginRoute pluginId={plugin.id} Component={route.Component}/>}/>))}
     <Route path="/executions" element={<ExecutionRecords/>}/><Route path="/creation" element={<CreationPage/>}/><Route path="/tasks" element={<TasksPage/>} />

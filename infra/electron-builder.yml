@@ -1,6 +1,7 @@
 appId: store.inspirai.library.worker
 productName: InspiraiNest
 asar: false
+afterPack: ./tooling/releases/package-cli.cjs
 directories:
   app: .
   output: artifacts/desktop
@@ -14,6 +15,9 @@ files:
   - apps/desktop/*.html
   - apps/desktop/*.css
   - apps/desktop/*.png
+  - apps/browser-extension/**
+  - from: apps/browser-extension
+    to: browser-extension
   - apps/desktop/vendor/**
   - apps/desktop/frontend/dist/**
   - apps/web/public/**
@@ -54,6 +58,8 @@ mac:
     - zip
     - dmg
   artifactName: InspiraiNest-v${version}-macOS-${arch}.${ext}
+  binaries:
+    - Contents/Resources/app/bin/lingnest
   hardenedRuntime: true
   entitlements: apps/desktop/entitlements.mac.plist
   entitlementsInherit: apps/desktop/entitlements.mac.plist

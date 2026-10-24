@@ -5,8 +5,9 @@ const active=new Set(['queued','assigned','running','uploading','waiting_action'
 export function createBlockMatching({store,plugins,saveTask,readSources,assigned,authenticate,checkAssignment,body,send,clock=Date.now}){
  async function scan(){
   if(!await plugins.enabled('blocks'))return;
+  const blocks=(await store.list('block')).filter(b=>!b.paused);if(!blocks.length)return;
   const sources=await readSources();
-  for(const row of await store.list('block'))await store.transaction(async tx=>{
+  for(const row of blocks)await store.transaction(async tx=>{
    await plugins.assertEnabled('blocks',tx,true);const b=await tx.getForUpdate('block',row.id);if(!b||b.paused)return;
    const keys=new Set(sources.map(s=>s.key));let invalidated=false;
    for(const l of b.links){const stale=!keys.has(sourceKey(l));if(Boolean(l.stale)!==stale){l.stale=stale;invalidated=true;}}

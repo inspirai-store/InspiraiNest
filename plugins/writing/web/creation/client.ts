@@ -1,10 +1,11 @@
+import type {RichText} from './richText.mjs';
 export type ContextRef={kind:'record'|'entry'|'text';id?:string;version?:number;archiveId?:string;title?:string;selectedText?:string;text?:string;file?:string;startLine?:number;[key:string]:unknown};
-export type CreationDocument={id:string;revision:number;title:string;markdown:string;citations:ContextRef[];media:any[];updatedAt:string};
+export type CreationDocument={id:string;revision:number;title:string;markdown:string;citations:ContextRef[];media:any[];richText?:RichText;typography?:import('./TypographyPanel').ArticleTypography;updatedAt:string};
 export type CreationEvent={sequence:number;type:string;at:string;data:{turnId?:string;instruction?:string;text?:string;value?:{items?:ContextRef[];coverage?:unknown;candidateDocument?:{title:string;markdown:string}}}};
 export type Publication={id:string;state:string;documentRevision:number;digest:string;error?:string;preview?:{origin:string;article_id:string;revision_id:string;content_sha256:string;source:string;locale:string;article:{title:string;markdown:string;media?:unknown[];[key:string]:unknown};published?:unknown};published?:{url:string;revisionId:string}};
 export type CreationSession={id:string;title:string;executorDeviceId:string;contextRefs:ContextRef[];sequence:number;document:CreationDocument;turns:{id:string;state:string;instruction:string}[];publication:Publication|null};
 type NativeBridge={call(action:string,input?:unknown):Promise<any>};
-declare global {interface Window {creation?:{request(input:unknown):Promise<{status:number;json:any}>;account():Promise<any>;login():Promise<{loginId:string}>;cancel(input:unknown):Promise<unknown>};captureBridge?:NativeBridge}}
+declare global {interface Window {creation?:{writing?(input:unknown):Promise<any>;request(input:unknown):Promise<{status:number;json:any}>;account():Promise<any>;login():Promise<{loginId:string}>;cancel(input:unknown):Promise<unknown>};captureBridge?:NativeBridge}}
 export class CreationClient {
   epoch=0;private pending=new Map<string,string>();
   invalidate(){this.epoch++;this.pending.clear();}

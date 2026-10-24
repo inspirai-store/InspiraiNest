@@ -126,6 +126,11 @@ export const manifests = [
           "label": "写作",
           "path": "/writing",
           "icon": "Feather"
+        },
+        {
+          "id": "creation",
+          "label": "文稿",
+          "path": "/creation"
         }
       ],
       "settings": true,
