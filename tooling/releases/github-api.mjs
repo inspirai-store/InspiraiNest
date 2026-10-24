@@ -11,3 +11,10 @@ export function githubJson(route,{repository='inspirai-store/InspiraiNest',execu
  }
  assert.fail('GitHub API read failed after three attempts: '+route);
 }
+
+// A failed finalizer can be rerun without rebuilding/signing packages. GitHub's
+// default latest-attempt jobs view omits successful jobs from prior attempts.
+export function successfulJob(jobs,name){
+ const job=jobs.filter(j=>j.name===name&&j.conclusion==='success').sort((a,b)=>b.id-a.id)[0];
+ assert(job,name+' must finish successfully');return job;
+}

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileDigest,origin,targets,preparePublication,readPublic,verifyPublic} from './desktop-publication.mjs';
-import {githubJson} from './github-api.mjs';
+import {githubJson,successfulJob} from './github-api.mjs';
 
 const repo='inspirai-store/InspiraiNest',root=path.resolve(import.meta.dirname,'../..');
 const mode=process.argv[2]||'audit',work=path.resolve(process.env.PUBLICATION_WORK||'artifacts/desktop-publication');
@@ -19,7 +19,7 @@ function trustedRun(id,commit,workflow,jobName){
  assert.match(String(id),/^\d+$/);assert.match(commit,/^[a-f0-9]{40}$/);const info=gh('actions/runs/'+id);assert.equal(info.head_repository.full_name,repo);assert.equal(info.head_branch,'main');assert.equal(info.head_sha,commit);assert.equal(info.path,workflow);
  const current=String(id)===process.env.GITHUB_RUN_ID;assert(info.conclusion==='success'||(current&&info.event==='workflow_dispatch'&&info.status==='in_progress'));
  assert.equal(spawnSync('git',['merge-base','--is-ancestor',commit,'HEAD'],{cwd:root}).status,0);
- const jobs=gh(`actions/runs/${id}/jobs?per_page=100`).jobs,job=jobs.find(j=>j.name===jobName);assert.equal(job?.conclusion,'success',jobName+' must finish successfully');return job;
+ const jobs=gh(`actions/runs/${id}/jobs?filter=all&per_page=100`).jobs;return successfulJob(jobs,jobName);
 }
 async function download(url,file,expected){
  const u=new URL(url,origin);assert.equal(u.origin,origin);const r=await fetch(u,{redirect:'error',headers:{'accept-encoding':'identity'}});assert(r.ok);const out=fs.createWriteStream(file),hash=createHash('sha256');let size=0;

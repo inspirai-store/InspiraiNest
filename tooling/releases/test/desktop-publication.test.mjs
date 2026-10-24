@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';import yaml from 'js-yaml';
 import {digest,targets,preparePublication,verifyPublic,unsignedPE} from '../desktop-publication.mjs';
-import {githubJson} from '../github-api.mjs';
+import {githubJson,successfulJob} from '../github-api.mjs';
 import {clientDownload} from '../../../services/api/modules/client-download.mjs';
 function fixture(t,version='0.2.33'){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-publication-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const input=path.join(root,'input');fs.mkdirSync(input);const feeds={windows:[],macos:[]};
@@ -39,4 +39,9 @@ test('the actual release handler serves consistent feeds, packages, hashes and r
 test('transient GitHub EOF retries reads, but exhaustion remains a visible release failure',()=>{
  let calls=0;const value=githubJson('actions/runs/1',{execute:(exe,args)=>{assert.equal(exe,'gh');assert.deepEqual(args,['api','repos/inspirai-store/InspiraiNest/actions/runs/1']);return ++calls<3?{status:1,stderr:'EOF'}:{status:0,stdout:'{"id":1}'};},pause:()=>{}});assert.equal(calls,3);assert.equal(value.id,1);
  assert.throws(()=>githubJson('actions/runs/1',{execute:()=>({status:1}),pause:()=>{}}),/three attempts/);
+});
+
+test('retrying the finalizer keeps the successful signing attempt instead of rebuilding',()=>{
+ const jobs=[{id:1,name:'signed-macos',conclusion:'success',run_attempt:1},{id:2,name:'synchronize',conclusion:'failure',run_attempt:1},{id:3,name:'synchronize',conclusion:null,run_attempt:2}];
+ assert.equal(successfulJob(jobs,'signed-macos').id,1);assert.throws(()=>successfulJob(jobs,'worker-windows'),/must finish/);
 });
