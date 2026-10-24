@@ -55,6 +55,17 @@ test('新规划协议筛选覆盖旧 Worker 与 capture 入口白名单',()=>{
  const id=randomUUID();for(const input of [{route:'/api/blocks/plans'},{route:'/api/blocks/plans',method:'POST'},{route:'/api/blocks/plans/'+id},{route:'/api/blocks/plans/'+id+'/turns',method:'POST'},{route:'/api/blocks/'+id+'/research',method:'POST'}])assert.doesNotThrow(()=>validateCaptureRequest(input));
  assert.throws(()=>validateCaptureRequest({route:'/api/blocks/plans/results/'+id,method:'POST'}),/not allowed/);
 });
+test('真实服务冻结研究正文与计划，新研究协议经心跳后才能领取',async t=>{
+ const f=await setup(t),at=new Date().toISOString(),id=randomUUID();
+ await f.app.store.put('capture',{id:'rea-source',version:1,text:'REA 原始研究记录，仍需补充能力边界。',attachments:[],createdAt:at,updatedAt:at});
+ const b={id,revision:1,title:'REA 研究',paused:false,researchEnabled:false,links:[],evaluations:[],createdAt:at,goals:[{id:'g',title:'REA 能力',output:'product',parts:[{id:'p',title:'能力边界',conditions:['提供能力边界证据'],dependsOn:[]}]}],collectionPlan:[{partId:'p',existing:['REA 原始研究记录'],external:['https://github.com/morluto/rea']}]};await f.app.store.put('block',b);
+ assert.equal((await f.request('/api/blocks/'+id+'/research','POST',{revision:1,enabled:true})).status,200);
+ const wait=async purpose=>{for(let i=0;i<60;i++){const task=(await f.app.store.list('task')).find(t=>t.blockId===id&&t.purpose===purpose);if(task)return task;await new Promise(r=>setTimeout(r,20));}assert.fail('任务未创建：'+purpose);};
+ await wait('blocks-match');const match=await f.claim(f.worker);assert.equal(match.purpose,'blocks-match');assert.equal((await f.request('/api/blocks/matches/'+match.id,'POST',{protocol:1,matches:[]},f.worker,match.assignmentId)).status,200);
+ await wait('blocks-research');assert.equal(await f.claim(f.worker),null,'旧节点不能吞掉带研究快照的任务');
+ await api(f.worker,'/api/heartbeat','POST',{capabilities:['note'],agents:['codex'],blocksProtocol:1,blocksResearchProtocol:1});
+ const research=await f.claim(f.worker);assert.equal(research.purpose,'blocks-research');assert.equal(research.blockResearchSnapshot.sources[0].sourceId,'rea-source');assert.match(research.blockResearchSnapshot.sources[0].text,/原始研究记录/);assert.match(research.content,/github.com\/morluto\/rea/);
+});
 test('关闭插件保留计划，拒绝继续规划但可恢复读取',async t=>{
  const f=await setup(t),p=(await f.create()).value;await f.request('/api/tasks/'+p.taskId+'/cancel','POST',{});const config=(await f.request('/api/plugins')).value;assert.equal((await f.request('/api/plugins/blocks','PUT',{revision:config.revision,enabled:false})).status,200);assert.equal((await f.read(p.id)).brief,p.brief);assert.equal((await f.change(await f.read(p.id),'turns',{message:'继续'})).status,409);assert.ok(await f.app.store.get('block-plan',p.id));
 });

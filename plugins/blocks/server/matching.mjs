@@ -1,8 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {fingerprint,sourceKey,validateMatches} from '../protocol/matching.mjs';
 import {evaluate} from '../protocol/model.mjs';
+import {rankSources} from '../protocol/research.mjs';
 const active=new Set(['queued','assigned','running','uploading','waiting_action']);
-export function createBlockMatching({store,plugins,saveTask,readSources,assigned,authenticate,checkAssignment,body,send,clock=Date.now}){
+export function createBlockMatching({store,plugins,saveTask,readSources,assigned,authenticate,checkAssignment,body,send,onChanged=()=>{},clock=Date.now}){
  async function scan(){
   if(!await plugins.enabled('blocks'))return;
   const blocks=(await store.list('block')).filter(b=>!b.paused);if(!blocks.length)return;
@@ -15,7 +16,8 @@ export function createBlockMatching({store,plugins,saveTask,readSources,assigned
    const goalsHash=fingerprint([b.goals,b.matchEpoch||0]),tasks=(await tx.list('task')).filter(t=>t.blockId===b.id&&t.purpose==='blocks-match');
    if(tasks.some(t=>active.has(t.state)))return;
    const done=new Set(tasks.filter(t=>t.state==='completed'&&t.blockSnapshot.goalsHash===goalsHash).flatMap(t=>t.blockSnapshot.sources.map(s=>s.key)));
-   const batch=sources.filter(s=>!done.has(s.key)).slice(0,8);if(!batch.length)return;
+   const preferred=(await tx.list('task')).filter(t=>t.blockId===b.id&&t.purpose==='blocks-research'&&t.state==='completed'&&t.archiveId).map(t=>t.archiveId);
+   const batch=rankSources(b,sources.filter(s=>!done.has(s.key)),{preferred}).slice(0,8);if(!batch.length)return;
    const task={id:randomUUID(),pluginId:'blocks',purpose:'blocks-match',blockId:b.id,type:'note',url:null,autoArchive:false,createdAt:new Date(clock()).toISOString(),deviceId:null,archiveId:null,content:`积木语义匹配：${b.title}`,blockSnapshot:{goalsHash,goals:b.goals,sources:batch}};
    await saveTask(task,'queued','等待电脑匹配已有资料与记录',tx);
   });
@@ -40,7 +42,7 @@ export function createBlockMatching({store,plugins,saveTask,readSources,assigned
     if(existing)Object.assign(existing,link);else b.links.push(link);
    }
    b.revision++;b.updatedAt=new Date(clock()).toISOString();b.evaluations.push(evaluate(b,b.updatedAt));await tx.put('block',b);await saveTask({...live,blockMatchResult:result},'completed','语义关联与评价已更新',tx);
-  });send(res,200,{saved:true});return true;
+  });onChanged();send(res,200,{saved:true});return true;
  }
  return {scan,handle};
 }

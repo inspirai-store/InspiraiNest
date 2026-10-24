@@ -12,7 +12,7 @@ export function supportsWritingTask(task, device) {
   return version === 1 && device.writingProtocol === 1;
 }
 
-export function supportsBlocksTask(task,device){return task.pluginId!=='blocks'||device.blocksProtocol===1&&(task.purpose!=='blocks-plan'||device.blocksPlanningProtocol===1);}
+export function supportsBlocksTask(task,device){return task.pluginId!=='blocks'||device.blocksProtocol===1&&(task.purpose!=='blocks-plan'||device.blocksPlanningProtocol===1)&&(!task.blockResearchSnapshot||device.blocksResearchProtocol===1);}
 
 // A specified computer is preferred on the first attempt. Once it cannot finish,
 // route to another authorized computer without changing submission identity.
