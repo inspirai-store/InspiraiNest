@@ -117,6 +117,17 @@ class ConfigurationTests(unittest.TestCase):
         for info in [share, app]:
             self.assertFalse(info["NSAppTransportSecurity"]["NSAllowsArbitraryLoads"])
 
+    def test_mixed_share_representations_do_not_require_every_offered_type(self):
+        with (ROOT / "Config/Share-Info.plist").open("rb") as file:
+            rule = plistlib.load(file)["NSExtension"]["NSExtensionAttributes"]["NSExtensionActivationRule"]
+        # Apple's version 1 excludes a text/URL provider that also offers an image.
+        # Version 2 accepts supported alternatives without claiming binary import.
+        self.assertEqual(rule.get("NSExtensionActivationDictionaryVersion", 1), 2)
+        self.assertTrue(rule["NSExtensionActivationSupportsText"])
+        self.assertGreater(rule["NSExtensionActivationSupportsWebURLWithMaxCount"], 0)
+        for key in ["NSExtensionActivationSupportsImageWithMaxCount", "NSExtensionActivationSupportsMovieWithMaxCount", "NSExtensionActivationSupportsFileWithMaxCount"]:
+            self.assertNotIn(key, rule)
+
     def test_backend_contract_still_matches_client_assumptions(self):
         server = (ROOT.parents[1] / "services/api/server.mjs").read_text(encoding="utf-8")
         for contract in ["text(input.key, 'pairing key', 200)", "text(input.name, 'device name', 100)", "input.content.length <= 10000", "input.autoArchive ?? true", "t.submissionId === submissionId", "Path=/library/; HttpOnly; Secure; SameSite=Strict", "awaiting_review"]:

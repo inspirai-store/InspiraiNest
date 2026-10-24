@@ -21,6 +21,23 @@ final class ShareCaptureTests: XCTestCase {
     }
 
     @MainActor
+    func testOneProviderOfferingURLAndPreviewImageKeepsURL() async throws {
+        let link = "https://b23.tv/mixed-provider"
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.url.identifier, visibility: .all) { completion in
+            completion(Data(link.utf8), nil); return nil
+        }
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            completion(Data(), nil); return nil
+        }
+        let item = NSExtensionItem()
+        item.attachments = [provider]
+        let captured = try await ShareCapture.read([item])
+        XCTAssertTrue(captured.parts.contains { $0.kind == "url" && $0.value == link })
+        XCTAssertEqual(captured.omittedAttachments, 1)
+    }
+
+    @MainActor
     func testImageOnlyShareDoesNotPretendToCaptureContent() async {
         let item = NSExtensionItem()
         item.attachments = [NSItemProvider(item: NSData(), typeIdentifier: UTType.jpeg.identifier)]

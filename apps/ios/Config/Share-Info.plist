@@ -18,6 +18,7 @@
     <key>NSExtensionAttributes</key><dict>
       <key>NSExtensionJavaScriptPreprocessingFile</key><string>Preprocess</string>
       <key>NSExtensionActivationRule</key><dict>
+        <key>NSExtensionActivationDictionaryVersion</key><integer>2</integer>
         <key>NSExtensionActivationSupportsText</key><true/>
         <key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>100</integer>
         <key>NSExtensionActivationSupportsWebPageWithMaxCount</key><integer>100</integer>
