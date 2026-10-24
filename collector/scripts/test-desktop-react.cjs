@@ -18,7 +18,7 @@ const expectedVersion=require('../package.json').version;
  try{
   await f.launch();await f.app.evaluate(()=>globalThis.workerDesktop().main.setContentSize(1240,820));
   await f.check('packaged React entry, resources, restricted IPC and compact window',async()=>{
-   assert.deepEqual(await f.page.getByRole('navigation',{name:'主导航'}).getByRole('button').allTextContents(),['记录','资料库','设置']);
+   assert.deepEqual(await f.page.getByRole('navigation',{name:'主导航'}).getByRole('button').allTextContents(),['记录','资料库','采集','设置']);
    assert.equal(await f.page.locator('iframe').count(),0,'record iframe removed');
    const appPath=await f.app.evaluate(({app})=>app.getAppPath());assert.equal(JSON.parse(fs.readFileSync(path.join(appPath,'package.json'))).version,expectedVersion);
    for(const file of ['desktop/frontend/dist/index.html','desktop/preload.cjs','src/record-document.mjs','src/task-routing.mjs','src/writing-protocol.mjs','src/writing-worker.mjs','skills/writing-workshop/SKILL.md','skills/writing-workshop/references/protocol.md'])assert.ok(fs.existsSync(path.join(appPath,resourceRelative(file))),file);
