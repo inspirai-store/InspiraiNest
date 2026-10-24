@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBlockScheduler} from '../../plugins/blocks/server/scheduler.mjs';
 import {createBlockMatching} from '../../plugins/blocks/server/matching.mjs';
-import {fingerprint} from '../../plugins/blocks/protocol/matching.mjs';
+import {fingerprint,goalsFingerprint} from '../../plugins/blocks/protocol/matching.mjs';
 import {rankSources} from '../../plugins/blocks/protocol/research.mjs';
 import {supportsBlocksTask} from '../../packages/core/node/task-routing.mjs';
 import fs from 'node:fs';
@@ -27,19 +27,19 @@ test('相关来源优先且不遗漏无关资料，REA 不误命中 create',asyn
 });
 test('完成首批后研究不被旧匹配队列阻塞，冻结正文与计划且旧节点不得领取',async()=>{
  const store=memory(),b=block();await store.put('block',b);
- const match={id:'m',blockId:b.id,purpose:'blocks-match',state:'completed',blockSnapshot:{goalsHash:fingerprint([b.goals,0]),sources:[]}};await store.put('task',match);await store.put('task',{...match,id:'next',state:'queued'});
+ const match={id:'m',blockId:b.id,purpose:'blocks-match',state:'completed',blockSnapshot:{goalsHash:goalsFingerprint(b),sources:[]}};await store.put('task',match);await store.put('task',{...match,id:'next',state:'queued'});
  const sources=[{kind:'entry',sourceId:'case',version:'v1',title:'REA 案例',text:'实际保存的正文',coverage:'full',sourceUrl:'https://example.org/case'}];
  const scheduler=createBlockScheduler({store,plugins,saveTask,readSources:async()=>sources,clock:()=>Date.parse('2026-10-25T00:00:00Z')});await scheduler.tick();await scheduler.tick();
  const task=(await store.list('task')).find(t=>t.purpose==='blocks-research');assert.ok(task);assert.equal((await store.list('task')).filter(t=>t.purpose==='blocks-research').length,1);
- assert.equal(task.blockResearchSnapshot.sources[0].text,'实际保存的正文');assert.match(task.content,/github.com\/morluto\/rea/);assert.deepEqual(task.blockResearchSnapshot.part.conditions,b.goals[0].parts[0].conditions);
- assert.equal(supportsBlocksTask(task,{blocksProtocol:1}),false);assert.equal(supportsBlocksTask(task,{blocksProtocol:1,blocksResearchProtocol:1}),true);
+ assert.equal(task.blockResearchSnapshot.sources[0].text,'实际保存的正文');assert.match(task.blockResearchSnapshot.collectionPlan.external[0],/github.com\/morluto\/rea/);assert.deepEqual(task.blockResearchSnapshot.part.conditions,b.goals[0].parts[0].conditions);
+ assert.equal(supportsBlocksTask(task,{blocksProtocol:1}),false);assert.equal(supportsBlocksTask(task,{blocksProtocol:1,blocksResearchProtocol:2}),true);
 });
 test('新资料经匹配取得进展后同日继续下一缺口，无进展则退避且不重复创建',async()=>{
  const store=memory(),b=block();await store.put('block',b);let time=Date.parse('2026-10-25T00:00:00Z');
  const scheduler=createBlockScheduler({store,plugins,saveTask,clock:()=>time});await scheduler.tick();const first=(await store.list('task'))[0];
  await store.put('archive',{id:'v1',entryId:'research',meta:{status:'archived'}});await store.put('task',{...first,state:'completed',archiveId:'v1'});await scheduler.tick();assert.equal((await store.list('task')).length,1);
  let live=await store.get('block','b');live.links=[{id:'proof',kind:'entry',sourceId:'research',version:'v1',partId:'p',relation:'support',coverage:'full',conditions:['有依据的范围']}];await store.put('block',live);
- await store.put('task',{id:'m',blockId:'b',purpose:'blocks-match',state:'completed',blockSnapshot:{goalsHash:fingerprint([b.goals,0]),sources:[{version:'v1'}]}});time+=1000;await scheduler.tick();
+ await store.put('task',{id:'m',blockId:'b',purpose:'blocks-match',state:'completed',blockSnapshot:{goalsHash:goalsFingerprint(b),sources:[{version:'v1'}]}});time+=1000;await scheduler.tick();
  const research=(await store.list('task')).filter(t=>t.purpose==='blocks-research');assert.equal(research.length,2);assert.equal(research[1].blockPartId,'q');assert.equal(research[1].blockResearchSnapshot.baselineConditions,1);
  await store.put('task',{...research[1],state:'failed'});await scheduler.tick();await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.purpose==='blocks-research').length,2);assert.ok(Date.parse((await store.get('block','b')).nextCheckAt)>time);
 });
@@ -50,4 +50,16 @@ test('计划中的网址不能让无关链接排在 REA 原文前面',()=>{
  const original={kind:'entry',sourceId:'rea-case',title:'DeepSeek 搭配 Hermes 使用 REA 逆向智能音箱实现家庭助理贾维斯',text:'REA 分析固件及调用链。',sourceUrl:'https://mp.weixin.qq.com/s/case'};
  assert.equal(rankSources(b,[...noise,original])[0].sourceId,'rea-case');
  b.collectionPlan[0].external.push('https://[invalid','https://example.org/%zz');assert.doesNotThrow(()=>rankSources(b,[original]));
+});
+
+test('取消且未产生资料的轮次释放当日额度，既有采集仍保留计数',async()=>{
+ const store=memory(),b={...block(),dailyLimit:1};await store.put('block',b);const now=Date.parse('2026-10-25T00:00:00Z');
+ await store.put('task',{id:'cancelled',blockId:'b',purpose:'blocks-research',blockPartId:'p',state:'cancelled',createdAt:new Date(now).toISOString()});
+ const scheduler=createBlockScheduler({store,plugins,saveTask,clock:()=>now});await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.state==='queued').length,1);await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.state==='queued').length,1);
+});
+
+test('新的有效证据恢复已退避的积木，并继续下一个依赖缺口',async()=>{
+ const store=memory(),now=Date.parse('2026-10-25T00:00:00Z'),b={...block(),researchEvidenceScore:0,researchSettledTaskId:'old',nextCheckAt:new Date(now+86400000).toISOString(),links:[{id:'support',partId:'p',relation:'support',coverage:'full',conditions:['有依据的范围']}]};await store.put('block',b);
+ await store.put('task',{id:'old',blockId:'b',purpose:'blocks-research',blockPartId:'p',state:'failed',createdAt:new Date(now-1000).toISOString()});
+ await createBlockScheduler({store,plugins,saveTask,clock:()=>now}).tick();assert.equal((await store.list('task')).find(t=>t.state==='queued').blockPartId,'q');
 });

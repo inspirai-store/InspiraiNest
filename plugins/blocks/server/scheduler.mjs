@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {evaluate} from '../protocol/model.mjs';
-import {fingerprint} from '../protocol/matching.mjs';
+import {goalsFingerprint} from '../protocol/matching.mjs';
 import {rankSources} from '../protocol/research.mjs';
 const dayKey=at=>new Date(new Date(at).getTime()+8*3600000).toISOString().slice(0,10);
 const pending=new Set(['queued','assigned','running','uploading']);
@@ -26,22 +26,24 @@ export function createBlockScheduler({store,plugins,saveTask,readSources=async()
    if(changed){b.revision++;b.updatedAt=new Date(time).toISOString();b.evaluations.push(evaluate(b,b.updatedAt));await tx.put('block',b);}
    if(b.researchEnabled===false)return;
    if(tasks.some(t=>t.purpose==='blocks-research'&&pending.has(t.state)))return;
-   const matches=tasks.filter(t=>t.purpose==='blocks-match'),goalsHash=fingerprint([b.goals,b.matchEpoch||0]);
+   const matches=tasks.filter(t=>t.purpose==='blocks-match'),goalsHash=goalsFingerprint(b);
    // Let the first relevant batch finish; unrelated backlog must not starve research.
    if(matches.length&&!matches.some(t=>t.state==='completed'&&t.blockSnapshot?.goalsHash===goalsHash))return;
    const assessment=evaluate(b,new Date(time).toISOString());
    const covered=assessment.parts.reduce((n,p)=>n+b.goals.flatMap(g=>g.parts).find(x=>x.id===p.partId).conditions.length-p.missing.length,0);
+   const evidenceAdvanced=b.researchEvidenceScore!==undefined&&covered>b.researchEvidenceScore;
+   if(b.researchEvidenceScore!==covered){b.researchEvidenceScore=covered;if(evidenceAdvanced){b.nextCheckAt=null;b.emptyRounds=0;}await tx.put('block',b);}
    const last=tasks.filter(t=>t.purpose==='blocks-research').sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).at(-1);
    if(last&&b.researchSettledTaskId!==last.id&&!pending.has(last.state)){
     if(last.state==='completed'&&last.archiveId&&!matches.some(t=>t.state==='completed'&&t.blockSnapshot?.goalsHash===goalsHash&&t.blockSnapshot.sources.some(s=>s.version===last.archiveId)))return;
-    const progressed=last.state==='completed'&&covered>(last.blockResearchSnapshot?.baselineConditions||0);
+    const progressed=evidenceAdvanced||last.state==='completed'&&covered>(last.blockResearchSnapshot?.baselineConditions||0);
     const waiting=['waiting_action','awaiting_review','cancelled'].includes(last.state);
     b.emptyRounds=progressed||waiting?0:Math.min((b.emptyRounds||0)+1,5);
     b.nextCheckAt=progressed||waiting?null:new Date(time+Math.min(7*86400000,86400000*2**(b.emptyRounds-1))).toISOString();
     b.researchSettledTaskId=last.id;await tx.put('block',b);
    }
    if(Date.parse(b.nextCheckAt||0)>time)return;
-   const day=dayKey(time),used=tasks.filter(t=>t.purpose==='blocks-research'&&t.createdAt&&dayKey(t.createdAt)===day).length;
+   const day=dayKey(time),used=tasks.filter(t=>t.purpose==='blocks-research'&&(t.state!=='cancelled'||t.archiveId)&&t.createdAt&&dayKey(t.createdAt)===day).length;
    if(used>=(b.dailyLimit||5))return;
    const blockedParts=new Set(tasks.filter(t=>['waiting_action','awaiting_review'].includes(t.state)).map(t=>t.blockPartId));
    const gap=assessment.parts.find(p=>!p.ready&&!p.dependencies.length&&!blockedParts.has(p.partId));
@@ -49,7 +51,7 @@ export function createBlockScheduler({store,plugins,saveTask,readSources=async()
    const part=b.goals.flatMap(g=>g.parts).find(p=>p.id===gap.partId);
    const at=new Date(time).toISOString(),arrangement=b.collectionPlan?.find(p=>p.partId===part.id);
    const selected=rankSources(b,sources,{part}).slice(0,8);
-   const task={id:randomUUID(),pluginId:'blocks',purpose:'blocks-research',blockId:b.id,blockPartId:part.id,blockRevision:b.revision,createdAt:at,deviceId:null,archiveId:null,type:'note',url:null,autoArchive:true,tags:[],blockResearchSnapshot:{protocol:1,blockId:b.id,revision:b.revision,title:b.title,goals:b.goals,part,missing:gap.missing,conflicts:gap.conflicts,collectionPlan:arrangement||null,assumptions:b.assumptions||[],sources:selected,baselineConditions:covered},content:`围绕长期积木「${b.title}」补齐部件「${part.title}」。逐项处理本部件尚缺的验收条件：${JSON.stringify(gap.missing)}。先阅读随任务提供的冻结资料与资料安排，再针对缺口搜索公开原始来源；本轮最多新增一个外部来源，不重复已有材料。需要归纳或方案时基于证据完成部件研究笔记，保留引用和未知事项。资料安排：${JSON.stringify(arrangement||{})}`};
+   const task={id:randomUUID(),pluginId:'blocks',purpose:'blocks-research',blockId:b.id,blockPartId:part.id,blockRevision:b.revision,createdAt:at,deviceId:null,archiveId:null,type:'note',url:null,autoArchive:true,tags:[],blockResearchSnapshot:{protocol:2,blockId:b.id,revision:b.revision,title:b.title,goals:b.goals,part,missing:gap.missing,conflicts:gap.conflicts,collectionPlan:arrangement||null,assumptions:b.assumptions||[],sources:selected,baselineConditions:covered},content:`围绕长期积木「${b.title}」研究部件「${part.title}」。依据任务内冻结的目标、文件证据和资料安排补齐缺口，保留来源与未决事项。`};
    await saveTask(task,'queued','积木按缺口安排增量收集',tx);
    await tx.put('block',{...b,nextCheckAt:new Date(time+86400000).toISOString(),lastTaskId:task.id});
   });

@@ -3,6 +3,8 @@ import {createBlockMatching} from '../../plugins/blocks/server/matching.mjs';
 import {sourceKey} from '../../plugins/blocks/protocol/matching.mjs';
 import {createBlockHandoff} from '../../plugins/blocks/server/handoff.mjs';
 import {createBlockScheduler} from '../../plugins/blocks/server/scheduler.mjs';
+import {archiveEvidence,recordEvidence} from '../../plugins/blocks/protocol/evidence.mjs';
+import {createResearchSources} from '../../plugins/blocks/server/research.mjs';
 import {createBlocks} from '../../plugins/blocks/server/blocks.mjs';
 import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../packages/core/shared/execution-policy.mjs';
 import {repositoryRoot,collectorRoot,collectorPath} from '../../tooling/layout.mjs';
@@ -97,19 +99,17 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     const result=[];
     for(const r of await store.list('capture')){
       if(r.deletedAt||!r.text?.trim())continue;
-      const source={kind:'record',sourceId:r.id,version:String(r.version),title:r.text.split('\n')[0].slice(0,120),text:r.text.slice(0,60000),coverage:r.text.length<=60000&&!r.attachments?.length?'full':'partial'};result.push({...source,key:sourceKey(source)});
+      const source=recordEvidence(r);result.push({...source,key:sourceKey(source)});
     }
     const latest=new Map();for(const a of await store.list('archive')){const old=latest.get(a.entryId);if(!old||old.createdAt<a.createdAt)latest.set(a.entryId,a);}
     for(const a of latest.values()){
       if((await store.get('trash',a.entryId))?.deletedAt)continue;
       const bytes=await storage.get(a.key);requireValue(hash(bytes)===a.id,'积木来源校验失败',500);const bundle=validateArchive(JSON.parse(bytes));
-      const originals=bundle.files.filter(f=>['original','source','transcript'].includes(f.role)&&/\.(md|txt|srt|vtt|markdown)$/i.test(f.path));
-      const files=originals.length?originals:bundle.files.filter(f=>/\.(md|txt|markdown)$/i.test(f.path));
-      const text=files.map(f=>f.path+'\n'+Buffer.from(f.body,'base64').toString('utf8')).join('\n\n');if(!text.trim())continue;
-      const source={kind:'entry',sourceId:a.entryId,version:a.id,title:a.meta.title,sourceUrl:a.meta.canonical_url||a.meta.source_url||null,verificationStatus:a.meta.verification_status||null,text:text.slice(0,60000),coverage:text.length<=60000&&originals.length&&a.meta.status==='archived'&&!bundle.omitted?.length?'full':'partial'};result.push({...source,key:sourceKey(source)});
+      const source=archiveEvidence(a,bundle);if(source)result.push({...source,key:sourceKey(source)});
     }
     return result;
   }
+  const researchSources=createResearchSources({plugins,assigned,body,send,publish});
   const blockMatching=createBlockMatching({store:collectionAccess(store,['block','task','setting','capture','archive','device','trash']),plugins,saveTask,readSources:blockSources,assigned,authenticate,checkAssignment,body,send,onChanged:()=>setImmediate(advanceBlocks),clock});
   const blockPlanning=createBlockPlanning({store:collectionAccess(store,['block-plan','block-plan-receipt','block','task','setting','device']),plugins,owner,body,send,serialized,saveTask,assigned,authenticate,checkAssignment,onChanged:()=>setImmediate(advanceBlocks),clock});
   const blocks = createBlocks({store:collectionAccess(store,['block','block-handoff','setting','capture','archive','trash','task']),plugins,owner,body,send,saveTask,onChanged:()=>setImmediate(advanceBlocks)});
@@ -333,7 +333,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
   async function body(req) {
     let size = 0;
     const chunks = [];
-    const limit = /\/(result|archives)$/.test(new URL(req.url, 'http://localhost').pathname) ? 58 * 1024 * 1024 : req.url.startsWith('/api/creation/v1/') ? 2*1024*1024 : 96 * 1024;
+    const endpoint=new URL(req.url,'http://localhost').pathname;
+    const limit = /\/(result|archives)$/.test(endpoint) ? 58 * 1024 * 1024 : /^\/api\/blocks\/(?:matches|plans\/results)\/[a-f0-9-]{36}$/.test(endpoint) ? 1000000 : req.url.startsWith('/api/creation/v1/') ? 2*1024*1024 : 96 * 1024;
     for await (const chunk of req) {
       size += chunk.length;
       requireValue(size <= limit, 'Request too large', 413);
@@ -343,7 +344,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     if (req.url.startsWith('/oauth/') && req.headers['content-type']?.split(';')[0] === 'application/x-www-form-urlencoded') return Object.fromEntries(new URLSearchParams(raw));
     try { return JSON.parse(raw); } catch { fail('Invalid JSON'); }
   }
-  async function publish(bundle, device, req, taskId) {
+  async function publish(bundle, device, req, taskId, {intermediate=false}={}) {
     if (Object.hasOwn(bundle,'linkedTrials')) { const {linkedTrials,...archiveBundle}=bundle;bundle=archiveBundle; }
     if (Object.hasOwn(bundle,'inputAttachments')) { const {inputAttachments,...archiveBundle} = bundle; bundle = archiveBundle; }
     const taskRecord = taskId ? await assigned(device, taskId, req) : null;
@@ -364,7 +365,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     await storage.put(key, buffer);
     // A revoked worker or cancelled task cannot commit a result after an in-flight upload.
     await authenticate(req);
-    const record = { id: digest, entryId: bundle.meta.id, meta: bundle.meta, key, deviceId: device.id, createdAt: now(), omittedCount: bundle.omitted?.length || 0, ...(taskRecord?.inputAttachments?.length ? { inputAttachments: taskRecord.inputAttachments } : {}) };
+    const record = { id: digest, entryId: bundle.meta.id, meta: bundle.meta, key, deviceId: device.id, createdAt: now(), ...(taskRecord?.purpose==='blocks-research'?{researchTaskId:taskId}:{}), omittedCount: bundle.omitted?.length || 0, ...(taskRecord?.inputAttachments?.length ? { inputAttachments: taskRecord.inputAttachments } : {}) };
     const commit = async tx => {
       const liveDevice = await tx.getForUpdate('device', device.id);
       requireValue(liveDevice && !liveDevice.revokedAt && liveDevice.tokenHash === device.tokenHash, 'Device authorization required', 401);
@@ -381,7 +382,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         return draft;
       }
       const archive = (await tx.get('archive', digest)) || await tx.put('archive', record);
-      if (taskId) await saveTask({ ...task, archiveId: digest }, 'completed', '归档校验完成，资料已上传', tx);
+      if (taskId&&!intermediate) await saveTask({ ...task, archiveId: digest }, 'completed', '归档校验完成，资料已上传', tx);
       return archive;
     };
     const result = await serialized('claim', () => store.transaction(commit));
@@ -648,6 +649,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if(await researchSources(req,res,url,device))return;
       if(await blockPlanning.handle(req,res,url,device))return;
       if(await blockMatching.handle(req,res,url,device))return;
       if(await blocks.handle(req,res,url,device))return;
@@ -785,7 +787,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const reported = clientRuntime(input.clientRuntime);
         requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
         const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
-        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,features:Array.isArray(input.creationRuntime.features)?input.creationRuntime.features.filter(x=>x==='outline-workflow-v1'):[],fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, blocksProtocol:input.blocksProtocol===1?1:null, blocksPlanningProtocol:input.blocksPlanningProtocol===1?1:null, blocksResearchProtocol:input.blocksResearchProtocol===1?1:null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,features:Array.isArray(input.creationRuntime.features)?input.creationRuntime.features.filter(x=>x==='outline-workflow-v1'):[],fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, blocksProtocol:input.blocksProtocol===1?1:null, blocksPlanningProtocol:input.blocksPlanningProtocol===1?1:null, blocksResearchProtocol:[1,2].includes(input.blocksResearchProtocol)?input.blocksResearchProtocol:null, blocksEvidenceProtocol:input.blocksEvidenceProtocol===1?1:null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
