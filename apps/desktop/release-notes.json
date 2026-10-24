@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.41",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "积木优先匹配相关资料，将计划与已有正文交给研究任务，支持有来源的部件分析。\n有效进展后继续处理缺口，保留每日额度、暂停和无进展退避。\n兼容原有积木、资料、文稿及设备授权。"
+  },
+  {
     "version": "0.2.40",
     "channel": "stable",
     "publishedAt": null,
