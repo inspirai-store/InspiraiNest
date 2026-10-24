@@ -1,10 +1,16 @@
 // Retrieval order only; semantic matching still judges every source and its evidence.
 export function rankSources(block,sources,{part,preferred=[]}={}){
- const query=[block.title,...block.goals.flatMap(g=>[g.title,...g.parts.map(p=>p.title)]),part?.title,...(block.collectionPlan||[]).flatMap(p=>[...p.existing,...p.external])].filter(Boolean).join(' ');
+ const seedUrls=[];
+ const query=[block.title,...block.goals.flatMap(g=>[g.title,...g.parts.map(p=>p.title)]),part?.title,...(block.collectionPlan||[]).flatMap(p=>[...p.existing,...p.external])].filter(Boolean).join(' ').replace(/https?:\/\/[^\s<>"，。；、（）()]+/gi,url=>{
+  const parsed=new URL(url);seedUrls.push(parsed.href);
+  // URL paths can name the subject; protocols and host suffixes are not topics.
+  return decodeURIComponent(parsed.pathname).replace(/[^a-z0-9_\u3400-\u9fff-]+/gi,' ');
+ });
  const terms=[...new Set((query.match(/[a-z][a-z0-9_-]{2,}|[\u3400-\u9fff]{2,}/gi)||[]).map(s=>s.toLowerCase()))];
  const score=source=>{
   const title=(source.title||'').toLowerCase(),body=(source.text||'').toLowerCase();
   let n=preferred.includes(source.version)?10000:0;
+  if(source.kind==='entry'&&seedUrls.includes(source.sourceUrl))n+=500;
   for(const term of terms){
    const has=text=>/^[a-z]/.test(term)?new RegExp('(^|[^a-z0-9_])'+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z0-9_]|$)','i').test(text):text.includes(term);
    if(has(title))n+=20;if(has(body))n+=2;

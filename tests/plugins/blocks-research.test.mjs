@@ -43,3 +43,10 @@ test('新资料经匹配取得进展后同日继续下一缺口，无进展则�
  const research=(await store.list('task')).filter(t=>t.purpose==='blocks-research');assert.equal(research.length,2);assert.equal(research[1].blockPartId,'q');assert.equal(research[1].blockResearchSnapshot.baselineConditions,1);
  await store.put('task',{...research[1],state:'failed'});await scheduler.tick();await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.purpose==='blocks-research').length,2);assert.ok(Date.parse((await store.get('block','b')).nextCheckAt)>time);
 });
+
+test('计划中的网址不能让无关链接排在 REA 原文前面',()=>{
+ const b=block();b.title='REA 能力与可信度研究及灵藏接入参考';b.goals[0].parts[0].title='智能音箱案例复用梳理';b.collectionPlan=[{partId:'p',existing:['确认计划后优先匹配智能音箱案例的已有记录、附件、操作日志与结果材料'],external:['以 https://github.com/morluto/rea 为入口补充官方文档']}];
+ const noise=Array.from({length:12},(_,i)=>({kind:'record',sourceId:'r'+i,title:'https://mp.weixin.qq.com/s/other'+i,text:'https://mp.weixin.qq.com/s/other'+i}));
+ const original={kind:'entry',sourceId:'rea-case',title:'DeepSeek 搭配 Hermes 使用 REA 逆向智能音箱实现家庭助理贾维斯',text:'REA 分析固件及调用链。',sourceUrl:'https://mp.weixin.qq.com/s/case'};
+ assert.equal(rankSources(b,[...noise,original])[0].sourceId,'rea-case');
+});
