@@ -27,12 +27,12 @@ export function createBlockScheduler({store,plugins,saveTask,readSources=async()
    if(b.researchEnabled===false)return;
    if(tasks.some(t=>t.purpose==='blocks-research'&&pending.has(t.state)))return;
    const matches=tasks.filter(t=>t.purpose==='blocks-match'),goalsHash=goalsFingerprint(b);
-   // Let the first relevant batch finish; unrelated backlog must not starve research.
-   if(matches.length&&!matches.some(t=>t.state==='completed'&&t.blockSnapshot?.goalsHash===goalsHash))return;
    const assessment=evaluate(b,new Date(time).toISOString());
    const covered=assessment.parts.reduce((n,p)=>n+b.goals.flatMap(g=>g.parts).find(x=>x.id===p.partId).conditions.length-p.missing.length,0);
    const evidenceAdvanced=b.researchEvidenceScore!==undefined&&covered>b.researchEvidenceScore;
    if(b.researchEvidenceScore!==covered){b.researchEvidenceScore=covered;if(evidenceAdvanced){b.nextCheckAt=null;b.emptyRounds=0;}await tx.put('block',b);}
+   // Record the baseline before the first new evidence pass; its progress can end backoff.
+   if(matches.length&&!matches.some(t=>t.state==='completed'&&t.blockSnapshot?.goalsHash===goalsHash))return;
    const last=tasks.filter(t=>t.purpose==='blocks-research').sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).at(-1);
    if(last&&b.researchSettledTaskId!==last.id&&!pending.has(last.state)){
     if(last.state==='completed'&&last.archiveId&&!matches.some(t=>t.state==='completed'&&t.blockSnapshot?.goalsHash===goalsHash&&t.blockSnapshot.sources.some(s=>s.version===last.archiveId)))return;

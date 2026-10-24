@@ -58,8 +58,10 @@ test('取消且未产生资料的轮次释放当日额度，既有采集仍保�
  const scheduler=createBlockScheduler({store,plugins,saveTask,clock:()=>now});await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.state==='queued').length,1);await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.state==='queued').length,1);
 });
 
-test('新的有效证据恢复已退避的积木，并继续下一个依赖缺口',async()=>{
- const store=memory(),now=Date.parse('2026-10-25T00:00:00Z'),b={...block(),researchEvidenceScore:0,researchSettledTaskId:'old',nextCheckAt:new Date(now+86400000).toISOString(),links:[{id:'support',partId:'p',relation:'support',coverage:'full',conditions:['有依据的范围']}]};await store.put('block',b);
+test('首次重判先记录基线，新的有效证据恢复退避并继续依赖缺口',async()=>{
+ const store=memory(),now=Date.parse('2026-10-25T00:00:00Z'),b={...block(),researchSettledTaskId:'old',nextCheckAt:new Date(now+86400000).toISOString()};await store.put('block',b);
  await store.put('task',{id:'old',blockId:'b',purpose:'blocks-research',blockPartId:'p',state:'failed',createdAt:new Date(now-1000).toISOString()});
- await createBlockScheduler({store,plugins,saveTask,clock:()=>now}).tick();assert.equal((await store.list('task')).find(t=>t.state==='queued').blockPartId,'q');
+ const match={id:'new-match',blockId:'b',purpose:'blocks-match',state:'queued',blockSnapshot:{goalsHash:goalsFingerprint(b),sources:[]}};await store.put('task',match);
+ const scheduler=createBlockScheduler({store,plugins,saveTask,clock:()=>now});await scheduler.tick();const current=await store.get('block','b');assert.equal(current.researchEvidenceScore,0);
+ current.links=[{id:'support',partId:'p',relation:'support',coverage:'full',conditions:['有依据的范围']}];await store.put('block',current);await store.put('task',{...match,state:'completed'});await scheduler.tick();assert.equal((await store.list('task')).find(t=>t.purpose==='blocks-research'&&t.state==='queued').blockPartId,'q');
 });
