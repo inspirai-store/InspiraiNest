@@ -1,3 +1,8 @@
+import {createBlockMatching} from '../../plugins/blocks/server/matching.mjs';
+import {sourceKey} from '../../plugins/blocks/protocol/matching.mjs';
+import {createBlockHandoff} from '../../plugins/blocks/server/handoff.mjs';
+import {createBlockScheduler} from '../../plugins/blocks/server/scheduler.mjs';
+import {createBlocks} from '../../plugins/blocks/server/blocks.mjs';
 import {assertExecutionAgent,activeExecutionAgents,isExecutionAgent} from '../../packages/core/shared/execution-policy.mjs';
 import {repositoryRoot,collectorRoot,collectorPath} from '../../tooling/layout.mjs';
 import {createPluginHost,collectionAccess,isCollectionAccess} from '../../packages/plugin-sdk/server.mjs';
@@ -87,6 +92,25 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
     if(t.state==='running'&&t.assignmentId!==old?.assignmentId){const session=await tx.get('creation-session',t.sessionId),device=await tx.get('device',session.executorDeviceId);await taskDiagnostics.creationClaim(t,session,device,tx);}
     else if(old?.state!==t.state)await taskDiagnostics.creationEvent(t,t.state,tx);
   }),storage,serialized,authenticate,owner,worker,body,send,readApi,clock});
+  async function blockSources(){
+    const result=[];
+    for(const r of await store.list('capture')){
+      if(r.deletedAt||!r.text?.trim())continue;
+      const source={kind:'record',sourceId:r.id,version:String(r.version),title:r.text.split('\n')[0].slice(0,120),text:r.text.slice(0,60000),coverage:r.text.length<=60000&&!r.attachments?.length?'full':'partial'};result.push({...source,key:sourceKey(source)});
+    }
+    const latest=new Map();for(const a of await store.list('archive')){const old=latest.get(a.entryId);if(!old||old.createdAt<a.createdAt)latest.set(a.entryId,a);}
+    for(const a of latest.values()){
+      if((await store.get('trash',a.entryId))?.deletedAt)continue;
+      const bytes=await storage.get(a.key);requireValue(hash(bytes)===a.id,'积木来源校验失败',500);const bundle=validateArchive(JSON.parse(bytes));
+      const originals=bundle.files.filter(f=>['original','source','transcript'].includes(f.role)&&/\.(md|txt|srt|vtt|markdown)$/i.test(f.path));
+      const files=originals.length?originals:bundle.files.filter(f=>/\.(md|txt|markdown)$/i.test(f.path));
+      const text=files.map(f=>f.path+'\n'+Buffer.from(f.body,'base64').toString('utf8')).join('\n\n');if(!text.trim())continue;
+      const source={kind:'entry',sourceId:a.entryId,version:a.id,title:a.meta.title,text:text.slice(0,60000),coverage:text.length<=60000&&originals.length&&a.meta.status==='archived'&&!bundle.omitted?.length?'full':'partial'};result.push({...source,key:sourceKey(source)});
+    }
+    return result;
+  }
+  const blockMatching=createBlockMatching({store:collectionAccess(store,['block','task','setting','capture','archive','device','trash']),plugins,saveTask,readSources:blockSources,assigned,authenticate,checkAssignment,body,send,clock});
+  const blocks = createBlocks({store:collectionAccess(store,['block','block-handoff','setting','capture','archive','trash','task']),plugins,owner,body,send,saveTask,onChanged:()=>setImmediate(advanceBlocks)});
   const readerAuth = readerAuthorization({ store, authenticate, serialized, publicUrl, body, send });
   const taskDiagnostics=createTaskDiagnostics({store,body,send,serialized,clock});
   const skills = createSkillService({ store:plugins.access('ai-assistant',["client-update","device","skill-environment","skill-operation","skill-stage","skill-version","task"]), storage, serialized, updateDevice, owner, worker, body, send, clock });
@@ -621,6 +645,8 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       }
       // Reader tokens may never reach legacy management, upload or worker routes.
       requireValue(device.role !== 'reader', 'Read-only authorization', 403);
+      if(await blockMatching.handle(req,res,url,device))return;
+      if(await blocks.handle(req,res,url,device))return;
       if(await creation.handle(req,res,url,device))return;
       if(await taskDiagnostics.handle(req,res,url,device))return;
       if (await contentTrash.handle(req,res,route,device)) return;
@@ -755,7 +781,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         const reported = clientRuntime(input.clientRuntime);
         requireValue(input.creationRuntime === undefined || input.creationRuntime?.version === 1, 'Invalid creation runtime');
         const capabilityFacts=cleanCapabilityFacts(input.capabilityFacts);
-        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
+        await updateDevice(device, input, { lingnestTools:input.lingnestTools?.schemaVersion===1?{schemaVersion:1,cli:input.lingnestTools.cli===true,codexSkill:input.lingnestTools.codexSkill===true,codebuddySkill:input.lingnestTools.codebuddySkill===true}:null, creationRuntime:input.creationRuntime ? {version:1,fingerprint:/^[a-f0-9]{64}$/.test(input.creationRuntime.fingerprint)?input.creationRuntime.fingerprint:null,account:typeof input.creationRuntime.account==='string'?input.creationRuntime.account.slice(0,100):null}:null, ...(capabilityFacts?{capabilityFacts}:{}), trialEnvironment:reportedTrial, writingSkills:input.writingSkills?.map(({version,hash})=>({version,hash})) || null, writingProtocol:input.writingProtocol || null, blocksProtocol:input.blocksProtocol===1?1:null, selectionWritingProtocol:input.selectionWritingProtocol || null, inputAttachmentProtocol:input.inputAttachmentProtocol || null, recordProtocol:input.recordProtocol || null, lastSeen: now(), lastHeartbeatAt: new Date(clock()).toISOString(), capabilities: [...new Set(input.capabilities)], agents: [...new Set(activeExecutionAgents(input.agents))], ...(reported?{workerRuntime:reported}:{}), skillRuntime:runtime ? { schemaVersion:1,mode:runtime.mode,idle:runtime.idle } : null, agentRuntime:agentRuntime ? { schemaVersion:1,busy:agentRuntime.busy } : null });
         return send(res, 200, { capabilityProofs:await taskDiagnostics.workerProofs(device.id), capabilityChecks:(await store.list('capability-check')).filter(c=>c.deviceId===device.id&&c.state==='queued'), tasks: (await store.list('task')).filter(t => t.deviceId === device.id).map(t => ({ id: t.id, state: t.state, assignmentId: t.assignmentId || null })), skillOperations:runtime?await skills.inbox(device.id):[], agentOperations:agentRuntime?await agents.inbox(device.id):[], clientUpdates:reported?.remoteUpdate?await clientUpdates.inbox(device.id):[] });
       }
       if (route === '/api/tasks' && req.method === 'POST') {
@@ -810,7 +836,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         if(await plugins.enabled('agent-lab'))await codexTrials.sync();
         return await serialized('claim', async () => {
           const tasks = await store.list('task');
-          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
+          let task = tasks.find(t => t.deviceId === device.id && active.includes(t.state) && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.pluginId!=='blocks'||device.blocksProtocol===1) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1));
           if (task && !task.assignmentId && input.assignmentProtocol === 1) {
             task = await store.transaction(async tx => {
               const live = await tx.getForUpdate('task', task.id);
@@ -822,7 +848,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
             // A task waiting for user action keeps its workspace on this computer,
             // but does not occupy the execution slot. Explicit retries join the
             // queue and must wait for any current task to finish.
-            const candidates = tasks.filter(t => t.state === 'queued' && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+            const candidates = tasks.filter(t => t.state === 'queued' && (t.purpose!=='codex-trial'||device.trialEnvironment?.protocol===1&&input.assignmentProtocol===1) && supportsWritingTask(t, device) && (t.pluginId!=='blocks'||device.blocksProtocol===1) && (t.purpose!=='selection-writing'||device.selectionWritingProtocol===1&&input.assignmentProtocol===1) && (!t.inputAttachments?.length || device.inputAttachmentProtocol === 1) && (t.deviceId === device.id || !t.deviceId && canRunTask(t, device))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
             for (const candidate of candidates) {
               const selected = ['selection-writing','codex-trial'].includes(candidate.purpose)?{eligible:true,selectedSkills:[]}:await skills.selection(candidate,device,tasks);
               if (!selected.eligible) continue;
@@ -835,6 +861,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
                 if ((await tx.list('task')).some(t => t.deviceId === device.id && active.includes(t.state))) return null;
                 const pending = await tx.getForUpdate('task', candidate.id);
                 if(pending?.purpose==='codex-trial'&&(live.trialEnvironment?.protocol!==1||input.assignmentProtocol!==1))return null;
+                if(pending?.pluginId==='blocks'&&live.blocksProtocol!==1)return null;
                 if(pending?.purpose==='selection-writing'&&(live.selectionWritingProtocol!==1||input.assignmentProtocol!==1))return null;
                 if (!supportsWritingTask(pending || {}, live) || pending?.inputAttachments?.length && live.inputAttachmentProtocol !== 1) return null;
                 if (pending?.state !== 'queued' || (pending.deviceId ? pending.deviceId !== device.id : !canRunTask(pending, live))) return null;
@@ -967,8 +994,14 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
       if (!error.status) console.error(error.name, error.code || 'request_failed');
     }
   });
+  const blockScheduler=createBlockScheduler({store:collectionAccess(store,['block','task','setting','archive']),plugins,saveTask,clock});
+  const handoffBlocks=createBlockHandoff({store:collectionAccess(store,['block','block-handoff']),plugins,writeDraft:packet=>writing.acceptHandoff(packet)});
+  let blockTick=null;
+  const advanceBlocks=()=>{if(!blockTick)blockTick=blockMatching.scan().then(()=>blockScheduler.tick()).then(handoffBlocks).catch(error=>console.error('blocks_scheduler',error.message)).finally(()=>{blockTick=null;});};
+  const blockTimer=setInterval(advanceBlocks,60000);blockTimer.unref();
+  server.on('listening',advanceBlocks);
   server.requestTimeout = 120000;
-  return { server, store, close: () => new Promise((resolve, reject) => { server.close(() => readApi.close().then(() => store.close()).then(resolve, reject)); server.closeIdleConnections(); }) };
+  return { server, store, close: () => new Promise((resolve, reject) => { clearInterval(blockTimer); server.close(() => Promise.resolve(blockTick).then(()=>readApi.close()).then(() => store.close()).then(resolve, reject)); server.closeIdleConnections(); }) };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

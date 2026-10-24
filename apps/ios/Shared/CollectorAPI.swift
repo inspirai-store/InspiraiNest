@@ -209,3 +209,21 @@ enum OutboxSender {
         }
     }
 }
+
+struct BlockList: Decodable { let items: [BlockSummary] }
+struct BlockSummary: Decodable, Identifiable {
+ let id: String; let title: String; let revision: Int; let paused: Bool; let goals: [Goal]
+ struct Goal: Decodable, Identifiable { let id: String; let title: String; let parts: [Part] }
+ struct Part: Decodable, Identifiable { let id: String; let title: String; let conditions: [String] }
+}
+struct BlockMaterials: Decodable { let items: [Material]
+ struct Material: Decodable, Identifiable { let kind: String; let sourceId: String; let title: String; var id: String { kind+":"+sourceId } }
+}
+extension CollectorAPI {
+ func blocks() async throws -> BlockList { try await decoded(BlockList.self,path:"/api/blocks") }
+ func blockMaterials() async throws -> BlockMaterials { try await decoded(BlockMaterials.self,path:"/api/blocks/materials") }
+ func joinBlock(_ block: BlockSummary, partID: String, material: BlockMaterials.Material) async throws {
+  let input: [String:Any] = ["revision":block.revision,"partId":partID,"kind":material.kind,"sourceId":material.sourceId]
+  _ = try await request("/api/blocks/\(identifier(block.id))/join",method:"POST",body:JSONSerialization.data(withJSONObject:input))
+ }
+}

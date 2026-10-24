@@ -25,7 +25,7 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
         Object.assign(source,{ref:input.id,version:record.version,text:record.text,document:record.document,label:source.label||record.text?.split('\n')[0]?.slice(0,100)||'媒体记录'});
         for(const file of record.attachments){const media=await store.get('record-media',file.sha256);requireValue(media,'原件不存在',404);source.files.push({id:id(),attachmentId:file.id,path:file.name,mime:media.mime,sha256:file.sha256,bytes:media.bytes,storageKey:media.key});}
       } else if(input.kind==='entry') {
-        const archive=(await store.list('archive')).filter(a=>a.entryId===input.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+        const archive=(await store.list('archive')).filter(a=>a.entryId===input.id&&(!input.version||a.id===input.version)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
         requireValue(archive&&!(await store.get('trash',input.id))?.deletedAt,'资料不存在',404);
         const bytes=await storage.get(archive.key);requireValue(hash(bytes)===archive.id,'资料校验失败',500);const bundle=validateArchive(JSON.parse(bytes));
         Object.assign(source,{ref:input.id,version:archive.id,label:source.label||bundle.meta.title,metadata:bundle.meta,omitted:bundle.omitted||[]});
@@ -142,7 +142,16 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
     const task=await store.get('task',taskId),record=await store.get(task?.archiveId?'archive':'draft',task?.archiveId||task?.draftId);
     requireValue(record,'稿件还未完成',404);const bytes=await storage.get(record.key);requireValue(hash(bytes)===record.id,'稿件校验失败',500);return validateArchive(JSON.parse(bytes));
   }
-  return {async handle(req,res,route,device) {
+  return {async acceptHandoff(packet){
+    const material=await sources(packet.sources);
+    return serialized('claim',()=>store.transaction(async tx=>{
+      const receiptId='blocks:'+packet.id,receipt=await tx.getForUpdate('writing-receipt',receiptId);
+      if(receipt)return receipt.result;
+      const session={id:id(),version:1,protocolVersion:2,brief:packet.title,title:packet.title,titleSource:'user',createdAt:now(),updatedAt:now(),context:{audience:'一般读者',language:'zh-CN',outputs:['markdown']},sources:material,answers:[],turns:[],rounds:[],runs:[],workingPlan:null,plan:{thesis:packet.title,audience:'一般读者',scope:packet.title,evidence:'只使用冻结材料并保留来源引用',outline:packet.parts.map(p=>p.title),visuals:'仅使用来源中已验证的图片',unresolvedHandling:'不编造缺失事实，明确列出证据限制'},planVersion:1,style:defaultWritingStyle(),styleCandidates:[],ready:true,deviceId:null,agent:null,blockHandoffId:packet.id};
+      await queue(session,'draft',tx);await save(session,tx);
+      const result={id:session.id,version:session.version};await tx.put('writing-receipt',{id:receiptId,result});return result;
+    }));
+  },async handle(req,res,route,device) {
     if(!route.startsWith('/api/writing'))return false;
     const workerRoute=route.match(/^\/api\/writing\/tasks\/([^/]+)\/(result|files\/([^/]+))$/);
     if(workerRoute){

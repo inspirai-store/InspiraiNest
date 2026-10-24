@@ -25,8 +25,8 @@ async function fixture(t,{legacy=false}={}){
  return {app,request,toggle,origin};
 }
 test('new spaces enable AI only; existing spaces preserve all delivered features',async t=>{
- const fresh=await fixture(t);const a=await fresh.request('/api/plugins');assert.equal(a.status,200);assert.deepEqual(a.body.enabled,{'agent-lab':false,'ai-assistant':true,writing:false});
- const old=await fixture(t,{legacy:true});const b=await old.request('/api/plugins');assert.ok(Object.values(b.body.enabled).every(Boolean));assert.equal(b.body.migrated,true);
+ const fresh=await fixture(t);const a=await fresh.request('/api/plugins');assert.equal(a.status,200);assert.deepEqual(a.body.enabled,{'agent-lab':false,'ai-assistant':true,blocks:false,writing:false});
+ const old=await fixture(t,{legacy:true});const b=await old.request('/api/plugins');assert.equal(b.body.enabled.blocks,false);assert.ok(['ai-assistant','writing','agent-lab'].every(id=>b.body.enabled[id]));assert.equal(b.body.migrated,true);
 });
 test('dependencies, active jobs, authorization and stale updates are enforced server-side',async t=>{
  const {app,request,toggle}=await fixture(t);
@@ -83,4 +83,36 @@ test('Worker uses registered handlers and never falls back for an unknown plugin
  assert.deepEqual(await registry.dispatch({task:{id:'one',pluginId:'specific'}}),{handled:'one'});
  await assert.rejects(registry.dispatch({task:{id:'two',pluginId:'unknown'}}),/没有支持/);
  assert.throws(()=>createWorkerRegistry([{id:'same',matches:()=>true,run:()=>{}},{id:'same',matches:()=>true,run:()=>{}}]),/Invalid Worker/);
+});
+
+test('blocks: disabled writes, version conflicts, persistence and paused state',async t=>{
+ const {request,toggle}=await fixture(t);const input={title:'AI 前沿',goals:[{title:'文章',output:'article',parts:[{title:'证据',conditions:['可追溯'],dependsOn:[]}]}]};
+ assert.equal((await request('/api/blocks','POST',input)).status,409);
+ assert.equal((await toggle('blocks',true)).status,200);
+ const created=await request('/api/blocks','POST',input);assert.equal(created.status,200);const b=created.body;
+ assert.equal((await request('/api/blocks/'+b.id+'/pause','POST',{revision:0,paused:true})).status,409);
+ const paused=await request('/api/blocks/'+b.id+'/pause','POST',{revision:b.revision,paused:true});assert.equal(paused.status,200);assert.equal(paused.body.paused,true);assert.equal(paused.body.evaluations[0].goals[0].ready,false);
+ for(const task of (await request('/api/state')).body.tasks.filter(t=>t.pluginId==='blocks'&&t.state==='queued'))await request('/api/tasks/'+task.id+'/cancel','POST',{});
+ assert.equal((await toggle('blocks',false)).status,200);assert.equal((await request('/api/blocks/'+b.id)).body.title,input.title);
+});
+
+test('手机快速加入与实际 Worker 语义结果更新评价，排除后不自动加回',async t=>{
+ const {app,request,toggle,origin}=await fixture(t);await toggle('blocks',true);
+ const rid=crypto.randomUUID(),at=new Date().toISOString();await app.store.put('capture',{id:rid,version:1,text:'独立运营的视频账号先验证选题、制作和发布三个环节。',attachments:[],createdAt:at});
+ const created=(await request('/api/blocks','POST',{title:'账号运营',goals:[{title:'验证运营流程',output:'product',parts:[{title:'流程',conditions:['明确运营环节'],dependsOn:[]}]}]})).body;
+ await new Promise(resolve=>setTimeout(resolve,100));
+ const current=(await request('/api/blocks/'+created.id)).body;
+ const joined=await request('/api/blocks/'+created.id+'/join','POST',{revision:current.revision,kind:'record',sourceId:rid,partId:created.goals[0].parts[0].id});assert.equal(joined.status,200);assert.equal(joined.body.links[0].relation,'lead');
+ await new Promise(resolve=>setTimeout(resolve,100));
+ // An old match snapshot is fenced after an explicit join changed the matching epoch.
+ const tasks=(await app.store.list('task')).filter(t=>t.purpose==='blocks-match');assert.ok(tasks.length);
+ const code=(await request('/api/pairings','POST',{role:'worker'})).body;
+ const pair=await fetch(origin+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:code.key,name:'matcher'})}).then(r=>r.json());
+ const job=tasks.filter(t=>t.state==='queued').sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).at(-1),assignment=crypto.randomUUID();await app.store.put('task',{...job,deviceId:pair.device.id,assignmentId:assignment,state:'running'});
+ const value={protocol:1,matches:[{sourceKey:job.blockSnapshot.sources[0].key,partId:created.goals[0].parts[0].id,relation:'support',reason:'正文明确列举三个运营环节',evidence:[{condition:'明确运营环节',quote:'先验证选题、制作和发布三个环节'}]}]};
+ const response=await fetch(origin+'/api/blocks/matches/'+job.id,{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/json','X-Task-Assignment':assignment},body:JSON.stringify(value)});
+ assert.equal(response.status,200,await response.text());
+ const accepted=await fetch(origin+'/api/blocks/matches/'+job.id,{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/json','X-Task-Assignment':assignment},body:JSON.stringify(value)});assert.equal(accepted.status,200,await accepted.text());
+ const ready=(await request('/api/blocks/'+created.id)).body;assert.equal(ready.evaluations.at(-1).goals[0].ready,true);
+ const removed=await request('/api/blocks/'+created.id+'/exclude','POST',{revision:ready.revision,linkId:ready.links[0].id});assert.equal(removed.status,200);assert.equal(removed.body.evaluations.at(-1).goals[0].ready,false);
 });
