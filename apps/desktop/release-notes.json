@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.43",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "积木资料改为卡片与无限画布，支持拖拽、缩放、搜索和证据侧栏。\n同一资料多部件关联合并展示，连线加入保持待验证状态。\n按资料空间保存本机画布布局，保留既有资料、目标、成熟度和授权。"
+  },
+  {
     "version": "0.2.42",
     "channel": "stable",
     "publishedAt": null,
