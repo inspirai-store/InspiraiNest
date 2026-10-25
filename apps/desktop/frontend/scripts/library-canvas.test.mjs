@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {libraryCards,readLibraryView,libraryNodeId} from '../../../../packages/core/web/library/data/canvas-model.ts';
+const entry=(id,status='archived')=>({id,archive_id:'archive:'+id,title:'资料 '+id,type:'article',status,summary:'实际摘要',tags:['研究'],collected_at:'2026-10-25T00:00:00Z',files:[{path:'source.md',role:'original',sha256:'hash'}]});
+test('资料卡使用稳定来源身份，保留归档状态与收藏，不修改原文或附件',()=>{const items=[entry('article:1'),entry('partial','partial'),entry('pending','pending')],before=structuredClone(items),cards=libraryCards(items,['article:1']);assert.equal(cards[0].id,libraryNodeId('article:1'));assert.match(cards[0].meta,/已收藏/);assert.equal(cards[1].badge,'待补齐');assert.equal(cards[2].badge,'待处理');assert.ok(cards.every(c=>!c.source&&!c.target));assert.equal(libraryCards(items.slice().reverse())[2].id,cards[0].id);assert.deepEqual(items,before);});
+test('视图偏好按资料空间隔离，旧用户默认画布，列表选择可恢复',()=>{const values=new Map([['library-view:v1:account-a','list']]),storage={getItem:k=>values.get(k)||null};assert.equal(readLibraryView(storage,'account-a'),'list');assert.equal(readLibraryView(storage,'account-b'),'canvas');assert.equal(readLibraryView(storage,null),'canvas');assert.equal(readLibraryView({getItem:()=>{throw Error('不可读');}},'account-a'),'canvas');});

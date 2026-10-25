@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.44",
+    "channel": "stable",
+    "publishedAt": null,
+    "releaseNotes": "资料库默认采用卡片与无限画布，复用积木的画布组件。\n保留搜索、筛选、收藏、分页与列表视图，点开卡片继续阅读原文和附件。\n按资料空间保存本机布局和视图偏好，保留既有数据与授权。"
+  },
+  {
     "version": "0.2.43",
     "channel": "stable",
     "publishedAt": null,

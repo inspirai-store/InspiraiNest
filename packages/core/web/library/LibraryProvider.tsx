@@ -6,7 +6,7 @@ import { LibraryClient } from './data/client';
 import { BookmarkStore, bookmarkScope } from './data/bookmarks';
 import { initialLiveLibrary, initialLiveTasks, useUiState } from '../workspace/UiState';
 
-const Context = createContext<{ client: LibraryClient; session: number; bookmarks: string[]; bookmarksReady: boolean; bookmarkError: string; toggleBookmark: (id:string) => void } | null>(null);
+const Context = createContext<{ client: LibraryClient; session: number; scope:string|null; bookmarks: string[]; bookmarksReady: boolean; bookmarkError: string; toggleBookmark: (id:string) => void } | null>(null);
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const cache = useQueryClient(), { setState, pages } = useUiState();
   const [session, setSession] = useState(0);
@@ -50,7 +50,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const unsubscribe = bridge?.onChanged?.(changed);
     return () => { unsubscribe?.(); client.invalidateSession(); cache.removeQueries({ queryKey: ['live-library'] }); };
   }, [bridge, cache, client, pages, setState]);
-  return <Context.Provider value={{ client, session, bookmarks, bookmarksReady:!!scope, bookmarkError, toggleBookmark }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ client, session, scope, bookmarks, bookmarksReady:!!scope, bookmarkError, toggleBookmark }}>{children}</Context.Provider>;
 }
 export function useLibrarySession() {
   const context = useContext(Context);
