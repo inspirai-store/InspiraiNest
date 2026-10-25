@@ -25,6 +25,8 @@ jobs:
         run: node tooling/plugins/browser-qa.mjs
       - name: Test conversational blocks planning in the browser
         run: node tooling/plugins/blocks-browser-qa.mjs
+      - name: Test library cards and canvas with existing REST archives
+        run: node tooling/library-canvas-browser-qa.mjs
       - run: npm test
       - run: node scripts/catalog.mjs build && node scripts/catalog.mjs check
   android:
