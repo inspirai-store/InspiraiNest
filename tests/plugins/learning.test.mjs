@@ -126,3 +126,12 @@ test('source validation rejects invented quotations and browser requests are fen
  const g={...starterGoal(),id:'g',revision:1,nodes:pathNodes(starterGoal().nodes)};const packet=teachingPacket(g,['kv-cache'],'web',[]);assert.equal(packet.sources.length,0);assert.equal(packet.nodes[0].mastery,'pending');
  assert.equal(canRunTask({type:'note',pluginId:'learning'},{role:'worker',clientType:'worker',agents:['codex'],capabilities:['note'],learningProtocol:0}),false);
 });
+
+test('selected records keep the original source link in reads and frozen AI inputs',async t=>{
+ const {app,request}=await fixture(t),url='https://example.org/guide?v=2#kv-cache';
+ const intake=(await request('/api/learning/intake',{requestId:randomUUID(),title:'学习来源链接',text:'已读取的 KV Cache 材料',url,manual:true})).body;
+ const source=(await request('/api/learning/sources')).body.items.find(s=>s.sourceId===intake.sources[0].sourceId);assert.equal(source.url,url);
+ const candidate=(await request('/api/learning/candidates/'+intake.id,{revision:1,action:'confirm'})).body;
+ const g=(await request('/api/learning/goals/'+candidate.goalId)).body;const queued=(await request('/api/learning/goals/'+g.id+'/assist',{revision:g.revision,operation:'path'})).body;
+ const task=await app.store.get('task',queued.id);assert.equal(task.learningSnapshot.sources[0].url,url);
+});

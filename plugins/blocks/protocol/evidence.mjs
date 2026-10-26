@@ -20,5 +20,5 @@ export function archiveEvidence(archive,bundle){
 }
 export function recordEvidence(record){
  const text=record.text.slice(0,limit),complete=record.text.length<=limit;
- return {kind:'record',sourceId:record.id,version:String(record.version),title:record.text.split('\n')[0].slice(0,120),text,units:complete?[{id:'record.txt',path:'record.txt',sha256:digest(text),role:'record',start:0,end:text.length,complete:true,derived:true}]:[],coverage:complete&&!record.attachments?.length?'full':'partial',limitations:record.attachments?.length?[{label:'记录附件',reason:'正文输入未包含附件内容'}]:[]};
+ return {kind:'record',sourceId:record.id,version:String(record.version),title:record.text.split('\n')[0].slice(0,120),sourceUrl:record.sourceUrl||null,text,units:complete?[{id:'record.txt',path:'record.txt',sha256:digest(text),role:'record',start:0,end:text.length,complete:true,derived:true}]:[],coverage:complete&&!record.attachments?.length?'full':'partial',limitations:record.attachments?.length?[{label:'记录附件',reason:'正文输入未包含附件内容'}]:[]};
 }
