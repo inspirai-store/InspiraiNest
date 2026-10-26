@@ -65,8 +65,16 @@ jobs:
       - run: python3 apps/ios/scripts/check_contract.py
       - name: Test app and share extension
         run: |
-          destination=$(xcrun simctl list devices available -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=Object.values(JSON.parse(s).devices).flat().find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(1);process.stdout.write(d.udid)})')
-          xcodebuild -project apps/ios/PersonalLibrary.xcodeproj -scheme PersonalLibrary -destination "platform=iOS Simulator,id=$destination" -derivedDataPath artifacts/ios CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- COLLECTOR_BUNDLE_ID=com.inspirai.devices.unit COLLECTOR_APP_GROUP=group.com.inspirai.devices.unit COLLECTOR_KEYCHAIN_SUFFIX=com.inspirai.devices.unit test
+          IFS=$'\t' read -r destination webkitLibrary < <(xcrun simctl list -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const data=JSON.parse(s);for(const [runtime,devices] of Object.entries(data.devices)){const device=devices.find(d=>d.isAvailable&&d.name.startsWith("iPhone"));if(device){const r=data.runtimes.find(r=>r.identifier===runtime);console.log(device.udid+"\t"+r.bundlePath+"/Contents/Resources/RuntimeRoot/System/Cryptexes/OS/usr/lib/swift/libswiftWebKit.dylib");return}}process.exit(1)})')
+          options=(-project apps/ios/PersonalLibrary.xcodeproj -scheme PersonalLibrary -destination "platform=iOS Simulator,id=$destination" -derivedDataPath artifacts/ios CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- COLLECTOR_BUNDLE_ID=com.inspirai.devices.unit COLLECTOR_APP_GROUP=group.com.inspirai.devices.unit COLLECTOR_KEYCHAIN_SUFFIX=com.inspirai.devices.unit)
+          xcodebuild "${options[@]}" build-for-testing
+          # iOS 18.5 moved the WebKit overlay without its compatibility link.
+          # Use the runtime's own library in the test host's search directory.
+          # https://bugs.webkit.org/show_bug.cgi?id=293831
+          if [ -f "$webkitLibrary" ]; then
+            ln -sf "$webkitLibrary" artifacts/ios/Build/Products/Debug-iphonesimulator/libswiftWebKit.dylib
+          fi
+          xcodebuild "${options[@]}" test-without-building
 
       - name: Reject retired iPhone/iPad artifacts
         run: python3 tooling/releases/check-ios-artifact.py artifacts/ios/Build/Products/Debug-iphonesimulator/PersonalLibrary.app
