@@ -143,15 +143,12 @@ class ConfigurationTests(unittest.TestCase):
         extension_sources = "\n".join(file.read_text(encoding="utf-8") for folder in ["Shared", "ShareExtension"] for file in (ROOT / folder).glob("*.swift"))
         self.assertNotIn("UIApplication.shared", extension_sources)
         self.assertNotIn("print(", sources)
-        reader = (ROOT / "App/LibraryReaderView.swift").read_text(encoding="utf-8")
-        self.assertIn(".nonPersistent()", reader)
-        self.assertIn("httpCookieStore.setCookie(cookie)", reader)
-        self.assertNotIn('forHTTPHeaderField: "Authorization"', reader)
-        bootstrap = (ROOT.parents[1] / "apps/web/public/library-bootstrap.js").read_text(encoding="utf-8")
-        self.assertIn("window.LIBRARY_DELETE", bootstrap)
-        self.assertIn("open-trash", bootstrap)
-        self.assertIn("Object.defineProperty(window, 'LIBRARY_DELETE'", reader)
-        self.assertIn("getElementById('open-trash')", reader)
+        self.assertFalse((ROOT / "App/CaptureView.swift").exists())
+        self.assertFalse((ROOT / "App/LibraryReaderView.swift").exists())
+        self.assertFalse((ROOT / "CaptureAssets").exists())
+        reader = (ROOT / "App/NativeReaderView.swift").read_text(encoding="utf-8")
+        self.assertNotIn("WKWebView", reader)
+        self.assertIn("origin.contains(url)", (ROOT / "Shared/CollectorAPI.swift").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

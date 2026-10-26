@@ -3,6 +3,8 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var plugins: ProductPluginSnapshot?
+    @Published private(set) var authorizationExpired = false
+    @Published private(set) var deviceID = ""
     @Published private(set) var paired = false
     @Published private(set) var serverName = ""
     @Published private(set) var deviceName = ""
@@ -28,6 +30,7 @@ final class AppModel: ObservableObject {
             let credential = try credentials.load()
             plugins = credential.flatMap { ProductPluginSnapshot.cached($0.origin) }
             paired = credential != nil
+            deviceID = credential?.deviceID ?? ""
             serverName = credential?.origin ?? ""; deviceName = credential?.name ?? ""
             items = try Outbox.shared().list()
         } catch { notice = safeMessage(error) }
@@ -56,6 +59,7 @@ final class AppModel: ObservableObject {
         guard attempt == loginGeneration, !Task.isCancelled else { throw CancellationError() }
         try saveCredential(credential)
         UserDefaults.standard.set(credential.origin, forKey: "lastSuccessfulOrigin")
+        authorizationExpired = false
         sessionID = UUID(); snapshot = nil; lastRefresh = nil
         reloadLocal()
         await refresh()
@@ -86,23 +90,25 @@ final class AppModel: ObservableObject {
             try Outbox.shared().cacheDevices(result.devices, origin: serverName)
         } catch {
             guard generation == sessionID, !Task.isCancelled else { return }
-            if case CollectorError.http(401) = error {
-                invalidateViews()
-                try? credentials.clear()
-                paired = false; serverName = ""; deviceName = ""
-            }
+            if case CollectorError.http(let status) = error, [401,403].contains(status) { expireAuthorization() }
             notice = safeMessage(error)
         }
     }
     private func invalidateViews() {
         sessionID = UUID(); snapshot = nil; lastRefresh = nil
     }
-    func forget() {
-        guard !busy else { return }
+    func expireAuthorization() {
+        guard paired || !authorizationExpired else { return }
+        cancelLogin(); authorizationExpired = true
+        invalidateViews(); try? credentials.clear()
+        paired = false; serverName = ""; deviceName = ""; deviceID = ""; plugins = nil
+    }
+    @discardableResult func forget() -> Result<Void, Error> {
+        guard !busy else { return .failure(CollectorError.message("操作未完成")) }
         do {
-            try credentials.clear(); invalidateViews(); reloadLocal()
-            notice = "已移除本机登录。发件箱原文保留；此操作不撤销服务器上的设备。"
-        } catch { notice = safeMessage(error) }
+            try credentials.clear(); authorizationExpired = false; invalidateViews(); reloadLocal()
+            return .success(())
+        } catch { notice = safeMessage(error); return .failure(error) }
     }
     func send(_ item: OutboxItem, bindUnassigned: Bool = false) async {
         guard !busy else { return }; busy = true; notice = nil

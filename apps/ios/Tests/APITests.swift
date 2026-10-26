@@ -176,11 +176,5 @@ extension APITests {
         let block=try await api.blocks().items[0]
         try await api.joinBlock(block,partID:"part",material:BlockMaterials.Material(kind:"record",sourceId:"record",title:"想法"))
     }
-    @MainActor func testCaptureBridgeAllowsOnlyBlocksReadAndQuickJoin() {
-        let bridge=CaptureController(onNavigate:{_ in})
-        XCTAssertTrue(bridge.allowed("/api/blocks","GET"))
-        XCTAssertTrue(bridge.allowed("/api/blocks/00000000-0000-4000-8000-000000000001/join","POST"))
-        XCTAssertFalse(bridge.allowed("/api/blocks/matches/00000000-0000-4000-8000-000000000001","POST"))
-        XCTAssertFalse(bridge.allowed("/api/blocks/00000000-0000-4000-8000-000000000001/structure","POST"))
-    }
+
 }
