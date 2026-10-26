@@ -12,7 +12,6 @@ struct NativeTaskView<Draft: View>: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.scenePhase) private var scenePhase
   @ScaledMetric private var scale: CGFloat = 1
-  @State private var columns: NavigationSplitViewVisibility = .all
   @State private var reviewingDraftID: String?
   private var p: NativePalette { .init(dark: scheme == .dark) }
   var body: some View {
@@ -20,12 +19,12 @@ struct NativeTaskView<Draft: View>: View {
       let tablet = UIDevice.current.userInterfaceIdiom == .pad && geo.size.width >= 760
       Group {
         if tablet {
-          NavigationSplitView(columnVisibility: $columns) {
+          NativeThreeColumnLayout {
             NativeLibrarySidebar(module: $module, library: library)
-              .background(NativeSplitConfiguration().frame(width: 0, height: 0))
-              .navigationSplitViewColumnWidth(240).toolbar(.hidden, for: .navigationBar)
+
+              .toolbar(.hidden, for: .navigationBar)
           } content: {
-            list(tablet: true).navigationSplitViewColumnWidth(320).toolbar(
+            list(tablet: true).toolbar(
               .hidden, for: .navigationBar)
           } detail: {
             NavigationStack {
@@ -37,7 +36,7 @@ struct NativeTaskView<Draft: View>: View {
                 emptyDetail
               }
             }.toolbar(.hidden, for: .navigationBar)
-          }.navigationSplitViewStyle(.balanced)
+          }
         } else {
           NavigationStack(path: $model.path) {
             list(tablet: false).toolbar(.hidden, for: .navigationBar)

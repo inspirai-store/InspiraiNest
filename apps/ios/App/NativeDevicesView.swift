@@ -10,7 +10,6 @@ struct NativeDevicesView: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.scenePhase) private var scene
   @ScaledMetric private var scale: CGFloat = 1
-  @State private var columns: NavigationSplitViewVisibility = .all
   private var p: NativePalette { .init(dark: scheme == .dark) }
   var body: some View {
     GeometryReader { geo in
@@ -18,18 +17,18 @@ struct NativeDevicesView: View {
       ZStack {
         Group {
         if tablet {
-          NavigationSplitView(columnVisibility: $columns) {
+          NativeThreeColumnLayout {
             NativeLibrarySidebar(module: $module, library: library)
-              .background(NativeSplitConfiguration().frame(width: 0, height: 0))
-              .navigationSplitViewColumnWidth(240).toolbar(.hidden, for: .navigationBar)
+
+              .toolbar(.hidden, for: .navigationBar)
           } content: {
-            list(tablet: true).navigationSplitViewColumnWidth(320).toolbar(.hidden, for: .navigationBar)
+            list(tablet: true).toolbar(.hidden, for: .navigationBar)
           } detail: {
             NavigationStack {
               if let device = model.selected { detail(device, tablet: true) }
               else { stateView.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(p.surface) }
             }.toolbar(.hidden, for: .navigationBar)
-          }.navigationSplitViewStyle(.balanced)
+          }
         } else {
           NavigationStack(path: $model.path) {
             list(tablet: false).toolbar(.hidden, for: .navigationBar)

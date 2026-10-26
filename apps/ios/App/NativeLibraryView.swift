@@ -12,7 +12,6 @@ struct NativeLibraryView<Reader: View>: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.dynamicTypeSize) private var dynamicType
   @ScaledMetric private var size: CGFloat = 34
-  @State private var columns: NavigationSplitViewVisibility = .all
   private var selected: ReadEntry? { model.entries.first(where: { $0.id == model.selectedID }) }
   @State private var panel: String?
   @State private var categorySegment = 0
@@ -33,12 +32,10 @@ struct NativeLibraryView<Reader: View>: View {
       let tablet = UIDevice.current.userInterfaceIdiom == .pad && geometry.size.width >= 760
       Group {
         if tablet {
-          NavigationSplitView(columnVisibility: $columns) {
-            NativeLibrarySidebar(module: $module, library: model).background(
-              NativeSplitConfiguration().frame(width: 0, height: 0)
-            ).navigationSplitViewColumnWidth(240).toolbar(.hidden, for: .navigationBar)
+          NativeThreeColumnLayout {
+            NativeLibrarySidebar(module: $module, library: model).toolbar(.hidden, for: .navigationBar)
           } content: {
-            list(tablet: true).navigationSplitViewColumnWidth(320).toolbar(
+            list(tablet: true).toolbar(
               .hidden, for: .navigationBar)
           } detail: {
             if statePage {
@@ -52,7 +49,7 @@ struct NativeLibraryView<Reader: View>: View {
             } else {
               p.surface
             }
-          }.navigationSplitViewStyle(.balanced).ignoresSafeArea(.container, edges: [.top, .bottom])
+          }.ignoresSafeArea(.container, edges: [.top, .bottom])
         } else {
           NavigationStack(path: $path) {
             list(tablet: false).ignoresSafeArea(.container, edges: .top).toolbar(

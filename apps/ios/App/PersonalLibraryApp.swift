@@ -15,7 +15,7 @@ struct PersonalLibraryApp: App {
                         do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { break }
                     }
                 }
-                // Cover native previews and the web view in the app-switcher.
+                // Cover private content in the app-switcher.
                 .overlay { if scenePhase != .active { Color(.systemBackground).ignoresSafeArea().overlay(Text("灵藏")) } }
         }
     }

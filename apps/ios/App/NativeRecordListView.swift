@@ -88,7 +88,6 @@ struct NativeRecordListView: View {
   var syncModel:NativeRecordSyncModel?
   var processingModel:NativeRecordProcessingModel?
   var autoReload = true
-  @State private var columns: NavigationSplitViewVisibility = .all
   @Environment(\.colorScheme) private var scheme
   @ScaledMetric private var scale: CGFloat = 1
   @ScaledMetric(relativeTo: .largeTitle) private var headerScale: CGFloat = 1
@@ -99,12 +98,12 @@ struct NativeRecordListView: View {
       let tablet = UIDevice.current.userInterfaceIdiom == .pad && geometry.size.width >= 760
       Group {
         if tablet {
-          NavigationSplitView(columnVisibility: $columns) {
+          NativeThreeColumnLayout {
             NativeRecordSidebar(model: model, module: $module,recordsHome:recordsHome)
-              .background(NativeSplitConfiguration().frame(width: 0, height: 0))
-              .navigationSplitViewColumnWidth(240).toolbar(.hidden, for: .navigationBar)
+
+              .toolbar(.hidden, for: .navigationBar)
           } content: {
-            list(tablet: true).navigationSplitViewColumnWidth(320).toolbar(
+            list(tablet: true).toolbar(
               .hidden, for: .navigationBar)
           } detail: {
             Group {
@@ -118,7 +117,7 @@ struct NativeRecordListView: View {
               p.paper.toolbar(.hidden, for: .navigationBar)
             }
             }.background(GeometryReader {geometry in Color.clear.preference(key:NativeRecordDetailBounds.self,value:geometry.frame(in:.global))})
-          }.navigationSplitViewStyle(.balanced).ignoresSafeArea(.container, edges: [.top, .bottom])
+          }.ignoresSafeArea(.container, edges: [.top, .bottom])
         } else {
           NavigationStack(path: $model.path) {
             list(tablet: false).toolbar(.hidden, for: .navigationBar)

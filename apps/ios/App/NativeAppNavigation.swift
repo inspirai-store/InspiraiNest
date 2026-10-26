@@ -28,37 +28,25 @@ enum NativeAppModule: String, CaseIterable, Identifiable {
     }
   }
 }
-struct NativeSplitConfiguration: UIViewControllerRepresentable {
-  func makeUIViewController(context: Context) -> Controller { Controller() }
-  func updateUIViewController(_ controller: Controller, context: Context) { controller.configure() }
-  final class Controller: UIViewController {
-    override func viewDidLoad() {
-      super.viewDidLoad()
-      view.isUserInteractionEnabled = false
-    }
-    override func didMove(toParent parent: UIViewController?) {
-      super.didMove(toParent: parent)
-      configure()
-    }
-    override func viewDidLayoutSubviews() {
-      super.viewDidLayoutSubviews()
-      configure()
-    }
-    func configure() {
-      var ancestor = parent
-      while let current = ancestor {
-        if let split = current as? UISplitViewController {
-          split.primaryBackgroundStyle = .none
-          split.minimumPrimaryColumnWidth = 240
-          split.maximumPrimaryColumnWidth = 240
-          split.preferredPrimaryColumnWidth = 240
-          split.minimumSupplementaryColumnWidth = 320
-          split.maximumSupplementaryColumnWidth = 320
-          split.preferredSupplementaryColumnWidth = 320
-          break
-        }
-        ancestor = current.parent
-      }
+struct NativeThreeColumnLayout<Sidebar: View, Content: View, Detail: View>: View {
+  let sidebar: Sidebar
+  let content: Content
+  let detail: Detail
+  @Environment(\.colorScheme) private var scheme
+  init(@ViewBuilder sidebar: () -> Sidebar, @ViewBuilder content: () -> Content,
+       @ViewBuilder detail: () -> Detail) {
+    self.sidebar = sidebar()
+    self.content = content()
+    self.detail = detail()
+  }
+  var body: some View {
+    let p = NativePalette(dark: scheme == .dark)
+    HStack(spacing: 0) {
+      sidebar.frame(width: 240).frame(maxHeight: .infinity)
+      Rectangle().fill(p.separator).frame(width: 0.5)
+      content.frame(width: 320).frame(maxHeight: .infinity)
+      Rectangle().fill(p.separator).frame(width: 0.5)
+      detail.frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }

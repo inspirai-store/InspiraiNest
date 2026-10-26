@@ -30,4 +30,8 @@
 - Xcode PersonalLibraryTests：原生页面模型、学习、登录、发件箱、附件、草稿、记录同步及旧数据导入。
 - `python3 tooling/releases/check-ios-artifact.py <artifact>`：发行包的 UI 代际与旧资源检查。
 
+iPad 三栏使用明确的原生列布局，保留 240/320 点导航列，避免系统在竖屏时收起主导航后无法切换模块。
+
+本次旧 1.0.7 (12) TestFlight 构建已设为过期，本机对应 IPA、归档和解包副本已删除，仅保留日志与校验记录。1.0.4 (11) 经核实为原生 UI，不列入旧壳退役范围。
+
 桌面及 Android 不属于此次 iOS UI 迁移，不改变其发行版本。
