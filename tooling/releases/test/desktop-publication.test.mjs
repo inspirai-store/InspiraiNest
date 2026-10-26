@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';import yaml from 'js-yaml';
-import {digest,targets,preparePublication,verifyPublic,unsignedPE,packageFeed} from '../desktop-publication.mjs';
+import {digest,targets,preparePublication,verifyPublic,unsignedPE,packageFeed,retainedTaskAssignments} from '../desktop-publication.mjs';
 import {githubJson,successfulJob,releaseForTag} from '../github-api.mjs';
 import {clientDownload} from '../../../services/api/modules/client-download.mjs';
 function fixture(t,version='0.2.33'){
@@ -62,4 +62,12 @@ test('a draft without a published tag is found and reused by release identity',(
 test('public downloads remain readable when verified inputs have owner-only permissions',{skip:process.platform==='win32'},async t=>{
  const{args}=fixture(t);for(const name of fs.readdirSync(args.artifacts))fs.chmodSync(path.join(args.artifacts,name),0o600);
  const plan=await preparePublication(args);for(const file of [...plan.files.map(f=>f.filename),'desktop-release.json'])assert.equal(fs.statSync(path.join(args.overlay,file)).mode&0o777,0o644,file);
+});
+
+test('distribution rollout retains active assignment scopes and allows a completed task',()=>{
+ const before={taskScopes:[{id:'task',state:'running',scopeHash:'same'}]};
+ assert.equal(retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'uploading',scopeHash:'same'}]}).retained,1);
+ assert.equal(retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'completed',scopeHash:'cleared'}]}).retained,1);
+ assert.throws(()=>retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'queued',scopeHash:'cleared'}]}),/assignment changed/);
+ assert.throws(()=>retainedTaskAssignments(before,{taskScopes:[]}),/disappeared/);
 });

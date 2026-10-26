@@ -64,3 +64,14 @@ export async function verifyPublic(plan,{fetcher=fetch,full=true,before}={}){
  const page=await fetcher(origin+'/download',{redirect:'error'});assert(page.ok,'Download page unavailable');assert((await page.text()).includes('worker-title'));
  return {at:new Date().toISOString(),version:plan.version,passed:true,checks,downloadPage:origin+'/download'};
 }
+
+// Distribution-only rolling updates keep the same API and durable Worker leases.
+export function retainedTaskAssignments(before,after){
+ const active=new Set(['assigned','running','uploading']),finished=new Set(['completed','archived','cancelled','failed','waiting_action']);
+ const current=new Map(after.taskScopes.map(task=>[task.id,task]));let retained=0;
+ for(const task of before.taskScopes.filter(task=>active.has(task.state))){
+  const next=current.get(task.id);assert(next,'Active task disappeared: '+task.id);
+  assert(next.scopeHash===task.scopeHash||finished.has(next.state),'Active task assignment changed: '+task.id);retained++;
+ }
+ return {retained};
+}
