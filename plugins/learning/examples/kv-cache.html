@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KV Cache 容量</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3ed;color:#232820;font:16px/1.7 system-ui,-apple-system,sans-serif}main{max-width:850px;margin:auto;padding:32px 24px}h1{font-size:32px;line-height:1.3;margin:0 0 20px}h2{font-size:20px;margin:0 0 12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.card{background:white;border:1px solid #dadfd3;border-radius:16px;padding:24px}label{display:grid;gap:8px;margin:0 0 18px}input,select,button{font:inherit;accent-color:#39704b}select,button{padding:8px;border:1px solid #c7cec1;border-radius:8px;background:white;color:inherit}output{display:block;font-size:38px;font-weight:650;color:#2c6543}.formula{font:14px/1.9 ui-monospace,monospace;overflow-wrap:anywhere;background:#eef2e9;border-radius:8px;padding:16px}p{margin:14px 0}button{cursor:pointer}@media(max-width:600px){.grid{grid-template-columns:1fr}main{padding:20px 16px}.card{padding:18px}}
+</style>
+<main><h1>KV Cache 容量</h1><div class="grid"><section class="card"><h2>模型与请求</h2>
+<label>模型层数 <input id="layers" type="number" min="1" max="256" value="32"></label>
+<label>KV 头数 <input id="heads" type="number" min="1" max="128" value="8"></label>
+<label>每个头的维度 <input id="dim" type="number" min="1" max="512" value="128"></label>
+<label>每元素字节数 <select id="precision"><option value="2">2 字节</option><option value="1">1 字节</option><option value="4">4 字节</option></select></label>
+<label>每条序列缓存的 token <input id="length" type="number" min="1" max="1048576" value="8192"></label>
+<label>活跃序列数 <input id="batch" type="number" min="1" max="1024" value="1"></label><button id="reset">重置</button>
+</section><section class="card"><h2>逻辑 KV 容量</h2><output id="capacity" aria-live="polite"></output><p id="per-token"></p><div class="formula" id="formula"></div><p>前面的 2 表示同时保存 Key 和 Value。这里使用 KV 头数；GQA 的 Query 头数可以与它不同。</p><p>这是未压缩的标准 MHA/GQA 逻辑估算，不包含分页浪费、元数据、运行时临时空间和额外副本。每张设备的实际分配还取决于实现与分片方式。</p><h2>试一试</h2><p>把活跃序列数改为 4，再把每元素字节数改为 1。分别解释容量为什么变化，并判断哪些实际成本仍未计入。</p></section></div></main>
+<script>
+const ids=['layers','heads','dim','precision','length','batch'],defaults=[32,8,128,2,8192,1];
+function update(){const values=ids.map(id=>Number(document.getElementById(id).value));if(values.some(v=>!Number.isFinite(v)||v<1)){document.getElementById('capacity').textContent='请输入有效参数';return;}const[l,h,d,b,s,n]=values,per=2*l*h*d*b,total=per*s*n;document.getElementById('capacity').textContent=(total/2**30).toLocaleString('zh-CN',{maximumFractionDigits:3})+' GiB';document.getElementById('per-token').textContent='每 token 的全层 KV：'+(per/1024).toLocaleString('zh-CN',{maximumFractionDigits:2})+' KiB';document.getElementById('formula').textContent='2 × '+values.join(' × ')+' = '+total.toLocaleString('zh-CN')+' 字节';}
+ids.forEach(id=>document.getElementById(id).addEventListener('input',update));document.getElementById('reset').addEventListener('click',()=>{ids.forEach((id,i)=>document.getElementById(id).value=defaults[i]);update();});update();
+</script></html>

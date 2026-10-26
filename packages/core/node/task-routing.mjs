@@ -19,6 +19,7 @@ export function canRunTask(task, device) {
   if(task.purpose==='codex-trial')return workerAuthorized(device) && device.id===task.trial?.deviceId && device.trialEnvironment?.protocol===1 && device.agents?.includes('codex');
   return workerAuthorized(device) && !capabilityBlock(task,device) && Boolean(device.agents?.some(isExecutionAgent))
     && (task.pluginId!=='blocks'||device.blocksProtocol===1)
+    && (task.pluginId!=='learning'||device.learningProtocol===1)
     && (task.purpose!=='selection-writing'||device.selectionWritingProtocol===1)
     && (!task.recordId || device.recordProtocol === 1)
     && supportsWritingTask(task, device)

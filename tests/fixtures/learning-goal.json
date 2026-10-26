@@ -1,0 +1,396 @@
+{
+  "title": "AI 基础软件架构师",
+  "expectedAbility": "能够解释、定位并验证大模型训推系统中的计算、显存、算子、编译和通信问题，形成可维护的架构方案。",
+  "foundation": "已有软件工程基础，从大模型系统开始；数学、编程和操作系统知识按节点需要补充。",
+  "nodes": [
+    {
+      "id": "tensors",
+      "stage": "模型与执行基础",
+      "title": "张量与模型执行",
+      "objectives": [
+        "解释张量形状、数据类型和算子调用",
+        "区分训练、推理和自动微分"
+      ],
+      "dependsOn": [],
+      "explanation": "从一个线性层开始：输入张量与权重做矩阵乘法，再应用激活函数。模型框架负责组织算子，设备运行时安排实际执行。先记录每一步的输入输出形状，再讨论速度与显存。",
+      "citations": [],
+      "recall": [
+        "为什么形状、精度和布局都会影响执行？"
+      ],
+      "exercises": [
+        "用一个两层网络列出张量形状与中间结果。"
+      ],
+      "order": 0,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "transformer",
+      "stage": "模型与执行基础",
+      "title": "Transformer 与 Attention",
+      "objectives": [
+        "解释 Q K V、因果掩码和注意力计算",
+        "描述一次生成请求的数据流"
+      ],
+      "dependsOn": [
+        "tensors"
+      ],
+      "explanation": "注意力用当前位置的 Query 与历史 Key 计算相关性，再汇总 Value。因果掩码限制信息访问范围。生成时通常逐步产生新 token，需要同时理解数学运算和执行时序。",
+      "citations": [],
+      "recall": [
+        "Q、K、V 分别解决什么问题？"
+      ],
+      "exercises": [
+        "画出从输入 token 到下一个 token 的计算过程。"
+      ],
+      "order": 1,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "prefill-decode",
+      "stage": "推理系统",
+      "title": "Prefill 与 Decode",
+      "objectives": [
+        "区分输入处理与逐步生成",
+        "理解 TTFT、ITL、吞吐和排队"
+      ],
+      "dependsOn": [
+        "transformer"
+      ],
+      "explanation": "Prefill 处理输入上下文，Decode 利用已得到的上下文继续生成。两阶段的计算形状和数据复用机会不同。以实际 batch、序列长度和硬件测量为依据，判断瓶颈。",
+      "citations": [],
+      "recall": [
+        "为什么吞吐升高时，首 token 延迟仍可能变差？"
+      ],
+      "exercises": [
+        "给出一个固定资源下同时比较吞吐与尾延迟的实验设计。"
+      ],
+      "order": 2,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "kv-cache",
+      "stage": "推理系统",
+      "title": "KV Cache",
+      "objectives": [
+        "解释为何保存历史 Key 和 Value",
+        "估算逻辑 KV 容量",
+        "区分缓存命中、容量与传输成本"
+      ],
+      "dependsOn": [
+        "prefill-decode"
+      ],
+      "explanation": "KV Cache 保存历史 token 在各层产生的 Key 和 Value。生成新 token 时，新的 Query 可以直接访问历史 KV，避免重复计算历史 token 的 K/V。它并没有消除读取历史 KV 的成本。\n\n对配置一致的标准 MHA/GQA，未压缩逻辑容量可估算为：\n\n`2 × 层数 × KV 头数 × 头维度 × 每元素字节数 × 有效 token 总数`\n\n**假设例子**：32 层、8 个 KV 头、头维度 128、每元素 2 字节，一条序列缓存 8192 token，逻辑 KV 为 1 GiB。该数字不包含分页浪费、元数据、运行时临时空间，也不直接代表每张卡的物理分配。\n\n演示可以让学习者改变上下文长度、并发、精度和 KV 头数，观察容量变化。GQA 的 KV 头数不同于 Query 头数；多卡情况下需要按实际分片或复制方式分析。",
+      "citations": [],
+      "recall": [
+        "缓存让哪些计算不用重复做？哪些读取仍然存在？"
+      ],
+      "exercises": [
+        "按上述假设计算 4 条 8192 token 序列的逻辑 KV，然后说明为何不能直接把结果当作设备显存需求。"
+      ],
+      "order": 3,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "scheduler",
+      "stage": "推理系统",
+      "title": "调度与缓存管理",
+      "objectives": [
+        "理解连续批处理、分页和前缀复用",
+        "区分 PagedAttention 与 FlashAttention"
+      ],
+      "dependsOn": [
+        "kv-cache"
+      ],
+      "explanation": "把计算调度与缓存管理分开分析：哪些请求进入本轮计算，缓存如何分配与回收，哪些前缀可以复用。缓存命中取决于可复用上下文、实现和配置。",
+      "citations": [],
+      "recall": [
+        "缓存容量尚有余量，为什么仍可能出现等待？"
+      ],
+      "exercises": [
+        "设计两种不同输入输出长度的工作负载，比较排队和缓存压力。"
+      ],
+      "order": 4,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "quantization",
+      "stage": "推理系统",
+      "title": "量化与 PD 分离",
+      "objectives": [
+        "区分权重量化与 KV 量化",
+        "比较分离部署的收益与 KV 传输成本"
+      ],
+      "dependsOn": [
+        "scheduler"
+      ],
+      "explanation": "量化减少数据体积，但实际收益还受硬件、算子与转换开销影响。PD 分离需要比较隔离计算干扰的收益、KV 传输成本和资源配比，不能预设吞吐一定提高。",
+      "citations": [],
+      "recall": [
+        "量化后为什么可能更慢？"
+      ],
+      "exercises": [
+        "为同等资源下的合并与分离部署列出比较条件。"
+      ],
+      "order": 5,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "gpu",
+      "stage": "单卡性能",
+      "title": "GPU 存储与性能分析",
+      "objectives": [
+        "识别计算、访存和同步瓶颈",
+        "建立正确性与性能基线"
+      ],
+      "dependsOn": [
+        "tensors"
+      ],
+      "explanation": "先检查真实形状、数据类型、执行时间线和带宽，再选择分块、复用、融合等方法。设备利用率高并不证明有效计算充分。",
+      "citations": [],
+      "recall": [
+        "单个算子加速为什么不一定带来相同比例的端到端改善？"
+      ],
+      "exercises": [
+        "选择一个矩阵乘法，记录形状、精度、预热和计时方式。"
+      ],
+      "order": 6,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "kernels",
+      "stage": "单卡性能",
+      "title": "CUDA Triton 与 TileLang",
+      "objectives": [
+        "理解并行映射和数据复用",
+        "比较手写内核与编译生成"
+      ],
+      "dependsOn": [
+        "gpu"
+      ],
+      "explanation": "以矩阵乘或归一化为起点，逐步分析分块、寄存器、片上存储、同步和布局。先验证误差与边界输入，再比较性能。工具可用性需要核对当前硬件和后端。",
+      "citations": [],
+      "recall": [
+        "tile 越大是否总是更好？"
+      ],
+      "exercises": [
+        "实现或阅读一个归一化内核，列出正确性和性能测试矩阵。"
+      ],
+      "order": 7,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "compiler",
+      "stage": "编译与自动优化",
+      "title": "计算图 IR 与 Pass",
+      "objectives": [
+        "解释图捕获到代码生成的链路",
+        "理解保持语义的程序变换"
+      ],
+      "dependsOn": [
+        "kernels"
+      ],
+      "explanation": "把一次编译拆为图捕获、中间表示、分析、变换、目标映射和代码生成。重点观察动态形状、布局与重新编译成本。",
+      "citations": [],
+      "recall": [
+        "修改编译器与只优化一个 kernel 有什么不同？"
+      ],
+      "exercises": [
+        "选择一个融合案例，说明输入约束、语义和失效条件。"
+      ],
+      "order": 8,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "parallel",
+      "stage": "分布式训推",
+      "title": "分布式并行策略",
+      "objectives": [
+        "比较 DP TP PP EP CP",
+        "解释计算、通信与等待"
+      ],
+      "dependsOn": [
+        "transformer",
+        "gpu"
+      ],
+      "explanation": "按参数、激活、梯度和专家路由的数据移动分析并行策略。扩展效率取决于模型、批量、拓扑与同步依赖。",
+      "citations": [],
+      "recall": [
+        "为什么卡数增加后加速比下降？"
+      ],
+      "exercises": [
+        "画出一种并行策略的数据与通信时序。"
+      ],
+      "order": 9,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "collectives",
+      "stage": "分布式训推",
+      "title": "集合通信与计算通信重叠",
+      "objectives": [
+        "区分 AllReduce AllGather ReduceScatter All-to-All",
+        "验证有效的计算通信重叠"
+      ],
+      "dependsOn": [
+        "parallel"
+      ],
+      "explanation": "先明确通信语义和参与者，再计算消息规模，观察通信与计算是否真正并行。异步提交本身不保证重叠，还可能产生资源争用。",
+      "citations": [],
+      "recall": [
+        "为什么异步通信后反而更慢？"
+      ],
+      "exercises": [
+        "用时间线设计一个能证明或否定有效重叠的实验。"
+      ],
+      "order": 10,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "post-training",
+      "stage": "分布式训推",
+      "title": "后训练与 VeRL",
+      "objectives": [
+        "解释生成、奖励、更新和权重同步",
+        "分析 Rollout 与训练资源分配"
+      ],
+      "dependsOn": [
+        "parallel",
+        "scheduler"
+      ],
+      "explanation": "沿后训练的数据流理解生成样本、奖励计算、优势估计、模型更新和权重同步。区分算法效果与系统执行效率。",
+      "citations": [],
+      "recall": [
+        "训练和推理如何共享资源，代价是什么？"
+      ],
+      "exercises": [
+        "为 Rollout 变慢列出分层定位顺序。"
+      ],
+      "order": 11,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "adaptation",
+      "stage": "适配与架构实践",
+      "title": "国产芯片适配",
+      "objectives": [
+        "分层定位兼容性和精度问题",
+        "建立可维护的适配路线"
+      ],
+      "dependsOn": [
+        "compiler",
+        "collectives"
+      ],
+      "explanation": "按框架、算子、编译后端、运行时、驱动和通信检查问题。建立参考结果，逐步推进运行正确、性能可用和长期稳定。实际支持范围以厂商和上游版本为准。",
+      "citations": [],
+      "recall": [
+        "能运行但性能差，如何确定改动层次？"
+      ],
+      "exercises": [
+        "拟定一个模型适配的正确性、性能和升级兼容验收表。"
+      ],
+      "order": 12,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "architecture",
+      "stage": "适配与架构实践",
+      "title": "综合架构与基准验证",
+      "objectives": [
+        "从性能现象推导架构取舍",
+        "用受控实验验证收益与边界"
+      ],
+      "dependsOn": [
+        "adaptation",
+        "post-training",
+        "quantization"
+      ],
+      "explanation": "固定模型、硬件、精度、输入输出长度、并发与版本，分解计算、访存、通信和排队。比较方案的性能、正确性、稳定性和维护成本。",
+      "citations": [],
+      "recall": [
+        "怎样证明改善来自自己的改动？"
+      ],
+      "exercises": [
+        "设计一次完整的推理服务优化复盘，保留未验证假设。"
+      ],
+      "order": 13,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    },
+    {
+      "id": "frontier",
+      "stage": "前沿延伸",
+      "title": "前沿论文与版本演进",
+      "objectives": [
+        "将新技术映射回已有原理和瓶颈",
+        "判断适用条件与复现要求"
+      ],
+      "dependsOn": [
+        "architecture"
+      ],
+      "explanation": "主动更新时读取官方文档、原始论文与版本变更。先说明新方法改变哪一层、依赖什么条件，再设计与已有基线的比较。",
+      "citations": [],
+      "recall": [
+        "新论文的结论能否直接迁移到当前硬件与负载？"
+      ],
+      "exercises": [
+        "选择一项新方法，整理假设、版本、复现条件与未覆盖场景。"
+      ],
+      "order": 14,
+      "contentRevision": 1,
+      "mastery": "pending",
+      "notes": "",
+      "progressRevision": 0
+    }
+  ],
+  "id": "11111111-1111-4111-8111-111111111111",
+  "revision": 1,
+  "state": "active",
+  "sources": [],
+  "attempts": [],
+  "artifacts": [],
+  "handoffs": [],
+  "runs": [],
+  "jobs": [],
+  "nextNodeId": "tensors"
+}

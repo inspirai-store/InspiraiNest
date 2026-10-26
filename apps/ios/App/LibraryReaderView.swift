@@ -159,6 +159,7 @@ struct LibraryReaderView: View {
             Text("只读资料浏览；删除、回收站操作需在管理页面完成。").font(.caption).foregroundStyle(.secondary).padding(6)
         }.navigationTitle("资料库").navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if model.plugins?.supports("learning") == true { NavigationLink("新知") { LearningView().id(model.sessionID) } }
             if model.plugins?.supports("blocks") == true { NavigationLink("积木") { BlocksLibraryView().id(model.sessionID) } }
             NavigationLink("附件") { ArchiveListView().id(model.sessionID) }.disabled(!model.paired)
             Button("重新载入") { Task { await reader.start() } }.disabled(!model.paired || reader.loading)

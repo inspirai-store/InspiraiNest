@@ -82,6 +82,7 @@ import store.inspirai.library.nativeui.design.*
     val content=remember(text){MarkdownContent.parse(text)};val list=rememberLazyListState();val scope=rememberCoroutineScope();val context=LocalContext.current
     LaunchedEffect(id,file) { model.load(id,file) }
     DetailScaffold("",back,actions={
+        if(pluginEnabled("learning"))TextButton(onClick={open("learning")}) { Text("加入新知") }
         if(pluginEnabled("blocks"))TextButton(onClick={open("join:entry:$id")}) { Text("加入积木") }
         IconButton(onClick={scope.launch { if(id in favorites)repository.dao.unfavorite(repository.credentials.server(),id) else repository.dao.favorite(Favorite(repository.credentials.server(),id)) }}) { Icon(if(id in favorites)Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,"收藏") }
         Box { IconButton(onClick={more=true}) { Icon(Icons.Outlined.MoreHoriz,"更多") };DropdownMenu(more,{more=false}) {

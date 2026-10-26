@@ -227,3 +227,18 @@ extension CollectorAPI {
   _ = try await request("/api/blocks/\(identifier(block.id))/join",method:"POST",body:JSONSerialization.data(withJSONObject:input))
  }
 }
+
+// Native learning clients use the same authenticated, origin-bound transport.
+extension CollectorAPI {
+ func learningIndex() async throws -> LearningIndex { try await decoded(LearningIndex.self,path:"/api/learning") }
+ func learningSources() async throws -> LearningSources { try await decoded(LearningSources.self,path:"/api/learning/sources") }
+ func learningGoal(_ id:String) async throws -> LearningGoal { try await decoded(LearningGoal.self,path:"/api/learning/goals/\(identifier(id))") }
+ func learningArtifact(_ id:String) async throws -> LearningArtifactBody {
+  guard id.count==64,id.allSatisfy({$0.isHexDigit}) else {throw CollectorError.message("教学文件编号无效")}
+  return try await decoded(LearningArtifactBody.self,path:"/api/learning/artifacts/"+id)
+ }
+ func learningPost(_ path:String,input:[String:Any]) async throws {
+  guard path.hasPrefix("/api/learning/") else {throw CollectorError.message("新知接口无效")}
+  _ = try await request(path,method:"POST",body:JSONSerialization.data(withJSONObject:input))
+ }
+}

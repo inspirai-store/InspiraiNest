@@ -108,7 +108,7 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
                 stateHolder.SaveableStateProvider(tab) {
                     when(tab) {
                         "library"->LibraryPage(library,open={open("reader:$it")},collect={open("share:${java.util.UUID.randomUUID()}")},connect={open("pair")})
-                        "records"->RecordsPage(records,open={open("record:$it")},create={open("edit:${java.util.UUID.randomUUID()}")},blocks={open("blocks")},writing={if(pluginCatalog.enabled("writing"))context.startActivity(Intent(context,store.inspirai.library.CaptureActivity::class.java).putExtra("writing",true))})
+                        "records"->RecordsPage(records,open={open("record:$it")},create={open("edit:${java.util.UUID.randomUUID()}")},blocks={open("blocks")},learning={open("learning")},writing={if(pluginCatalog.enabled("writing"))context.startActivity(Intent(context,store.inspirai.library.CaptureActivity::class.java).putExtra("writing",true))})
                         "tasks"->TasksPage(tasks,open={open("task:$it")},create={open("share:${java.util.UUID.randomUUID()}")},startSession={ids->if(ids.isNotEmpty()){session=ids;sessionIndex=0;open("task:${ids.first()}")}})
                         else->AccountPage(account,theme,onTheme,::open)
                     }
@@ -128,6 +128,8 @@ private val roots=listOf(Destination("records","记录"),Destination("library","
                         target=="pair"->PairPage(repository,{back()},{onConnectionChanged();back()})
                         target=="outbox"->OutboxPage(repository,{back()},::open)
                         target=="devices" || target.startsWith("device:")->DevicesPage(account,target.removePrefix("device:").takeIf { target.startsWith("device:") },{back()},::open)
+                        target=="learning"->LearningPage(repository,{back()})
+                        target.startsWith("learn:")->LearningPage(repository,{back()},target.removePrefix("learn:"))
                         target=="blocks"->BlocksPage(repository,{back()})
                         target.startsWith("join:")->target.split(":",limit=3).let { args->BlocksPage(repository,{back()},args[1],args[2]) }
                         target=="plugins"->PluginsPage({back()})

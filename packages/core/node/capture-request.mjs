@@ -14,7 +14,8 @@ export function validateCaptureRequest(input) {
   const contentTrash=method==='GET'&&(route==='/api/content-trash'||/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+$/.test(route))||method==='POST'&&/^\/api\/content-trash\/(record|writing|task|selection-writing|library)\/[a-zA-Z0-9-]+\/(delete|restore)$/.test(route);
   const recordChanges=method==='GET'&&/^\/api\/records\/changes\?(?:cursor=[a-f0-9%:-]+&)?wait=(?:[0-9]|1[0-9]|2[0-5])(?:&limit=(?:[1-9][0-9]?|1[0-9]{2}|200))?$/i.test(route);
   const blocksRoute = method==='GET'&&/^\/api\/blocks(?:\/materials|\/[a-f0-9-]{36}(?:\/handoffs)?)?$/.test(route)||method==='POST'&&(route==='/api/blocks'||/^\/api\/blocks\/[a-f0-9-]{36}\/(structure|pause|link|join|exclude|evaluate)$/.test(route));
-  requireValue(blocksRoute||allowed||writingGet||writingPost||contentTrash||recordChanges||creationRoute(route,method),'Capture route not allowed',403);
+  const learningRoute=(method==='GET'&&/^\/api\/learning(?:\/(?:sources|goals\/[a-f0-9-]{36}|artifacts\/[a-f0-9]{64}))?$/.test(route))||(method==='POST'&&/^\/api\/learning\/(?:intake|goals(?:\/[a-f0-9-]{36}\/(?:edit|progress|attempts|apply|assist|teaching|artifacts|writing))?|candidates\/[a-f0-9]{64})$/.test(route));
+  requireValue(learningRoute||blocksRoute||allowed||writingGet||writingPost||contentTrash||recordChanges||creationRoute(route,method),'Capture route not allowed',403);
   if (input.bytes !== undefined) requireValue(typeof input.bytes === 'string' && input.bytes.length <= 44739244 && method === 'PUT' && route.includes('/media/'),'Invalid media body');
   return input;
 }
