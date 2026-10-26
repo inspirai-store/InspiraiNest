@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {fileDigest,origin,targets,preparePublication,readPublic,verifyPublic} from './desktop-publication.mjs';
+import {fileDigest,origin,targets,packageFeed,preparePublication,readPublic,verifyPublic} from './desktop-publication.mjs';
 import {githubJson,successfulJob} from './github-api.mjs';
 
 const repo='inspirai-store/InspiraiNest',root=path.resolve(import.meta.dirname,'../..');
@@ -12,7 +12,8 @@ assert(['publish','audit','reconcile'].includes(mode));fs.mkdirSync(work,{recurs
 const save=(name,data)=>fs.writeFileSync(path.join(work,name),JSON.stringify(data,null,2)+'\n');
 function command(exe,args,options={}){const r=spawnSync(exe,args,{cwd:root,encoding:'utf8',timeout:600000,...options});assert.equal(r.status,0,`${exe} ${args[0]} failed${r.stderr?' : '+r.stderr.slice(-1500):''}`);return r.stdout;}
 function gh(route){return githubJson(route,{repository:repo});}
-const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;assert.match(version,/^\d+\.\d+\.\d+$/,'Formal publication requires a stable version');assert.equal(JSON.parse(fs.readFileSync(path.join(root,'collector/package.json'))).version,version);
+const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version;assert.match(version,/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/,'Invalid desktop release version');assert.equal(JSON.parse(fs.readFileSync(path.join(root,'collector/package.json'))).version,version);
+const beta=version.includes('-beta.'),feedNames=['windows','macos'].map(p=>packageFeed(version,p));
 const tag='v'+version,before=await readPublic(),input=path.join(work,'packages');fs.mkdirSync(input,{recursive:true});save('public-before.json',before);
 let platforms,source,base,notes;
 function trustedRun(id,commit,workflow,jobName){
@@ -40,7 +41,7 @@ if(mode==='publish'){
    for(const name of ['Verify signatures, both architectures and update metadata','Test signed macOS React records, login and safe conflicts','Test signed macOS planning conversation and owner bridge','Test signed Apple Silicon update download','Test signed macOS update window shutdown'])assert.equal(job.steps.find(s=>s.name===name)?.conclusion,'success',name);
   }
   if(source.commit)assert.equal(proof.commit,source.commit,'Formal platforms must use the same reviewed commit');source.commit=proof.commit;source[platform]={run:platform==='windows'?proof.sourceCI:proof.run,...(platform==='windows'?{artifactId:proof.artifactId,artifactDigest:proof.artifactDigest}:{})};
-  for(const file of fs.readdirSync(folder)){if(file.startsWith(`InspiraiNest-v${version}-`)||['latest.yml','latest-mac.yml'].includes(file))fs.copyFileSync(path.join(folder,file),path.join(input,file));}
+  for(const file of fs.readdirSync(folder)){if(file.startsWith(`InspiraiNest-v${version}-`)||feedNames.includes(file))fs.copyFileSync(path.join(folder,file),path.join(input,file));}
  }
  const sourceNotes=JSON.parse(command('git',['show',source.commit+':apps/desktop/release-notes.json']));notes=sourceNotes.find(r=>r.version===version)?.releaseNotes;assert(notes);
  command('python3',['tooling/releases/deploy-desktop-release.py','inspect','--work',work]);base=JSON.parse(fs.readFileSync(path.join(work,'base/desktop-release.json')));
@@ -75,11 +76,11 @@ try{release=gh('releases/tags/'+tag);}catch(error){if(mode!=='publish')throw err
 if(mode!=='audit'){
  if(!release){
   const body=path.join(work,'release-notes.md');fs.writeFileSync(body,notes+'\n\nWindows x64 为未签名 CI 包；macOS 为 Developer ID 签名和公证包。\n本次发布保留资料、文稿、任务历史及配置；实机升级单独验收。\n');
-  command('gh',['release','create',tag,'--repo',repo,'--target',source.commit,'--draft','--title','灵藏 '+version,'--notes-file',body]);release=gh('releases/tags/'+tag);
+  command('gh',['release','create',tag,'--repo',repo,'--target',source.commit,'--draft',...(beta?['--prerelease']:[]),'--title','灵藏 '+version,'--notes-file',body]);release=gh('releases/tags/'+tag);
  }
  const refResult=spawnSync('gh',['api',`repos/${repo}/git/ref/tags/${tag}`],{encoding:'utf8'});if(refResult.status===0){let ref=JSON.parse(refResult.stdout).object;if(ref.type==='tag')ref=gh('git/tags/'+ref.sha).object;assert.equal(ref.sha,source.commit,'Do not move an existing release tag');}else assert(release.draft);
  const uploads=plan.files.map(f=>({name:f.filename,file:path.join(input,f.filename),size:f.size,sha256:f.sha256}));
- if(mode==='publish')for(const name of [...(platforms.includes('windows')?['latest.yml',`InspiraiNest-v${version}-Windows-x64.exe.sha256`]:[]),...(platforms.includes('macos')?['latest-mac.yml']:[])]){const file=path.join(input,name);uploads.push({name,file,size:fs.statSync(file).size,sha256:await fileDigest(file)});}
+ if(mode==='publish')for(const name of [...(platforms.includes('windows')?[packageFeed(version,'windows'),`InspiraiNest-v${version}-Windows-x64.exe.sha256`]:[]),...(platforms.includes('macos')?[packageFeed(version,'macos')]:[])]){const file=path.join(input,name);uploads.push({name,file,size:fs.statSync(file).size,sha256:await fileDigest(file)});}
  for(const platform of platforms){const files=uploads.filter(f=>f.name.includes(platform==='windows'?'Windows-':'macOS-'));const filename=(platform==='windows'?'Windows':'macOS')+'-SHA256SUMS.txt',file=path.join(work,filename);fs.writeFileSync(file,files.map(f=>`${f.sha256}  ${f.name}\n`).join(''));uploads.push({name:filename,file,size:fs.statSync(file).size,sha256:await fileDigest(file)});}
  for(const upload of uploads){
   const previous=release.assets.find(a=>a.name===upload.name);if(previous){assert.equal(previous.size,upload.size);assert.equal(previous.digest,'sha256:'+upload.sha256,'Never replace published assets');continue;}
@@ -96,6 +97,6 @@ if(mode==='reconcile'&&release){
 }
 const verification=await verifyPublic(plan,{full:true,before});save('public-verification.json',verification);
 release=gh('releases/tags/'+tag);for(const asset of plan.assets){for(const item of[asset,asset.blockmap]){const published=release.assets.find(a=>a.name===item.filename);assert.equal(published?.digest,'sha256:'+item.sha256,'GitHub / official source diverged: '+item.filename);assert.equal(published.size,item.size);}}
-if(mode!=='audit'&&release.draft){command('gh',['release','edit',tag,'--repo',repo,'--draft=false','--latest']);release=gh('releases/tags/'+tag);}
-assert(!release.draft&&!release.prerelease);const final={mode,version,passed:true,release:release.html_url,downloadPage:origin+'/download',assets:plan.assets.map(a=>({target:a.target,filename:a.filename,sha256:a.sha256,size:a.size,signed:a.signed})),distributionChanged:!!plan.changed,realDeviceAcceptance:'separate, not performed by CI'};save('publication-receipt.json',final);console.log(JSON.stringify(final,null,2));
+if(mode!=='audit'&&release.draft){command('gh',['release','edit',tag,'--repo',repo,'--draft=false',beta?'--latest=false':'--latest']);release=gh('releases/tags/'+tag);}
+assert(!release.draft&&release.prerelease===beta);const final={mode,version,passed:true,release:release.html_url,downloadPage:origin+'/download',assets:plan.assets.map(a=>({target:a.target,filename:a.filename,sha256:a.sha256,size:a.size,signed:a.signed})),distributionChanged:!!plan.changed,realDeviceAcceptance:'separate, not performed by CI'};save('publication-receipt.json',final);console.log(JSON.stringify(final,null,2));
 if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`## Desktop publication ${version}\n\n${release.html_url}\n\nGitHub assets, download page/index, stable/Beta update feeds, complete package hashes and blockmaps verified. Windows remains unsigned. Device acceptance is separate.\n`);

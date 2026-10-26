@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.2.45-beta.1",
+    "channel": "beta",
+    "publishedAt": null,
+    "releaseNotes": "新增可选「新知」模块：收集待学目标、确认分阶段路径，记录复述、练习、笔记与掌握状态。\n支持教学任务包导出、视频与隔离 HTML 演示回收，以及前沿待审更新和写作草稿交接。\n资料空间启用后可使用；保留既有资料、积木、文稿、进度与授权。"
+  },
+  {
     "version": "0.2.44",
     "channel": "stable",
     "publishedAt": null,

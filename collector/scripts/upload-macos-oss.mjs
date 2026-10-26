@@ -19,7 +19,7 @@ async function main() {
   const brand = process.argv[3] || 'LingNest';
   if (!['LingNest', 'InspiraiNest'].includes(brand)) throw new Error('Invalid product name');
   const run = required('OSS_RELEASE_RUN_ID');
-  if (!/^[0-9]+(?:-[0-9]+)?$/.test(run) || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version)) throw new Error('Invalid version or run ID');
+  if (!/^[0-9]+(?:-[0-9]+)?$/.test(run) || !/^[0-9]+\.[0-9]+\.[0-9]+(?:-beta\.[0-9]+)?$/.test(version)) throw new Error('Invalid version or run ID');
   const prefix = `releases/macos/v${version}/${run}`;
   const client = new OSS({
     region: required('OSS_RELEASE_REGION'), bucket: required('OSS_RELEASE_BUCKET'),
@@ -36,7 +36,7 @@ async function main() {
   if (expected.size !== 4 || names.some(name => !expected.has(name))) throw new Error('Unexpected package list');
   const assets = [];
   // Validate every local file before making any remote changes.
-  const updateFiles = brand === 'InspiraiNest' ? [...names.filter(name => name.endsWith('.zip') || existsSync(path.join(dir, name + '.blockmap'))).map(name => name + '.blockmap'), 'latest-mac.yml'] : [];
+  const updateFiles = brand === 'InspiraiNest' ? [...names.filter(name => name.endsWith('.zip') || existsSync(path.join(dir, name + '.blockmap'))).map(name => name + '.blockmap'), version.includes('-beta.')?'beta-mac.yml':'latest-mac.yml'] : [];
   for (const name of [...names, ...updateFiles, 'SHASUMS256.txt']) {
     const file = path.join(dir, name);
     const sha256 = await digest(createReadStream(file));

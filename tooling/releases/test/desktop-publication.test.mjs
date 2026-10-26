@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';import yaml from 'js-yaml';
-import {digest,targets,preparePublication,verifyPublic,unsignedPE} from '../desktop-publication.mjs';
+import {digest,targets,preparePublication,verifyPublic,unsignedPE,packageFeed} from '../desktop-publication.mjs';
 import {githubJson,successfulJob} from '../github-api.mjs';
 import {clientDownload} from '../../../services/api/modules/client-download.mjs';
 function fixture(t,version='0.2.33'){
@@ -9,7 +9,7 @@ function fixture(t,version='0.2.33'){
   if(platform==='windows'){bytes=Buffer.alloc(512);bytes.write('MZ');bytes.writeUInt32LE(64,0x3c);bytes.write('PE\0\0',64);bytes.writeUInt16LE(0x10b,88);}
   fs.writeFileSync(path.join(input,filename),bytes);fs.writeFileSync(path.join(input,filename+'.blockmap'),Buffer.from('blockmap '+target));if(platform==='windows')fs.writeFileSync(path.join(input,filename+'.sha256'),digest(bytes)+'\n');feeds[platform].push({url:filename,size:bytes.length,sha512:digest(bytes,'sha512','base64')});
  }
- for(const[p,files]of Object.entries(feeds))fs.writeFileSync(path.join(input,p==='windows'?'latest.yml':'latest-mac.yml'),yaml.dump({version,files}));
+ for(const[p,files]of Object.entries(feeds))fs.writeFileSync(path.join(input,packageFeed(version,p)),yaml.dump({version,files}));
  const args={version,platforms:['windows','macos'],artifacts:input,base:{schemaVersion:1,releases:[]},overlay:path.join(root,'overlay'),notes:'正式发布说明',source:{commit:'a'.repeat(40),windows:{run:'1'},macos:{run:'2'}}};return{root,input,args};
 }
 test('both platforms stage together; rerun is immutable and keeps historical metadata',async t=>{
@@ -44,4 +44,11 @@ test('transient GitHub EOF retries reads, but exhaustion remains a visible relea
 test('retrying the finalizer keeps the successful signing attempt instead of rebuilding',()=>{
  const jobs=[{id:1,name:'signed-macos',conclusion:'success',run_attempt:1},{id:2,name:'synchronize',conclusion:'failure',run_attempt:1},{id:3,name:'synchronize',conclusion:null,run_attempt:2}];
  assert.equal(successfulJob(jobs,'signed-macos').id,1);assert.throws(()=>successfulJob(jobs,'worker-windows'),/must finish/);
+});
+
+test('beta publication reads beta feeds and preserves every stable release',async t=>{
+ const{args}=fixture(t,'0.2.45-beta.1');const stable={version:'0.2.32',channel:'stable',publishedAt:'2026-10-24',releaseNotes:'existing',assets:{macos_arm64:{filename:'existing.zip'}}};
+ const base={schemaVersion:1,releases:[stable]};const plan=await preparePublication({...args,platforms:['macos'],base});
+ assert.equal(plan.channel,'beta');assert.deepEqual(plan.index.releases[0],stable);assert.equal(base.releases.length,1);
+ assert.equal(packageFeed(args.version,'macos'),'beta-mac.yml');assert.equal(packageFeed('0.2.32','windows'),'latest.yml');
 });

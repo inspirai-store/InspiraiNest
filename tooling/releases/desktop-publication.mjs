@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import yaml from 'js-yaml';
 import {desktopVersion,compareDesktopVersions,versionChannel} from '../../packages/core/shared/desktop-release.mjs';
 
+export const packageFeed=(version,platform)=>`${versionChannel(version)==='beta'?'beta':'latest'}${platform==='macos'?'-mac':''}.yml`;
 export const origin='https://library.inspirai.store';
 export const targets={windows_x64:'Windows-x64.exe',macos_arm64:'macOS-arm64.zip',macos_x64:'macOS-x64.zip',macos_arm64_dmg:'macOS-arm64.dmg',macos_x64_dmg:'macOS-x64.dmg'};
 export const digest=(bytes,algorithm='sha256',format='hex')=>createHash(algorithm).update(bytes).digest(format);
@@ -27,7 +28,7 @@ export async function preparePublication({version,platforms,artifacts,base,overl
  assert.equal(record.channel,versionChannel(version));const assets=[],files=[];let changed=false;
  // Check the entire set before making an overlay; an incomplete platform never becomes visible.
  for(const platform of platforms){
-  const feed=yaml.load(fs.readFileSync(path.join(artifacts,platform==='windows'?'latest.yml':'latest-mac.yml'),'utf8'));assert.equal(feed.version,version,'Package/feed version mismatch');
+  const feed=yaml.load(fs.readFileSync(path.join(artifacts,packageFeed(version,platform)),'utf8'));assert.equal(feed.version,version,'Package/feed version mismatch');
   for(const[target,suffix]of Object.entries(targets).filter(([t])=>t.startsWith(platform==='windows'?'windows':'macos'))){
    const filename=`InspiraiNest-v${version}-${suffix}`,file=path.join(artifacts,filename),size=fs.statSync(file).size;assert(size>0);
    const sha256=await fileDigest(file),sha512=await fileDigest(file,'sha512','base64'),entry=feed.files.find(f=>f.url===filename);assert(entry,'Missing package in update feed: '+filename);assert.equal(entry.size,size);assert.equal(entry.sha512,sha512);
@@ -59,7 +60,7 @@ export async function verifyPublic(plan,{fetcher=fetch,full=true,before}={}){
   }
   const r=await fetcher(origin+'/downloads/'+asset.filename,{redirect:'error',headers:{Range:'bytes=0-15','accept-encoding':'identity'}});assert.equal(r.status,206);assert.equal(r.headers.get('etag'),'"sha256-'+asset.sha256+'"');await r.arrayBuffer();
  }
- if(before){for(const key of ['android','ios','reader'])assert.deepEqual(current[key],before[key]);for(const[target,value]of Object.entries(before.worker))if(!plan.assets.some(a=>a.target===target))assert.deepEqual(current.worker[target],value);}
+ if(before){if(plan.channel==='beta'){assert.deepEqual(current.desktop.channels.stable,before.desktop.channels.stable,'Beta publication changed the stable channel');assert.deepEqual(current.worker,before.worker,'Beta publication changed legacy stable downloads');}for(const key of ['android','ios','reader'])assert.deepEqual(current[key],before[key]);for(const[target,value]of Object.entries(before.worker))if(!plan.assets.some(a=>a.target===target))assert.deepEqual(current.worker[target],value);}
  const page=await fetcher(origin+'/download',{redirect:'error'});assert(page.ok,'Download page unavailable');assert((await page.text()).includes('worker-title'));
  return {at:new Date().toISOString(),version:plan.version,passed:true,checks,downloadPage:origin+'/download'};
 }

@@ -227,7 +227,7 @@ jobs:
             artifacts/desktop/InspiraiNest-v*-Windows-x64.exe
             artifacts/desktop/InspiraiNest-v*-Windows-x64.exe.blockmap
             artifacts/desktop/InspiraiNest-v*-Windows-x64.exe.sha256
-            artifacts/desktop/latest.yml
+            artifacts/desktop/*.yml
             artifacts/desktop/package-verification.json
           if-no-files-found: error
     env:
@@ -286,9 +286,10 @@ jobs:
           done
           test "$(find ../artifacts/desktop -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.zip' | wc -l | tr -d ' ')" = 2
           test "$(find ../artifacts/desktop -maxdepth 1 -name 'InspiraiNest-v*-macOS-*.dmg' | wc -l | tr -d ' ')" = 2
-          test -s ../artifacts/desktop/latest-mac.yml
-          grep -F "InspiraiNest-v${version}-macOS-arm64.zip" ../artifacts/desktop/latest-mac.yml
-          grep -F "InspiraiNest-v${version}-macOS-x64.zip" ../artifacts/desktop/latest-mac.yml
+          feed=$(node -p "require('./package.json').version.includes('-beta.')?'beta-mac.yml':'latest-mac.yml'")
+          test -s "../artifacts/desktop/$feed"
+          grep -F "InspiraiNest-v${version}-macOS-arm64.zip" "../artifacts/desktop/$feed"
+          grep -F "InspiraiNest-v${version}-macOS-x64.zip" "../artifacts/desktop/$feed"
           grep -F 'provider: generic' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
           grep -F 'https://library.inspirai.store/updates/macos' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
           (cd ../artifacts/desktop && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
@@ -326,7 +327,7 @@ jobs:
             artifacts/desktop/InspiraiNest-v*-macOS-*.dmg
             artifacts/desktop/InspiraiNest-v*-macOS-*.blockmap
             artifacts/desktop/SHASUMS256.txt
-            artifacts/desktop/latest-mac.yml
+            artifacts/desktop/*-mac.yml
           if-no-files-found: error
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -356,7 +357,8 @@ jobs:
           version=$(node -p "require('./package.json').version")
           zip="../artifacts/desktop/InspiraiNest-v${version}-macOS-x64.zip"
           test -s "$zip"
-          test -s ../artifacts/desktop/latest-mac.yml
+          feed=$(node -p "require('./package.json').version.includes('-beta.')?'beta-mac.yml':'latest-mac.yml'")
+          test -s "../artifacts/desktop/$feed"
           mkdir -p ../artifacts/desktop/intel-unpacked
           ditto -x -k "$zip" ../artifacts/desktop/intel-unpacked
           app=../artifacts/desktop/intel-unpacked/灵藏.app
