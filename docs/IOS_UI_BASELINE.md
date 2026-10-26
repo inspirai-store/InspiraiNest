@@ -14,7 +14,7 @@
 - 已删除旧主壳、CaptureView、LibraryReaderView、旧扫码/草稿/附件页面，以及全部 CaptureAssets。
 - 资料、登录、设备身份、Keychain/App Group、发件箱及后端协议保持原身份和版本处理方式。
 - 原生源码缺失时直接构建失败；禁止加载旧页面或从旧安装包覆盖资源。
-- `native-v1` 写入主应用 Info.plist。源文件检查和 Xcode 构建检查共同拦截旧 UI；安装包检查拒绝缺少该标记或包含 CaptureAssets 的归档/IPA。
+- `native-v1` 写入主应用 Info.plist。源文件检查和 Xcode 构建检查共同拦截旧 UI；安装包检查拒绝缺少该标记或包含 CaptureAssets 的归档/IPA，并核对主应用和分享扩展的 App Group、Keychain 与版本。模拟器无设备签名权限，仅检查 UI 与资源；发行包必须通过完整签名身份检查。
 - 1.0.7 (12) 和其它经核实含旧壳的构建不得再作为验收包或候选发行包。已下载的离线副本无法远程删除；TestFlight 的分发状态单独核对。
 
 ## 原有本机记录
