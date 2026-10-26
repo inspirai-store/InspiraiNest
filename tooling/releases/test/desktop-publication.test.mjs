@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';import yaml from 'js-yaml';
-import {digest,targets,preparePublication,verifyPublic,unsignedPE,packageFeed} from '../desktop-publication.mjs';
-import {githubJson,successfulJob} from '../github-api.mjs';
+import {digest,targets,preparePublication,verifyPublic,unsignedPE,packageFeed,retainedTaskAssignments} from '../desktop-publication.mjs';
+import {githubJson,successfulJob,releaseForTag} from '../github-api.mjs';
 import {clientDownload} from '../../../services/api/modules/client-download.mjs';
 function fixture(t,version='0.2.33'){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'desktop-publication-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const input=path.join(root,'input');fs.mkdirSync(input);const feeds={windows:[],macos:[]};
@@ -51,4 +51,23 @@ test('beta publication reads beta feeds and preserves every stable release',asyn
  const base={schemaVersion:1,releases:[stable]};const plan=await preparePublication({...args,platforms:['macos'],base});
  assert.equal(plan.channel,'beta');assert.deepEqual(plan.index.releases[0],stable);assert.equal(base.releases.length,1);
  assert.equal(packageFeed(args.version,'macos'),'beta-mac.yml');assert.equal(packageFeed('0.2.32','windows'),'latest.yml');
+});
+
+test('a draft without a published tag is found and reused by release identity',()=>{
+ const draft={id:424459408,tag_name:'v0.2.45-beta.1',draft:true,target_commitish:'a'.repeat(40)},published={id:1,tag_name:'v0.2.32',draft:false};
+ const execute=(command,args)=>{assert.equal(command,'gh');assert.equal(args[1],'repos/test/repo/releases?per_page=100');return {status:0,stdout:JSON.stringify([draft,published])};};
+ const options={repository:'test/repo',execute};assert.deepEqual(releaseForTag(draft.tag_name,options),draft);assert.deepEqual(releaseForTag(published.tag_name,options),published);assert.equal(releaseForTag('v0.2.99',options),null);
+});
+
+test('public downloads remain readable when verified inputs have owner-only permissions',{skip:process.platform==='win32'},async t=>{
+ const{args}=fixture(t);for(const name of fs.readdirSync(args.artifacts))fs.chmodSync(path.join(args.artifacts,name),0o600);
+ const plan=await preparePublication(args);for(const file of [...plan.files.map(f=>f.filename),'desktop-release.json'])assert.equal(fs.statSync(path.join(args.overlay,file)).mode&0o777,0o644,file);
+});
+
+test('distribution rollout retains active assignment scopes and allows a completed task',()=>{
+ const before={taskScopes:[{id:'task',state:'running',scopeHash:'same'}]};
+ assert.equal(retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'uploading',scopeHash:'same'}]}).retained,1);
+ assert.equal(retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'completed',scopeHash:'cleared'}]}).retained,1);
+ assert.throws(()=>retainedTaskAssignments(before,{taskScopes:[{id:'task',state:'queued',scopeHash:'cleared'}]}),/assignment changed/);
+ assert.throws(()=>retainedTaskAssignments(before,{taskScopes:[]}),/disappeared/);
 });

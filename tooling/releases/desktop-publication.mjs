@@ -42,8 +42,8 @@ export async function preparePublication({version,platforms,artifacts,base,overl
   }
  }
  if(!existing)index.releases.push(record);
- fs.mkdirSync(overlay,{recursive:true});for(const item of files)fs.copyFileSync(item.file,path.join(overlay,safeName(item.filename)));
- fs.writeFileSync(path.join(overlay,'desktop-release.json'),JSON.stringify(index,null,2)+'\n');
+ fs.mkdirSync(overlay,{recursive:true});for(const item of files){const target=path.join(overlay,safeName(item.filename));fs.copyFileSync(item.file,target);fs.chmodSync(target,0o644);}
+ fs.writeFileSync(path.join(overlay,'desktop-release.json'),JSON.stringify(index,null,2)+'\n');fs.chmodSync(path.join(overlay,'desktop-release.json'),0o644);
  return {schemaVersion:1,version,channel:record.channel,changed,source,assets,files:files.map(({file,...item})=>item),index};
 }
 export async function readPublic(fetcher=fetch){const r=await fetcher(origin+'/client-release.json',{redirect:'error'});assert(r.ok,'Cannot read official release index');return r.json();}
@@ -63,4 +63,15 @@ export async function verifyPublic(plan,{fetcher=fetch,full=true,before}={}){
  if(before){if(plan.channel==='beta'){assert.deepEqual(current.desktop.channels.stable,before.desktop.channels.stable,'Beta publication changed the stable channel');assert.deepEqual(current.worker,before.worker,'Beta publication changed legacy stable downloads');}for(const key of ['android','ios','reader'])assert.deepEqual(current[key],before[key]);for(const[target,value]of Object.entries(before.worker))if(!plan.assets.some(a=>a.target===target))assert.deepEqual(current.worker[target],value);}
  const page=await fetcher(origin+'/download',{redirect:'error'});assert(page.ok,'Download page unavailable');assert((await page.text()).includes('worker-title'));
  return {at:new Date().toISOString(),version:plan.version,passed:true,checks,downloadPage:origin+'/download'};
+}
+
+// Distribution-only rolling updates keep the same API and durable Worker leases.
+export function retainedTaskAssignments(before,after){
+ const active=new Set(['assigned','running','uploading']),finished=new Set(['completed','archived','cancelled','failed','waiting_action']);
+ const current=new Map(after.taskScopes.map(task=>[task.id,task]));let retained=0;
+ for(const task of before.taskScopes.filter(task=>active.has(task.state))){
+  const next=current.get(task.id);assert(next,'Active task disappeared: '+task.id);
+  assert(next.scopeHash===task.scopeHash||finished.has(next.state),'Active task assignment changed: '+task.id);retained++;
+ }
+ return {retained};
 }

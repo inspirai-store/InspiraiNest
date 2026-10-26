@@ -10,5 +10,6 @@ try{
  const fingerprints=records.filter(r=>protectedKinds.has(r.kind)).map(r=>({kind:r.kind,id:r.id,sha256:hash(r.body)}));
  const deviceAuth=records.filter(r=>r.kind==='device').map(r=>({id:r.id,sha256:hash(Object.fromEntries(['tokenHash','ownerTokenHash','revokedAt','expiresAt','role','permissions','installationKey'].map(k=>[k,r.body[k]??null])))}));
  const active=records.filter(r=>(r.kind==='task'&&['assigned','running','uploading'].includes(r.body.state))||(['creation-turn','creation-run'].includes(r.kind)&&['state','status'].some(k=>['queued','assigned','running','uploading'].includes(r.body[k])))).length;
- console.log(JSON.stringify({fingerprints,deviceAuth,active}));await db.rollback();
+ const taskScopes=records.filter(r=>r.kind==='task').map(r=>({id:r.id,state:r.body.state,scopeHash:hash([r.body.deviceId??null,r.body.assignmentId??null,r.body.recordId??null,r.body.recordVersion??null])}));
+ console.log(JSON.stringify({fingerprints,deviceAuth,active,taskScopes}));await db.rollback();
 }finally{await db.end();}

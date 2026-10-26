@@ -50,18 +50,18 @@ try:
   if phase=='Succeeded':break
   time.sleep(5)
  else:raise RuntimeError('Prepull timed out; production unchanged')
- for _ in range(21):
-  original=snapshot(live()['metadata']['name'])
-  if not original['active']:break
-  print('Active collection/creation tasks: waiting without restarting nodes.',flush=True);time.sleep(30)
- else:raise RuntimeError('Tasks still active: leave packages staged and retry publication later')
+ # Only /app/releases is overlaid; API code, environment and durable leases stay identical.
+ original=snapshot(live()['metadata']['name'])
+ if original['active']:print('Publishing distribution files with active task assignments retained.',flush=True)
  save(private/'state-before.json',original,True);current=obj(kube+['get','deployment',deployment,'-o','json']);assert current['spec']==before['spec'];assert public()==json.loads((work/'public-before.json').read_text())
  patch=[{'op':'test','path':'/metadata/resourceVersion','value':current['metadata']['resourceVersion']},{'op':'test','path':'/spec/template/spec/containers/0/image','value':context['image']},{'op':'replace','path':'/spec/strategy','value':{'type':'RollingUpdate','rollingUpdate':{'maxSurge':1,'maxUnavailable':0}}},{'op':'replace','path':'/spec/template/spec/containers/0/image','value':target}]
  run(kube+['patch','deployment',deployment,'--type=json','-p',json.dumps(patch)]);applied=True
  run(kube+['rollout','status','deployment/'+deployment,'--timeout=300s'],capture=False);actual=live();assert actual['spec']['containers'][0]['image']==target
  after=snapshot(actual['metadata']['name']);save(private/'state-after.json',after,True);after_hash={(r['kind'],r['id']):r['sha256']for r in after['fingerprints']};assert all(after_hash.get((r['kind'],r['id']))==r['sha256']for r in original['fingerprints']),'Protected content changed during publication; inspect private fingerprints'
+ assignment_check="import fs from 'node:fs';import{retainedTaskAssignments}from '"+(repo/'tooling/releases/desktop-publication.mjs').as_uri()+"';const input=JSON.parse(fs.readFileSync(0,'utf8'));console.log(JSON.stringify(retainedTaskAssignments(input.before,input.after)));"
+ assignments=obj(['node','--input-type=module','-e',assignment_check],json.dumps({'before':original,'after':after}))
  auth_hash={r['id']:r['sha256']for r in after['deviceAuth']};assert all(auth_hash.get(r['id'])==r['sha256']for r in original['deviceAuth']),'Device authorization changed'
- save(work/'deployment-receipt.json',{'image':target,'previousImage':context['image'],'pod':actual['metadata']['name'],'protectedRecordsUnchanged':len(original['fingerprints']),'deviceAuthorizationUnchanged':True,'runtimeConfigurationUnchanged':True});print('Desktop distribution deployed; protected content and authorizations unchanged.')
+ save(work/'deployment-receipt.json',{'image':target,'previousImage':context['image'],'pod':actual['metadata']['name'],'protectedRecordsUnchanged':len(original['fingerprints']),'deviceAuthorizationUnchanged':True,'activeTaskAssignmentsRetained':assignments['retained'],'runtimeConfigurationUnchanged':True});print('Desktop distribution deployed; protected content and authorizations unchanged.')
 except Exception:
  if applied:
   now=obj(kube+['get','deployment',deployment,'-o','json']);assert now['spec']['template']['spec']['containers'][0]['image']==target,'Concurrent change: do not overwrite it'
