@@ -15,10 +15,11 @@ test('持久化调度去重、暂停、每日额度及完成资料回流',async(
  let time=Date.parse('2026-10-24T00:00:00Z');const scheduler=createBlockScheduler({store,plugins:{enabled:async()=>true,assertEnabled:async()=>{}},clock:()=>time,saveTask:async(t,state,_m,tx)=>tx.put('task',{...t,state})});
  await scheduler.tick();await scheduler.tick();assert.equal((await store.list('task')).length,1);
  const task=(await store.list('task'))[0];assert.equal(task.type,'note');await store.put('archive',{id:'archive',entryId:'source',meta:{status:'archived'}});await store.put('task',{...task,state:'completed',archiveId:'archive'});
+ await store.put('task',{id:'matched',blockId:'b',purpose:'blocks-match',state:'completed',blockSnapshot:{goalsHash:goalsFingerprint(b),sources:[{version:'archive'}]}});
  await scheduler.tick();const linked=await store.get('block','b');assert.equal(linked.links.length,1);assert.equal(linked.links[0].relation,'lead');assert.equal(linked.evaluations.at(-1).goals[0].ready,false);
  await scheduler.tick();assert.equal((await store.get('block','b')).links.length,1);
- time+=86400000;await store.put('block',{...linked,paused:true});await scheduler.tick();assert.equal((await store.list('task')).length,1);
- await store.put('block',{...linked,paused:false});await scheduler.tick();assert.equal((await store.list('task')).length,2);
+ time+=86400000;await store.put('block',{...linked,paused:true});await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.purpose==='blocks-research').length,1);
+ await store.put('block',{...linked,paused:false});await scheduler.tick();assert.equal((await store.list('task')).filter(t=>t.purpose==='blocks-research').length,2);
 });
 
 import {createBlockHandoff} from '../../plugins/blocks/server/handoff.mjs';
@@ -40,7 +41,7 @@ test('写作交接创建一次实际草稿任务并固定记录版本',async()=>
  const a=await writing.acceptHandoff(packet),b=await writing.acceptHandoff(packet);assert.equal(a.id,b.id);assert.equal(queued,1);assert.equal((await store.get('writing-session',a.id)).blockHandoffId,'packet');
 });
 
-import {validateMatches,sourceKey,fingerprint} from '../../plugins/blocks/protocol/matching.mjs';
+import {validateMatches,sourceKey,fingerprint,goalsFingerprint} from '../../plugins/blocks/protocol/matching.mjs';
 import {createBlockMatching} from '../../plugins/blocks/server/matching.mjs';
 import {canRunTask} from '../../packages/core/node/task-routing.mjs';
 test('语义支持必须引用输入正文，拒绝虚构引句与未知条件',()=>{

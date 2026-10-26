@@ -19,7 +19,7 @@ export function evaluate(block,at=new Date().toISOString()){
  const states=new Map(),parts=block.goals.flatMap(g=>g.parts);
  const check=p=>{
   if(states.has(p.id))return states.get(p.id);
-  const evidence=block.links.filter(l=>l.partId===p.id&&!l.excluded&&!l.stale&&l.coverage==='full'&&l.relation==='support'&&(!l.expiresAt||Date.parse(l.expiresAt)>Date.parse(at)));
+  const evidence=block.links.filter(l=>l.partId===p.id&&!l.excluded&&!l.stale&&l.coverage==='full'&&l.relation==='support'&&(l.evidenceScope!=='file'||l.scopeReason&&l.evidence?.length&&l.evidence.every(e=>e.filePath&&/^[a-f0-9]{64}$/.test(e.fileSha256)))&&(!l.expiresAt||Date.parse(l.expiresAt)>Date.parse(at)));
   const missing=p.conditions.filter(c=>!evidence.some(l=>l.conditions.includes(c)));
   const conflicts=block.links.filter(l=>l.partId===p.id&&!l.excluded&&!l.stale&&l.relation==='contradiction');
   const dependencies=p.dependsOn.filter(id=>!check(parts.find(x=>x.id===id)).ready);

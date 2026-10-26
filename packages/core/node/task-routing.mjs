@@ -12,13 +12,15 @@ export function supportsWritingTask(task, device) {
   return version === 1 && device.writingProtocol === 1;
 }
 
+export function supportsBlocksTask(task,device){return task.pluginId!=='blocks'||device.blocksProtocol===1&&(task.purpose!=='blocks-plan'||device.blocksPlanningProtocol===1)&&(!task.blockResearchSnapshot||device.blocksResearchProtocol>=(task.blockResearchSnapshot.protocol||1))&&(!task.blockSnapshot?.evidenceProtocol||device.blocksEvidenceProtocol>=task.blockSnapshot.evidenceProtocol);}
+
 // A specified computer is preferred on the first attempt. Once it cannot finish,
 // route to another authorized computer without changing submission identity.
 export function canRunTask(task, device) {
   if(task.preferredAgent && !isExecutionAgent(task.preferredAgent)) return false;
   if(task.purpose==='codex-trial')return workerAuthorized(device) && device.id===task.trial?.deviceId && device.trialEnvironment?.protocol===1 && device.agents?.includes('codex');
   return workerAuthorized(device) && !capabilityBlock(task,device) && Boolean(device.agents?.some(isExecutionAgent))
-    && (task.pluginId!=='blocks'||device.blocksProtocol===1)
+    && supportsBlocksTask(task,device)
     && (task.pluginId!=='learning'||device.learningProtocol===1)
     && (task.purpose!=='selection-writing'||device.selectionWritingProtocol===1)
     && (!task.recordId || device.recordProtocol === 1)

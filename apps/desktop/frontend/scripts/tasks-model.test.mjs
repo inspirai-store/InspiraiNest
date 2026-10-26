@@ -6,7 +6,7 @@ const t={id:'a',createdAt:'2026-10-12T04:00:00Z',deviceId:'worker'};
 assert.deepEqual(taskActions({...t,state:'awaiting_review'}),['approve','cancel']);
 assert.deepEqual(taskActions({...t,state:'waiting_action'}),['retry','reassign','cancel']);
 assert.deepEqual(taskActions({...t,state:'running'}),['reassign','cancel']);
-assert.deepEqual(taskActions({...t,state:'completed'}),[]);assert.deepEqual(taskActions({...t,state:'cancelled'}),[]);
+assert.deepEqual(taskActions({...t,state:'completed'}),[]);assert.deepEqual(taskActions({...t,state:'completed',archiveId:'saved'}),['supplement']);assert.deepEqual(taskActions({...t,state:'cancelled'}),[]);
 assert.deepEqual(taskActions({...t,state:'queued',deviceId:null}),['cancel']);
 assert.equal(taskTitle({...t,state:'queued',recordSnapshot:{text:'标题\n正文'}}),'标题');
 });

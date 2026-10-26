@@ -92,7 +92,8 @@ export const manifests = [
       "settings": true,
       "jobs": [
         "blocks.research",
-        "blocks.match"
+        "blocks.match",
+        "blocks.plan"
       ]
     },
     "legacyEnabled": false
