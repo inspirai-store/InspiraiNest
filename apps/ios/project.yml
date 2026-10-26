@@ -7,6 +7,10 @@ options:
 configs:
   Debug: debug
   Release: release
+packages:
+  SwiftMarkdown:
+    url: https://github.com/swiftlang/swift-markdown.git
+    exactVersion: 0.9.0
 configFiles:
   Debug: Config/Local.xcconfig
   Release: Config/Local.xcconfig
@@ -17,23 +21,29 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: '16.0'
     TARGETED_DEVICE_FAMILY: '1,2'
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: '1.0.7'
-    CURRENT_PROJECT_VERSION: '12'
+    MARKETING_VERSION: '1.0.8'
+    CURRENT_PROJECT_VERSION: '13'
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 targets:
   PersonalLibrary:
     type: application
     platform: iOS
     preBuildScripts:
-      - name: Verify bundled writing UI
+      - name: Enforce native UI generation
+        inputFiles:
+          - $(SRCROOT)/App/PersonalLibraryApp.swift
         script: |
-          test -s "$SRCROOT/CaptureAssets/writing/index.html" || { echo 'error: Run node collector/scripts/stage-writing.mjs before building iOS.'; exit 1; }
+          /usr/bin/grep -q 'NativeLibraryRoot()' "$SRCROOT/App/PersonalLibraryApp.swift" || { echo 'error: Only the native iPhone/iPad UI may be built.'; exit 1; }
+          for old in App/CaptureView.swift App/LibraryReaderView.swift CaptureAssets/index.html CaptureAssets/writing/index.html; do
+            test ! -e "$SRCROOT/$old" || { echo "error: Retired iOS UI must be removed: $old"; exit 1; }
+          done
     sources:
       - App
       - Shared
-      - ShareExtension/ShareCapture.swift
+      - path: ShareExtension
+        excludes: [ShareViewController.swift]
       - Assets.xcassets
-      - path: CaptureAssets
+      - path: ThirdPartyNotices
         type: folder
         buildPhase: resources
       - path: LICENSE
@@ -46,6 +56,8 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Config/Shared.entitlements
     dependencies:
+      - package: SwiftMarkdown
+        product: Markdown
       - target: CollectorShare
         embed: true
       - sdk: libsqlite3.tbd
@@ -57,6 +69,8 @@ targets:
     sources:
       - ShareExtension
       - Shared
+      - App/NativeDesignSystem.swift
+      - App/NativeComponents.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(COLLECTOR_BUNDLE_ID).share

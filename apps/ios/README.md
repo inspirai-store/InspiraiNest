@@ -1,7 +1,7 @@
 # 灵藏 · InspiraiNest iOS
 
 本目录是公开仓库 `inspirai-store/InspiraiNest` 的 iOS 客户端，以 `main` 为维护分支。
-当前配置为 **1.0.0（3）、iPhone、iOS 16.0+**，包含主应用、系统分享扩展和 XCTest。
+当前配置为 **1.0.8（13）、iPhone/iPad、iOS 16.0+**，包含主应用、系统分享扩展和 XCTest。
 原工程名 `PersonalLibrary`、已有配对协议名及后端路由保持兼容。
 
 扫码配对、阅读首页、分享链接和预览图兼容修复已在公开提交 `e15dec6` 合入。
@@ -10,34 +10,29 @@
 是 **0.1.0（1）旧版本的历史材料**，不证明当前公开版本已签名、已完成真机验收或已提交 Apple 审核。
 当前发布配置及外部待办见 [iOS 发布说明](../../../docs/IOS_APP_STORE_RELEASE.md)。
 
-## Contents
+## 当前 UI 基线
 
-- `project.yml`: XcodeGen project with an iOS app, embedded real `com.apple.share-services`
-  extension and hosted XCTest target; minimum iOS 16, iPhone, Swift 5 language mode.
-- `App/`: SwiftUI pairing, tasks and event progress, retry/cancel, draft review and
-  approval, device revocation, local outbox, protected WKWebView reader, native
-  archive attachment browsing with PDFKit/image/text previews; grouped device
-  authorization and device identity reporting.
-- `ShareExtension/`: UIKit extension entry point hosting SwiftUI, all-item
-  `NSItemProvider` capture and Safari preprocessing, optional additional requirements,
-  auto-archive, tags, collapsed computer/Agent selectors, save-before-send lifecycle.
-- `Shared/`: immutable request models, owner-device Keychain credential, HTTPS API,
-  SQLite App Group outbox and cached dispatch choices. These files compile directly
-  into **each** executable; neither executable links the other one's Swift module.
-- `Config/`: separate Info.plists, common entitlements, local signing configuration example.
-- `Tests/`: XCTest sources for payload preservation/limits, origin/cookie policy,
-  durable outbox and leases, cached choices, pairing and task API requests.
-- `scripts/check_contract.py`: runnable Windows/macOS checks, including independent
-  OS processes exercising SQL extracted from the actual Swift implementation.
+正式入口为 `NativeLibraryRoot`，原生适配 iPhone 和 iPad。记录、资料库、阅读、任务、发件箱、配对、设备和分享扩展使用原生界面；新知、积木和插件设置通过原生导航接入。
+旧 Web 主壳、旧 TabView 和 `CaptureAssets` 已删除，不允许回退。原生 UI 缺失时构建必须失败。
+WebKit 只用于隔离的教学 HTML 和无界面的旧数据只读导入，不提供旧工作台入口。
+
+- `App/`：原生工作台及页面模型。
+- `ShareExtension/`：原生分享表单，继续先保存原文再发送。
+- `Shared/`：现有登录、设备身份、App Group、SQLite 发件箱和记录存储。
+- `ThirdPartyNotices/`：Swift Markdown、cmark 的许可证与署名。
+- `Tests/`：原生页面、数据、登录、导入和业务测试。
+
+构建前运行仓库根目录的 `npm run check:ios-ui`。分发前运行 `python3 tooling/releases/check-ios-artifact.py <ipa-or-app-or-xcarchive>`。
+`1.0.7 (12)` 及此前的旧壳构建不再是可用的验收基线。此次迁移配置为 **1.0.8 (13)**；构建、测试、签名、TestFlight 和真机验收分别记录。
 
 ## Reproduce the project on a Mac
 
 Use Xcode 16 or newer, its selected command-line tools, and XcodeGen 2.42 or newer.
-The project has no third-party Swift packages. SQLite3, CryptoKit, WebKit, PDFKit,
+The native Markdown reader uses Swift Markdown 0.9.0. SQLite3, CryptoKit, WebKit, PDFKit,
 SwiftUI, UniformTypeIdentifiers and Security come from Apple's SDK.
 
 ```sh
-cd collector/mobile/ios
+cd apps/ios
 # Install XcodeGen through your normal package-management workflow if absent:
 brew install xcodegen
 cp Config/Local.xcconfig.example Config/Local.xcconfig

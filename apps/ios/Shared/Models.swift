@@ -66,6 +66,13 @@ struct SharedPart: Codable, Equatable, Sendable {
     let value: String
 }
 
+extension SharedPart {
+    static func uniqueValues(in parts: [SharedPart]) -> [SharedPart] {
+        var seen: [Int: Set<Data>] = [:]
+        return parts.filter { !$0.value.isEmpty && seen[$0.item, default: []].insert(Data($0.value.utf8)).inserted }
+    }
+}
+
 struct Submission: Codable, Equatable, Sendable {
     let submissionId: String
     let content: String
@@ -148,6 +155,7 @@ struct Device: Codable, Identifiable, Sendable {
     var readyForDispatch: Bool? = nil
     var browserExpiresAt: String? = nil
     var loggedOutAt: String? = nil
+    var recordProtocol: Int? = nil
     var capabilities: [String]? = nil
     var environment: SkillEnvironmentSummary? = nil
     var agentRuntime: AgentRuntimeSummary? = nil
@@ -243,6 +251,14 @@ struct LibraryTask: Codable, Identifiable, Sendable {
     let archiveId: String?
     let draftId: String?
     let createdAt: String
+    var recordId: String? = nil
+    var recordVersion: Int? = nil
+    var processing: NativeRecordProcessKind? = nil
+    var preferredDeviceId: String? = nil
+    var preferredAgent: String? = nil
+    var agent: String? = nil
+    var recordSnapshot: NativeRecord? = nil
+    var draftVersion: Int? = nil
     var title: String { content ?? url ?? id }
     var canRetry: Bool { ["waiting_action", "failed"].contains(state) }
     var canCancel: Bool { !["completed", "cancelled"].contains(state) }

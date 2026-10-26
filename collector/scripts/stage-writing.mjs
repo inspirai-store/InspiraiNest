@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const root=collectorRoot,frontend=collectorPath('desktop/frontend');
 const result=spawnSync(process.execPath,[path.join(repositoryRoot,'node_modules/vite/bin/vite.js'),'build','--config','vite.writing.config.ts'],{cwd:frontend,stdio:'inherit'});
 if(result.status!==0)process.exit(result.status||1);
-for(const target of ['mobile/android/app/src/main/assets/capture/writing','mobile/ios/CaptureAssets/writing']){
+for(const target of ['mobile/android/app/src/main/assets/capture/writing']){
  const dest=collectorPath(target);fs.mkdirSync(dest,{recursive:true});
  fs.copyFileSync(path.join(frontend,'writing/index.html'),path.join(dest,'index.html'));
  fs.copyFileSync(collectorPath('public/capture/bridge.js'),path.join(dest,'bridge.js'));

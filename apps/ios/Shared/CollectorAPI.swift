@@ -11,7 +11,7 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate {
 }
 
 // Immutable after initialization; URLSession supports concurrent requests.
-final class CollectorAPI: @unchecked Sendable {
+final class CollectorAPI: LibraryReadService, LibraryReadingService, NativeRecordListService, @unchecked Sendable {
     let origin: ServerOrigin
     private let token: String?
     private let session: URLSession
@@ -37,7 +37,11 @@ final class CollectorAPI: @unchecked Sendable {
         if let token { req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         let data: Data; let response: URLResponse
         do { (data, response) = try await session.data(for: req) }
-        catch { throw CollectorError.message("网络请求未确认完成。已保存的记录可在主应用重试。") }
+        catch {
+            if Task.isCancelled { throw CancellationError() }
+            if path.hasPrefix("/api/read/v1/") || path == "/api/records" { throw error }
+            throw CollectorError.message("网络请求未确认完成。已保存的记录可在主应用重试。")
+        }
         guard let http = response as? HTTPURLResponse, let url = http.url, origin.contains(url) else {
             throw CollectorError.message("服务端响应地址无效。")
         }
@@ -132,6 +136,81 @@ final class CollectorAPI: @unchecked Sendable {
     }
     func taskDiagnostics(taskID: String) async throws -> TaskDiagnosticReport { try await decoded(TaskDiagnosticReport.self, path: "/api/read/v1/tasks/\(identifier(taskID))/diagnostics") }
     func nodeCapabilities(deviceID: String) async throws -> NodeCapabilityReport { try await decoded(NodeCapabilityReport.self, path: "/api/devices/\(identifier(deviceID))/capabilities") }
+    func readEntries(_ query: ReadQuery) async throws -> ReadPage {
+        try await decoded(ReadPage.self, path: query.path)
+    }
+    func readCategories() async throws -> ReadCategories {
+        try await decoded(ReadCategories.self, path: "/api/read/v1/categories")
+    }
+    func listRecords() async throws -> [NativeRecord] {
+        struct Response: Decodable { let records: [NativeRecord] }
+        let (data, _) = try await request("/api/records")
+        do { return try JSONDecoder().decode(Response.self, from: data).records }
+        catch { throw CollectorError.message("记录内容格式不匹配。") }
+    }
+    func recordURLRequest(_ path:String,method:String="GET",mime:String?=nil,body:Data?=nil) throws -> URLRequest {
+        guard path.hasPrefix("/api/records") else {throw NativeRecordSyncFailure.integrity}
+        var request=URLRequest(url:try origin.url(path));request.httpMethod=method;request.httpBody=body
+        request.setValue("application/json",forHTTPHeaderField:"Accept")
+        if let mime {request.setValue(mime,forHTTPHeaderField:"Content-Type")}
+        if let token {request.setValue("Bearer "+token,forHTTPHeaderField:"Authorization")}
+        return request
+    }
+    static func recordFailure(status:Int,data:Data) -> NativeRecordSyncFailure {
+        struct Issue:Decodable {var code:String?}
+        let code=(try? JSONDecoder().decode(Issue.self,from:data))?.code
+        let message:String
+        switch (status,code) {
+        case (401,_),(403,_):message="设备授权已失效 · 本机内容已保留"
+        case (409,"record_version_conflict"),(409,nil):message="远端版本已变化 · 本机内容已保留"
+        case (409,"record_request_reused"):message="请求内容已变化 · 原请求已保留"
+        case (409,"record_media_missing"):message="原件尚未完整上传 · 请重试"
+        case (413,_):message="附件超过资料空间容量限制"
+        case (415,_):message="资料空间暂不支持此原件格式 · 原件已保留"
+        case (404,_),(405,_):message="记录服务暂不可用"
+        default:message="同步未确认完成 · HTTP \(status)"
+        }
+        return .http(status,code,message)
+    }
+    func recordData(_ request:URLRequest,allowMissing:Bool=false) async throws -> (Data,HTTPURLResponse) {
+        let (data,response)=try await session.data(for:request)
+        guard let http=response as? HTTPURLResponse,let url=http.url,origin.contains(url) else {throw NativeRecordSyncFailure.integrity}
+        guard (200..<300).contains(http.statusCode) || (allowMissing && http.statusCode==404) else {throw Self.recordFailure(status:http.statusCode,data:data)}
+        return (data,http)
+    }
+    private func readPath(_ endpoint: String, fields: [URLQueryItem]) -> String {
+        var components = URLComponents()
+        components.queryItems = fields
+        return "/api/read/v1/" + endpoint + "?" + (components.percentEncodedQuery ?? "")
+    }
+    func readDetail(id: String) async throws -> ReadDetail {
+        let detail = try await decoded(ReadDetail.self, path: readPath("entry", fields: [.init(name: "id", value: id)]))
+        try detail.validate(expectedID: id)
+        return detail
+    }
+    func readFile(entry: ReadDetail, file: ReadFile) async throws -> Data {
+        try file.validate()
+        guard entry.files.contains(file) else { throw ReaderFailure.integrity }
+        let (data, response) = try await request(readPath("file", fields: [.init(name: "id", value: entry.id), .init(name: "file", value: file.path)]))
+        guard let checksum = response.value(forHTTPHeaderField: "X-Content-SHA256") else { throw ReaderFailure.integrity }
+        try file.verify(data, header: checksum)
+        let current = try await readDetail(id: entry.id)
+        guard current.archiveID == entry.archiveID, current.files.contains(file) else { throw ReaderFailure.changed }
+        return data
+    }
+    func readArchiveData(digest: String) async throws -> Data {
+        guard ReadFile.validDigest(digest) else { throw ReaderFailure.integrity }
+        let (data, _) = try await request("/api/archives/" + digest)
+        guard ReadFile.digest(data) == digest else { throw ReaderFailure.integrity }
+        let bundle = try JSONDecoder().decode(DraftBundle.self, from: data)
+        _ = try AttachmentIntegrity.validate(bundle)
+        return data
+    }
+    func approveDraft(_ id: String, expectedDigest: String) async throws {
+        guard ReadFile.validDigest(expectedDigest) else { throw ReaderFailure.integrity }
+        let data = try JSONEncoder().encode(["expectedDraftId": expectedDigest])
+        _ = try await request("/api/tasks/\(identifier(id))/approve", method: "POST", body: data)
+    }
     func state() async throws -> ServerState { try await decoded(ServerState.self, path: "/api/state") }
     func submit(_ submission: Submission) async throws -> LibraryTask {
         try submission.validateForSending()
