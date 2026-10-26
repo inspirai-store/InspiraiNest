@@ -10,7 +10,7 @@ async function main() {
   const folder = path.resolve(process.argv[2]);
   const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'android-release.json')));
   const run = required('OSS_RELEASE_RUN_ID'), commit = required('OSS_RELEASE_SOURCE_COMMIT');
-  if (!/^\d+\.\d+\.\d+$/.test(manifest.version) || !/^\d+(?:-\d+)?$/.test(run) || !/^[a-f0-9]{40}$/.test(commit)
+  if (!/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/.test(manifest.version) || !/^\d+(?:-\d+)?$/.test(run) || !/^[a-f0-9]{40}$/.test(commit)
     || manifest.filename !== `InspiraiNest-v${manifest.version}-Android.apk`) throw Error('Invalid release identity');
   const bytes = fs.readFileSync(path.join(folder, manifest.filename));
   if (bytes.length !== manifest.size || hash(bytes) !== manifest.sha256) throw Error('APK checksum mismatch');

@@ -17,9 +17,9 @@ android {
         applicationId 'store.inspirai.library'
         minSdk 26
         targetSdk 36
-        versionCode 24
+        versionCode 25
         buildConfigField 'String', 'DEFAULT_SERVER', '"' + collectorServer + '"'
-        versionName '1.4.3'
+        versionName '1.4.4-beta.1'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     sourceSets { androidTest.assets.srcDir(rootProject.file("../../tests/fixtures")); test.resources.srcDir(rootProject.file("../../collector/test/fixtures")); test.resources.srcDir(rootProject.file("../../tests/fixtures")) }

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 const cfg = fs.readFileSync('app/build.gradle', 'utf8');
 const version = /versionName '([^']+)'/.exec(cfg)?.[1], versionCode = Number(/versionCode (\d+)/.exec(cfg)?.[1]);
-if (!/^\d+\.\d+\.\d+$/.test(version) || !versionCode) throw Error('Invalid Android version');
+if (!/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/.test(version) || !versionCode) throw Error('Invalid Android version');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const apk = 'app/build/outputs/apk/release/app-release.apk', bytes = fs.readFileSync(apk);
 const response = await fetch('https://library.inspirai.store/client-release.json', { redirect: 'error' });

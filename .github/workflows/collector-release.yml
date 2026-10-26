@@ -476,3 +476,13 @@ jobs:
         if: always()
         shell: bash
         run: rm -f "$RUNNER_TEMP/inspirainest-android-release.p12"
+
+      - name: Retain signed Android Beta for user acceptance
+        uses: actions/upload-artifact@v4
+        with:
+          name: InspiraiNest-Android-signed-beta
+          path: |
+            public-source/collector/mobile/dist/InspiraiNest-v*-Android.apk
+            public-source/collector/mobile/dist/InspiraiNest-v*-Android.apk.sha256
+            public-source/collector/mobile/dist/android-release.json
+          if-no-files-found: error
