@@ -42,8 +42,8 @@ export async function preparePublication({version,platforms,artifacts,base,overl
   }
  }
  if(!existing)index.releases.push(record);
- fs.mkdirSync(overlay,{recursive:true});for(const item of files)fs.copyFileSync(item.file,path.join(overlay,safeName(item.filename)));
- fs.writeFileSync(path.join(overlay,'desktop-release.json'),JSON.stringify(index,null,2)+'\n');
+ fs.mkdirSync(overlay,{recursive:true});for(const item of files){const target=path.join(overlay,safeName(item.filename));fs.copyFileSync(item.file,target);fs.chmodSync(target,0o644);}
+ fs.writeFileSync(path.join(overlay,'desktop-release.json'),JSON.stringify(index,null,2)+'\n');fs.chmodSync(path.join(overlay,'desktop-release.json'),0o644);
  return {schemaVersion:1,version,channel:record.channel,changed,source,assets,files:files.map(({file,...item})=>item),index};
 }
 export async function readPublic(fetcher=fetch){const r=await fetcher(origin+'/client-release.json',{redirect:'error'});assert(r.ok,'Cannot read official release index');return r.json();}

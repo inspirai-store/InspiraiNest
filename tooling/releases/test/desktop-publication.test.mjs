@@ -58,3 +58,8 @@ test('a draft without a published tag is found and reused by release identity',(
  const execute=(command,args)=>{assert.equal(command,'gh');assert.equal(args[1],'repos/test/repo/releases?per_page=100');return {status:0,stdout:JSON.stringify([draft,published])};};
  const options={repository:'test/repo',execute};assert.deepEqual(releaseForTag(draft.tag_name,options),draft);assert.deepEqual(releaseForTag(published.tag_name,options),published);assert.equal(releaseForTag('v0.2.99',options),null);
 });
+
+test('public downloads remain readable when verified inputs have owner-only permissions',{skip:process.platform==='win32'},async t=>{
+ const{args}=fixture(t);for(const name of fs.readdirSync(args.artifacts))fs.chmodSync(path.join(args.artifacts,name),0o600);
+ const plan=await preparePublication(args);for(const file of [...plan.files.map(f=>f.filename),'desktop-release.json'])assert.equal(fs.statSync(path.join(args.overlay,file)).mode&0o777,0o644,file);
+});
