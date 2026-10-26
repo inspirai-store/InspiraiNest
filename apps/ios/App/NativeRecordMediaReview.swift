@@ -34,7 +34,8 @@ import UniformTypeIdentifiers
         if let i=args.firstIndex(of:"--review-record-store"),args.indices.contains(i+1) {key=String(args[i+1].filter {$0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-")}.prefix(80))}
         let dir=FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("RecordsMediaReview/"+key,isDirectory:true)
         let scope="media-review"
-        let store=try NativeRecordLocalStore(directory:dir,now:{NativeRecordListModel.date("2026-10-16T10:36:00+08:00")!})
+        let capturedDate=NativeRecordListModel.date("2026-10-16T10:36:00+08:00")!
+        let store=try NativeRecordLocalStore(directory:dir,now:{capturedDate})
         let media=try NativeRecordMediaStore(directory:dir.appendingPathComponent("Originals"))
         workbench.mediaStore=media;workbench.recordingDirectory=dir.appendingPathComponent("Recordings")
         if args.contains("--review-synthetic-audio") {workbench.recordingInputFactory={NativeRecordSyntheticAudioInput()}}
