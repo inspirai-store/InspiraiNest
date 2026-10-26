@@ -145,9 +145,9 @@ export function createWriting({store,storage,serialized,owner,assigned,authentic
   return {async acceptHandoff(packet){
     const material=await sources(packet.sources);
     return serialized('claim',()=>store.transaction(async tx=>{
-      const receiptId='blocks:'+packet.id,receipt=await tx.getForUpdate('writing-receipt',receiptId);
+      const receiptId=(packet.origin||'blocks')+':'+packet.id,receipt=await tx.getForUpdate('writing-receipt',receiptId);
       if(receipt)return receipt.result;
-      const session={id:id(),version:1,protocolVersion:2,brief:packet.title,title:packet.title,titleSource:'user',createdAt:now(),updatedAt:now(),context:{audience:'一般读者',language:'zh-CN',outputs:['markdown']},sources:material,answers:[],turns:[],rounds:[],runs:[],workingPlan:null,plan:{thesis:packet.title,audience:'一般读者',scope:packet.title,evidence:'只使用冻结材料并保留来源引用',outline:packet.parts.map(p=>p.title),visuals:'仅使用来源中已验证的图片',unresolvedHandling:'不编造缺失事实，明确列出证据限制'},planVersion:1,style:defaultWritingStyle(),styleCandidates:[],ready:true,deviceId:null,agent:null,blockHandoffId:packet.id};
+      const session={id:id(),version:1,protocolVersion:2,brief:packet.title,title:packet.title,titleSource:'user',createdAt:now(),updatedAt:now(),context:{audience:'一般读者',language:'zh-CN',outputs:['markdown']},sources:material,answers:[],turns:[],rounds:[],runs:[],workingPlan:null,plan:{thesis:packet.title,audience:'一般读者',scope:packet.title,evidence:'只使用冻结材料并保留来源引用',outline:packet.parts.map(p=>p.title),visuals:'仅使用来源中已验证的图片',unresolvedHandling:'不编造缺失事实，明确列出证据限制'},planVersion:1,style:defaultWritingStyle(),styleCandidates:[],ready:true,deviceId:null,agent:null,...(packet.origin==='learning'?{learningHandoffId:packet.id}:{blockHandoffId:packet.id})};
       await queue(session,'draft',tx);await save(session,tx);
       const result={id:session.id,version:session.version};await tx.put('writing-receipt',{id:receiptId,result});return result;
     }));

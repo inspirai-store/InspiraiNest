@@ -5,6 +5,7 @@
     "agent-lab": false,
     "ai-assistant": true,
     "blocks": false,
+    "learning": false,
     "writing": false
   },
   "plugins": [
@@ -107,6 +108,43 @@
         ]
       },
       "legacyEnabled": false,
+      "enabled": false
+    },
+    {
+      "id": "learning",
+      "name": "新知",
+      "version": "1.0.0",
+      "hostVersion": 1,
+      "defaultEnabled": false,
+      "legacyEnabled": false,
+      "dependencies": [
+        "ai-assistant"
+      ],
+      "platforms": [
+        "web",
+        "desktop",
+        "android",
+        "ios",
+        "server",
+        "worker"
+      ],
+      "capabilities": [
+        "learning.manage"
+      ],
+      "contributes": {
+        "navigation": [
+          {
+            "id": "learning",
+            "label": "新知",
+            "path": "/learning",
+            "icon": "GraduationCap"
+          }
+        ],
+        "settings": true,
+        "jobs": [
+          "learning.assist"
+        ]
+      },
       "enabled": false
     },
     {

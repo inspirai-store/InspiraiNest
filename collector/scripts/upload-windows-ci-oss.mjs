@@ -41,10 +41,11 @@ async function validate() {
 async function upload() {
   const { default: OSS } = await import('ali-oss'), { default: yaml } = await import('js-yaml');
   const input = JSON.parse(fs.readFileSync(path.join(dist, 'ci-source.json'))), name = `InspiraiNest-v${input.version}-Windows-x64.exe`;
-  assert.match(input.version, /^\d+\.\d+\.\d+$/); assert.match(input.commit, /^[a-f0-9]{40}$/);
+  assert.match(input.version, /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/); assert.match(input.commit, /^[a-f0-9]{40}$/);
   const bytes = fs.readFileSync(path.join(dist, name)); assert.equal(bytes.subarray(0, 2).toString(), 'MZ');
   assert.equal(fs.readFileSync(path.join(dist, name + '.sha256'), 'utf8').trim(), sha(bytes));
-  const feed = yaml.load(fs.readFileSync(path.join(dist, 'latest.yml'), 'utf8')), file = feed.files.find(f => f.url === name);
+  const feedName=input.version.includes('-beta.')?'beta.yml':'latest.yml';
+  const feed = yaml.load(fs.readFileSync(path.join(dist, feedName), 'utf8')), file = feed.files.find(f => f.url === name);
   assert.equal(feed.version, input.version); assert.equal(file.size, bytes.length); assert.equal(file.sha512, sha(bytes, 'sha512', 'base64'));
   const run = required('OSS_RELEASE_RUN_ID'); assert.match(run, /^\d+-\d+$/);
   const prefix = `releases/windows/v${input.version}/${run}`, client = new OSS({ region: required('OSS_RELEASE_REGION'), bucket: required('OSS_RELEASE_BUCKET'), accessKeyId: required('OSS_RELEASE_ACCESS_KEY_ID'), accessKeySecret: required('OSS_RELEASE_ACCESS_KEY_SECRET'), secure: true, timeout: 300000 });
@@ -56,7 +57,7 @@ async function upload() {
     for await (const chunk of result.stream) { count += chunk.length; hash.update(chunk); }
     assert.equal(count, size); assert.equal(hash.digest('hex'), digest); console.log('Verified private Windows release object: ' + key);
   }
-  for (const filename of [name, name + '.sha256', name + '.blockmap', 'latest.yml']) {
+  for (const filename of [name, name + '.sha256', name + '.blockmap', feedName]) {
     const file = path.join(dist, filename), b = fs.readFileSync(file), asset = { name: filename, key: prefix + '/' + filename, size: b.length, sha256: sha(b) };
     assert.ok(asset.size > 0); await put(asset.key, file, asset.sha256, asset.size); assets.push(asset);
   }

@@ -25,7 +25,7 @@ async function fixture(t,{legacy=false}={}){
  return {app,request,toggle,origin};
 }
 test('new spaces enable AI only; existing spaces preserve all delivered features',async t=>{
- const fresh=await fixture(t);const a=await fresh.request('/api/plugins');assert.equal(a.status,200);assert.deepEqual(a.body.enabled,{'agent-lab':false,'ai-assistant':true,blocks:false,writing:false});
+ const fresh=await fixture(t);const a=await fresh.request('/api/plugins');assert.equal(a.status,200);assert.deepEqual(a.body.enabled,{'agent-lab':false,'ai-assistant':true,blocks:false,learning:false,writing:false});
  const old=await fixture(t,{legacy:true});const b=await old.request('/api/plugins');assert.equal(b.body.enabled.blocks,false);assert.ok(['ai-assistant','writing','agent-lab'].every(id=>b.body.enabled[id]));assert.equal(b.body.migrated,true);
 });
 test('dependencies, active jobs, authorization and stale updates are enforced server-side',async t=>{

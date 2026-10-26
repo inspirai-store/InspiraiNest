@@ -10,12 +10,13 @@ const { _electron } = require('playwright');
   const executable = path.resolve(process.argv[2] || '');
   const installer = path.resolve(process.argv[3] || '');
   if (!fs.existsSync(executable) || !fs.existsSync(installer)) throw new Error('Pass the unpacked executable and its update package');
-  const metadataName = process.platform === 'darwin' ? 'latest-mac.yml' : 'latest.yml';
+  const current = require('../package.json').version;
+  const beta=current.includes('-beta.');
+  const metadataName = (beta?'beta':'latest')+(process.platform==='darwin'?'-mac':'')+'.yml';
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inspirainest-update-test-'));
   const workerConfig = path.join(root, 'worker.json');
   fs.writeFileSync(workerConfig, JSON.stringify({ dataDir: path.join(root, 'data') }));
   const metadataFile = path.join(path.dirname(installer), metadataName);
-  const current = require('../package.json').version;
   const next = current.replace(/\d+$/, value => String(Number(value) + 1));
   const metadata = fs.readFileSync(metadataFile, 'utf8').replace(`version: ${current}`, `version: ${next}`);
   if (!metadata.includes(`version: ${next}`)) throw new Error('Cannot prepare update fixture');
@@ -26,7 +27,7 @@ const { _electron } = require('playwright');
     if (route === '/' + metadataName) { res.writeHead(200, { 'Content-Type': 'text/yaml' }); res.end(metadata); return; }
     const packageName = path.basename(route);
     const packageFile = path.join(path.dirname(installer), packageName);
-    if (route === '/' + packageName && /^InspiraiNest-v\d+\.\d+\.\d+-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(packageName)
+    if (route === '/' + packageName && /^InspiraiNest-v\d+\.\d+\.\d+(?:-beta\.\d+)?-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(packageName)
       && fs.existsSync(packageFile)) {
       res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': fs.statSync(packageFile).size });
       fs.createReadStream(packageFile).pipe(res); return;
@@ -41,7 +42,8 @@ const { _electron } = require('playwright');
     delete env.ELECTRON_RUN_AS_NODE;
     app = await _electron.launch({ executablePath: executable, env });
     await app.evaluate((_, { url, cache }) => {
-      const updater = globalThis.workerDesktop().updates.updater;
+      const updates = globalThis.workerDesktop().updates;
+      const updater = updates.updater;
       Object.defineProperty(updater.app, 'baseCachePath', { value: cache });
       updater.setFeedURL({ provider: 'generic', url, useMultipleRangeRequest: false });
     }, { url: base, cache: path.join(root, 'updater-cache') });
@@ -53,6 +55,7 @@ const { _electron } = require('playwright');
     }
     if (!page) throw new Error('Main application window did not load');
     await showSettings(page,'updates');
+    if(beta) await app.evaluate(()=>globalThis.workerDesktop().updates.setChannel({channel:'beta'}));
     const react = await page.locator('[data-region=一级导航]').count() > 0;
     const content = react ? page.locator('[data-region="更新内容"]') : page.locator('body');
     await content.waitFor();
@@ -65,7 +68,7 @@ const { _electron } = require('playwright');
     if (react) assert.match(await content.innerText(), /下载完成/);
     else assert.match(await page.locator('#update-description').innerText(), /已下载并校验/);
     const packageRequests = requests.map(url => new URL(url, 'http://localhost').pathname)
-      .filter(route => /^\/InspiraiNest-v\d+\.\d+\.\d+-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(route));
+      .filter(route => /^\/InspiraiNest-v\d+\.\d+\.\d+(?:-beta\.\d+)?-(Windows-x64\.exe|macOS-(x64|arm64)\.zip)$/.test(route));
     assert.ok(packageRequests.includes('/' + path.basename(installer)), `Updater selected the wrong package: ${packageRequests.join(', ')}`);
     assert.ok(packageRequests.every(route => route === '/' + path.basename(installer)), `Updater requested another architecture: ${packageRequests.join(', ')}`);
     const output=path.resolve(__dirname,'../test-output/packaged-update');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'update-downloaded.png')});fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,platform:process.platform,version:current,availableVersionFixture:next,package:path.basename(installer),checks:['real update metadata check','actual package download and updater checksum','correct platform and architecture'],scope:'Local update feed with real installer bytes; installation/replacement remains manual'},null,2));

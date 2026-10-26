@@ -250,7 +250,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C public-source rev-parse HEAD)" = ${{ github.sha }}
-          node -e 'if(!/^\d+\.\d+\.\d+$/.test(require("./public-source/collector/package.json").version))throw Error("Invalid release version")'
+          node -e 'if(!/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/.test(require("./public-source/collector/package.json").version))throw Error("Invalid release version")'
           test -f public-source/apps/desktop/updater.mjs
           test -f public-source/apps/desktop/macos-policy.mjs
           test -f public-source/collector/electron-builder.yml
@@ -286,7 +286,8 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
-          test -s ../artifacts/desktop/latest-mac.yml
+          feed=$(node -p "require('./package.json').version.includes('-beta.')?'beta-mac.yml':'latest-mac.yml'")
+          test -s "../artifacts/desktop/$feed"
           for arch in arm64 x64; do
             zip="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.zip"
             dmg="../artifacts/desktop/InspiraiNest-v${version}-macOS-${arch}.dmg"
@@ -303,11 +304,11 @@ jobs:
             [[ "$signature" == *"TeamIdentifier=$APPLE_TEAM_ID"* ]]
             xcrun stapler validate "$app"
             spctl --assess --type execute "$app"
-            grep -F "InspiraiNest-v${version}-macOS-${arch}.zip" ../artifacts/desktop/latest-mac.yml
+            grep -F "InspiraiNest-v${version}-macOS-${arch}.zip" "../artifacts/desktop/$feed"
           done
           grep -F 'provider: generic' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
           grep -F 'https://library.inspirai.store/updates/macos' ../artifacts/desktop/mac/灵藏.app/Contents/Resources/app-update.yml
-          node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("../artifacts/desktop/latest-mac.yml","utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`../artifacts/desktop/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
+          node -e 'const fs=require("fs"),crypto=require("crypto"),yaml=require("js-yaml");const manifest=yaml.load(fs.readFileSync("../artifacts/desktop/"+(require("./package.json").version.includes("-beta.")?"beta-mac.yml":"latest-mac.yml"),"utf8"));if(manifest.version!==require("./package.json").version)throw Error("Version mismatch");for(const arch of ["arm64","x64"]){const name=`InspiraiNest-v${manifest.version}-macOS-${arch}.zip`;const entry=manifest.files.find(file=>file.url===name);if(!entry)throw Error(`Missing ${name} in update manifest`);const bytes=fs.readFileSync(`../artifacts/desktop/${name}`);if(bytes.length!==entry.size||crypto.createHash("sha512").update(bytes).digest("base64")!==entry.sha512)throw Error(`Manifest checksum mismatch: ${name}`)}'
           (cd ../artifacts/desktop && shasum -a 256 "InspiraiNest-v${version}-macOS-arm64.zip" \
             "InspiraiNest-v${version}-macOS-x64.zip" "InspiraiNest-v${version}-macOS-arm64.dmg" \
             "InspiraiNest-v${version}-macOS-x64.dmg" > SHASUMS256.txt)
@@ -342,7 +343,7 @@ jobs:
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.zip
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.dmg
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.zip.blockmap
-            public-source/artifacts/desktop/latest-mac.yml
+            public-source/artifacts/desktop/*-mac.yml
             public-source/artifacts/desktop/SHASUMS256.txt
           if-no-files-found: error
       - name: Upload verified packages and update files to private OSS
@@ -373,7 +374,7 @@ jobs:
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.zip
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.dmg
             public-source/artifacts/desktop/InspiraiNest-v*-macOS-*.blockmap
-            public-source/artifacts/desktop/latest-mac.yml
+            public-source/artifacts/desktop/*-mac.yml
             public-source/artifacts/desktop/macos-ci-source.json
           if-no-files-found: error
 

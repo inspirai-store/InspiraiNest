@@ -99,6 +99,42 @@ export const manifests = [
     "legacyEnabled": false
   },
   {
+    "id": "learning",
+    "name": "新知",
+    "version": "1.0.0",
+    "hostVersion": 1,
+    "defaultEnabled": false,
+    "legacyEnabled": false,
+    "dependencies": [
+      "ai-assistant"
+    ],
+    "platforms": [
+      "web",
+      "desktop",
+      "android",
+      "ios",
+      "server",
+      "worker"
+    ],
+    "capabilities": [
+      "learning.manage"
+    ],
+    "contributes": {
+      "navigation": [
+        {
+          "id": "learning",
+          "label": "新知",
+          "path": "/learning",
+          "icon": "GraduationCap"
+        }
+      ],
+      "settings": true,
+      "jobs": [
+        "learning.assist"
+      ]
+    }
+  },
+  {
     "id": "writing",
     "name": "写作工作台",
     "version": "1.0.0",

@@ -22,7 +22,7 @@ android {
         versionName '1.4.3'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
-    sourceSets { test.resources.srcDir(rootProject.file("../../collector/test/fixtures")); test.resources.srcDir(rootProject.file("../../tests/fixtures")) }
+    sourceSets { androidTest.assets.srcDir(rootProject.file("../../tests/fixtures")); test.resources.srcDir(rootProject.file("../../collector/test/fixtures")); test.resources.srcDir(rootProject.file("../../tests/fixtures")) }
     testBuildType = providers.gradleProperty('androidTestBuildType').orElse('debug').get()
     buildFeatures { buildConfig true; compose true }
     kotlinOptions { jvmTarget = '17' }

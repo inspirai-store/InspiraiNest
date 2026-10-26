@@ -11,7 +11,7 @@ const version=JSON.parse(fs.readFileSync(collectorPath('package.json'))).version
 const name=`InspiraiNest-v${version}-Windows-x64.exe`,file=path.join(dist,name),bytes=fs.readFileSync(file);
 const sha=(bytes,algorithm)=>createHash(algorithm).update(bytes).digest(algorithm==='sha512'?'base64':'hex');
 assert.ok(bytes.length>1000000);assert.equal(bytes.subarray(0,2).toString(),'MZ');
-const manifest=yaml.load(fs.readFileSync(path.join(dist,'latest.yml'),'utf8'));
+const manifest=yaml.load(fs.readFileSync(path.join(dist,version.includes('-beta.')?'beta.yml':'latest.yml'),'utf8'));
 assert.equal(manifest.version,version);const item=manifest.files.find(item=>item.url===name);assert.ok(item);assert.equal(item.size,bytes.length);assert.equal(item.sha512,sha(bytes,'sha512'));
 assert.ok(fs.statSync(file+'.blockmap').size>0);
 const app=path.join(dist,'win-unpacked/resources/app');assert.equal(JSON.parse(fs.readFileSync(path.join(app,'package.json'))).version,version);
