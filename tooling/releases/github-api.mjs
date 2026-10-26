@@ -18,3 +18,8 @@ export function successfulJob(jobs,name){
  const job=jobs.filter(j=>j.name===name&&j.conclusion==='success').sort((a,b)=>b.id-a.id)[0];
  assert(job,name+' must finish successfully');return job;
 }
+
+// Unpublished drafts have no tag ref and are omitted by the by-tag endpoint.
+export function releaseForTag(tag,options={}){
+ return githubJson('releases?per_page=100',options).find(release=>release.tag_name===tag)||null;
+}

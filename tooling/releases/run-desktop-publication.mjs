@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileDigest,origin,targets,packageFeed,preparePublication,readPublic,verifyPublic} from './desktop-publication.mjs';
-import {githubJson,successfulJob} from './github-api.mjs';
+import {githubJson,successfulJob,releaseForTag} from './github-api.mjs';
 
 const repo='inspirai-store/InspiraiNest',root=path.resolve(import.meta.dirname,'../..');
 const mode=process.argv[2]||'audit',work=path.resolve(process.env.PUBLICATION_WORK||'artifacts/desktop-publication');
@@ -72,11 +72,11 @@ if(mode!=='audit'&&platforms.includes('macos')){
  }
 }
 let release;
-try{release=gh('releases/tags/'+tag);}catch(error){if(mode!=='publish')throw error;}
+release=releaseForTag(tag,{repository:repo});assert(release||mode==='publish','Release not found');
 if(mode!=='audit'){
  if(!release){
   const body=path.join(work,'release-notes.md');fs.writeFileSync(body,notes+'\n\nWindows x64 为未签名 CI 包；macOS 为 Developer ID 签名和公证包。\n本次发布保留资料、文稿、任务历史及配置；实机升级单独验收。\n');
-  command('gh',['release','create',tag,'--repo',repo,'--target',source.commit,'--draft',...(beta?['--prerelease']:[]),'--title','灵藏 '+version,'--notes-file',body]);release=gh('releases/tags/'+tag);
+  command('gh',['release','create',tag,'--repo',repo,'--target',source.commit,'--draft',...(beta?['--prerelease']:[]),'--title','灵藏 '+version,'--notes-file',body]);release=release?gh('releases/'+release.id):releaseForTag(tag,{repository:repo});
  }
  const refResult=spawnSync('gh',['api',`repos/${repo}/git/ref/tags/${tag}`],{encoding:'utf8'});if(refResult.status===0){let ref=JSON.parse(refResult.stdout).object;if(ref.type==='tag')ref=gh('git/tags/'+ref.sha).object;assert.equal(ref.sha,source.commit,'Do not move an existing release tag');}else assert(release.draft);
  const uploads=plan.files.map(f=>({name:f.filename,file:path.join(input,f.filename),size:f.size,sha256:f.sha256}));
@@ -86,7 +86,7 @@ if(mode!=='audit'){
   const previous=release.assets.find(a=>a.name===upload.name);if(previous){assert.equal(previous.size,upload.size);assert.equal(previous.digest,'sha256:'+upload.sha256,'Never replace published assets');continue;}
   command('gh',['release','upload',tag,upload.file,'--repo',repo]);
  }
- release=gh('releases/tags/'+tag);for(const item of uploads){const asset=release.assets.find(a=>a.name===item.name);assert.equal(asset?.digest,'sha256:'+item.sha256);assert.equal(asset.size,item.size);}
+ release=release?gh('releases/'+release.id):releaseForTag(tag,{repository:repo});for(const item of uploads){const asset=release.assets.find(a=>a.name===item.name);assert.equal(asset?.digest,'sha256:'+item.sha256);assert.equal(asset.size,item.size);}
  if(mode==='publish'&&plan.changed)command('python3',['tooling/releases/deploy-desktop-release.py','deploy','--work',work],{stdio:'inherit',timeout:1800000});
 }
 if(mode==='reconcile'&&release){
@@ -96,7 +96,7 @@ if(mode==='reconcile'&&release){
  }
 }
 const verification=await verifyPublic(plan,{full:true,before});save('public-verification.json',verification);
-release=gh('releases/tags/'+tag);for(const asset of plan.assets){for(const item of[asset,asset.blockmap]){const published=release.assets.find(a=>a.name===item.filename);assert.equal(published?.digest,'sha256:'+item.sha256,'GitHub / official source diverged: '+item.filename);assert.equal(published.size,item.size);}}
-if(mode!=='audit'&&release.draft){command('gh',['release','edit',tag,'--repo',repo,'--draft=false',beta?'--latest=false':'--latest']);release=gh('releases/tags/'+tag);}
+release=release?gh('releases/'+release.id):releaseForTag(tag,{repository:repo});for(const asset of plan.assets){for(const item of[asset,asset.blockmap]){const published=release.assets.find(a=>a.name===item.filename);assert.equal(published?.digest,'sha256:'+item.sha256,'GitHub / official source diverged: '+item.filename);assert.equal(published.size,item.size);}}
+if(mode!=='audit'&&release.draft){command('gh',['release','edit',tag,'--repo',repo,'--draft=false',beta?'--latest=false':'--latest']);release=release?gh('releases/'+release.id):releaseForTag(tag,{repository:repo});}
 assert(!release.draft&&release.prerelease===beta);const final={mode,version,passed:true,release:release.html_url,downloadPage:origin+'/download',assets:plan.assets.map(a=>({target:a.target,filename:a.filename,sha256:a.sha256,size:a.size,signed:a.signed})),distributionChanged:!!plan.changed,realDeviceAcceptance:'separate, not performed by CI'};save('publication-receipt.json',final);console.log(JSON.stringify(final,null,2));
 if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`## Desktop publication ${version}\n\n${release.html_url}\n\nGitHub assets, download page/index, stable/Beta update feeds, complete package hashes and blockmaps verified. Windows remains unsigned. Device acceptance is separate.\n`);
