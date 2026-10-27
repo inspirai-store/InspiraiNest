@@ -320,4 +320,9 @@ extension CollectorAPI {
   guard path.hasPrefix("/api/learning/") else {throw CollectorError.message("新知接口无效")}
   _ = try await request(path,method:"POST",body:JSONSerialization.data(withJSONObject:input))
  }
+ func learningSubmit(_ path:String,input:[String:Any]) async throws -> LearningSubmission {
+  guard path.hasPrefix("/api/learning/") else {throw CollectorError.message("新知接口无效")}
+  let (data,_) = try await request(path,method:"POST",body:JSONSerialization.data(withJSONObject:input))
+  return try JSONDecoder().decode(LearningSubmission.self,from:data)
+ }
 }

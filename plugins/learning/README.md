@@ -14,6 +14,12 @@
 
 iOS 与 Android 提供目标收集、候选确认、阶段阅读、练习、笔记、掌握状态和视频/HTML 成果预览。桌面与 Web 管理完整路径和教学交接。
 
+### 卡片与按需输入
+
+首页展示目标卡片、进度和下一节点；通过“添加材料”选择资料、文件或粘贴内容，来源支持搜索、多选和分批显示。标题沿用来源或文件名称，补充说明按需展开。候选默认只读，建立目标、加入已有目标和忽略都通过按钮完成，主动修改才打开编辑器。
+
+路径按阶段组织节点卡片，节点分为概念、练习、笔记和成果。复述与笔记在点击“开始回答”“记下理解”后编辑；取消不改写已保存内容。四种掌握状态由用户主动选择。管理操作收进“更多”；桌面/Web 的视频、Web 演示和博客交接采用动作卡片。原生端继续使用现有原生入口，直接读取已冻结的来源正文。
+
 ## API
 
 | 方法 | 路径 | 行为 |
@@ -53,3 +59,5 @@ node tooling/learning/import-starter.mjs --connection /absolute/path/connection.
 ```
 
 验证命令：`npm test`、`npm run build:all`、`npm run build:native-assets`，以及现有 Android Gradle 与 iOS XcodeGen/XCTest 流程。构建、GUI、签名、真机和发布分别验收。
+
+卡片交互的独立验收服务：`node tooling/learning/cards-review-server.mjs`。它创建临时空间、15 节点路径、两份示例快照和 234 条来源卡片，不连接生产；临时登录信息只保存在忽略的 `artifacts/learning/cards/review-connection.json`。iOS `LearningTests` 检查来源兼容、默认无空编辑器和手机/平板布局；Android `NativeComposeFlowTest#learningCardsKeepWritingOptionalAndPreserveSnapshots` 验证来源阅读、按需笔记、取消和用户确认掌握。签名发行包、真机和 Beta 分发仍需单独验收。

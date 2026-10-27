@@ -168,6 +168,38 @@ class NativeComposeFlowTest {
         assertEquals("record",repository.blockJoin?.getString("kind"));assertEquals("f537a7a6-5b45-48a9-a1be-1068b7d65881",repository.blockJoin?.getString("sourceId"));assertEquals("part-flow",repository.blockJoin?.getString("partId"));capture("blocks-joined")
     }
     private fun awaitReport(){try{compose.waitUntil(15000){compose.onAllNodesWithText("原生报告关联验收").fetchSemanticsNodes().isNotEmpty()}}catch(error:Throwable){capture("failed-report");File(context.getExternalFilesDir(null),"native-qa/failed-report.txt").writeText(compose.onRoot(useUnmergedTree=true).printToString());throw error}}
+    @Test fun learningCardsKeepWritingOptionalAndPreserveSnapshots() {
+        // A fresh emulator may leave a boot-time System UI ANR over the app.
+        // Dismiss that external dialog once; every screenshot must then belong to the app.
+        instrumentation.uiAutomation.rootInActiveWindow?.let { root ->
+            if(root.findAccessibilityNodeInfosByText("System UI isn't responding").isNotEmpty())
+                root.findAccessibilityNodeInfosByViewId("android:id/aerr_close").firstOrNull()?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+        }
+        repository.learningMode=true
+        launch(Intent(context,NativeActivity::class.java).putExtra("tab","records"))
+        compose.waitUntil(15000){compose.onAllNodesWithContentDescription("更多").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.waitUntil(15000){compose.onAllNodesWithText("新知").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("新知").performClick()
+        compose.waitUntil(15000){compose.onAllNodesWithText("AI 基础软件架构师").fetchSemanticsNodes().isNotEmpty()}
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0);assertEquals(context.packageName,instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString());capture("learning-cards-goals")
+        compose.onNodeWithText("继续学习").performScrollTo().performClick()
+        compose.onNodeWithText("KV Cache").performScrollTo().performClick()
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0);compose.onNodeWithText("待学").assertIsDisplayed();assertEquals(context.packageName,instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString());capture("learning-cards-kv-cache")
+        compose.onNodeWithText("来源资料 · 2").performScrollTo().performClick()
+        compose.onNodeWithText("岗位要求快照").performScrollTo().performClick()
+        compose.onNodeWithText("原始 JD 与版本定位").assertExists();compose.onNodeWithContentDescription("关闭").performClick()
+        compose.onNodeWithText("笔记").performScrollTo().performClick();compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        compose.onNodeWithText("记下理解").performScrollTo().performClick();compose.onNode(hasSetTextAction()).performTextInput("需要主动保存的个人理解")
+        compose.onNodeWithText("取消").performScrollTo().performClick();assertEquals("",repository.learningGoal.optJSONArray("nodes").objects().first{it.optString("id")=="kv-cache"}.optString("notes"))
+        compose.onNodeWithText("记下理解").performScrollTo().performClick();compose.onNode(hasSetTextAction()).performTextInput("KV 仍需读取历史缓存")
+        compose.onNodeWithText("保存笔记").performScrollTo().performClick()
+        compose.waitUntil(15000){repository.learningGoal.optJSONArray("nodes").objects().first{it.optString("id")=="kv-cache"}.optString("notes")=="KV 仍需读取历史缓存"}
+        compose.onNodeWithText("已掌握").performScrollTo().performClick()
+        compose.waitUntil(15000){repository.learningGoal.optJSONArray("nodes").objects().first{it.optString("id")=="kv-cache"}.optString("mastery")=="mastered"}
+        assertEquals(15,repository.learningGoal.optJSONArray("nodes").length());assertEquals(2,repository.learningGoal.optJSONArray("sources").length())
+        capture("learning-cards-saved")
+    }
     private fun findEditor(view: View): EditText? {
         if(view is EditText)return view
         if(view is ViewGroup)for(i in 0 until view.childCount)findEditor(view.getChildAt(i))?.let{return it}
@@ -184,6 +216,8 @@ class NativeComposeFlowTest {
     private class Fixture(val database: NativeDatabase,override val credentials: Credentials): NestRepository {
         override val dao=database.dao();override val records=dao.observeRecords()
         var blocksMode=false
+        var learningMode=false
+        val learningGoal=JSONObject(InstrumentationRegistry.getInstrumentation().context.assets.open("learning-goal.json").bufferedReader().readText()).put("sources",JSONArray().put(JSONObject().put("kind","record").put("sourceId","jd").put("version","1").put("title","岗位要求快照").put("coverage","partial").put("text","原始 JD 与版本定位")).put(JSONObject().put("kind","record").put("sourceId","handbook").put("version","1").put("title","面试学习手册快照").put("coverage","full").put("text","面试学习手册原文")))
         var blockJoin: JSONObject?=null
         var additionalEntries: List<JSONObject> = emptyList()
         private val recordId="f537a7a6-5b45-48a9-a1be-1068b7d65881"
@@ -198,6 +232,13 @@ class NativeComposeFlowTest {
         private val item=JSONObject().put("id","native-reader-fixture").put("title","真实字体测量与原生阅读").put("summary","中文长标题、代码和表格的组件验收资料").put("status","archived").put("type","article").put("archive_id",archiveId).put("inputAttachments",JSONArray().put(attachment)).put("collected_at","2026-10-17T10:00:00+08:00")
         suspend fun seed(){val value=JSONObject().put("id",recordId).put("server",credentials.server()).put("text","记录原文与加工结果分开保存。").put("createdAt","2026-10-17T08:00:00Z").put("remoteVersion",3).put("sync","synced");dao.put(LocalRecord(credentials.server(),recordId,value.toString(),System.currentTimeMillis()))}
         override suspend fun request(path: String,method: String,body: JSONObject?)=when {
+            learningMode&&path=="/api/plugins"->JSONObject("""{"protocol":1,"revision":1,"enabled":{"learning":true},"plugins":[{"id":"learning","name":"新知","enabled":true,"platforms":["android"]}]}""")
+            learningMode&&path=="/api/learning"->JSONObject().put("goals",JSONArray().put(learningGoal)).put("candidates",JSONArray())
+            learningMode&&path=="/api/learning/sources"->JSONObject().put("items",learningGoal.getJSONArray("sources"))
+            learningMode&&path.startsWith("/api/learning/goals/")-> {
+                if(method=="POST") {check(body!!.getInt("revision")==learningGoal.getInt("revision"));val node=learningGoal.getJSONArray("nodes").objects().first{it.getString("id")==body.getString("nodeId")};for(key in listOf("notes","mastery"))if(body.has(key))node.put(key,body.getString(key));learningGoal.put("revision",learningGoal.getInt("revision")+1)}
+                learningGoal
+            }
             blocksMode&&path=="/api/plugins"->JSONObject("""{"protocol":1,"revision":1,"enabled":{"blocks":true},"plugins":[{"id":"blocks","name":"积木","enabled":true,"platforms":["android"]}]}""")
             blocksMode&&path=="/api/blocks"->JSONObject("""{"items":[{"id":"block-flow","title":"AI 运营 B 站账号","revision":3,"paused":false,"goals":[{"id":"goal-flow","title":"验证独立运营","parts":[{"id":"part-flow","title":"运营流程","conditions":["明确选题、制作、发布三个环节"]}]}]}]}""")
             blocksMode&&path=="/api/blocks/block-flow/join"->{blockJoin=body;JSONObject().put("saved",true)}
