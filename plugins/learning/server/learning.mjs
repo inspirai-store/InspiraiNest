@@ -5,12 +5,13 @@ import {demoDocument} from '../protocol/demo.mjs';
 
 const active=['queued','assigned','running','uploading','waiting_action'];
 const structureKey=g=>fingerprint([g.title,g.foundation,g.expectedAbility,g.state,g.nodes.map(n=>[n.id,n.contentRevision,n.dependsOn]),g.sources.map(sourceKey)]);
-export function createLearning({store,plugins,owner,assigned,authenticate,checkAssignment,body,send,saveTask,readSources,saveOriginal,enrichOriginal=async()=>{},readMedia,writeDraft,clock=Date.now}){
+export function createLearning({store,plugins,owner,assigned,authenticate,checkAssignment,body,send,saveTask,readSources,readSourceIndex=readSources,saveOriginal,enrichOriginal=async()=>{},readMedia,writeDraft,clock=Date.now}){
   const now=()=>new Date(clock()).toISOString();
   const previews=new Map();
   async function initialize(){
-    const sources=await readSources();
-    await store.transaction(async tx=>{for(const source of sources)await tx.put('learning-seen',{id:fingerprint(sourceKey(source)),source:sourceRef(source)});await tx.put('learning-setting',{id:'intake',startedAt:now()});});
+    if(await store.get('learning-setting','intake'))return;
+    const sources=await readSourceIndex();
+    await store.transaction(async tx=>{if(await tx.getForUpdate('learning-setting','intake'))return;for(const source of sources)await tx.put('learning-seen',{id:fingerprint(sourceKey(source)),source:sourceRef(source)});await tx.put('learning-setting',{id:'intake',startedAt:now()});});
   }
   async function preview(req,res,url){
     if(!url.pathname.startsWith('/api/learning/previews/'))return false;
@@ -39,20 +40,21 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
     await saveTask(task,'queued','等待电脑处理学习任务',tx);return {id:task.id,state:'queued'};
   }
   async function frozenSources(g){
-    const all=await readSources();
+    const missing=g.sources.filter(s=>typeof s.text!=='string');
+    const all=missing.length?await readSources(missing.map(sourceKey)):[];
     return g.sources.map(ref=>all.find(s=>sourceKey(s)===sourceKey(ref))||ref).filter(s=>typeof s.text==='string');
   }
   async function scan(){
     if(!await plugins.enabled('learning'))return;
-    const sources=await readSources();
+    await initialize();
+    const seen=new Set((await store.list('learning-seen')).map(s=>s.id));
+    const batch=(await readSourceIndex()).filter(s=>!seen.has(fingerprint(sourceKey(s)))).slice(0,4);
+    if(!batch.length)return;
+    if((await store.list('task')).some(t=>t.pluginId==='learning'&&t.learningSnapshot?.operation==='extract'&&active.includes(t.state)))return;
+    const keys=new Set(batch.map(sourceKey)),sources=(await readSources([...keys])).filter(s=>keys.has(sourceKey(s)));
     await lock(async tx=>{
-      const initialized=await tx.get('learning-setting','intake');
-      if(!initialized){for(const s of sources)await tx.put('learning-seen',{id:fingerprint(sourceKey(s)),source:sourceRef(s)});await tx.put('learning-setting',{id:'intake',startedAt:now()});return;}
       if((await tx.list('task')).some(t=>t.pluginId==='learning'&&t.learningSnapshot?.operation==='extract'&&active.includes(t.state)))return;
-      const batch=[];
-      for(const s of sources){if(!await tx.get('learning-seen',fingerprint(sourceKey(s))))batch.push(s);if(batch.length===4)break;}
-      if(!batch.length)return;
-      await queue(tx,'extract',null,batch);
+      if(sources.length)await queue(tx,'extract',null,sources);
       for(const s of batch)await tx.put('learning-seen',{id:fingerprint(sourceKey(s)),source:sourceRef(s)});
     });
   }
@@ -98,7 +100,7 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
     owner(device);const p=url.pathname.split('/').filter(Boolean).slice(2);
     if(req.method==='GET'){
       if(!p.length){const goals=await store.list('learning-goal');send(res,200,{goals:goals.map(g=>({...g,sources:g.sources.map(sourceRef),retiredNodes:[],nodes:g.nodes.map(n=>({...n,explanation:''})),nextNodeId:recommendation(g)})),candidates:(await store.list('learning-candidate')).map(c=>({...c,sources:c.sources.map(sourceRef)}))});return true;}
-      if(p[0]==='sources'){send(res,200,{items:(await readSources()).map(s=>({...sourceRef(s),key:sourceKey(s)}))});return true;}
+      if(p[0]==='sources'){send(res,200,{items:(await readSourceIndex()).map(s=>({...sourceRef(s),key:sourceKey(s)}))});return true;}
       if(p[0]==='goals'){
         const g=await store.get('learning-goal',p[1]);if(!g)fail('学习目标不存在',404);
         send(res,200,{...g,nextNodeId:recommendation(g),runs:(await store.list('learning-run')).filter(r=>r.goalId===g.id).map(r=>r.state==='proposed'&&r.baseStructureKey!==structureKey(g)?{...r,state:'stale'}:r),attempts:(await store.list('learning-attempt')).filter(a=>a.goalId===g.id),handoffs:(await store.list('learning-handoff')).filter(h=>h.goalId===g.id),artifacts:(await store.list('learning-artifact')).filter(a=>a.goalId===g.id),jobs:(await store.list('task')).filter(t=>t.learningGoalId===g.id).map(t=>({id:t.id,state:t.state,operation:t.learningSnapshot.operation,message:t.events?.at(-1)?.message||''}))});return true;
@@ -121,7 +123,7 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
     if(p[0]==='intake'){
       await plugins.assertEnabled('learning');
       let selected,sourceTask;
-      if(input.sourceKeys){const keys=strings(input.sourceKeys,'资料选择',30);selected=(await readSources()).filter(s=>keys.includes(sourceKey(s)));if(selected.length!==keys.length)fail('来源已更新，请重新选择',409);}
+      if(input.sourceKeys){const keys=strings(input.sourceKeys,'资料选择',30);selected=(await readSources(keys)).filter(s=>keys.includes(sourceKey(s)));if(selected.length!==keys.length)fail('来源已更新，请重新选择',409);}
       else {
         const text=rawString(input.text,'学习材料',60000),title=string(input.title||text.trim().split('\n')[0].slice(0,120),'标题',200);
         const url=string(input.url||(/^https?:\/\/\S+$/.test(text)?text:''),'原始链接',2000,true);
