@@ -15,3 +15,7 @@
 - [VeRL HybridFlow](https://verl.readthedocs.io/en/latest/hybrid_flow.html)、[vLLM Ascend](https://docs.vllm.ai/projects/ascend/en/latest/)：后训练数据流与硬件插件边界。
 
 原始岗位与手册快照继续由资料空间持有，不打包到公共源码，也不在节点正文和候选卡片中陈列。课程升级仅匹配原内置概述的精确文本；用户已经修改的正文保留。旧正文进入内部修订记录，节点 ID、先修关系、资料、笔记、练习与状态不变，迟到 AI 结果按现有版本冲突逻辑处理。
+
+## 图解层
+
+visuals/lessons.mjs 组织 16 个主题的 64 步；visuals/player.mjs 显示矩阵、缓存、数据流、依赖与时间线，visuals/math.mjs 固定教学算例。Web、桌面和原生使用同一份图解逻辑。所有容量、峰值、延迟与比较数字均为有明确假设的示例，不表示目标机器实测性能。图解不展示来源，也不写入用户掌握记录。

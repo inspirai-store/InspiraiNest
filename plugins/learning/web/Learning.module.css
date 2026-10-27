@@ -17,3 +17,5 @@
 
 .dialog{height:auto!important;overflow:hidden!important}.dialogBody{overflow:auto;min-height:0;max-height:calc(100dvh - 250px);padding:4px}.dialog>footer{height:auto;min-height:36px;flex-wrap:wrap}.dialog>div.dialogBody{margin:0}.reading{scroll-margin-top:8px}
 .article>p,.article>ul,.article>ol{margin:0 0 16px}.article h2{margin:28px 0 14px;line-height:1.45}.article h3{margin:24px 0 12px}.article>:last-child{margin-bottom:0}
+
+.visual{width:100%;height:840px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}@media(max-width:760px){.visual{height:calc(100dvh - 140px);min-height:600px}}

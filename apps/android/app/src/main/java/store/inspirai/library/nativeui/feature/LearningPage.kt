@@ -40,6 +40,7 @@ private fun sourceKey(s:JSONObject)=s.optString("kind")+":"+s.optString("sourceI
  Dialog(onDismissRequest=close,properties=DialogProperties(usePlatformDefaultWidth=false)) { Surface(Modifier.fillMaxWidth().padding(12.dp).widthIn(max=840.dp).fillMaxHeight(.94f),shape=MaterialTheme.shapes.large) { Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(title,style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f));IconButton(onClick=close){Icon(Icons.Outlined.Close,"关闭")}};content() } } }
 }
 @Composable fun LearningPage(repository:NestRepository,back:()->Unit,initialSource:String?=null) {
+ val context=LocalContext.current;val visualTemplate=remember{runCatching{context.assets.open("learning-visuals/index.html").bufferedReader().use{it.readText()}}.getOrDefault("")};var overview by remember{mutableStateOf(false)}
  val scope=rememberCoroutineScope();val identity=repository.credentials.snapshot()?.generation
  var goals by remember(identity){mutableStateOf(emptyList<JSONObject>())};var candidates by remember(identity){mutableStateOf(emptyList<JSONObject>())};var sources by remember(identity){mutableStateOf(emptyList<JSONObject>())}
  var goal by remember(identity){mutableStateOf<JSONObject?>(null)};var nodeID by remember(identity){mutableStateOf<String?>(null)}
@@ -59,12 +60,12 @@ private fun sourceKey(s:JSONObject)=s.optString("kind")+":"+s.optString("sourceI
  LaunchedEffect(identity,goal?.optString("id"),nodeID,tab){pageScroll.scrollTo(0)}
  val nodes=goal?.optJSONArray("nodes").objects();val node=nodes.firstOrNull{it.optString("id")==nodeID}
  LaunchedEffect(nodeID){notes=node?.optString("notes")?:"";question=node?.optJSONArray("recall")?.optString(0)?:node?.optJSONArray("exercises")?.optString(0)?:""}
- DetailScaffold(node?.optString("title")?:goal?.optString("title")?:"新知",{if(nodeID!=null){nodeID=null}else if(goal!=null)goal=null else back()}) { padding ->
+ DetailScaffold(if(overview)"全景图" else node?.optString("title")?:goal?.optString("title")?:"新知",{if(overview){overview=false}else if(nodeID!=null){nodeID=null}else if(goal!=null)goal=null else back()}) { padding ->
   Column(Modifier.padding(padding).fillMaxSize().verticalScroll(pageScroll).padding(20.dp).widthIn(max=1000.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
    if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
    if(error.isNotBlank())ErrorState(error){perform{load()}}
    goal?.optJSONArray("jobs").objects().filter{it.optString("state") !in listOf("completed","cancelled")}.forEach{LearningTaskCard(repository,it.getString("id"))}
-   if(goal==null) {
+   if(overview&&goal!=null){LearningVisual(visualTemplate,"overview",Modifier.fillMaxWidth().height(820.dp))}else if(goal==null) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){Button(onClick={collecting=true}){Icon(Icons.Outlined.Add,null);Text("添加材料")};OutlinedButton(onClick={pendingOnly=!pendingOnly}){Icon(Icons.Outlined.Inbox,null);Text(if(pendingOnly)"全部目标" else "待确认 ${candidates.size}")};var menu by remember{mutableStateOf(false)};Box{IconButton(onClick={menu=true}){Icon(Icons.Outlined.MoreHoriz,"更多")};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){DropdownMenuItem(text={Text("手动建立")},onClick={menu=false;goalName="";manual=true});DropdownMenuItem(text={Text("刷新")},onClick={menu=false;perform{load()}})}}}
     intakeTask?.let{LearningTaskCard(repository,it)}
     Text(if(pendingOnly)"待确认目标" else "学习目标",style=MaterialTheme.typography.titleLarge)
@@ -78,12 +79,16 @@ private fun sourceKey(s:JSONObject)=s.optString("kind")+":"+s.optString("sourceI
      if(goals.isEmpty())LearningActionCard("从一份材料开始",Icons.Outlined.Add,{collecting=true})
     }
    } else if(node==null) {
+    if(visualTemplate.isNotBlank()&&nodes.any{!it.isNull("visualLessonId")&&it.optString("visualLessonId").isNotBlank()})OutlinedButton(onClick={overview=true}){Icon(Icons.Outlined.Layers,null);Text("全景图")}
     LearningCard{Text(goal?.optString("expectedAbility")?:"");if(goal?.optString("foundation")?.isNotBlank()==true){var foundationOpen by remember{mutableStateOf(false)};TextButton(onClick={foundationOpen=!foundationOpen}){Text("已有基础")};if(foundationOpen)Text(goal!!.optString("foundation"))};nodes.firstOrNull{it.optString("id")==goal?.optString("nextNodeId")}?.let{next->Button(onClick={nodeID=next.getString("id")}){Icon(Icons.Outlined.ArrowForward,null);Text("继续学习")}}}
     nodes.groupBy{it.optString("stage")}.forEach{(stage,items)->LearningCard{Text(stage,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onSurfaceVariant);items.forEach{n->LearningActionCard(n.optString("title"),Icons.Outlined.School,{nodeID=n.getString("id")},body=(learningMasteryLabels[n.optString("mastery")]?:"待学")+if(goal?.optString("nextNodeId")==n.optString("id"))" · 下一步" else "")}}}
    } else {
     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("内容","练习","笔记").forEach{label->FilterChip(selected=tab==label,onClick={tab=label},label={Text(label)})}}
     if(tab=="内容"){
-     LearningCard{val document=remember(node.optString("explanation")){MarkdownContent.parse(node.optString("explanation"))};androidx.compose.foundation.text.selection.SelectionContainer{Column(verticalArrangement=Arrangement.spacedBy(16.dp)){document.blocks.forEach{MarkdownBlock(it)}}}}
+     val visual=node.optString("visualLessonId").takeIf{LearningVisualDocument.html(visualTemplate,it,false)!=null}
+     if(visual!=null)LearningVisual(visualTemplate,visual,Modifier.fillMaxWidth().height(620.dp))
+     LearningCard{var fullText by remember(nodeID){mutableStateOf(false)};if(visual!=null)TextButton(onClick={fullText=!fullText}){Text("完整讲解")};if(visual==null||fullText){val document=remember(node.optString("explanation")){MarkdownContent.parse(node.optString("explanation"))};androidx.compose.foundation.text.selection.SelectionContainer{Column(verticalArrangement=Arrangement.spacedBy(16.dp)){document.blocks.forEach{MarkdownBlock(it)}}}}}
+
      LearningCard{var prerequisitesOpen by remember(nodeID){mutableStateOf(false)};TextButton(onClick={prerequisitesOpen=!prerequisitesOpen}){Text("学习要点与先修")};if(prerequisitesOpen){node.optJSONArray("objectives")?.let{for(i in 0 until it.length())Text(it.getString(i))};node.optJSONArray("dependsOn")?.let{deps->for(i in 0 until deps.length()){val prior=nodes.firstOrNull{it.optString("id")==deps.getString(i)};if(prior!=null)TextButton(onClick={nodeID=prior.getString("id")}){Text(prior.optString("title"))}}}}}
      val index=nodes.indexOfFirst{it.optString("id")==nodeID};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){if(index>0)OutlinedButton(onClick={nodeID=nodes[index-1].getString("id")}){Icon(Icons.Outlined.ArrowBack,null);Text("上一节")};if(index+1<nodes.size)Button(onClick={nodeID=nodes[index+1].getString("id")}){Text("下一节");Icon(Icons.Outlined.ArrowForward,null)}}
     }else if(tab=="练习"){

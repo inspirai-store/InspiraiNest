@@ -432,6 +432,7 @@ jobs:
         run: |
           node scripts/stage-writing.mjs
           node scripts/stage-capture.mjs
+          node ../tooling/learning/stage-visuals.mjs
       - name: Build and verify the existing Android signing identity
         working-directory: public-source/apps/android
         shell: bash

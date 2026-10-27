@@ -27,6 +27,11 @@ export function starterGoal(){
   return {...goal,nodes:goal.nodes.map(n=>({...n,explanation:lessons[n.id]}))};
 }
 
+export function visualLessonId(node){
+  if(node.explanation!==lessons[node.id])return null;
+  return starterOverview().nodes.some(n=>n.id===node.id&&n.title===node.title)?node.id:null;
+}
+
 export function starterLessonUpdates(goal){
   if(goal.title!=='AI 基础软件架构师')return [];
   const old=starterOverview().nodes;

@@ -24,7 +24,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "tensors"
     },
     {
       "id": "transformer",
@@ -49,7 +50,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "transformer"
     },
     {
       "id": "prefill-decode",
@@ -74,7 +76,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "prefill-decode"
     },
     {
       "id": "kv-cache",
@@ -100,7 +103,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "kv-cache"
     },
     {
       "id": "scheduler",
@@ -125,7 +129,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "scheduler"
     },
     {
       "id": "quantization",
@@ -150,7 +155,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "quantization"
     },
     {
       "id": "gpu",
@@ -175,7 +181,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "gpu"
     },
     {
       "id": "kernels",
@@ -200,7 +207,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "kernels"
     },
     {
       "id": "compiler",
@@ -225,7 +233,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "compiler"
     },
     {
       "id": "parallel",
@@ -251,7 +260,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "parallel"
     },
     {
       "id": "collectives",
@@ -276,7 +286,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "collectives"
     },
     {
       "id": "post-training",
@@ -302,7 +313,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "post-training"
     },
     {
       "id": "adaptation",
@@ -328,7 +340,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "adaptation"
     },
     {
       "id": "architecture",
@@ -355,7 +368,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "architecture"
     },
     {
       "id": "frontier",
@@ -380,7 +394,8 @@
       "contentRevision": 1,
       "mastery": "pending",
       "notes": "",
-      "progressRevision": 0
+      "progressRevision": 0,
+      "visualLessonId": "frontier"
     }
   ],
   "id": "11111111-1111-4111-8111-111111111111",

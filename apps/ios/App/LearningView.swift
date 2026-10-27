@@ -156,7 +156,7 @@ struct LearningGoalView:View {
         if let error{LearningCard{Text(error).foregroundStyle(.red);Button("重试"){Task{await load()}}}}
         if let goal{
             ForEach(goal.jobs?.filter{!["completed","cancelled"].contains($0.state)} ?? []){job in LearningTaskCard(taskID:job.id)}
-            LearningCard{Text(goal.expectedAbility);if !goal.foundation.isEmpty{DisclosureGroup("已有基础"){Text(goal.foundation)}};if let next=goal.nextNodeId{NavigationLink{LearningNodeView(goalID:goalID,nodeID:next)}label:{Label("继续学习",systemImage:"arrow.right")}.buttonStyle(.borderedProminent)}}
+            LearningCard{if goal.nodes.contains(where:{$0.visualLessonId != nil}),LearningVisualDocument.supports("overview"){NavigationLink{LearningOverviewView()}label:{Label("全景图",systemImage:"square.3.layers.3d")}.buttonStyle(.bordered)};Text(goal.expectedAbility);if !goal.foundation.isEmpty{DisclosureGroup("已有基础"){Text(goal.foundation)}};if let next=goal.nextNodeId{NavigationLink{LearningNodeView(goalID:goalID,nodeID:next)}label:{Label("继续学习",systemImage:"arrow.right")}.buttonStyle(.borderedProminent)}}
             LazyVGrid(columns:[GridItem(.adaptive(minimum:280),spacing:16)],alignment:.leading,spacing:16){ForEach(goal.stageNames,id:\.self){stage in LearningCard{Text(stage).font(.headline).foregroundStyle(.secondary);ForEach(goal.nodes.filter{$0.stage==stage}){node in NavigationLink{LearningNodeView(goalID:goalID,nodeID:node.id)}label:{VStack(alignment:.leading,spacing:10){Text(node.title).font(.headline).fixedSize(horizontal:false,vertical:true);HStack{Text(learningMasteryLabels[node.mastery] ?? node.mastery);if goal.nextNodeId==node.id{Label("下一步",systemImage:"arrow.right")}}.font(.subheadline).foregroundStyle(.secondary)}.padding(.vertical,12).frame(maxWidth:.infinity,alignment:.leading)}.buttonStyle(.plain);if node.id != goal.nodes.filter({$0.stage==stage}).last?.id{Divider()}}}}}
         }
     }.navigationTitle(goal?.title ?? "学习路径").task{await load()}.id(model.sessionID)}
@@ -176,7 +176,10 @@ struct LearningNodeView:View {
         if let node,let goal{
             Picker("节点内容",selection:$tab){ForEach(["内容","练习","笔记"],id:\.self){Text($0).tag($0)}}.pickerStyle(.segmented)
             if tab=="内容"{
-                LearningCard{LearningMarkdown(node.explanation)}
+                if let id=node.visualLessonId,LearningVisualDocument.supports(id){
+                    LearningVisual(lessonID:id).frame(height:620).clipShape(RoundedRectangle(cornerRadius:14))
+                    LearningCard{DisclosureGroup("完整讲解"){LearningMarkdown(node.explanation)}}
+                }else{LearningCard{LearningMarkdown(node.explanation)}}
                 LearningCard{DisclosureGroup("学习要点与先修"){ForEach(node.objectives,id:\.self){Text($0)};ForEach(node.dependsOn,id:\.self){id in if let prior=goal.nodes.first(where:{$0.id==id}){NavigationLink(prior.title){LearningNodeView(goalID:goalID,nodeID:id)}}}}}
                 if let index=goal.nodes.firstIndex(where:{$0.id==nodeID}){HStack{if index>0{NavigationLink{LearningNodeView(goalID:goalID,nodeID:goal.nodes[index-1].id)}label:{Label("上一节",systemImage:"arrow.left")}.buttonStyle(.bordered)};Spacer();if index+1<goal.nodes.count{NavigationLink{LearningNodeView(goalID:goalID,nodeID:goal.nodes[index+1].id)}label:{Label("下一节",systemImage:"arrow.right")}.buttonStyle(.borderedProminent)}}}
             }else if tab=="练习"{

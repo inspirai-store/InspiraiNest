@@ -19,6 +19,7 @@ struct LearningGoal: Decodable, Identifiable {
     let jobs: [LearningJob]?
 }
 struct LearningNode: Decodable, Identifiable {
+    let visualLessonId: String?
     let id: String; let title: String; let stage: String; let explanation: String; let mastery: String; let notes: String
     let contentRevision: Int; let objectives: [String]; let dependsOn: [String]; let recall: [String]; let exercises: [String]; let citations: [LearningSource]
 }

@@ -145,7 +145,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts
-      - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
+      - run: npm run build:native-assets
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: bash ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
         working-directory: apps/android
@@ -432,7 +432,7 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - run: npm ci --ignore-scripts
-      - run: node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs
+      - run: npm run build:native-assets
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm

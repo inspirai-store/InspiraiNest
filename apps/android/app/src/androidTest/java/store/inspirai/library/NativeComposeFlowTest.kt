@@ -185,10 +185,16 @@ class NativeComposeFlowTest {
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0);assertEquals(context.packageName,instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString());capture("learning-cards-goals")
         compose.onNodeWithText("继续学习").performScrollTo().performClick()
         compose.onNodeWithText("KV Cache").performScrollTo().performClick()
-        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0);compose.onNodeWithText("第三个 token 为什么需要前两个 token").assertExists();assertEquals(context.packageName,instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString());capture("learning-cards-kv-cache")
+        compose.waitUntil(15000){visualEvaluate("document.body?.dataset.ready === 'true'")=="true"}
+        compose.waitUntil(15000){visualEvaluate("document.querySelector('figure').getBoundingClientRect().height > 120 && document.querySelector('main').getBoundingClientRect().height > 400")=="true"}
+        File(context.getExternalFilesDir(null),"native-qa/learning-viewport.json").apply{parentFile?.mkdirs();writeText(visualEvaluate("JSON.stringify({width:innerWidth,height:innerHeight,main:document.querySelector('main').getBoundingClientRect().height,figure:document.querySelector('figure').getBoundingClientRect().height})"))}
+        assertTrue(visualEvaluate("document.querySelector('button[data-step=\"3\"]').click();document.querySelector('figure').textContent").contains("1 GiB"))
+        assertTrue(visualEvaluate("document.querySelector('button[data-param=\"batch\"][data-value=\"4\"]').click();document.querySelector('figure').textContent").contains("4 GiB"))
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0);compose.onNodeWithText("完整讲解").assertExists();assertEquals(context.packageName,instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString());capture("learning-cards-kv-cache")
         compose.onNodeWithText("来源资料 · 2").assertDoesNotExist();compose.onNodeWithText("岗位要求快照").assertDoesNotExist();compose.onNodeWithText("成果").assertDoesNotExist()
         // Continue without answering or marking mastery.
         compose.onNodeWithText("下一节").performScrollTo().performClick()
+        compose.onNodeWithText("完整讲解").performScrollTo().performClick()
         compose.onNodeWithText("调度器决定本轮计算哪些 token；缓存管理器决定这些 token 的状态放在哪里。把两者分开，才能理解为什么显存未满也会排队。").assertExists()
         assertEquals("pending",repository.learningGoal.optJSONArray("nodes").objects().first{it.optString("id")=="kv-cache"}.optString("mastery"))
         compose.onNodeWithText("上一节").performScrollTo().performClick()
@@ -203,6 +209,12 @@ class NativeComposeFlowTest {
         compose.waitUntil(15000){repository.learningGoal.optJSONArray("nodes").objects().first{it.optString("id")=="kv-cache"}.optString("mastery")=="mastered"}
         assertEquals(15,repository.learningGoal.optJSONArray("nodes").length());assertEquals(2,repository.learningGoal.optJSONArray("sources").length())
         capture("learning-cards-saved")
+    }
+    private fun visualEvaluate(script:String):String {
+        val done=java.util.concurrent.CountDownLatch(1);var value=""
+        fun web(view:View):android.webkit.WebView?{if(view is android.webkit.WebView)return view;if(view is ViewGroup)for(i in 0 until view.childCount)web(view.getChildAt(i))?.let{return it};return null}
+        instrumentation.runOnMainSync{val target=web(activity.window.decorView);if(target==null)done.countDown() else target.evaluateJavascript(script){value=it;done.countDown()}}
+        check(done.await(5,java.util.concurrent.TimeUnit.SECONDS));return value
     }
     private fun findEditor(view: View): EditText? {
         if(view is EditText)return view

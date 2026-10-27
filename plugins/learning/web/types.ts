@@ -1,7 +1,7 @@
 export type Source={kind:string;sourceId:string;version:string;title:string;url?:string|null;coverage:string;quote?:string;location?:string;key?:string;text?:string};
 export type Mastery='pending'|'learning'|'review'|'mastered';
 export const masteryLabels:Record<Mastery,string>={pending:'待学',learning:'学习中',review:'待复习',mastered:'已掌握'};
-export type LearningNode={id:string;title:string;stage:string;objectives:string[];dependsOn:string[];explanation:string;citations:Source[];recall:string[];exercises:string[];notes:string;mastery:Mastery;contentRevision:number;progressRevision:number};
+export type LearningNode={id:string;visualLessonId?:string|null;title:string;stage:string;objectives:string[];dependsOn:string[];explanation:string;citations:Source[];recall:string[];exercises:string[];notes:string;mastery:Mastery;contentRevision:number;progressRevision:number};
 export type LearningCandidate={id:string;revision:number;title:string;reason:string;expectedAbility:string;state:string;citations:Source[]};
 export type LearningAttempt={id:string;nodeId:string;question:string;answer:string;feedback:string|null};
 export type TeachingHandoff={id:string;goalId:string;title:string;format:string;goalRevision:number;nodes:LearningNode[];files:{name:string;text:string}[]};

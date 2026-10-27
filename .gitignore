@@ -53,3 +53,7 @@ collector/mobile/ios/CaptureAssets/writing/
 /apps/android/local.properties
 /apps/desktop/frontend/.runtime/
 /apps/ios/*.xcresult/
+
+# Generated offline learning diagrams.
+/apps/ios/LearningVisuals/
+/apps/android/app/src/main/assets/learning-visuals/

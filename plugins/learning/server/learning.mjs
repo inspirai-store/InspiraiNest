@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {fail,string,rawString,strings,sourceKey,sourceRef,pathNodes,recommendation,masteryStates,operations,validateResult,fingerprint} from '../protocol/model.mjs';
 import {teachingPacket} from '../protocol/handoff.mjs';
 import {demoDocument} from '../protocol/demo.mjs';
-import {starterLessonUpdates} from '../protocol/starter.mjs';
+import {starterLessonUpdates,visualLessonId} from '../protocol/starter.mjs';
 import {lessonEdition} from '../protocol/lessons.mjs';
 
 const active=['queued','assigned','running','uploading','waiting_action'];
@@ -115,7 +115,7 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
           await tx.put('learning-run',{id:'curriculum-'+fingerprint([live.id,lessonEdition,live.revision]),goalId:live.id,operation:'lesson',state:'applied',baseRevision:live.revision,previousNodes:before,result:{nodes:live.nodes.filter(n=>updates.some(u=>u.id===n.id)),summary:'补全内置课程正文'},createdAt:now()});
           return save(tx,live);
         });
-        send(res,200,{...g,nextNodeId:recommendation(g),runs:(await store.list('learning-run')).filter(r=>r.goalId===g.id).map(r=>r.state==='proposed'&&r.baseStructureKey!==structureKey(g)?{...r,state:'stale'}:r),attempts:(await store.list('learning-attempt')).filter(a=>a.goalId===g.id),handoffs:(await store.list('learning-handoff')).filter(h=>h.goalId===g.id),artifacts:(await store.list('learning-artifact')).filter(a=>a.goalId===g.id),jobs:(await store.list('task')).filter(t=>t.learningGoalId===g.id).map(t=>({id:t.id,state:t.state,operation:t.learningSnapshot.operation,message:t.events?.at(-1)?.message||''}))});return true;
+        send(res,200,{...g,nodes:g.nodes.map(n=>({...n,visualLessonId:visualLessonId(n)})),nextNodeId:recommendation(g),runs:(await store.list('learning-run')).filter(r=>r.goalId===g.id).map(r=>r.state==='proposed'&&r.baseStructureKey!==structureKey(g)?{...r,state:'stale'}:r),attempts:(await store.list('learning-attempt')).filter(a=>a.goalId===g.id),handoffs:(await store.list('learning-handoff')).filter(h=>h.goalId===g.id),artifacts:(await store.list('learning-artifact')).filter(a=>a.goalId===g.id),jobs:(await store.list('task')).filter(t=>t.learningGoalId===g.id).map(t=>({id:t.id,state:t.state,operation:t.learningSnapshot.operation,message:t.events?.at(-1)?.message||''}))});return true;
       }
       if(p[0]==='artifacts'){
         const a=await store.get('learning-artifact',p[1]);if(!a)fail('教学成果不存在',404);

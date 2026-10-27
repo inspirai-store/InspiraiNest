@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import WebKit
 @testable import PersonalLibrary
 
 private final class LearningProtocol:URLProtocol {
@@ -37,6 +38,12 @@ final class LearningTests:XCTestCase {
         XCTAssertTrue(document.blocks.contains{if case .code = $0.kind{return $0.text.contains("keys.append")};return false})
         XCTAssertEqual(goal.nodes.count,15);XCTAssertEqual(Set(goal.nodes.map(\.stage)).count,7)
     }
+    func testOfflineVisualDocumentUsesOnlyKnownLessonsAndNoAppBridge()throws {
+        let html=try XCTUnwrap(LearningVisualDocument.html("kv-cache",dark:true))
+        XCTAssertTrue(html.contains("data-lesson=\"kv-cache\""));XCTAssertTrue(html.contains("data-theme=\"dark\""))
+        XCTAssertTrue(html.contains("connect-src 'none'"));XCTAssertFalse(html.contains("messageHandlers"))
+        XCTAssertNil(LearningVisualDocument.html("../outside",dark:false));XCTAssertNil(LearningVisualDocument.html("future-unsupported",dark:false))
+    }
     func testFrozenSourceBodyDecodesAlongsideLegacySources()throws {
         var value=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture()) as? [String:Any])
         value["sources"]=[["kind":"record","sourceId":"jd","version":"1","title":"岗位快照","coverage":"partial","text":"原始 JD 正文与定位"],["kind":"record","sourceId":"legacy","version":"1","title":"旧来源","coverage":"partial"]]
@@ -62,6 +69,23 @@ final class LearningTests:XCTestCase {
         for (name,view) in views{
             let host=UIHostingController(rootView:view);window.rootViewController=host;window.makeKeyAndVisible()
             try await Task.sleep(nanoseconds:700_000_000);host.view.setNeedsLayout();host.view.layoutIfNeeded()
+            if name=="learning-kv-cache"{
+                func findWeb(_ view:UIView)->WKWebView?{if let web=view as? WKWebView{return web};for child in view.subviews{if let web=findWeb(child){return web}};return nil}
+                let web=try XCTUnwrap(findWeb(host.view));var ready=false
+                for _ in 0..<40{if (try? await web.evaluateJavaScript("document.body?.dataset.ready === 'true' && document.querySelector('main').getBoundingClientRect().height > 400")) as? Bool == true{ready=true;break};try await Task.sleep(nanoseconds:250_000_000)}
+                XCTAssertTrue(ready,"Offline visual lesson must load in the native content panel")
+                let stageHeight=try await web.evaluateJavaScript("document.querySelector('figure').getBoundingClientRect().height") as? Double
+                XCTAssertGreaterThan(stageHeight ?? 0,120)
+                let visualSnapshot=try await web.takeSnapshot(configuration:nil)
+                let visualAttachment=XCTAttachment(image:visualSnapshot);visualAttachment.name="learning-visual";visualAttachment.lifetime = .keepAlways;add(visualAttachment)
+                XCTAssertFalse(web.configuration.websiteDataStore.isPersistent)
+                _ = try await web.evaluateJavaScript("document.querySelector('button[data-step=\"3\"]').click()")
+                let before=try await web.evaluateJavaScript("document.querySelector('figure').textContent") as? String
+                XCTAssertTrue(before?.contains("1 GiB") == true)
+                _ = try await web.evaluateJavaScript("document.querySelector('button[data-param=\"batch\"][data-value=\"4\"]').click()")
+                let after=try await web.evaluateJavaScript("document.querySelector('figure').textContent") as? String
+                XCTAssertTrue(after?.contains("4 GiB") == true)
+            }
             func editableTextViews(_ view:UIView)->Int{(view is UITextView && (view as? UITextView)?.isEditable == true ? 1:0)+view.subviews.reduce(0){$0+editableTextViews($1)}}
             XCTAssertEqual(editableTextViews(host.view),0,"Default learning pages must not expose empty text editors")
             let image=UIGraphicsImageRenderer(bounds:window.bounds).image{_ in window.drawHierarchy(in:window.bounds,afterScreenUpdates:true)}
