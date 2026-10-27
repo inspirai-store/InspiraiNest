@@ -25,7 +25,7 @@
     "build:all": "npm run plugins:check && npm run build && npm run build:web",
     "check:boundaries": "node tooling/plugins/check-boundaries.mjs",
     "typecheck": "tsc --noEmit -p apps/desktop/frontend/tsconfig.json",
-    "build:native-assets": "node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs",
+    "build:native-assets": "node collector/scripts/stage-writing.mjs && node collector/scripts/stage-capture.mjs && node tooling/learning/stage-visuals.mjs",
     "build:worker-template": "node collector/scripts/stage-worker-template.mjs",
     "build:brand-icons": "node collector/scripts/build-brand-icons.mjs",
     "build:macos-tray-icon": "node collector/scripts/build-macos-tray-icon.mjs",

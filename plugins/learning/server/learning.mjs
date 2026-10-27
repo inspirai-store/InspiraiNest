@@ -2,6 +2,8 @@ import {randomUUID} from 'node:crypto';
 import {fail,string,rawString,strings,sourceKey,sourceRef,pathNodes,recommendation,masteryStates,operations,validateResult,fingerprint} from '../protocol/model.mjs';
 import {teachingPacket} from '../protocol/handoff.mjs';
 import {demoDocument} from '../protocol/demo.mjs';
+import {starterLessonUpdates,visualLessonId} from '../protocol/starter.mjs';
+import {lessonEdition} from '../protocol/lessons.mjs';
 
 const active=['queued','assigned','running','uploading','waiting_action'];
 const structureKey=g=>fingerprint([g.title,g.foundation,g.expectedAbility,g.state,g.nodes.map(n=>[n.id,n.contentRevision,n.dependsOn]),g.sources.map(sourceKey)]);
@@ -34,7 +36,7 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
     if(!operations.includes(operation))fail('学习任务类型错误');
     const snapshot={operation,goal:g?structuredClone(g):null,sources,...extra};
     const key=fingerprint(snapshot);
-    const existing=(await tx.list('task')).find(t=>t.pluginId==='learning'&&t.learningKey===key&&active.includes(t.state));
+    const existing=(await tx.list('task')).find(t=>t.pluginId==='learning'&&active.includes(t.state)&&(t.learningKey===key||operation==='feedback'&&t.learningSnapshot?.attemptId===extra.attemptId));
     if(existing)return existing;
     const task={id:randomUUID(),pluginId:'learning',purpose:'learning-assist',learningKey:key,learningGoalId:g?.id||null,learningSnapshot:snapshot,type:'note',url:null,autoArchive:false,createdAt:now(),deviceId:null,archiveId:null,content:`新知 · ${{extract:'提取学习目标',path:'构建学习路径',lesson:'生成概念讲解',feedback:'练习反馈',frontier:'更新前沿'}[operation]}${g?'：'+g.title:''}`};
     await saveTask(task,'queued','等待电脑处理学习任务',tx);return {id:task.id,state:'queued'};
@@ -102,8 +104,18 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
       if(!p.length){const goals=await store.list('learning-goal');send(res,200,{goals:goals.map(g=>({...g,sources:g.sources.map(sourceRef),retiredNodes:[],nodes:g.nodes.map(n=>({...n,explanation:''})),nextNodeId:recommendation(g)})),candidates:(await store.list('learning-candidate')).map(c=>({...c,sources:c.sources.map(sourceRef)}))});return true;}
       if(p[0]==='sources'){send(res,200,{items:(await readSourceIndex()).map(s=>({...sourceRef(s),key:sourceKey(s)}))});return true;}
       if(p[0]==='goals'){
-        const g=await store.get('learning-goal',p[1]);if(!g)fail('学习目标不存在',404);
-        send(res,200,{...g,nextNodeId:recommendation(g),runs:(await store.list('learning-run')).filter(r=>r.goalId===g.id).map(r=>r.state==='proposed'&&r.baseStructureKey!==structureKey(g)?{...r,state:'stale'}:r),attempts:(await store.list('learning-attempt')).filter(a=>a.goalId===g.id),handoffs:(await store.list('learning-handoff')).filter(h=>h.goalId===g.id),artifacts:(await store.list('learning-artifact')).filter(a=>a.goalId===g.id),jobs:(await store.list('task')).filter(t=>t.learningGoalId===g.id).map(t=>({id:t.id,state:t.state,operation:t.learningSnapshot.operation,message:t.events?.at(-1)?.message||''}))});return true;
+        let g=await store.get('learning-goal',p[1]);if(!g)fail('学习目标不存在',404);
+        // Repair only unchanged built-in outlines. Preserve user text, path, progress and history.
+        if(starterLessonUpdates(g).length)g=await lock(async tx=>{
+          const live=await goal(tx,p[1]),updates=starterLessonUpdates(live);
+          if(!updates.length)return live;
+          const before=live.nodes.filter(n=>updates.some(u=>u.id===n.id));
+          const next=live.nodes.map(n=>updates.find(u=>u.id===n.id)||n);
+          live.nodes=pathNodes(next,live.sources,live.nodes);
+          await tx.put('learning-run',{id:'curriculum-'+fingerprint([live.id,lessonEdition,live.revision]),goalId:live.id,operation:'lesson',state:'applied',baseRevision:live.revision,previousNodes:before,result:{nodes:live.nodes.filter(n=>updates.some(u=>u.id===n.id)),summary:'补全内置课程正文'},createdAt:now()});
+          return save(tx,live);
+        });
+        send(res,200,{...g,nodes:g.nodes.map(n=>({...n,visualLessonId:visualLessonId(n)})),nextNodeId:recommendation(g),runs:(await store.list('learning-run')).filter(r=>r.goalId===g.id).map(r=>r.state==='proposed'&&r.baseStructureKey!==structureKey(g)?{...r,state:'stale'}:r),attempts:(await store.list('learning-attempt')).filter(a=>a.goalId===g.id),handoffs:(await store.list('learning-handoff')).filter(h=>h.goalId===g.id),artifacts:(await store.list('learning-artifact')).filter(a=>a.goalId===g.id),jobs:(await store.list('task')).filter(t=>t.learningGoalId===g.id).map(t=>({id:t.id,state:t.state,operation:t.learningSnapshot.operation,message:t.events?.at(-1)?.message||''}))});return true;
       }
       if(p[0]==='artifacts'){
         const a=await store.get('learning-artifact',p[1]);if(!a)fail('教学成果不存在',404);
@@ -206,8 +218,14 @@ export function createLearning({store,plugins,owner,assigned,authenticate,checkA
       }else if(action==='attempts'){
         const n=g.nodes.find(n=>n.id===input.nodeId);if(!n)fail('学习节点不存在',404);
         const key=string(input.requestId,'练习编号',100),old=await tx.get('learning-attempt',key);if(old){if(old.goalId!==g.id||old.nodeId!==n.id)fail('练习编号已使用',409);return old;}
-        const a={id:key,goalId:g.id,nodeId:n.id,contentRevision:n.contentRevision,answer:rawString(input.answer,'复述或练习答案',20000),question:string(input.question,'题目',4000),createdAt:now(),feedback:null};await tx.put('learning-attempt',a);
-        await queue(tx,'feedback',g,g.sources,{nodeId:n.id,attemptId:a.id,attempt:a});return a;
+        const a={id:key,goalId:g.id,nodeId:n.id,contentRevision:n.contentRevision,contentSnapshot:structuredClone(n),answer:rawString(input.answer,'复述或练习答案',20000),question:string(input.question,'题目',4000),createdAt:now(),feedback:null};await tx.put('learning-attempt',a);
+        if(input.feedback!==false)await queue(tx,'feedback',g,g.sources,{nodeId:n.id,attemptId:a.id,attempt:a});return a;
+      }else if(action==='feedback'){
+        const a=await tx.get('learning-attempt',string(input.attemptId,'练习编号',100));
+        if(!a||a.goalId!==g.id)fail('练习不存在',404);
+        if(a.feedback)return a;
+        const snapshot=a.contentSnapshot?{...g,nodes:g.nodes.map(n=>n.id===a.nodeId?a.contentSnapshot:n)}:g;
+        return queue(tx,'feedback',snapshot,g.sources,{nodeId:a.nodeId,attemptId:a.id,attempt:a});
       }else if(action==='apply'){
         const run=await tx.getForUpdate('learning-run',input.runId);if(!run||run.goalId!==g.id||run.state!=='proposed')fail('待审结果不存在或已处理',409);
         if(input.reject===true){run.state='rejected';await tx.put('learning-run',run);return g;}

@@ -426,6 +426,7 @@ export function createService({ dataDir, masterKey, storage = new LocalStorage(p
         requireValue(!relative.includes('..')&&!relative.includes('\\'),'Invalid application path',400);
         const file=path.resolve(repositoryRoot,'apps/web/dist',relative);requireValue(fs.existsSync(file)&&fs.statSync(file).isFile(),'Web 界面尚未构建',503);
         const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.pdf':'application/pdf','.mp4':'video/mp4','.webm':'video/webm'}[path.extname(file)]||'application/octet-stream';
+        if(/^learning-visuals\/(index\.html|player\.js|player\.css)$/.test(relative))res.setHeader('Content-Security-Policy',"sandbox allow-scripts; default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; frame-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'");
         res.setHeader('Content-Type',mime);return res.end(fs.readFileSync(file));
       }
 
