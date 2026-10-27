@@ -12,8 +12,8 @@ import {LearningClient} from '../../plugins/learning/web/client.ts';
 import {createLearning} from '../../plugins/learning/server/learning.mjs';
 import {canRunTask} from '../../packages/core/node/task-routing.mjs';
 
-async function fixture(t){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'nest-learning-')),key='learning-test-key-'.repeat(4),app=createService({dataDir:dir,masterKey:key});
+async function fixture(t,options={}){
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'nest-learning-')),key='learning-test-key-'.repeat(4),app=createService({dataDir:dir,masterKey:key,...options});
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
  t.after(async()=>{await app.close();fs.rmSync(dir,{recursive:true,force:true});});
  const origin='http://127.0.0.1:'+app.server.address().port;
@@ -37,6 +37,37 @@ test('candidate intake saves originals first, retains provenance, deduplicates a
  const confirmed=await request('/api/learning/candidates/'+a.body.id,{revision:1,action:'confirm',foundation:'软件工程基础'});assert.equal(confirmed.status,200);
  const g=(await request('/api/learning/goals/'+confirmed.body.goalId)).body;assert.equal(g.foundation,'软件工程基础');assert.equal(g.sources[0].sourceId,raw.id);
  assert.equal((await request('/api/learning/candidates/'+a.body.id,{revision:1,action:'confirm'})).status,409);
+});
+test('enabling learning and listing source versions never download archived payloads',async t=>{
+ let downloads=0;
+ const {app,request,toggle}=await fixture(t,{storage:{async get(){downloads++;throw Error('unexpected archive download');}}});
+ await toggle('learning',false);await app.store.delete('learning-setting','intake');
+ for(const [id,entryId,createdAt] of [['older','entry','2026-01-01'],['latest','entry','2026-01-02'],['deleted','removed','2026-01-03']])await app.store.put('archive',{id,entryId,key:id,createdAt,meta:{title:entryId,status:'archived'}});
+ await app.store.put('trash',{id:'removed',deletedAt:'2026-01-04'});
+ await app.store.put('capture',{id:'record',version:1,text:'旧记录正文',sourceUrl:'https://example.org/record'});
+ assert.equal((await toggle('learning',true)).status,200);
+ const sources=(await request('/api/learning/sources')).body.items;
+ assert.deepEqual(sources.map(s=>[s.kind,s.sourceId,s.version]).sort(),[['entry','entry','latest'],['record','record','1']]);
+ assert.equal(sources.find(s=>s.kind==='record').url,'https://example.org/record');
+ assert.equal(sources.find(s=>s.kind==='entry').coverage,'partial');
+ assert.equal((await app.store.list('learning-seen')).length,2);assert.equal(downloads,0);
+ const start=(await app.store.get('learning-setting','intake')).startedAt;
+ await app.store.put('capture',{id:'new-record',version:1,text:'停用后新增记录'});
+ await toggle('learning',false);await toggle('learning',true);
+ assert.equal((await app.store.get('learning-setting','intake')).startedAt,start);
+ assert.equal((await app.store.list('learning-seen')).length,2,'re-enabling must not mark new source versions as already seen');
+ assert.equal(downloads,0);
+});
+test('incremental intake resolves only unseen source payloads outside the write transaction',async()=>{
+ const rows=new Map(),store={async get(k,id){return structuredClone(rows.get(k+':'+id)||null);},async getForUpdate(k,id){return this.get(k,id);},async list(k){return [...rows.entries()].filter(([key])=>key.startsWith(k+':')).map(([,v])=>structuredClone(v));},async put(k,v){rows.set(k+':'+v.id,structuredClone(v));return v;},async transaction(fn){assert.equal(inTransaction,false);inTransaction=true;try{return await fn(this);}finally{inTransaction=false;}}};
+ let inTransaction=false,index=Array.from({length:234},(_,i)=>({kind:'entry',sourceId:'old-'+i,version:'v1',title:'已有资料',coverage:'partial'}));
+ const requests=[];
+ const learning=createLearning({store,plugins:{enabled:async()=>true,assertEnabled:async()=>{}},readSourceIndex:async()=>index,readSources:async keys=>{assert.equal(inTransaction,false);requests.push(keys);return index.filter(s=>keys.includes(`${s.kind}:${s.sourceId}:${s.version}`)).map(s=>({...s,text:'新资料正文'}));},saveTask:async(task,state,_message,tx)=>tx.put('task',{...task,state})});
+ await learning.initialize();await learning.scan();assert.deepEqual(requests,[]);
+ index=[...index,{kind:'record',sourceId:'new',version:'1',title:'新资料',coverage:'full'}];
+ await learning.initialize();await learning.scan();await learning.scan();
+ assert.deepEqual(requests,[['record:new:1']]);assert.equal((await store.list('task')).length,1);
+ assert.equal((await store.list('task'))[0].learningSnapshot.sources[0].text,'新资料正文');
 });
 test('path edits preserve notes and mastery, reject cycles, and retain removed node history',async t=>{
  const {request}=await fixture(t);let g=await createGoal(request);const kv=g.nodes.find(n=>n.id==='kv-cache');
