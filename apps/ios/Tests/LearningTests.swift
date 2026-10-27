@@ -30,6 +30,13 @@ final class LearningTests:XCTestCase {
         XCTAssertTrue(saved)
         do{_ = try await client.learningArtifact("../outside");XCTFail("invalid artifact accepted")}catch{}
     }
+    func testLessonsContainNativeHeadingsAndCopyableCode()throws {
+        let goal=try JSONDecoder().decode(LearningGoal.self,from:fixture())
+        let kv=try XCTUnwrap(goal.nodes.first{$0.id=="kv-cache"}),document=NativeMarkdownDocument(kv.explanation)
+        XCTAssertTrue(document.headings.contains{$0.title=="一步步估算容量"})
+        XCTAssertTrue(document.blocks.contains{if case .code = $0.kind{return $0.text.contains("keys.append")};return false})
+        XCTAssertEqual(goal.nodes.count,15);XCTAssertEqual(Set(goal.nodes.map(\.stage)).count,7)
+    }
     func testFrozenSourceBodyDecodesAlongsideLegacySources()throws {
         var value=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture()) as? [String:Any])
         value["sources"]=[["kind":"record","sourceId":"jd","version":"1","title":"岗位快照","coverage":"partial","text":"原始 JD 正文与定位"],["kind":"record","sourceId":"legacy","version":"1","title":"旧来源","coverage":"partial"]]

@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {createService} from '../../services/api/server.mjs';
 import {pathNodes,recommendation,validateResult} from '../../plugins/learning/protocol/model.mjs';
-import {starterGoal} from '../../plugins/learning/protocol/starter.mjs';
+import {starterGoal,starterOverview} from '../../plugins/learning/protocol/starter.mjs';
 import {teachingPacket,demoDocument} from '../../plugins/learning/protocol/handoff.mjs';
 import {LearningClient} from '../../plugins/learning/web/client.ts';
 import {createLearning} from '../../plugins/learning/server/learning.mjs';
@@ -28,6 +28,38 @@ async function fixture(t,options={}){
  return {app,request,toggle,assignedTask,origin};
 }
 async function createGoal(request){const g=(await request('/api/learning/goals',starterGoal())).body;return (await request('/api/learning/goals/'+g.id+'/edit',{revision:g.revision,nodes:starterGoal().nodes})).body;}
+
+test('existing built-in outlines become full lessons once, preserving user content and study records',async t=>{
+ const {app,request,assignedTask}=await fixture(t),overview=starterOverview();
+ let g=(await request('/api/learning/goals',overview)).body;
+ g=(await request('/api/learning/goals/'+g.id+'/edit',{revision:g.revision,nodes:overview.nodes})).body;
+ g=(await request('/api/learning/goals/'+g.id+'/progress',{revision:g.revision,nodeId:'kv-cache',notes:'我的缓存理解',mastery:'mastered'})).body;
+ g=(await request('/api/learning/goals/'+g.id+'/edit',{revision:g.revision,nodes:g.nodes.map(n=>n.id==='compiler'?{...n,explanation:'自己改过的编译器内容'}:n)})).body;
+ const job=(await request('/api/learning/goals/'+g.id+'/assist',{revision:g.revision,operation:'lesson',nodeId:'kv-cache'})).body,submit=await assignedTask(job.id);
+ const prior=structuredClone(g),detail=(await request('/api/learning/goals/'+g.id)).body,kv=detail.nodes.find(n=>n.id==='kv-cache');
+ assert.equal(detail.revision,prior.revision+1);assert.equal(detail.nodes.length,15);assert.equal(new Set(detail.nodes.map(n=>n.stage)).size,7);
+ assert.match(kv.explanation,/一个不依赖框架的单头计算/);assert.equal(kv.contentRevision,prior.nodes.find(n=>n.id==='kv-cache').contentRevision+1);
+ assert.equal(kv.notes,'我的缓存理解');assert.equal(kv.mastery,'mastered');assert.equal(kv.progressRevision,prior.nodes.find(n=>n.id==='kv-cache').progressRevision);
+ assert.equal(detail.nodes.find(n=>n.id==='compiler').explanation,'自己改过的编译器内容');
+ assert.deepEqual(detail.sources,prior.sources);assert.deepEqual(detail.nodes.map(n=>n.dependsOn),prior.nodes.map(n=>n.dependsOn));
+ const history=(await app.store.list('learning-run')).find(r=>r.id.startsWith('curriculum-'));
+ assert.equal(history.previousNodes.find(n=>n.id==='kv-cache').explanation,overview.nodes.find(n=>n.id==='kv-cache').explanation);
+ assert.equal((await request('/api/learning/goals/'+g.id)).body.revision,detail.revision);
+ assert.equal((await submit({protocol:1,nodes:[prior.nodes.find(n=>n.id==='kv-cache')]})).status,200);
+ assert.equal((await request('/api/learning/goals/'+g.id)).body.runs.find(r=>r.id===job.id).state,'stale');
+});
+
+test('personal practice saves without a Worker; AI feedback is explicitly requested and never controls progress',async t=>{
+ const {app,request}=await fixture(t);const g=await createGoal(request),route='/api/learning/goals/'+g.id;
+ const input={revision:g.revision,nodeId:'kv-cache',requestId:randomUUID(),question:'缓存保存了什么？',answer:'我先记录自己的理解',feedback:false};
+ const a=(await request(route+'/attempts',input)).body;
+ assert.equal((await request(route+'/attempts',input)).body.id,a.id);
+ assert.equal((await app.store.list('task')).length,0);assert.equal((await request(route)).body.nodes.find(n=>n.id==='kv-cache').mastery,'pending');
+ const first=await request(route+'/feedback',{revision:g.revision,attemptId:a.id}),again=await request(route+'/feedback',{revision:g.revision,attemptId:a.id});
+ assert.equal(first.status,200);assert.equal(first.body.id,again.body.id);assert.equal((await app.store.list('task')).length,1);
+ assert.equal((await request(route+'/feedback',{revision:g.revision,attemptId:randomUUID()})).status,404);
+ assert.equal((await request(route)).body.nodes.find(n=>n.id==='kv-cache').mastery,'pending');
+});
 
 test('candidate intake saves originals first, retains provenance, deduplicates and requires confirmation',async t=>{
  const {app,request}=await fixture(t),input={requestId:randomUUID(),text:'  私密职位要求：理解 KV Cache 与集合通信。\n原始缩进与结尾保留。  ',title:'AI 系统能力',manual:true};

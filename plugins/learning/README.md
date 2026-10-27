@@ -8,17 +8,13 @@
 
 学习节点可编辑、调整顺序、设置先修关系和移除；移除的笔记与进度保留在历史节点中。掌握状态由用户选择，复述反馈、阅读和视频播放均不会代替用户确认。练习记录固定内容版本。并发修改使用目标 revision；跨资料空间的迟到请求与结果被客户端隔离。
 
-教学任务包为 ZIP，含 TASK.md、learning-handoff.json 和选定来源快照。视频与 Web 演示使用同一交接协议，首版由用户交给 Claude Code 或其他工具执行。导入文件先保存为核心媒体，再关联 handoffId、nodeId 和冻结版本。HTML 演示使用不带应用桥接的隔离页面；临时预览票据绑定授权设备，5 分钟到期，撤销设备后不可用。服务端与 iframe 同时施加 sandbox；演示不能访问应用数据或联网。
+## 个人学习
 
-博客交接只使用选定节点的讲解与引用；个人笔记、教学附件由用户选择包含。原始 JD 与聊天不会自动进入稿件。重复交接固定内容返回同一草稿任务，不发布文章。
+首页使用目标卡片，路径按阶段组织。进入节点直接阅读完整学习内容，包含原理、具体算例、动手步骤和适用边界。7 阶段、15 节点的内置课程从张量与 Attention 展开，覆盖推理、单卡、编译、分布式、后训练和适配。内容维护与技术核验见 CONTENT.md，不在阅读页面展示来源快照、引用目录、教学成果或制作/博客交接。
 
-iOS 与 Android 提供目标收集、候选确认、阶段阅读、练习、笔记、掌握状态和视频/HTML 成果预览。桌面与 Web 管理完整路径和教学交接。
+节点只有“内容、练习、笔记”三个面板。回答和笔记主动点击才展开；保存回答不启动 AI 作业，按需选择“AI 帮我看看”。学习状态由用户自己选择，进入下一节不需要做题或标记掌握。原生端复用原生 Markdown 解析器显示标题、列表和代码。
 
-### 卡片与按需输入
-
-首页展示目标卡片、进度和下一节点；通过“添加材料”选择资料、文件或粘贴内容，来源支持搜索、多选和分批显示。标题沿用来源或文件名称，补充说明按需展开。候选默认只读，建立目标、加入已有目标和忽略都通过按钮完成，主动修改才打开编辑器。
-
-路径按阶段组织节点卡片，节点分为概念、练习、笔记和成果。复述与笔记在点击“开始回答”“记下理解”后编辑；取消不改写已保存内容。四种掌握状态由用户主动选择。管理操作收进“更多”；桌面/Web 的视频、Web 演示和博客交接采用动作卡片。原生端继续使用现有原生入口，直接读取已冻结的来源正文。
+添加材料继续支持资料卡片、文件和粘贴；名称复用已有信息。来源版本内部保留，候选卡片直接展示学习目标与内容。旧版导入的内置概述在首次打开时补全为课程正文，只替换精确匹配的未修改文本，旧正文保留在修订记录；路径、笔记和进度不变。不新增集合，不删除历史来源或附件。历史教学/写作接口仅保留协议兼容，不再出现在新知 UI。
 
 ## API
 
@@ -32,7 +28,8 @@ iOS 与 Android 提供目标收集、候选确认、阶段阅读、练习、笔�
 | GET | `/api/learning/goals/:id` | 路径、进度、练习、待审结果、成果与作业 |
 | POST | `/api/learning/goals/:id/edit` | 目标及路径编辑 |
 | POST | `/api/learning/goals/:id/progress` | 节点掌握状态或笔记 |
-| POST | `/api/learning/goals/:id/attempts` | 保存复述/练习并排队反馈 |
+| POST | `/api/learning/goals/:id/attempts` | 保存复述/练习；新客户端使用 feedback:false，不排队反馈 |
+| POST | `/api/learning/goals/:id/feedback` | 用户按需请求已有回答的 AI 反馈 |
 | POST | `/api/learning/goals/:id/assist` | path、lesson、frontier |
 | POST | `/api/learning/goals/:id/apply` | 审阅结果的应用或拒绝 |
 | POST | `/api/learning/goals/:id/teaching` | 冻结教学包 |
@@ -60,4 +57,4 @@ node tooling/learning/import-starter.mjs --connection /absolute/path/connection.
 
 验证命令：`npm test`、`npm run build:all`、`npm run build:native-assets`，以及现有 Android Gradle 与 iOS XcodeGen/XCTest 流程。构建、GUI、签名、真机和发布分别验收。
 
-卡片交互的独立验收服务：`node tooling/learning/cards-review-server.mjs`。它创建临时空间、15 节点路径、两份示例快照和 234 条来源卡片，不连接生产；临时登录信息只保存在忽略的 `artifacts/learning/cards/review-connection.json`。iOS `LearningTests` 检查来源兼容、默认无空编辑器和手机/平板布局；Android `NativeComposeFlowTest#learningCardsKeepWritingOptionalAndPreserveSnapshots` 验证来源阅读、按需笔记、取消和用户确认掌握。签名发行包、真机和 Beta 分发仍需单独验收。
+卡片交互的独立验收服务：`node tooling/learning/cards-review-server.mjs`。它创建临时空间、15 节点路径、两份示例快照和 234 条来源卡片，不连接生产；临时登录信息只保存在忽略的 `artifacts/learning/cards/review-connection.json`。iOS `LearningTests` 检查来源兼容、默认无空编辑器和手机/平板布局；Android `NativeComposeFlowTest#learningCardsKeepWritingOptionalAndPreserveSnapshots` 验证正文阅读、隐藏来源与成果、按需笔记、取消和用户确认掌握。签名发行包、真机和 Beta 分发仍需单独验收。

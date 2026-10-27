@@ -1,5 +1,7 @@
-// A reusable curriculum. Personal JDs and source manuscripts are imported at runtime.
-export function starterGoal(){
+import {lessons} from './lessons.mjs';
+
+// Kept for exact-match upgrades of the original built-in outlines. User edits never match.
+export function starterOverview(){
   const data=[
     ['tensors','模型与执行基础','张量与模型执行',[],['解释张量形状、数据类型和算子调用','区分训练、推理和自动微分'],'从一个线性层开始：输入张量与权重做矩阵乘法，再应用激活函数。模型框架负责组织算子，设备运行时安排实际执行。先记录每一步的输入输出形状，再讨论速度与显存。','为什么形状、精度和布局都会影响执行？','用一个两层网络列出张量形状与中间结果。'],
     ['transformer','模型与执行基础','Transformer 与 Attention',['tensors'],['解释 Q K V、因果掩码和注意力计算','描述一次生成请求的数据流'],'注意力用当前位置的 Query 与历史 Key 计算相关性，再汇总 Value。因果掩码限制信息访问范围。生成时通常逐步产生新 token，需要同时理解数学运算和执行时序。','Q、K、V 分别解决什么问题？','画出从输入 token 到下一个 token 的计算过程。'],
@@ -18,4 +20,16 @@ export function starterGoal(){
     ['frontier','前沿延伸','前沿论文与版本演进',['architecture'],['将新技术映射回已有原理和瓶颈','判断适用条件与复现要求'],'主动更新时读取官方文档、原始论文与版本变更。先说明新方法改变哪一层、依赖什么条件，再设计与已有基线的比较。','新论文的结论能否直接迁移到当前硬件与负载？','选择一项新方法，整理假设、版本、复现条件与未覆盖场景。']
   ];
   return {title:'AI 基础软件架构师',expectedAbility:'能够解释、定位并验证大模型训推系统中的计算、显存、算子、编译和通信问题，形成可维护的架构方案。',foundation:'已有软件工程基础，从大模型系统开始；数学、编程和操作系统知识按节点需要补充。',nodes:data.map(([id,stage,title,dependsOn,objectives,explanation,recall,exercise])=>({id,stage,title,dependsOn,objectives,explanation,citations:[],recall:[recall],exercises:[exercise]}))};
+}
+
+export function starterGoal(){
+  const goal=starterOverview();
+  return {...goal,nodes:goal.nodes.map(n=>({...n,explanation:lessons[n.id]}))};
+}
+
+export function starterLessonUpdates(goal){
+  if(goal.title!=='AI 基础软件架构师')return [];
+  const old=starterOverview().nodes;
+  return goal.nodes.filter(n=>old.some(p=>p.id===n.id&&p.title===n.title&&p.explanation===n.explanation))
+    .map(n=>({...n,explanation:lessons[n.id]}));
 }

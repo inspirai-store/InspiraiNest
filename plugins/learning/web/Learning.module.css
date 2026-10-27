@@ -16,3 +16,4 @@
 .goalGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:20px}
 
 .dialog{height:auto!important;overflow:hidden!important}.dialogBody{overflow:auto;min-height:0;max-height:calc(100dvh - 250px);padding:4px}.dialog>footer{height:auto;min-height:36px;flex-wrap:wrap}.dialog>div.dialogBody{margin:0}.reading{scroll-margin-top:8px}
+.article>p,.article>ul,.article>ol{margin:0 0 16px}.article h2{margin:28px 0 14px;line-height:1.45}.article h3{margin:24px 0 12px}.article>:last-child{margin-bottom:0}
